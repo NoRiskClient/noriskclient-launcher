@@ -1,12 +1,9 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth;
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
-use crate::utils::hash_utils;
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs;
 
 /// Represents a datapack found in the profile directory
@@ -120,31 +117,6 @@ pub async fn get_datapacks_dir(profile: &Profile) -> Result<PathBuf> {
         datapacks_dir.display()
     );
     Ok(datapacks_dir)
-}
-
-/// Check if a path is a datapack file
-fn is_datapack_file(path: &Path) -> bool {
-    if !path.is_file() {
-        debug!("Skipping non-file path: {}", path.display());
-        return false;
-    }
-
-    let file_name = match path.file_name().and_then(|s| s.to_str()) {
-        Some(name) => name,
-        None => {
-            debug!("Path has no valid filename: {}", path.display());
-            return false;
-        }
-    };
-
-    // Check for .zip or .zip.disabled extension
-    let is_zip = file_name.ends_with(".zip") || file_name.ends_with(".zip.disabled");
-    if is_zip {
-        debug!("File confirmed as data pack (zip): {}", path.display());
-    } else {
-        debug!("File is not a data pack (not a zip): {}", path.display());
-    }
-    return is_zip;
 }
 
 /// Update a data pack from Modrinth to a new version

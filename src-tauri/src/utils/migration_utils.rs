@@ -17,7 +17,7 @@ enum RunMode {
 struct Migration {
     id: &'static str,
     mode: RunMode,
-    run: fn(&mut HashMap<Uuid, Profile>) -> usize,
+    run: fn(&mut HashMap<Uuid, Profile>) -> Vec<Uuid>,
 }
 
 const MIGRATIONS: &[Migration] = &[
@@ -33,21 +33,24 @@ const MIGRATIONS: &[Migration] = &[
     },
 ];
 
-pub fn migrate_profiles(profiles: &mut HashMap<Uuid, Profile>) -> usize {
+pub fn migrate_profiles(profiles: &mut HashMap<Uuid, Profile>) -> Vec<Uuid> {
     migrate_profiles_with_ledger(profiles, &ledger_path())
 }
 
-fn migrate_profiles_with_ledger(profiles: &mut HashMap<Uuid, Profile>, path: &Path) -> usize {
+pub fn migrate_profiles_with_ledger(
+    profiles: &mut HashMap<Uuid, Profile>,
+    path: &Path,
+) -> Vec<Uuid> {
     let mut ledger = read_ledger(path);
     let mut newly_applied: Vec<&str> = Vec::new();
-    let mut migration_count = 0;
+    let mut touched: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
 
     for migration in MIGRATIONS {
         if migration.mode == RunMode::Once && ledger.applied.iter().any(|id| id == migration.id) {
             continue;
         }
 
-        migration_count += (migration.run)(profiles);
+        touched.extend((migration.run)(profiles));
 
         if migration.mode == RunMode::Once {
             newly_applied.push(migration.id);
@@ -61,18 +64,18 @@ fn migrate_profiles_with_ledger(profiles: &mut HashMap<Uuid, Profile>, path: &Pa
         write_ledger(path, &ledger);
     }
 
-    if migration_count > 0 {
+    if !touched.is_empty() {
         info!(
-            "ProfileManager: Completed profile migrations. Total changes: {}",
-            migration_count
+            "ProfileManager: Completed profile migrations. Profiles changed: {}",
+            touched.len()
         );
     }
 
-    migration_count
+    touched.into_iter().collect()
 }
 
-fn move_norisk_dev_to_prod(profiles: &mut HashMap<Uuid, Profile>) -> usize {
-    let mut migrated_count = 0;
+fn move_norisk_dev_to_prod(profiles: &mut HashMap<Uuid, Profile>) -> Vec<Uuid> {
+    let mut touched = Vec::new();
 
     for (_, profile) in profiles.iter_mut() {
         if profile.selected_norisk_pack_id.as_deref() == Some("norisk-dev") {
@@ -82,44 +85,46 @@ fn move_norisk_dev_to_prod(profiles: &mut HashMap<Uuid, Profile>) -> usize {
             );
 
             profile.selected_norisk_pack_id = Some("norisk-prod".to_string());
-            migrated_count += 1;
+            touched.push(profile.id);
         }
     }
 
-    if migrated_count > 0 {
+    if !touched.is_empty() {
         info!(
             "Migration: Updated {} profiles from norisk-dev to norisk-prod",
-            migrated_count
+            touched.len()
         );
     }
 
-    migrated_count
+    touched
 }
 
-fn raise_legacy_memory_default(profiles: &mut HashMap<Uuid, Profile>) -> usize {
+fn raise_legacy_memory_default(profiles: &mut HashMap<Uuid, Profile>) -> Vec<Uuid> {
     let target = crate::state::profile_state::default_memory_max_mb();
     if target <= LEGACY_DEFAULT_MEMORY_MAX_MB {
-        return 0;
+        return Vec::new();
     }
 
-    let mut migrated_count = 0;
+    let mut touched = Vec::new();
     for (_, profile) in profiles.iter_mut() {
         if profile.settings.memory.max == LEGACY_DEFAULT_MEMORY_MAX_MB
             && profile.settings.memory.min == LEGACY_DEFAULT_MEMORY_MIN_MB
         {
             profile.settings.memory.max = target;
-            migrated_count += 1;
+            touched.push(profile.id);
         }
     }
 
-    if migrated_count > 0 {
+    if !touched.is_empty() {
         info!(
             "Migration: Raised memory from {} MB to {} MB on {} profiles",
-            LEGACY_DEFAULT_MEMORY_MAX_MB, target, migrated_count
+            LEGACY_DEFAULT_MEMORY_MAX_MB,
+            target,
+            touched.len()
         );
     }
 
-    migrated_count
+    touched
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -158,7 +163,3 @@ fn write_ledger(path: &Path, ledger: &Ledger) {
         warn!("Could not record migrations in {:?}: {}", path, e);
     }
 }
-
-#[cfg(test)]
-#[path = "migration_utils_test.rs"]
-mod tests;

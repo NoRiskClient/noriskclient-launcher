@@ -95,6 +95,13 @@ export function useGlobalDragAndDrop() {
           
           const payload = event.payload as WebviewDragDropPayload;
 
+          if (useAppDragDropStore.getState().syncPacksDropActive) {
+            if (payload.type === 'drop' || payload.type === 'leave') {
+              useAppDragDropStore.getState().setDragHover(null);
+            }
+            return;
+          }
+
           if (payload.type === 'enter') {
             const hoveredPaths = payload.paths ?? [];
             useAppDragDropStore.getState().setDragHover({

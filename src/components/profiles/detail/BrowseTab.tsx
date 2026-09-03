@@ -16,6 +16,7 @@ import { ActionButtons, type ActionButton } from "../../ui/ActionButtons";
 import * as ProfileService from "../../../services/profile-service";
 import type { ModrinthProjectType } from "../../../types/modrinth";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import { loaderIconSrc } from "../../../lib/loader-icons";
 
 interface BrowseTabProps {
   profile?: Profile;
@@ -106,21 +107,7 @@ export function BrowseTab({
 
 
   // Get mod loader icon
-  const getModLoaderIcon = () => {
-    if (!currentProfile) return "/icons/minecraft.png";
-    switch (currentProfile.loader) {
-      case "fabric":
-        return "/icons/fabric.png";
-      case "forge":
-        return "/icons/forge.png";
-      case "quilt":
-        return "/icons/quilt.png";
-      case "neoforge":
-        return "/icons/neoforge.png";
-      default:
-        return "/icons/minecraft.png";
-    }
-  };
+  const getModLoaderIcon = () => loaderIconSrc(currentProfile?.loader);
 
   // Handle back navigation
   const handleBack = () => {

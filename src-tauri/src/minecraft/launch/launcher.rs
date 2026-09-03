@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::ClasspathBuilder;
@@ -7,13 +8,9 @@ use crate::minecraft::GameArguments;
 use crate::minecraft::JvmArguments;
 use crate::state::profile_state::{ImageSource, Profile, ProfileBanner, WindowSize};
 use crate::state::state_manager::State;
-use log::{debug, error, info, warn};
-use serde_json::Value;
-use std::collections::HashMap;
+use log::{info, warn};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Instant;
-use tauri::Manager;
+use std::process::Command;
 use uuid::Uuid;
 
 pub struct MinecraftLaunchParameters {
@@ -29,6 +26,7 @@ pub struct MinecraftLaunchParameters {
     pub resolution: Option<WindowSize>,
     pub quick_play_singleplayer: Option<String>,
     pub quick_play_multiplayer: Option<String>,
+    pub mod_resolution: Option<ModResolutionReport>,
 }
 
 impl MinecraftLaunchParameters {
@@ -46,7 +44,13 @@ impl MinecraftLaunchParameters {
             resolution: None,
             quick_play_singleplayer: None,
             quick_play_multiplayer: None,
+            mod_resolution: None,
         }
+    }
+
+    pub fn with_mod_resolution(mut self, report: ModResolutionReport) -> Self {
+        self.mod_resolution = Some(report);
+        self
     }
 
     pub fn with_main_class(mut self, main_class: &str) -> Self {
@@ -109,7 +113,7 @@ impl MinecraftLaunchParameters {
 /// Returns None if the banner is None or cannot be resolved.
 fn resolve_profile_banner_path(
     banner: &Option<ProfileBanner>,
-    profile_id: Uuid,
+    _profile_id: Uuid,
     profile_path: &Path,
 ) -> Option<String> {
     let banner = banner.as_ref()?;
@@ -177,7 +181,7 @@ impl MinecraftLauncher {
         piston_meta: &PistonMeta,
     ) -> Option<Vec<String>> {
         minecraft_arguments.map(|args_string| {
-            info!("\nProcessing old format arguments (with advanced splitting):");
+            info!("Processing old format arguments (with advanced splitting):");
 
             // 1. Create the helper to resolve variables
             let game_args_resolver = GameArguments::new(
@@ -220,7 +224,7 @@ impl MinecraftLauncher {
         // Arguments
         let mut args_iter = command.get_args().peekable();
         while let Some(arg_os_str) = args_iter.next() {
-            let mut arg_str = arg_os_str.to_string_lossy().into_owned();
+            let arg_str = arg_os_str.to_string_lossy().into_owned();
 
             if arg_str.starts_with("-Dnorisk.token=") {
                 parts.push("-Dnorisk.token=*****".to_string());
@@ -304,7 +308,7 @@ impl MinecraftLauncher {
         );
 
         // Process and add JVM arguments
-        info!("\nProcessing JVM arguments:");
+        info!("Processing JVM arguments:");
         let mut has_classpath = false;
         let mut has_natives = false;
 
@@ -590,9 +594,19 @@ impl MinecraftLauncher {
         };
         // Snapshot mod manifest (incl. disabled) for crash analysis.
         let crash_mods = match &profile {
-            Some(p) => crate::state::process_state::build_crash_mod_manifest(p, &state).await,
+            Some(p) => {
+                crate::state::process_state::build_crash_mod_manifest(
+                    p,
+                    &state,
+                    params.mod_resolution.as_ref(),
+                )
+                .await
+            }
             None => Vec::new(),
         };
+        let crash_modpack = profile
+            .as_ref()
+            .and_then(crate::state::process_state::crash_modpack_info);
         let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name, profile_image_url) =
             match profile {
                 Some(p) => {
@@ -643,6 +657,7 @@ impl MinecraftLauncher {
                 post_exit_hook,
                 params.memory_max_mb,
                 crash_mods,
+                crash_modpack,
             )
             .await?;
 

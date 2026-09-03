@@ -15,13 +15,9 @@ use tokio::fs;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-#[cfg(test)]
-#[path = "export_utils_test.rs"]
-mod tests;
-
 pub(crate) const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 pub(crate) const OVERRIDES_DIR_NAME: &str = "overrides";
-pub(crate) const OVERRIDES_MODS_PREFIX: &str = "overrides/mods/";
+pub const OVERRIDES_MODS_PREFIX: &str = "overrides/mods/";
 
 const NEVER_EXPORTABLE_PREFIXES: &[&str] = &[
     "profile.json",
@@ -67,7 +63,7 @@ pub(crate) struct ExportEntry {
     pub zip_path: String,
 }
 
-pub(crate) fn normalize_loader_version(version: &str, game_version: &str) -> String {
+pub fn normalize_loader_version(version: &str, game_version: &str) -> String {
     let trimmed = version.trim();
     let bare = trimmed.split_whitespace().next().unwrap_or(trimmed);
     let stripped = bare
@@ -114,13 +110,13 @@ pub(crate) async fn resolve_export_loader_version(
     })
 }
 
-pub(crate) fn relative_zip_path(base: &Path, path: &Path) -> Option<String> {
+pub fn relative_zip_path(base: &Path, path: &Path) -> Option<String> {
     path.strip_prefix(base)
         .ok()
         .map(|rel| rel.to_string_lossy().replace('\\', "/"))
 }
 
-pub(crate) async fn select_export_files(
+pub async fn select_export_files(
     instance_path: &Path,
     include_files: Option<&Vec<PathBuf>>,
 ) -> Result<Vec<PathBuf>> {
@@ -304,7 +300,7 @@ async fn emit_export_progress(
 }
 
 /// Collect all files recursively (like Modrinth's add_all_recursive_folder_paths)
-pub(crate) fn collect_all_files_recursive<'a>(
+pub fn collect_all_files_recursive<'a>(
     dir_path: &'a Path,
     file_list: &'a mut Vec<PathBuf>,
 ) -> BoxFuture<'a, Result<()>> {
@@ -358,7 +354,7 @@ fn collect_files_guarded<'a>(
     })
 }
 
-pub(crate) fn override_zip_path(rel_path: &str) -> Option<String> {
+pub fn override_zip_path(rel_path: &str) -> Option<String> {
     let is_excluded = NEVER_EXPORTABLE_PREFIXES
         .iter()
         .any(|prefix| rel_path.starts_with(prefix))

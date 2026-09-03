@@ -52,8 +52,11 @@ import ChildProtectionModal from "./components/modals/ChildProtectionModal";
 import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
+import { useWelcomeStore } from "./store/welcome-store";
+import { WelcomeScreen } from "./components/welcome/WelcomeScreen";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
+import { invalidatePlayerAppearance } from "./services/cosmetic-cache";
 import { hasPermission, refreshPermissions } from "./services/permission-service";
 import {
   fetchTesterQueueCount,
@@ -82,6 +85,21 @@ export function App() {
   const { showModal, hideModal } = useGlobalModal();
   const { activeAccount } = useMinecraftAuthStore();
   const { fetchNotifications } = useNotificationStore();
+
+  // The welcome screen covers the whole app, so the account list has to be
+  // loaded here — its usual trigger sits inside AppLayout's header, behind the
+  // overlay. `accountsLoaded` keeps the screen from flashing up during the
+  // first fetch, when there is legitimately no active account yet.
+  const initializeAccounts = useMinecraftAuthStore((s) => s.initializeAccounts);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  useEffect(() => {
+    initializeAccounts().finally(() => setAccountsLoaded(true));
+  }, [initializeAccounts]);
+
+  const welcomeSkipped = useWelcomeStore((s) => s.skipped);
+  // Terms come first: stacking the welcome screen over that modal would hide it.
+  const showWelcome =
+    hasAcceptedTermsOfService && accountsLoaded && !activeAccount && !welcomeSkipped;
 
   const activeTab = location.pathname.substring(1) || "play";
 
@@ -150,6 +168,7 @@ export function App() {
               event.payload.event_type === FrontendEventType.MinecraftSkinChanged
           ) {
             console.log("[App.tsx] Global MinecraftSkinChanged event");
+            invalidatePlayerAppearance();
             useSkinStore.getState().bumpSkinRevision();
             return;
           }
@@ -564,6 +583,7 @@ export function App() {
         <ImportPackConfirmModal />
         <DragDropOverlay />
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
+        {showWelcome && <WelcomeScreen />}
         <GlobalModalPortal />
         <ChildProtectionModal />
         <NotificationModal />

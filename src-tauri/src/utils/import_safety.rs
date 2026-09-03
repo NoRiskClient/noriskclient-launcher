@@ -9,8 +9,8 @@ use std::path::{Component, Path, PathBuf};
 
 const ALLOWED_CONTENT_EXTENSIONS: &[&str] = &["jar", "zip"];
 
-const MODRINTH_HOSTS: &[&str] = &["cdn.modrinth.com"];
-const CURSEFORGE_HOSTS: &[&str] = &[
+pub const MODRINTH_HOSTS: &[&str] = &["cdn.modrinth.com"];
+pub const CURSEFORGE_HOSTS: &[&str] = &[
     "edge.forgecdn.net",
     "mediafilez.forgecdn.net",
     "media.forgecdn.net",
@@ -130,11 +130,10 @@ pub fn safe_file_component(name: &str) -> Result<String> {
     Ok(cleaned)
 }
 
-pub fn sanitize_imported_profile(profile: &mut Profile) -> ImportSecurityReport {
-    let mut report = ImportSecurityReport::default();
-
-    let claimed = std::mem::take(&mut profile.settings);
-
+pub fn sanitize_settings(
+    claimed: ProfileSettings,
+    report: &mut ImportSecurityReport,
+) -> ProfileSettings {
     if claimed.use_custom_java_path || claimed.java_path.is_some() {
         report.stripped_java_path = claimed
             .java_path
@@ -159,11 +158,13 @@ pub fn sanitize_imported_profile(profile: &mut Profile) -> ImportSecurityReport 
         report.stripped_quick_play_path = Some(path.clone());
     }
 
-    let mut settings = ProfileSettings::default();
-    settings.memory = claimed.memory;
-    settings.resolution = claimed.resolution;
-    settings.fullscreen = claimed.fullscreen;
-    settings.use_overwrite_loader_version = claimed.use_overwrite_loader_version;
+    let mut settings = ProfileSettings {
+        memory: claimed.memory,
+        resolution: claimed.resolution,
+        fullscreen: claimed.fullscreen,
+        use_overwrite_loader_version: claimed.use_overwrite_loader_version,
+        ..ProfileSettings::default()
+    };
 
     match claimed.overwrite_loader_version.as_deref() {
         Some(v) if !is_version_like(v) => {
@@ -178,7 +179,14 @@ pub fn sanitize_imported_profile(profile: &mut Profile) -> ImportSecurityReport 
         .filter(|(_, v)| is_version_like(v))
         .collect();
 
-    profile.settings = settings;
+    settings
+}
+
+pub fn sanitize_imported_profile(profile: &mut Profile) -> ImportSecurityReport {
+    let mut report = ImportSecurityReport::default();
+
+    let claimed = std::mem::take(&mut profile.settings);
+    profile.settings = sanitize_settings(claimed, &mut report);
 
     let mut kept: Vec<Mod> = Vec::with_capacity(profile.mods.len());
     for mod_info in std::mem::take(&mut profile.mods) {
@@ -207,7 +215,7 @@ pub fn sanitize_imported_profile(profile: &mut Profile) -> ImportSecurityReport 
     report
 }
 
-fn strip_profile_flags(profile: &mut Profile, report: &mut ImportSecurityReport) {
+pub(crate) fn strip_profile_flags(profile: &mut Profile, report: &mut ImportSecurityReport) {
     if profile.is_standard_version {
         profile.is_standard_version = false;
         report
@@ -224,6 +232,11 @@ fn strip_profile_flags(profile: &mut Profile, report: &mut ImportSecurityReport)
         report
             .stripped_profile_flags
             .push("preferred_account_id".to_string());
+    }
+    if !std::mem::take(&mut profile.sync_pack_ids).is_empty() {
+        report
+            .stripped_profile_flags
+            .push("sync_pack_ids".to_string());
     }
     profile.playtime_seconds = 0;
 
@@ -339,7 +352,7 @@ fn inspect_mod(mod_info: &Mod, report: &mut ImportSecurityReport) -> std::result
     Ok(())
 }
 
-fn check_content_file_name(name: &str) -> std::result::Result<(), String> {
+pub fn check_content_file_name(name: &str) -> std::result::Result<(), String> {
     let cleaned = safe_file_component(name).map_err(|e| e.to_string())?;
     let extension = std::path::Path::new(&cleaned)
         .extension()
@@ -367,7 +380,7 @@ fn require_https(url: &str) -> std::result::Result<String, String> {
         .ok_or_else(|| format!("'{}' has no host", url))
 }
 
-fn require_host(
+pub fn require_host(
     url: &str,
     allowed: &[&str],
     platform: &str,
@@ -387,14 +400,10 @@ fn is_coordinate_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+')
 }
 
-fn is_version_like(value: &str) -> bool {
+pub fn is_version_like(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
         && value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+'))
 }
-
-#[cfg(test)]
-#[path = "import_safety_test.rs"]
-mod tests;

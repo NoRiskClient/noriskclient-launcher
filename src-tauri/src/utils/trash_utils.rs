@@ -141,7 +141,7 @@ async fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
 /// Returns the number of items (wrapper directories) removed.
 pub async fn purge_expired(max_age_seconds: u64) -> Result<u64> {
     let trash_root = ensure_trash_dir(None).await?;
-    let now = Utc::now();
+    let _now = Utc::now();
     let mut removed: u64 = 0;
 
     let mut cat_iter = fs::read_dir(&trash_root).await.map_err(AppError::Io)?;

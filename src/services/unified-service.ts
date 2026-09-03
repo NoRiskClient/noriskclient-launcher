@@ -18,6 +18,11 @@ import type { SwitchContentVersionPayload, ContentType } from "../types/content"
 import type { LocalContentItem } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 
+export interface BatchUpdateResult {
+    applied: number[];
+    failed: number[];
+}
+
 class UnifiedService {
     static async searchMods(params: UnifiedModSearchParams): Promise<UnifiedModSearchResponse> {
         return invoke<UnifiedModSearchResponse>("search_mods_unified_command", { params });
@@ -38,20 +43,40 @@ class UnifiedService {
         });
     }
 
+    static buildSwitchContentVersionPayload(
+        profileId: string,
+        contentType: ContentType,
+        currentItem: LocalContentItem,
+        newVersion: UnifiedVersion
+    ): SwitchContentVersionPayload {
+        return {
+            profile_id: profileId,
+            content_type: contentType,
+            current_item_details: { ...currentItem, path_str: currentItem.path_str },
+            new_version_details: newVersion,
+        };
+    }
+
     static async switchContentVersion(
         profileId: string,
         contentType: ContentType,
         currentItem: LocalContentItem,
         newVersion: UnifiedVersion
     ): Promise<void> {
-        const payload: SwitchContentVersionPayload = {
-            profile_id: profileId,
-            content_type: contentType,
-            current_item_details: { ...currentItem, path_str: currentItem.path_str },
-            new_version_details: newVersion,
-        };
+        const payload = UnifiedService.buildSwitchContentVersionPayload(
+            profileId,
+            contentType,
+            currentItem,
+            newVersion
+        );
 
         return invoke("switch_content_version", { payload });
+    }
+
+    static async switchContentVersions(
+        payloads: SwitchContentVersionPayload[]
+    ): Promise<BatchUpdateResult> {
+        return invoke<BatchUpdateResult>("update_contents_from_profile", { payloads });
     }
 
     static async switchModpackVersion(request: ModpackSwitchRequest): Promise<ModpackSwitchResponse> {

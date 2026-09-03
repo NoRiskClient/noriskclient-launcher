@@ -6,7 +6,7 @@ use crate::friends::models::{
     FriendRequestWithUsers, FriendsFriendUser, FriendsUser, OnlineState,
 };
 use crate::minecraft::api::norisk_api::NoRiskApi;
-use log::{debug, error};
+use log::{debug, error, trace};
 use uuid::Uuid;
 
 const MOJANG_API_URL: &str = "https://api.mojang.com";
@@ -74,16 +74,16 @@ impl FriendsApi {
         let base_url = NoRiskApi::get_api_base(is_experimental);
         let url = format!("{}/friends/{}", base_url, uuid);
 
-        debug!("[Friends API] Fetching friends for {}", uuid);
+        trace!("[Friends API] Fetching friends for {}", uuid);
 
         let api_response = nrc_get(&url)
             .bearer(norisk_token)
             .json::<ApiFriendsInformationDto>("Friends get")
             .await?;
 
-        debug!("[Friends API] Raw pending count: {}", api_response.pending.len());
+        trace!("[Friends API] Raw pending count: {}", api_response.pending.len());
         for (i, val) in api_response.pending.iter().enumerate() {
-            debug!("[Friends API] Pending item {}: {}", i, val);
+            trace!("[Friends API] Pending item {}: {}", i, val);
         }
 
         let pending: Vec<FriendRequestWithUsers> = api_response
@@ -159,7 +159,7 @@ impl FriendsApi {
                     })
                     .collect();
 
-                debug!("[Friends API] Parsed request: id={}, sender={}, receiver={}", id, sender, receiver);
+                trace!("[Friends API] Parsed request: id={}, sender={}, receiver={}", id, sender, receiver);
 
                 Some(FriendRequestWithUsers {
                     id,
@@ -188,7 +188,7 @@ impl FriendsApi {
         let base_url = NoRiskApi::get_api_base(is_experimental);
         let url = format!("{}/friends/user", base_url);
 
-        debug!("[Friends API] Fetching current user data");
+        trace!("[Friends API] Fetching current user data");
 
         let api_response = nrc_get(&url)
             .bearer(norisk_token)

@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::error::{AppError, CommandError};
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;
@@ -14,7 +15,6 @@ use crate::state::state_manager::State;
 use crate::utils::mc_utils;
 use log::{debug, error, info};
 use std::path::PathBuf;
-use std::sync::Arc;
 use tauri_plugin_dialog::DialogExt;
 use uuid::Uuid;
 
@@ -318,7 +318,7 @@ pub async fn upload_skin<R: tauri::Runtime>(
     }
 
     // Convert the file content to base64
-    let base64_data = base64::encode(&file_content);
+    let base64_data = BASE64.encode(&file_content);
     debug!(
         "Converted skin to base64 ({} characters)",
         base64_data.len()
@@ -681,7 +681,7 @@ pub async fn add_skin_locally(
     );
 
     let mut final_skin_name = payload.target_skin_name.clone();
-    let mut final_skin_variant = payload.target_skin_variant.clone();
+    let final_skin_variant = payload.target_skin_variant.clone();
 
     // Extract base64 data using the reusable function
     let base64_data = get_base64_from_skin_source(&payload.source).await?;
@@ -765,26 +765,12 @@ pub async fn add_skin_locally(
     );
 
     // Track skin added event
-    let mut source_type = "unknown";
-    let mut source_value = String::new();
-    match &payload.source {
-        SkinSource::Profile(profile_data) => {
-            source_type = "username";
-            source_value = profile_data.query.clone();
-        }
-        SkinSource::Url(url_data) => {
-            source_type = "url";
-            source_value = url_data.url.clone();
-        }
-        SkinSource::FilePath(filepath_data) => {
-            source_type = "file";
-            source_value = filepath_data.path.clone();
-        }
-        SkinSource::Base64(_) => {
-            source_type = "base64";
-            source_value = "base64_content".to_string();
-        }
-    }
+    let (source_type, source_value) = match &payload.source {
+        SkinSource::Profile(profile_data) => ("username", profile_data.query.clone()),
+        SkinSource::Url(url_data) => ("url", url_data.url.clone()),
+        SkinSource::FilePath(filepath_data) => ("file", filepath_data.path.clone()),
+        SkinSource::Base64(_) => ("base64", "base64_content".to_string()),
+    };
 
     let mut props = std::collections::HashMap::new();
     props.insert("skin_name".to_string(), serde_json::Value::String(skin_to_add.name.clone()));
@@ -825,7 +811,7 @@ fn write_face_avatar(
     overlay: bool,
     out_size: u32,
 ) -> Result<(), AppError> {
-    let skin_bytes = base64::decode(base64_data)
+    let skin_bytes = BASE64.decode(base64_data)
         .map_err(|e| AppError::Other(format!("Failed to decode skin base64: {}", e)))?;
     let img = image::load_from_memory(&skin_bytes)
         .map_err(|e| AppError::Other(format!("Failed to decode skin PNG: {}", e)))?

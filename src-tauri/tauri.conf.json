@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NoRisk Launcher",
-  "version": "0.6.25",
+  "version": "0.6.26-beta.8",
   "identifier": "gg.norisk.NoRiskClientLauncherV3",
   "build": {
-    "beforeDevCommand": "yarn dev",
+    "beforeDevCommand": "yarn native-deps && yarn stage-native --debug && yarn dev",
     "devUrl": "http://localhost:1430",
-    "beforeBuildCommand": "yarn build",
+    "beforeBuildCommand": "yarn native-deps && yarn build && yarn stage-native",
     "frontendDist": "../dist"
   },
   "plugins": {
@@ -264,6 +264,13 @@
           "https://player.vimeo.com",
           "https://api.norisk.gg",
           "https://api-staging.norisk.gg"
+        ],
+        "media-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "blob:",
+          "data:"
         ]
       },
       "assetProtocol": {

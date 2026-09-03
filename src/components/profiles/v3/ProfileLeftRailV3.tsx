@@ -38,7 +38,7 @@ interface ProfileLeftRailV3Props {
 export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: ProfileLeftRailV3Props) {
   const { t } = useTranslation();
 
-  const modCount = profile.mods?.length ?? 0;
+  const modCount = profile.mod_count ?? profile.mods?.length ?? 0;
 
   const groups: NavGroup[] = [
     {
@@ -52,7 +52,7 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
       ],
     },
     {
-      labelKey: "profiles.tabs.worlds",
+      labelKey: "profiles.v3.leftRail.world",
       items: [
         { key: "worlds",      icon: "solar:planet-bold-duotone",      labelKey: "profiles.tabs.worlds" },
         { key: "screenshots", icon: "solar:camera-bold-duotone",      labelKey: "profiles.tabs.screenshots" },
@@ -66,7 +66,7 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
       {groups.map((group, gi) => (
         <div key={gi} className="mb-5">
           <div className="px-4 mb-2 text-xs uppercase tracking-wider text-white/60 font-minecraft">
-            {gi === 0 ? t("profiles.tabs.content") : t("profiles.v3.leftRail.world")}
+            {t(group.labelKey)}
           </div>
           <div className="px-2 space-y-1">
             {group.items.map((item) => {

@@ -5,16 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "predev": "yarn icons",
+    "predev": "yarn icons && yarn native-deps",
     "build": "tsc && vite build",
-    "prebuild": "yarn icons",
+    "prebuild": "yarn icons && yarn native-deps",
     "preview": "vite preview",
     "tauri": "tauri",
-    "icons": "node scripts/generate-icon-bundle.mjs"
+    "icons": "node scripts/generate-icon-bundle.mjs",
+    "native-deps": "node scripts/setup-native-deps.mjs",
+    "stage-native": "node scripts/stage-native-deps.mjs"
   },
   "dependencies": {
     "@iconify/react": "^5.2.1",
-    "@noriskclient/nrc-skin-renderer": "0.8.2",
+    "@noriskclient/nrc-skin-renderer": "0.10.1",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "8.13.7",
     "@sfirew/minecraft-motd-parser": "^1.1.4",

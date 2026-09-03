@@ -27,6 +27,7 @@ import {
   type LocalContentType,
   useLocalContentManager,
 } from "../../../../hooks/useLocalContentManager";
+import { useVersionOptions } from "../../../../hooks/useVersionOptions";
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
 import * as FlagsmithService from "../../../../services/flagsmith-service";
 import UnifiedService from "../../../../services/unified-service";
@@ -165,10 +166,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
 
   // ── Version-Switcher-State (pro Item) ─────────────────────────────────────
-  const [openVersionKey, setOpenVersionKey] = useState<string | null>(null);
-  const [versionCache, setVersionCache] = useState<Record<string, UnifiedVersion[]>>({});
-  const [loadingVersionsFor, setLoadingVersionsFor] = useState<Record<string, boolean>>({});
-  const [versionErrorFor, setVersionErrorFor] = useState<Record<string, string | null>>({});
+  const versionOptions = useVersionOptions();
   const [switchingVersionFor, setSwitchingVersionFor] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
@@ -185,37 +183,22 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   }, []);
 
   const handleOpenVersionDropdown = useCallback(async (item: LocalContentItem) => {
-    const key = tileKey(item);
-    const willOpen = openVersionKey !== key;
-    setOpenVersionKey(willOpen ? key : null);
-    if (!willOpen) return;
-    if (versionCache[key]) return;
-
     const { platform, projectId } = getItemPlatformAndProjectId(item);
-    if (!platform || !projectId) {
-      setVersionErrorFor(prev => ({ ...prev, [key]: t("profiles.v3.versions.noProject") }));
-      return;
-    }
-    setLoadingVersionsFor(prev => ({ ...prev, [key]: true }));
-    setVersionErrorFor(prev => ({ ...prev, [key]: null }));
-    try {
-      const response = await UnifiedService.getModVersions({
-        source: platform,
-        project_id: projectId,
-        loaders: contentType === "Mod" && profile?.loader ? [profile.loader] : undefined,
-        game_versions: profile?.game_version ? [profile.game_version] : undefined,
-      });
-      setVersionCache(prev => ({ ...prev, [key]: response.versions }));
-    } catch (err) {
-      console.error("[V3] Failed to load versions:", err);
-      setVersionErrorFor(prev => ({ ...prev, [key]: t("profiles.v3.versions.loadFailed") }));
-    } finally {
-      setLoadingVersionsFor(prev => ({ ...prev, [key]: false }));
-    }
-  }, [openVersionKey, versionCache, getItemPlatformAndProjectId, contentType, profile, tileKey]);
+    await versionOptions.toggle(
+      tileKey(item),
+      platform && projectId
+        ? {
+            platform,
+            projectId,
+            loaders: contentType === "Mod" && profile?.loader ? [profile.loader] : undefined,
+            gameVersions: profile?.game_version ? [profile.game_version] : undefined,
+          }
+        : null,
+    );
+  }, [contentType, getItemPlatformAndProjectId, profile, tileKey, versionOptions]);
 
   const handleSwitchVersion = useCallback(async (item: LocalContentItem, newVersion: UnifiedVersion) => {
-    setOpenVersionKey(null);
+    versionOptions.close();
     setSwitchingVersionFor(item.filename);
     try {
       await manager.handleSwitchContentVersion(item as T, newVersion);
@@ -225,56 +208,39 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     } finally {
       setSwitchingVersionFor(null);
     }
-  }, [manager, t]);
+  }, [manager, t, versionOptions]);
 
   // Batch Enable/Disable — iteriert Selection und toggelt nur die Mods,
   // deren aktueller State vom Ziel abweicht.
-  const handleBatchEnable = useCallback(async () => {
-    const targets: T[] = [];
-    for (const id of manager.selectedItemIds) {
-      const item = manager.items.find(i => i.filename === id);
-      if (item && item.is_disabled) targets.push(item);
-    }
+  const runBatch = useCallback(async (enabled: boolean) => {
+    const targets = manager.items.filter(
+      (item) => manager.selectedItemIds.has(item.filename) && item.is_disabled === enabled,
+    );
     if (targets.length === 0) {
       manager.handleSelectAllToggle(false);
       return;
     }
+
     setBatchProgress({ current: 0, total: targets.length });
     try {
-      for (let i = 0; i < targets.length; i++) {
-        await manager.handleToggleItemEnabled(targets[i]);
-        setBatchProgress({ current: i + 1, total: targets.length });
+      const changed = await manager.handleBatchSetEnabled(enabled);
+      setBatchProgress({ current: targets.length, total: targets.length });
+      if (changed > 0) {
+        toast.success(
+          t(enabled ? "profiles.v3.batch.enabled" : "profiles.v3.batch.disabled", {
+            count: changed,
+          }),
+        );
       }
     } finally {
       setBatchProgress(null);
       manager.handleSelectAllToggle(false);
     }
-  }, [manager]);
+  }, [manager, t]);
 
-  const handleBatchDisable = useCallback(async () => {
-    const targets: T[] = [];
-    for (const id of manager.selectedItemIds) {
-      const item = manager.items.find(i => i.filename === id);
-      if (item && !item.is_disabled) targets.push(item);
-    }
-    if (targets.length === 0) {
-      manager.handleSelectAllToggle(false);
-      return;
-    }
-    setBatchProgress({ current: 0, total: targets.length });
-    try {
-      for (let i = 0; i < targets.length; i++) {
-        await manager.handleToggleItemEnabled(targets[i]);
-        setBatchProgress({ current: i + 1, total: targets.length });
-      }
-    } finally {
-      setBatchProgress(null);
-      manager.handleSelectAllToggle(false);
-    }
-  }, [manager]);
+  const handleBatchEnable = useCallback(() => runBatch(true), [runBatch]);
+  const handleBatchDisable = useCallback(() => runBatch(false), [runBatch]);
 
-  // Batch Pause/Resume Update-Checks — zielt auf Mehrheits-Zustand:
-  // Wenn >= die Haelfte aktiv, wird pausiert. Sonst wieder aktiviert.
   const batchUpdateChecksConfig = useMemo(() => {
     const selectedItems = Array.from(manager.selectedItemIds)
       .map(id => manager.items.find(i => i.filename === id))
@@ -362,7 +328,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         break;
     }
     return sorted;
-  }, [manager.filteredItems, filter, sortBy, getDisplayFileName, manager, hasUpdate, isBlockedConfigLoaded]);
+  }, [manager.filteredItems, manager.getItemPlatformDisplayName, filter, sortBy, getDisplayFileName, hasUpdate, isBlockedConfigLoaded]);
 
   // "Add content" opens an in-place side sheet instead of navigating to a
   // dedicated browse route, so the profile view stays mounted and the
@@ -548,7 +514,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
             data={visibleItems}
             customScrollParent={scrollParent ?? undefined}
             listClassName="grid grid-cols-1 lg:grid-cols-2 gap-3"
-            computeItemKey={(_, item) => tileKey(item)}
+            computeItemKey={(index, item) => `${index}:${tileKey(item)}`}
             itemContent={(_, item) => {
               const key = tileKey(item);
               const updateKey = getUpdateIdentifier(item);
@@ -602,10 +568,10 @@ export function LocalContentTabV3<T extends LocalContentItem>({
                     : undefined}
                   isQuickUpdating={manager.itemsBeingUpdated.has(item.filename)}
                   noRiskStatus={noRiskStatus}
-                  versionDropdownOpen={openVersionKey === key}
-                  availableVersions={versionCache[key] ?? null}
-                  isLoadingVersions={!!loadingVersionsFor[key]}
-                  versionError={versionErrorFor[key] ?? null}
+                  versionDropdownOpen={versionOptions.openKey === key}
+                  availableVersions={versionOptions.versionsFor(key)}
+                  isLoadingVersions={versionOptions.loadingFor(key)}
+                  versionError={versionOptions.errorFor(key)}
                   onVersionClick={() => handleOpenVersionDropdown(item)}
                   onSwitchVersion={(v) => handleSwitchVersion(item, v)}
                   updateAvailable={updateAvailable}

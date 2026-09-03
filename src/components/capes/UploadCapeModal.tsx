@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
+import { WebGLBoundary } from "../WebGLBoundary";
+import { CapeImage } from "./CapeImage";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
@@ -126,18 +128,29 @@ export function UploadCapeModal({
           </div>
         )}
         <div className="relative flex justify-center items-center mb-6 p-2 rounded-md aspect-[10/16] max-w-[200px] mx-auto">
-          <SkinRenderer
-            textureUrl={null}
-            cape={{
-              texture: paddedPreviewUrl || previewImageUrl,
-              elytra: showElytraPreview,
-            }}
-            rotation={Math.PI}
-            draggable
-            zoom={1.5}
-            fps={30}
-            className="w-full h-full"
-          />
+          <WebGLBoundary
+            label="cape upload preview"
+            fallback={
+              <CapeImage
+                imageUrl={paddedPreviewUrl || previewImageUrl}
+                part="back"
+                width={160}
+              />
+            }
+          >
+            <SkinRenderer
+              textureUrl={null}
+              cape={{
+                texture: paddedPreviewUrl || previewImageUrl,
+                elytra: showElytraPreview,
+              }}
+              rotation={Math.PI}
+              draggable
+              zoom={1.5}
+              fps={30}
+              className="w-full h-full"
+            />
+          </WebGLBoundary>
           {!isCapeOnly && (
             <IconButton
               onClick={() => setShowElytraPreview(!showElytraPreview)}

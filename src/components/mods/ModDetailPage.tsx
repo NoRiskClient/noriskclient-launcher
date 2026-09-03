@@ -194,6 +194,7 @@ interface ModDetailPageProps {
    */
   hideBackButton?: boolean;
   targetProfile?: import("../../types/profile").Profile;
+  installTarget?: import("../../types/content").ContentInstallTarget;
 }
 
 export function ModDetailPage({
@@ -202,6 +203,7 @@ export function ModDetailPage({
   onBack,
   hideBackButton,
   targetProfile,
+  installTarget,
 }: ModDetailPageProps = {}) {
   const { t } = useTranslation();
   const params = useParams<{ source: string; projectId: string }>();
@@ -466,12 +468,17 @@ export function ModDetailPage({
           showVersions={showVersions}
           onToggleVersions={() => setShowVersions(!showVersions)}
           targetProfile={targetProfile}
+          installTarget={installTarget}
         />
 
         {showVersions ? (
           /* Versions View */
           <div className="mt-6">
-            <ModDetailVersions project={project} targetProfile={targetProfile} />
+            <ModDetailVersions
+              project={project}
+              targetProfile={targetProfile}
+              installTarget={installTarget}
+            />
           </div>
         ) : (
           /* Default View: Gallery + Description + Sidebar */

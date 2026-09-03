@@ -5,7 +5,7 @@ use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::post_init::PostInitializationHandler;
 use crate::state::state_manager::State;
 use async_trait::async_trait;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
@@ -38,7 +38,7 @@ impl NoriskVersionManager {
     /// Creates a new NoriskVersionManager instance, loading the configuration from the specified path.
     /// If the file doesn't exist, it initializes with a default empty configuration.
     pub fn new(config_path: PathBuf) -> Result<Self> {
-        info!(
+        trace!(
             "NoriskVersionManager: Initializing with path: {:?} (config loading deferred)",
             config_path
         );
@@ -173,7 +173,7 @@ impl NoriskVersionManager {
     /// Prints the current configuration to the console for debugging.
     #[allow(dead_code)]
     pub async fn print_current_config(&self) {
-        let config_guard = self.config.read().await;
+        let _config_guard = self.config.read().await;
         //println!("--- Current Norisk Versions Config ---");
         //println!("{:#?}", *config_guard);
         //println!("--- End Norisk Versions Config ---");
@@ -192,7 +192,7 @@ impl NoriskVersionManager {
 #[async_trait]
 impl PostInitializationHandler for NoriskVersionManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("NoriskVersionManager: on_state_ready called. Loading configuration...");
+        trace!("NoriskVersionManager: on_state_ready called. Loading configuration...");
         // Load initial config. If loading fails critically (e.g., IO error other than NotFound), propagate the error.
         // If parsing fails or file not found, use default. This logic is now effectively in load_config_internal.
         let load_path = if let Ok(state) = State::get().await {
@@ -210,11 +210,12 @@ impl PostInitializationHandler for NoriskVersionManager {
             NoriskVersionsConfig::default()
         });
 
+        let version_count = loaded_config.profiles.len();
         let mut config_guard = self.config.write().await;
         *config_guard = loaded_config;
         drop(config_guard);
 
-        info!("NoriskVersionManager: Successfully processed configuration in on_state_ready.");
+        info!("NoriskVersionManager: {} standard versions loaded from {:?}", version_count, load_path);
         Ok(())
     }
 }

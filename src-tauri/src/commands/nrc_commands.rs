@@ -1,12 +1,10 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward, UniquePlayersResponse, UserNotification};
+use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
 use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
-use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::state::state_manager::State;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::info;
 use log::{debug, error};
-use std::sync::Arc;
 use tauri::{AppHandle, Manager, Url, UserAttentionType, WebviewUrl, WebviewWindowBuilder};
 use crate::utils::updater_utils;
 

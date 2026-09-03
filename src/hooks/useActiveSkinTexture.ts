@@ -2,6 +2,7 @@ import { MinecraftSkinService } from "../services/minecraft-skin-service";
 import { useSkinStore } from "../store/useSkinStore";
 import { useMinecraftAuthStore } from "../store/minecraft-auth-store";
 import type { SkinVariant } from "../types/localSkin";
+import { cosmeticCacheKeys } from "../services/cosmetic-cache";
 import { useAsyncResource } from "./useAsyncResource";
 
 export interface ActiveSkinTexture {
@@ -33,6 +34,7 @@ export function useActiveSkinTexture(): ActiveSkinTexture {
     },
     [activeAccount?.id, skinRevision],
     EMPTY,
+    { cacheKey: activeAccount?.id ? cosmeticCacheKeys.activeSkin(activeAccount.id) : undefined },
   );
 
   return { ...data, loading };

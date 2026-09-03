@@ -9,6 +9,7 @@ interface TooltipProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  wrapperClassName?: string;
   // "cursor" (default): follows the mouse. "top"/"bottom": static, centered above/below the trigger.
   position?: "cursor" | "top" | "bottom";
 }
@@ -18,6 +19,7 @@ export function Tooltip({
   children,
   delay = 300,
   className = "",
+  wrapperClassName = "",
   position = "cursor",
 }: TooltipProps) {
   const isStatic = position === "top" || position === "bottom";
@@ -141,7 +143,7 @@ export function Tooltip({
         // buttons around it in flex rows. Plain `inline-block` was offsetting
         // wrapped children by ~1px because its baseline sits on the last line
         // of text while neighboring `inline-flex` items center their content.
-        className="inline-flex items-center"
+        className={`inline-flex items-center ${wrapperClassName}`}
       >
         {children}
       </div>
