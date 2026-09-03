@@ -551,7 +551,7 @@ nav button:not(.no-radius),
     will-change: backdrop-filter;
 }
 
-/* WebKitGTK may ignore backdrop-filter; blur the launcher layer itself as a fallback. */
+/* WebKitGTK ignores backdrop-filter; blur the launcher layer itself as a fallback. */
 #root.modal-background-blur {
     filter: blur(10px);
     transition: filter 120ms ease-out;

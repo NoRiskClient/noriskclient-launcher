@@ -24,6 +24,9 @@ interface ModalProps {
   contentClassName?: string;
 }
 
+// Monotonically increasing so the most recently opened modal always stacks on top.
+let modalZIndexCounter = 1000;
+
 export function Modal({
   title,
   titleIcon,
@@ -49,6 +52,10 @@ export function Modal({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isClosing, setIsClosing] = useState(false);
+  const zIndexRef = useRef<number>();
+  if (zIndexRef.current === undefined) {
+    zIndexRef.current = ++modalZIndexCounter;
+  }
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isClosing) {
@@ -139,12 +146,13 @@ export function Modal({
   return createPortal(
     <div
       ref={modalRef}
-      className="modal-backdrop fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="modal-backdrop fixed inset-0 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      style={{ zIndex: zIndexRef.current }}
       onClick={handleBackdropClick}
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh] backdrop-blur-md-anyos",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
