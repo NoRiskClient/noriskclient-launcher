@@ -45,6 +45,7 @@ pub fn mask_sensitive_data(content: &str) -> String {
         static ref NORISK_TOKEN_REGEX: Regex = Regex::new(r"-Dnorisk\.token=[^\s]+").unwrap();
         // Mask Twitch integration tokens
         static ref TWITCH_TOKEN_REGEX: Regex = Regex::new(r"-Dtwitch\.token=[^\s]+").unwrap();
+        static ref TWITCH_REFRESH_TOKEN_REGEX: Regex = Regex::new(r"-Dtwitch\.refresh_token=[^\s]+").unwrap();
         // Mask Minecraft access tokens
         static ref ACCESS_TOKEN_REGEX: Regex = Regex::new(r"--accessToken\s+[^\s]+").unwrap();
         static ref CLIENT_ID_ARG_REGEX: Regex = Regex::new(r"--clientId\s+[^\s]+").unwrap();
@@ -67,6 +68,7 @@ pub fn mask_sensitive_data(content: &str) -> String {
 
     let mut masked_content = NORISK_TOKEN_REGEX.replace_all(content, "-Dnorisk.token=*****").to_string();
     masked_content = TWITCH_TOKEN_REGEX.replace_all(&masked_content, "-Dtwitch.token=*****").to_string();
+    masked_content = TWITCH_REFRESH_TOKEN_REGEX.replace_all(&masked_content, "-Dtwitch.refresh_token=*****").to_string();
     masked_content = ACCESS_TOKEN_REGEX.replace_all(&masked_content, "--accessToken *****").to_string();
     masked_content = CLIENT_ID_ARG_REGEX.replace_all(&masked_content, "--clientId *****").to_string();
     masked_content = XUID_ARG_REGEX.replace_all(&masked_content, "--xuid *****").to_string();
