@@ -4,6 +4,7 @@ use super::detect;
 use super::model::*;
 use super::resolve;
 use crate::error::Result;
+use crate::integrations::pack_preview::NoriskPackOffer;
 use crate::integrations::provenance::{classify_executable_entries, ProvenanceReport};
 use crate::state::profile_state::ProfileSettings;
 use crate::state::State;
@@ -132,6 +133,7 @@ pub async fn preview_instance(
         security: security_report_for(&instance),
         executable_content: classify_executable_entries(plan.executable_paths.clone(), &[""]),
         managed_pack: instance.managed_pack.as_ref().map(ManagedPackRef::label),
+        norisk_pack: NoriskPackOffer::default(),
         warnings: collect_warnings(&instance, &plan),
         already_imported_at: already_imported_at(instance_dir).await,
         buckets: plan.per_bucket,

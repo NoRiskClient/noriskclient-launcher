@@ -1,4 +1,5 @@
 use super::buckets;
+use crate::integrations::pack_preview::NoriskPackOffer;
 use crate::integrations::provenance::{ExecutableContentReport, ProvenanceReport};
 use crate::state::profile_state::{ImageSource, ModLoader};
 use crate::utils::import_safety::ImportSecurityReport;
@@ -308,6 +309,7 @@ pub struct ExternalInstancePreview {
     pub provenance: ProvenanceReport,
     pub executable_content: ExecutableContentReport,
     pub managed_pack: Option<String>,
+    pub norisk_pack: NoriskPackOffer,
     pub warnings: Vec<String>,
     pub already_imported_at: Option<DateTime<Utc>>,
 }
