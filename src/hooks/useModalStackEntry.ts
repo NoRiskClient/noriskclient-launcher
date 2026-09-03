@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { modalZIndexForDepth } from "../lib/z-layers";
-import { needsRootBlurFallback } from "../lib/platform";
+import { needsRootBlurFallback } from "../utils/platform";
 
 const ROOT_BLUR_CLASS = "modal-background-blur";
 
