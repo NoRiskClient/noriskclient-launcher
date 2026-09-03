@@ -11,7 +11,6 @@
   "twitch.scopeInfoExplanation": "Twitch pokazuje żółte ostrzeżenie przy kilku zakresach OAuth, ponieważ mogą brzmieć szeroko. Potrzebujemy ich, aby odczytywać aktywność streama i wyświetlać powiadomienia na żywo w grze.",
   "twitch.scopeInfoUsage": "Obejmuje to wydarzenia takie jak rajdy kanału, subskrypcje, obserwowania, aktywność na czacie i inne wydarzenia streama.",
   "twitch.scopeInfoNoAutomation": "NoRisk nigdy nie rozpoczyna ani nie kontroluje rajdów, nie zmienia subskrypcji ani nie wykonuje żadnych innych zautomatyzowanych działań na Twoim koncie Twitch.",
-  "twitch.scopeInfoFollow": "Jedyną dostępną akcją na koncie jest obserwowanie kanału, gdy wyraźnie naciśniesz jego przycisk obserwowania w grze.",
   "twitch.scopeInfoContinue": "Przejdź do Twitcha",
   "settings.sections.behaviour": "Zachowanie",
   "settings.sections.interface": "Pobieranie i interfejs",

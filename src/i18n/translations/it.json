@@ -11,7 +11,6 @@
   "twitch.scopeInfoExplanation": "Twitch mostra un avviso giallo per diversi ambiti OAuth perché possono sembrare molto estesi. Ci servono per leggere l'attività dello stream e mostrare popup live nel gioco.",
   "twitch.scopeInfoUsage": "Ciò include eventi come raid del canale, abbonamenti, follow, attività della chat e altri eventi dello stream.",
   "twitch.scopeInfoNoAutomation": "NoRisk non avvia né controlla mai raid, non modifica gli abbonamenti e non esegue altre azioni automatiche sul tuo account Twitch.",
-  "twitch.scopeInfoFollow": "L'unica azione disponibile sull'account è seguire un canale quando premi esplicitamente il suo pulsante Segui nel gioco.",
   "twitch.scopeInfoContinue": "Continua su Twitch",
   "settings.sections.behaviour": "Comportamento",
   "settings.sections.interface": "Download e interfaccia",

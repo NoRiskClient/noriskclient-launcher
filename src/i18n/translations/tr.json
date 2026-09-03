@@ -11,7 +11,6 @@
   "twitch.scopeInfoExplanation": "Twitch, geniş kapsamlı görünebildikleri için bazı OAuth kapsamlarında sarı uyarı gösterir. Yayın etkinliğini okumak ve oyun içinde canlı açılır bildirimler göstermek için bunlara ihtiyacımız var.",
   "twitch.scopeInfoUsage": "Buna kanal baskınları, abonelikler, takipler, sohbet etkinliği ve diğer yayın etkinlikleri dahildir.",
   "twitch.scopeInfoNoAutomation": "NoRisk asla baskın başlatmaz veya kontrol etmez, abonelikleri değiştirmez ve Twitch hesabınızda başka hiçbir otomatik işlem yapmaz.",
-  "twitch.scopeInfoFollow": "Kullanılabilen tek hesap işlemi, oyun içinde takip düğmesine açıkça bastığınızda bir kanalı takip etmektir.",
   "twitch.scopeInfoContinue": "Twitch'e devam et",
   "settings.sections.behaviour": "Davranış",
   "settings.sections.interface": "İndirmeler ve arayüz",

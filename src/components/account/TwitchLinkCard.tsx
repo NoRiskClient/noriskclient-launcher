@@ -197,7 +197,6 @@ function TwitchScopeInfoModal({
         <div className="space-y-2 border-l-2 border-yellow-300/70 pl-4">
           <p>{t("twitch.scopeInfoUsage")}</p>
           <p>{t("twitch.scopeInfoNoAutomation")}</p>
-          <p>{t("twitch.scopeInfoFollow")}</p>
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

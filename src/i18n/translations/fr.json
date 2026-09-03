@@ -11,7 +11,6 @@
   "twitch.scopeInfoExplanation": "Twitch affiche un avertissement jaune pour plusieurs autorisations OAuth, car elles peuvent sembler étendues. Nous en avons besoin pour lire l'activité du stream et afficher des alertes en direct dans le jeu.",
   "twitch.scopeInfoUsage": "Cela inclut des événements tels que les raids de chaîne, les abonnements, les suivis, l'activité du chat et d'autres événements du stream.",
   "twitch.scopeInfoNoAutomation": "NoRisk ne lance ni ne contrôle jamais de raids, ne modifie pas les abonnements et n'effectue aucune autre action automatisée sur votre compte Twitch.",
-  "twitch.scopeInfoFollow": "La seule action possible sur le compte est de suivre une chaîne lorsque vous appuyez explicitement sur son bouton Suivre dans le jeu.",
   "twitch.scopeInfoContinue": "Continuer vers Twitch",
   "settings.sections.behaviour": "Comportement",
   "settings.sections.interface": "Téléchargements et interface",

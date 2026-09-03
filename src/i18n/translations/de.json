@@ -11,7 +11,6 @@
   "twitch.scopeInfoExplanation": "Twitch zeigt bei mehreren OAuth-Berechtigungen eine gelbe Warnung an, weil sie weitreichend klingen können. Wir benötigen sie, um Stream-Aktivitäten zu lesen und Live-Popups im Spiel anzuzeigen.",
   "twitch.scopeInfoUsage": "Dazu gehören Ereignisse wie Channel-Raids, Abonnements, Follows, Chat-Aktivität und andere Stream-Ereignisse.",
   "twitch.scopeInfoNoAutomation": "NoRisk startet oder steuert niemals Raids, ändert keine Abonnements und führt keine anderen automatisierten Aktionen auf deinem Twitch-Konto aus.",
-  "twitch.scopeInfoFollow": "Die einzige mögliche Kontoaktion ist das Folgen eines Kanals, wenn du im Spiel ausdrücklich auf dessen Folgen-Schaltfläche klickst.",
   "twitch.scopeInfoContinue": "Weiter zu Twitch",
   "news.title": "Neuigkeiten",
   "news.no_news_available": "Momentan keine Neuigkeiten verfügbar.",
