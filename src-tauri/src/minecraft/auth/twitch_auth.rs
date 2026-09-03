@@ -9,7 +9,15 @@ use crate::error::{AppError, Result};
 pub const TWITCH_CLIENT_ID: &str = "p60nwofs8at0mc615hsbgxu7psdluk";
 
 /// Scopes requested for the in-game Twitch integration (drops/chat identity).
-pub const TWITCH_SCOPES: &str = "user:read:email";
+pub const TWITCH_SCOPES: &'static [&'static str] = &[
+    "user:read:chat",
+    "user:write:chat",
+    "user:edit:follows",
+    "moderator:read:followers",
+    "channel:read:subscriptions",
+    "bits:read",
+    "channel:read:redemptions",
+];
 
 const DEVICE_CODE_URL: &str = "https://id.twitch.tv/oauth2/device";
 const TOKEN_URL: &str = "https://id.twitch.tv/oauth2/token";
@@ -81,7 +89,7 @@ fn token_from_response(res: TokenResponse) -> TwitchToken {
 pub async fn request_device_code() -> Result<DeviceCodeResponse> {
     let response = HTTP_CLIENT
         .post(DEVICE_CODE_URL)
-        .form(&[("client_id", TWITCH_CLIENT_ID), ("scopes", TWITCH_SCOPES)])
+        .form(&[("client_id", TWITCH_CLIENT_ID), ("scopes", TWITCH_SCOPES.join(" ").as_str())])
         .send()
         .await
         .map_err(|e| AppError::RequestError(format!("Twitch device code request failed: {}", e)))?;
@@ -112,7 +120,7 @@ pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
         .form(&[
             ("client_id", TWITCH_CLIENT_ID),
             ("device_code", device_code),
-            ("scopes", TWITCH_SCOPES),
+            ("scopes", TWITCH_SCOPES.join(" ").as_str()),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ])
         .send()
