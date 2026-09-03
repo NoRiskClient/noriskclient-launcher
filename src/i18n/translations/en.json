@@ -453,6 +453,13 @@
   "twitch.starting": "Requesting a Twitch device code...",
   "twitch.openTwitch": "Open Twitch",
   "twitch.cancel": "Cancel",
+  "twitch.scopeInfoTitle": "Twitch Permissions",
+  "twitch.scopeInfoHeadline": "Why does Twitch show yellow warnings?",
+  "twitch.scopeInfoExplanation": "Twitch shows a yellow warning for several OAuth scopes because they can sound broad. We request them to read stream activity and make live in-game popups possible.",
+  "twitch.scopeInfoUsage": "This includes events such as channel raids, subscriptions, follows, chat activity, and other stream events.",
+  "twitch.scopeInfoNoAutomation": "NoRisk never starts or controls raids, changes subscriptions, or performs any other automated action on your Twitch account.",
+  "twitch.scopeInfoFollow": "The only account action available is following a channel when you explicitly press its follow button in-game.",
+  "twitch.scopeInfoContinue": "Continue to Twitch",
 
   "skins.signedOut.title": "Sign in to manage skins",
   "skins.signedOut.description": "Upload, switch and store your skins once you are signed in.",
