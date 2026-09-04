@@ -1,7 +1,7 @@
 use crate::state::state_manager::State;
 use log::{error, info, warn};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
 
 #[derive(Clone, Serialize)]
@@ -82,6 +82,7 @@ async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
         }
     }
 
+    focus_main_window(app_handle);
     info!("[DeepLink] Twitch {} request received", action);
     let _ = app_handle.emit(
         "deep-link-twitch-request",
@@ -90,6 +91,22 @@ async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
             export_key,
         },
     );
+}
+
+fn focus_main_window(app_handle: &AppHandle) {
+    let Some(window) = app_handle.get_webview_window("main") else {
+        return;
+    };
+
+    if let Err(error) = window.show() {
+        warn!("[DeepLink] Could not show main window for Twitch request: {}", error);
+    }
+    if let Err(error) = window.unminimize() {
+        warn!("[DeepLink] Could not restore main window for Twitch request: {}", error);
+    }
+    if let Err(error) = window.set_focus() {
+        warn!("[DeepLink] Could not focus main window for Twitch request: {}", error);
+    }
 }
 
 /// Handles `norisk://auth/bridge?sessionId=xxx` deep links.
