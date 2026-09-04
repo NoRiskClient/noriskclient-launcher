@@ -15,6 +15,7 @@ pub const TWITCH_CLIENT_ID: &str = "p60nwofs8at0mc615hsbgxu7psdluk";
 
 pub const TWITCH_SCOPES: &'static [&'static str] = &[
     "user:read:chat",
+    "user:read:follows",
     "user:write:chat",
     "moderator:read:followers",
     "channel:read:subscriptions",
