@@ -53,6 +53,8 @@ import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
 import { useWelcomeStore } from "./store/welcome-store";
+import { TwitchDeviceLoginModal } from "./components/account/TwitchLinkCard";
+import { TwitchService } from "./services/twitch-service";
 import { WelcomeScreen } from "./components/welcome/WelcomeScreen";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
@@ -313,6 +315,89 @@ export function App() {
       unlistenResult.then((f) => f());
     };
   }, [showModal, hideModal, t]);
+
+  useEffect(() => {
+    const unlisten = listen<{ action: "link" | "unlink" | "change"; export_key: string | null }>(
+      "deep-link-twitch-request",
+      (event) => {
+        const { action, export_key: exportKey } = event.payload;
+        const confirmationId = "deep-link-twitch-confirm";
+        const loginId = "deep-link-twitch-login";
+        const exportId = "deep-link-twitch-export";
+        const isUnlink = action === "unlink";
+        const actionLabel = t(`deep_link.twitch.${action}`);
+
+        hideModal(loginId);
+        hideModal(exportId);
+        showModal(
+          confirmationId,
+          <Modal
+            title={t("deep_link.twitch.title")}
+            onClose={() => hideModal(confirmationId)}
+            width="sm"
+            footer={
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => hideModal(confirmationId)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  variant={isUnlink ? "destructive" : "default"}
+                  onClick={() => {
+                    hideModal(confirmationId);
+                    if (isUnlink) {
+                      void TwitchService.unlink()
+                        .then(() => toast.success(t("twitch.unlinked")))
+                        .catch(() => toast.error(t("twitch.unlinkFailed")));
+                      return;
+                    }
+
+                    showModal(
+                      loginId,
+                      <TwitchDeviceLoginModal
+                        beginLogin={() => TwitchService.beginDeeplinkDeviceLogin(exportKey!)}
+                        onClose={async () => {
+                          hideModal(loginId);
+                          await TwitchService.cancelLogin();
+                        }}
+                        onFailedToStart={() => {
+                          hideModal(loginId);
+                          toast.error(t("twitch.linkFailed"));
+                        }}
+                        onCompleted={async (encryptedToken) => {
+                          hideModal(loginId);
+                          if (!encryptedToken) {
+                            toast.error(t("deep_link.twitch.exportFailed"));
+                            return;
+                          }
+                          showModal(
+                            exportId,
+                            <DeepLinkTwitchTokenModal
+                              encryptedToken={encryptedToken}
+                              onClose={() => hideModal(exportId)}
+                            />,
+                          );
+                        }}
+                      />,
+                    );
+                  }}
+                >
+                  {actionLabel}
+                </Button>
+              </div>
+            }
+          >
+            <div className="p-6 text-white/80 font-minecraft text-sm">
+              <p>{t(`deep_link.twitch.${action}Description`)}</p>
+            </div>
+          </Modal>,
+        );
+      },
+    );
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [hideModal, showModal, t]);
 
   useEffect(() => {
     refreshNrcDataOnMount();
@@ -599,6 +684,43 @@ export function App() {
         )}
       </div>
     </FlagsmithProvider>
+  );
+}
+
+function DeepLinkTwitchTokenModal({
+  encryptedToken,
+  onClose,
+}: {
+  encryptedToken: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(encryptedToken);
+    setCopied(true);
+  };
+
+  return (
+    <Modal title={t("deep_link.twitch.exportTitle")} onClose={onClose} width="sm">
+      <div className="p-4 space-y-3 font-minecraft text-sm text-white/80">
+        <p>{t("deep_link.twitch.exportDescription")}</p>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          title={t("deep_link.twitch.copy")}
+          className="w-full truncate rounded border border-white/20 bg-black/40 px-3 py-2 text-left font-mono text-xs text-white hover:border-white/40"
+        >
+          {encryptedToken}
+        </button>
+        <div className="flex justify-end">
+          <Button variant="default" size="sm" onClick={() => void copy()}>
+            {copied ? t("twitch.copied") : t("deep_link.twitch.copy")}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

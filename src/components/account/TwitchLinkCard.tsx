@@ -13,7 +13,7 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { useLatest } from "../../hooks/useLatest";
 import { openExternalUrl } from "../../services/tauri-service";
 import { TwitchService } from "../../services/twitch-service";
-import type { TwitchLoginPayload, TwitchStatus } from "../../types/twitch";
+import type { TwitchDeviceLogin, TwitchLoginPayload, TwitchStatus } from "../../types/twitch";
 import { useSocialsModalStore } from "../../store/socials-modal-store";
 
 const MODAL_ID = "twitch-device-login-modal";
@@ -163,8 +163,9 @@ export function TwitchLinkCard() {
 
 export interface TwitchDeviceLoginModalProps {
   onClose: () => Promise<void>;
-  onCompleted: () => Promise<void>;
+  onCompleted: (encryptedToken?: string) => Promise<void>;
   onFailedToStart: () => void;
+  beginLogin?: () => Promise<TwitchDeviceLogin>;
 }
 
 interface TwitchScopeInfoModalProps {
@@ -226,6 +227,7 @@ export function TwitchDeviceLoginModal({
   onClose,
   onCompleted,
   onFailedToStart,
+  beginLogin = TwitchService.beginDeviceLogin,
 }: TwitchDeviceLoginModalProps) {
   const { t } = useTranslation();
   const [payload, setPayload] = useState<TwitchLoginPayload | null>(null);
@@ -241,7 +243,7 @@ export function TwitchDeviceLoginModal({
       unlisten = await TwitchService.onLoginEvent((event) => {
         setPayload(event);
         if (event.stage === "completed") {
-          onCompletedRef.current();
+          onCompletedRef.current(event.encrypted_token ?? undefined);
         }
       });
 
@@ -252,7 +254,7 @@ export function TwitchDeviceLoginModal({
       }
 
       try {
-        const device = await TwitchService.beginDeviceLogin();
+        const device = await beginLogin();
         if (disposed) return;
         setPayload((current) =>
           current ?? {
@@ -263,6 +265,7 @@ export function TwitchDeviceLoginModal({
             progress: 0,
             expires_in: device.expires_in,
             error: null,
+            encrypted_token: null,
           },
         );
       } catch (err) {

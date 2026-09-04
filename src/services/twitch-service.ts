@@ -14,6 +14,12 @@ export class TwitchService {
     return await invoke<TwitchDeviceLogin>("twitch_begin_device_login");
   }
 
+  static async beginDeeplinkDeviceLogin(exportKey: string): Promise<TwitchDeviceLogin> {
+    return await invoke<TwitchDeviceLogin>("twitch_begin_deeplink_device_login", {
+      exportKey,
+    });
+  }
+
   static async cancelLogin(): Promise<void> {
     await invoke("twitch_cancel_login");
   }

@@ -35,6 +35,7 @@ pub struct TwitchLoginPayload {
     pub progress: Option<f64>,
     pub expires_in: Option<i64>,
     pub error: Option<String>,
+    pub encrypted_token: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -71,10 +72,22 @@ pub struct TwitchDeviceLogin {
 
 #[tauri::command]
 pub async fn twitch_begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, CommandError> {
-    begin_device_login(app).await
+    begin_device_login(app, None).await
 }
 
-async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, CommandError> {
+#[tauri::command]
+pub async fn twitch_begin_deeplink_device_login(
+    app: AppHandle,
+    export_key: String,
+) -> Result<TwitchDeviceLogin, CommandError> {
+    let key = twitch_auth::decode_export_key(&export_key)?;
+    begin_device_login(app, Some(key)).await
+}
+
+async fn begin_device_login(
+    app: AppHandle,
+    export_key: Option<Vec<u8>>,
+) -> Result<TwitchDeviceLogin, CommandError> {
     info!("[Twitch] Starting device code login");
 
     if let Some(handle) = ACTIVE_LOGIN.lock().await.take() {
@@ -91,6 +104,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
             progress: Some(0.0),
             expires_in: None,
             error: None,
+            encrypted_token: None,
         },
     );
 
@@ -106,6 +120,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                 progress: None,
                 expires_in: None,
                 error: Some(e.to_string()),
+                encrypted_token: None,
             },
         );
         CommandError::from(e)
@@ -126,6 +141,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
             progress: Some(0.0),
             expires_in: Some(total_secs),
             error: None,
+            encrypted_token: None,
         },
     );
 
@@ -150,6 +166,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                         progress: Some(100.0),
                         expires_in: Some(0),
                         error: Some("The Twitch code expired. Please try again.".to_string()),
+                        encrypted_token: None,
                     },
                 );
                 return;
@@ -164,7 +181,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                         let state = State::get().await?;
                         state
                             .minecraft_account_manager_v2
-                            .set_twitch_token(account_id, Some(token))
+                            .set_twitch_token(account_id, Some(token.clone()))
                             .await
                     }
                     .await;
@@ -172,6 +189,15 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                     match persisted {
                         Ok(()) => {
                             info!("[Twitch] Linked account {}", account_id);
+                            let encrypted_token = export_key.as_deref().and_then(|key| {
+                                match twitch_auth::encrypt_token_export(&token, key) {
+                                    Ok(value) => Some(value),
+                                    Err(e) => {
+                                        error!("[Twitch] Failed to encrypt deeplink token export: {}", e);
+                                        None
+                                    }
+                                }
+                            });
                             emit(
                                 &app,
                                 TwitchLoginPayload {
@@ -182,6 +208,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                                     progress: Some(100.0),
                                     expires_in: None,
                                     error: None,
+                                    encrypted_token,
                                 },
                             );
                         }
@@ -197,6 +224,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                                     progress: None,
                                     expires_in: None,
                                     error: Some(e.to_string()),
+                                    encrypted_token: None,
                                 },
                             );
                         }
@@ -217,6 +245,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                             progress: Some(progress),
                             expires_in: Some(remaining),
                             error: None,
+                            encrypted_token: None,
                         },
                     );
                 }
@@ -232,6 +261,7 @@ async fn begin_device_login(app: AppHandle) -> Result<TwitchDeviceLogin, Command
                             progress: None,
                             expires_in: None,
                             error: Some(e.to_string()),
+                            encrypted_token: None,
                         },
                     );
                     return;
@@ -265,6 +295,7 @@ pub async fn twitch_cancel_login(app: AppHandle) -> Result<(), CommandError> {
             progress: None,
             expires_in: None,
             error: None,
+            encrypted_token: None,
         },
     );
     Ok(())

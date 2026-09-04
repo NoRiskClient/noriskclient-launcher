@@ -16,11 +16,22 @@ pub struct AuthBridgeResult {
     pub message: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct TwitchDeepLinkRequest {
+    pub action: String,
+    pub export_key: Option<String>,
+}
+
 /// Handles incoming deep link URLs.
 /// Parses the URL scheme and dispatches to the appropriate handler.
 pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
     for url in urls {
-        info!("[DeepLink] Received URL: {}", url);
+        info!(
+            "[DeepLink] Received URL: {}://{}{}",
+            url.scheme(),
+            url.host_str().unwrap_or_default(),
+            url.path()
+        );
 
         if url.scheme() != "norisk" {
             warn!("[DeepLink] Ignoring URL with unknown scheme: {}", url.scheme());
@@ -35,6 +46,7 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
                     warn!("[DeepLink] Unknown auth path: {}", url.path());
                 }
             }
+            Some("twitch") => handle_twitch_deep_link(app_handle, &url).await,
             Some(host) => {
                 warn!("[DeepLink] Unknown deep link host: {}", host);
             }
@@ -43,6 +55,41 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
             }
         }
     }
+}
+
+async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
+    let action = match url.path() {
+        "/link" => "link",
+        "/unlink" => "unlink",
+        "/change" => "change",
+        path => {
+            warn!("[DeepLink] Unknown Twitch path: {}", path);
+            return;
+        }
+    };
+    let export_key = url
+        .query_pairs()
+        .find(|(key, _)| key == "key")
+        .map(|(_, value)| value.to_string());
+
+    if action != "unlink" {
+        match export_key.as_deref().and_then(|key| crate::minecraft::auth::twitch_auth::decode_export_key(key).ok()) {
+            Some(_) => {}
+            None => {
+                warn!("[DeepLink] Twitch {} request missing a valid export key", action);
+                return;
+            }
+        }
+    }
+
+    info!("[DeepLink] Twitch {} request received", action);
+    let _ = app_handle.emit(
+        "deep-link-twitch-request",
+        TwitchDeepLinkRequest {
+            action: action.to_string(),
+            export_key,
+        },
+    );
 }
 
 /// Handles `norisk://auth/bridge?sessionId=xxx` deep links.

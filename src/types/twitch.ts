@@ -16,6 +16,7 @@ export interface TwitchLoginPayload {
   /** Seconds left before the device code expires. */
   expires_in: number | null;
   error: string | null;
+  encrypted_token: string | null;
 }
 
 export interface TwitchStatus {

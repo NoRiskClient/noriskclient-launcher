@@ -1,5 +1,9 @@
+use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::{Aes256Gcm, Nonce};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
 use log::{info, warn};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 use reqwest::StatusCode;
@@ -42,6 +46,53 @@ impl TwitchToken {
     pub fn is_expired(&self) -> bool {
         self.expires <= Utc::now()
     }
+}
+
+#[derive(Serialize)]
+struct TwitchTokenExport<'a> {
+    #[serde(rename = "a")]
+    access_token: &'a str,
+    #[serde(rename = "r")]
+    refresh_token: &'a str,
+}
+
+/// Encrypts the Twitch token pair with a caller-provided 32-byte AES-256 key.
+/// The compact output is `v1.<base64url nonce>.<base64url ciphertext-and-tag>`.
+pub fn encrypt_token_export(token: &TwitchToken, key: &[u8]) -> Result<String> {
+    let key: [u8; 32] = key.try_into().map_err(|_| {
+        AppError::Other("The Twitch deeplink key must decode to exactly 32 bytes.".to_string())
+    })?;
+    let payload = serde_json::to_vec(&TwitchTokenExport {
+        access_token: &token.access_token,
+        refresh_token: &token.refresh_token,
+    })
+    .map_err(|e| AppError::Other(format!("Could not serialize Twitch token export: {e}")))?;
+
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| AppError::Other(format!("Could not initialize token encryption: {e}")))?;
+    let mut nonce = [0u8; 12];
+    rand::thread_rng().fill_bytes(&mut nonce);
+    let ciphertext = cipher
+        .encrypt(Nonce::from_slice(&nonce), payload.as_ref())
+        .map_err(|e| AppError::Other(format!("Could not encrypt Twitch token export: {e}")))?;
+
+    Ok(format!(
+        "v1.{}.{}",
+        URL_SAFE_NO_PAD.encode(nonce),
+        URL_SAFE_NO_PAD.encode(ciphertext)
+    ))
+}
+
+pub fn decode_export_key(encoded_key: &str) -> Result<Vec<u8>> {
+    let key = URL_SAFE_NO_PAD.decode(encoded_key).map_err(|_| {
+        AppError::Other("The Twitch deeplink key must be base64url encoded.".to_string())
+    })?;
+    if key.len() != 32 {
+        return Err(AppError::Other(
+            "The Twitch deeplink key must decode to exactly 32 bytes.".to_string(),
+        ));
+    }
+    Ok(key)
 }
 
 #[derive(Deserialize, Debug, Clone)]
