@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "No se pudieron preparar los tokens de Twitch cifrados.",
   "deep_link.twitch.exportTitle": "Twitch vinculada",
   "deep_link.twitch.exportDescription": "Vinculación realizada correctamente. Copia este valor y pégalo de nuevo en el juego para finalizar la vinculación dentro del juego.",
-  "deep_link.twitch.copy": "Copiar",
+  "deep_link.twitch.copy": "Copiar y cerrar",
   "settings.sections.behaviour": "Comportamiento",
   "settings.sections.interface": "Descargas e interfaz",
   "settings.sections.login_cache": "Inicio de sesión y caché",

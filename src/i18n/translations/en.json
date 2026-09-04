@@ -462,7 +462,7 @@
   "deep_link.twitch.exportFailed": "Could not prepare the encrypted Twitch tokens.",
   "deep_link.twitch.exportTitle": "Twitch Linked",
   "deep_link.twitch.exportDescription": "Link successful. Copy this value and paste it back into the game to finish linking in-game.",
-  "deep_link.twitch.copy": "Copy",
+  "deep_link.twitch.copy": "Copy and close",
 
   "skins.signedOut.title": "Sign in to manage skins",
   "skins.signedOut.description": "Upload, switch and store your skins once you are signed in.",

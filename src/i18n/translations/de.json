@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "Die verschlüsselten Twitch-Tokens konnten nicht vorbereitet werden.",
   "deep_link.twitch.exportTitle": "Twitch verknüpft",
   "deep_link.twitch.exportDescription": "Verknüpfung erfolgreich. Kopiere diesen Wert und füge ihn wieder im Spiel ein, um die Verknüpfung im Spiel abzuschließen.",
-  "deep_link.twitch.copy": "Kopieren",
+  "deep_link.twitch.copy": "Kopieren und schließen",
   "news.title": "Neuigkeiten",
   "news.no_news_available": "Momentan keine Neuigkeiten verfügbar.",
   "news.item": "Neuigkeit",

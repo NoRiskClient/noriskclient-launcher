@@ -695,11 +695,10 @@ function DeepLinkTwitchTokenModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
 
-  const copy = async () => {
+  const copyAndClose = async () => {
     await navigator.clipboard.writeText(encryptedToken);
-    setCopied(true);
+    onClose();
   };
 
   return (
@@ -708,15 +707,15 @@ function DeepLinkTwitchTokenModal({
         <p>{t("deep_link.twitch.exportDescription")}</p>
         <button
           type="button"
-          onClick={() => void copy()}
+          onClick={() => void navigator.clipboard.writeText(encryptedToken)}
           title={t("deep_link.twitch.copy")}
           className="w-full truncate rounded border border-white/20 bg-black/40 px-3 py-2 text-left font-mono text-xs text-white hover:border-white/40"
         >
           {encryptedToken}
         </button>
         <div className="flex justify-end">
-          <Button variant="default" size="sm" onClick={() => void copy()}>
-            {copied ? t("twitch.copied") : t("deep_link.twitch.copy")}
+          <Button variant="default" size="sm" onClick={() => void copyAndClose()}>
+            {t("deep_link.twitch.copy")}
           </Button>
         </div>
       </div>

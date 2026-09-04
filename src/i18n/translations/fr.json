@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "Impossible de préparer les jetons Twitch chiffrés.",
   "deep_link.twitch.exportTitle": "Twitch lié",
   "deep_link.twitch.exportDescription": "Liaison réussie. Copiez cette valeur et collez-la dans le jeu pour terminer la liaison en jeu.",
-  "deep_link.twitch.copy": "Copier",
+  "deep_link.twitch.copy": "Copier et fermer",
   "settings.sections.behaviour": "Comportement",
   "settings.sections.interface": "Téléchargements et interface",
   "settings.sections.login_cache": "Connexion et cache",

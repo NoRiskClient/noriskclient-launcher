@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "एन्क्रिप्ट किए गए Twitch टोकन तैयार नहीं किए जा सके।",
   "deep_link.twitch.exportTitle": "Twitch लिंक हो गया",
   "deep_link.twitch.exportDescription": "लिंक सफल रहा। इस मान को कॉपी करें और गेम में लिंक पूरा करने के लिए इसे वापस गेम में पेस्ट करें।",
-  "deep_link.twitch.copy": "कॉपी करें",
+  "deep_link.twitch.copy": "कॉपी करें और बंद करें",
   "settings.sections.behaviour": "व्यवहार",
   "settings.sections.interface": "डाउनलोड और इंटरफ़ेस",
   "settings.sections.login_cache": "लॉगिन और कैश",

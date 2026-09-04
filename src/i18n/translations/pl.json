@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "Nie udało się przygotować zaszyfrowanych tokenów Twitch.",
   "deep_link.twitch.exportTitle": "Twitch połączony",
   "deep_link.twitch.exportDescription": "Połączenie zakończone sukcesem. Skopiuj tę wartość i wklej ją z powrotem w grze, aby zakończyć łączenie w grze.",
-  "deep_link.twitch.copy": "Kopiuj",
+  "deep_link.twitch.copy": "Kopiuj i zamknij",
   "settings.sections.behaviour": "Zachowanie",
   "settings.sections.interface": "Pobieranie i interfejs",
   "settings.sections.login_cache": "Logowanie i pamięć podręczna",

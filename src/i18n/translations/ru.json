@@ -22,7 +22,7 @@
   "deep_link.twitch.exportFailed": "Не удалось подготовить зашифрованные токены Twitch.",
   "deep_link.twitch.exportTitle": "Twitch привязан",
   "deep_link.twitch.exportDescription": "Привязка выполнена успешно. Скопируйте это значение и вставьте его обратно в игре, чтобы завершить привязку в игре.",
-  "deep_link.twitch.copy": "Копировать",
+  "deep_link.twitch.copy": "Копировать и закрыть",
   "settings.sections.behaviour": "Поведение",
   "settings.sections.interface": "Загрузки и интерфейс",
   "settings.sections.login_cache": "Вход и кэш",
