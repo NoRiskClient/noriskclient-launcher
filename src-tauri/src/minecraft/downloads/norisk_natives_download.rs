@@ -7,7 +7,18 @@ use tokio::fs;
 
 const NATIVES_DIR: &str = "natives";
 const MARKER_FILE: &str = ".nrc_natives";
-const LIBRARY_EXTENSIONS: [&str; 4] = [".dll", ".so", ".dylib", ".jnilib"];
+/// Bumped whenever extraction changes what lands on disk, so existing installs are redone.
+const EXTRACT_REVISION: u32 = 2;
+
+/// True for shared libraries on any platform. Linux carries the soversion *after* the
+/// suffix (`libavcodec.so.61`), so a trailing-extension test would miss every real library
+/// and keep only the `libjni*.so` bridges — which then fail to resolve at load time.
+fn is_shared_library(name: &str) -> bool {
+    name.ends_with(".dll")
+        || name.ends_with(".dylib")
+        || name.ends_with(".jnilib")
+        || name.contains(".so")
+}
 
 /// One Maven artifact whose platform-classified jar carries native libraries.
 pub struct NativeArtifact {
@@ -114,7 +125,7 @@ impl NoriskNativesDownloadService {
             .map(|a| format!("{}:{}:{}:{}", a.group_id, a.artifact_id, a.version, platform))
             .collect();
         coords.sort();
-        coords.join(",")
+        format!("v{} {}", EXTRACT_REVISION, coords.join(","))
     }
 
     async fn is_up_to_date(marker_path: &Path, target_dir: &Path, fingerprint: &str) -> bool {
@@ -169,7 +180,7 @@ impl NoriskNativesDownloadService {
                 if entry.is_dir() || !name.contains(&marker) || name.starts_with("META-INF/") {
                     continue;
                 }
-                if !LIBRARY_EXTENSIONS.iter().any(|ext| name.ends_with(ext)) {
+                if !is_shared_library(&name) {
                     continue;
                 }
                 let file_name = match name.rsplit('/').next() {
