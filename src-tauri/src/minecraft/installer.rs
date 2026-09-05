@@ -9,6 +9,7 @@ use crate::minecraft::downloads::mc_assets_download::MinecraftAssetsDownloadServ
 use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
+use crate::minecraft::downloads::norisk_natives_download::{NoriskNativesDownloadService, FFMPEG};
 use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
@@ -457,6 +458,18 @@ pub async fn install_minecraft_version(
             .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
             .await?
     });
+
+    // ffmpeg natives for the Twitch stream player, installed once per machine for every account.
+    // A failure must not block the launch, the client degrades gracefully without them.
+    if !NoriskNativesDownloadService::ffmpeg_ready() {
+        let natives_download = NoriskNativesDownloadService::new();
+        timed_step(&state, &summary, EventType::DownloadingNoRiskClientAssets, profile.id, "ffmpeg natives", || async {
+            if let Err(e) = natives_download.install(&FFMPEG).await {
+                log::error!("[NRC Natives] Continuing without ffmpeg natives: {}", e);
+            }
+            Ok::<(), AppError>(())
+        }).await?;
+    }
 
     // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());

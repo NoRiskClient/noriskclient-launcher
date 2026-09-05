@@ -114,6 +114,7 @@ pub async fn consume_pending(store: &MinecraftAuthStore) {
                     ignore_child_protection_warning: false,
                     auth_flow: handback.auth_flow,
                     mc_access_token_expires: Some(mc_token_expiry(MC_TOKEN_LIFETIME_SECS)),
+                    twitch_token: None,
                 };
                 (creds, true, username)
             }

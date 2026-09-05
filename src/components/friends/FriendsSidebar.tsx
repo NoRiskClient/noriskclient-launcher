@@ -96,7 +96,9 @@ export function FriendsSidebar() {
             (activeChatFriend || isSettingsOpen) ? "w-[380px] opacity-100" : "w-0 opacity-0"
           )}
           style={{
-            background: `linear-gradient(135deg, ${accentColor.value}40 0%, ${accentColor.value}30 50%, ${accentColor.value}35 100%)`,
+            background: "${colors.main}15",
+            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(12px)",
             borderLeft: (activeChatFriend || isSettingsOpen) ? `2px solid ${accentColor.value}50` : "none",
             boxShadow: (activeChatFriend || isSettingsOpen) ? `inset 0 0 100px ${accentColor.value}25` : "none",
           }}
@@ -108,7 +110,9 @@ export function FriendsSidebar() {
         <div
           className="w-96 h-full flex flex-col backdrop-blur-md"
           style={{
-            background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
+            background: `linear-gradient(135deg, ${accentColor.value}40 0%, ${accentColor.value}30 50%, ${accentColor.value}35 100%)`,
+            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(12px)",
             borderLeft: `2px solid ${accentColor.value}60`,
             boxShadow: `inset 0 0 120px ${accentColor.value}30, -5px 0 20px rgba(0, 0, 0, 0.5)`,
           }}
@@ -215,7 +219,7 @@ export function FriendsSidebar() {
               <div
                 className="flex items-center gap-3 px-4 py-3 rounded-xl mt-3"
                 style={{
-                  backgroundColor: `${accentColor.value}15`,
+                  background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
                   border: `1px solid ${accentColor.value}40`,
                 }}
               >
