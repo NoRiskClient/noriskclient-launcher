@@ -331,6 +331,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "Assets.car"
+    ],
     "createUpdaterArtifacts": true,
     "fileAssociations": [
       {
