@@ -14,6 +14,7 @@ import { NebulaGrid } from "./effects/NebulaGrid";
 import { NebulaVoxels } from "./effects/NebulaVoxels";
 import { NebulaLightning } from "./effects/NebulaLightning";
 import { NebulaLiquidChrome } from "./effects/NebulaLiquidChrome";
+import { useReducedMotionEnabled } from "../store/reduced-motion-store";
 
 interface EffectPreviewCardProps {
   effectId: string;
@@ -34,6 +35,7 @@ export default function EffectPreviewCard({
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { qualityLevel } = useQualitySettingsStore();
+  const reducedMotionEnabled = useReducedMotionEnabled();
 
   const getQualityParams = () => {
     switch (qualityLevel) {
@@ -52,7 +54,7 @@ export default function EffectPreviewCard({
     const previewProps = {
       ...qualityParams,
       className: "pointer-events-none",
-      forceEnable: true,
+      forceEnable: !reducedMotionEnabled,
     };
 
     switch (effectId) {
