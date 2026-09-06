@@ -25,6 +25,7 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
 import { isWindows } from "../../utils/platform";
+import { getMotionSafeScrollBehavior } from "../../store/reduced-motion-store";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -150,14 +151,14 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     spyTimeoutRef.current = setTimeout(() => {
       spySuppressRef.current = false;
     }, 500);
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.scrollIntoView({ behavior: getMotionSafeScrollBehavior(), block: "start" });
   };
 
   useEffect(() => {
     if (sidebarQuery) return;
     const root = contentRef.current;
     const defs = sectionDefs[activeTab];
-    if (!root || !defs) {
+    if (!root || defs.length === 0) {
       setActiveSection(null);
       return;
     }
