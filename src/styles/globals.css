@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+}
+
 @font-face {
     font-family: "SmallCaps";
     src: url("/fonts/smallcaps.ttf") format("truetype");
