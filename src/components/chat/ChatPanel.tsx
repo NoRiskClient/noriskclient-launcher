@@ -7,6 +7,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getMotionSafeScrollBehavior } from "../../store/reduced-motion-store";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 function getDateLabel(timestamp: number, t: (key: string) => string): string {
@@ -152,7 +153,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
             return [...prev, msg];
           });
           setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            messagesEndRef.current?.scrollIntoView({ behavior: getMotionSafeScrollBehavior() });
           }, 50);
         }
       }
@@ -299,7 +300,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
 
       // Scroll to bottom
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: getMotionSafeScrollBehavior() });
       }, 50);
     } catch (e) {
       console.error("Failed to send message:", e);
