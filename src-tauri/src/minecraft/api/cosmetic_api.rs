@@ -1,6 +1,13 @@
-use crate::{error::Result, utils::http_client::nrc_get};
+use crate::{error::Result, utils::http_client::{nrc_get, nrc_post}};
 use log::trace;
+use serde::Serialize;
 use uuid::Uuid;
+
+#[derive(Serialize)]
+struct SkinAnnounceRequest<'a> {
+    variant: &'a str,
+    url: &'a str,
+}
 
 pub struct CosmeticApi;
 
@@ -15,6 +22,25 @@ impl CosmeticApi {
         } else {
             String::from("https://api.norisk.gg/api/v1/cosmetics")
         }
+    }
+
+    pub async fn announce_skin(
+        &self,
+        norisk_token: &str,
+        skin_url: &str,
+        skin_variant: &str,
+        is_experimental: bool,
+    ) -> Result<()> {
+        let url = format!("{}/user/skin/announce", Self::get_api_base(is_experimental));
+        trace!("[Cosmetic API announce_skin] URL: {} variant: {}", url, skin_variant);
+
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&SkinAnnounceRequest { variant: skin_variant, url: skin_url })
+            .send("Announce skin")
+            .await?;
+
+        Ok(())
     }
 
     pub async fn get_player_outfit(

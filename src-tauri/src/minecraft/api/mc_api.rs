@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, TexturesData};
+use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, SkinUpdateResponse, TexturesData};
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
 use crate::utils::file_utils::write_atomic;
@@ -332,7 +332,7 @@ impl MinecraftApiService {
         uuid: &str,
         skin_path: &str,
         skin_variant: &str,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         debug!(
             "API call: change_skin for UUID: {} with variant: {}",
             uuid, skin_variant
@@ -414,7 +414,17 @@ impl MinecraftApiService {
         }
 
         debug!("API call completed: change_skin - Skin uploaded successfully");
-        Ok(())
+        Ok(Self::active_skin_url(response).await)
+    }
+
+    async fn active_skin_url(response: reqwest::Response) -> Option<String> {
+        match response.json::<SkinUpdateResponse>().await {
+            Ok(profile) => profile.active_skin().map(|skin| skin.url.clone()),
+            Err(e) => {
+                debug!("Could not read the skin url from the upload response: {:?}", e);
+                None
+            }
+        }
     }
 
     // Reset skin to default
@@ -466,7 +476,7 @@ impl MinecraftApiService {
         access_token: &str,
         base64_data: &str,
         skin_variant: &str,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         debug!(
             "API call: change_skin_from_base64 with variant: {}",
             skin_variant
@@ -544,7 +554,7 @@ impl MinecraftApiService {
         }
 
         debug!("API call completed: change_skin_from_base64 - Skin uploaded successfully");
-        Ok(())
+        Ok(Self::active_skin_url(response).await)
     }
 
     // Join server session - client side authentication for Minecraft servers
