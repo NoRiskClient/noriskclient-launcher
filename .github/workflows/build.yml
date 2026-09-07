@@ -104,6 +104,44 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: yarn install --frozen-lockfile # Use yarn install
 
+      # The sidecar is staged and signed before the bundler packs it;
+      # NRC_KEEP_STAGED_SIDECAR keeps the build from overwriting the signed file.
+      - name: Stage the capture sidecar
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        run: yarn native-deps && yarn stage-native
+
+      - name: Azure login (OIDC federated credential)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign norisk-capture.exe with Azure Artifact Signing
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Azure logout and record the signed sidecar
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          az logout
+          az account clear
+          $sidecar = "${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe"
+          $signature = Get-AuthenticodeSignature -FilePath $sidecar
+          if ($signature.Status -ne 'Valid') { throw "signing left norisk-capture.exe in state $($signature.Status)" }
+          echo "SIDECAR_SHA256=$((Get-FileHash -Algorithm SHA256 $sidecar).Hash)" >> $env:GITHUB_ENV
+          echo "SIDECAR_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" >> $env:GITHUB_ENV
+
       # Tauri Action now handles build and sign
       - name: Build and Sign Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -111,6 +149,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Wird evtl. intern von Tauri benötigt
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          NRC_KEEP_STAGED_SIDECAR: ${{ (matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')) && '1' || '' }}
           RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
         with:
           # Revert to using packageManager and args
@@ -153,6 +192,21 @@ jobs:
           rm -rf squashfs-root appimagetool-x86_64.AppImage
           
           echo "--- Fix Complete ---"
+
+      - name: Verify the bundled norisk-capture.exe
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $sidecar = "${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $sidecar).Hash
+          $signature = Get-AuthenticodeSignature -FilePath $sidecar
+          if ($hash -ne $env:SIDECAR_SHA256) {
+            throw "norisk-capture.exe does not match the staged file (expected $env:SIDECAR_SHA256, got $hash)"
+          }
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $env:SIDECAR_THUMBPRINT) {
+            throw "norisk-capture.exe signature check failed ($($signature.Status))"
+          }
+          Write-Host "norisk-capture.exe verified, signed by $($signature.SignerCertificate.Subject)"
 
       # --- Code Signing (Windows) via Azure Artifact Signing ---
       - name: Find Windows EXE for Signing

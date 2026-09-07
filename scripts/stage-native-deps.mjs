@@ -34,32 +34,36 @@ if (process.platform !== "win32") {
 
 console.log(`\nStaging capture binaries (${profile})`);
 
-step("building norisk-capture");
-execFileSync(
-  "cargo",
-  [
-    "build",
-    ...(profile === "release" ? ["--release"] : []),
-    "-p",
-    "norisk-capture",
-    "--bin",
-    "norisk-capture",
-  ],
-  { cwd: srcTauri, stdio: "inherit" },
-);
-
-freeLockedHooks();
-
 const triple = readHostTriple();
 fs.mkdirSync(staging, { recursive: true });
-
-const daemon = path.join(fromDir, "norisk-capture.exe");
-if (!fs.existsSync(daemon)) {
-  throw new Error(`norisk-capture.exe is not in ${fromDir} even after building.`);
-}
 const daemonTarget = path.join(staging, `norisk-capture-${triple}.exe`);
-fs.copyFileSync(daemon, daemonTarget);
-ok(`norisk-capture-${triple}.exe  (${mb(fs.statSync(daemonTarget).size)} MB)`);
+
+if (process.env.NRC_KEEP_STAGED_SIDECAR && fs.existsSync(daemonTarget)) {
+  ok(`norisk-capture-${triple}.exe kept as staged (NRC_KEEP_STAGED_SIDECAR)`);
+} else {
+  step("building norisk-capture");
+  execFileSync(
+    "cargo",
+    [
+      "build",
+      ...(profile === "release" ? ["--release"] : []),
+      "-p",
+      "norisk-capture",
+      "--bin",
+      "norisk-capture",
+    ],
+    { cwd: srcTauri, stdio: "inherit" },
+  );
+
+  freeLockedHooks();
+
+  const daemon = path.join(fromDir, "norisk-capture.exe");
+  if (!fs.existsSync(daemon)) {
+    throw new Error(`norisk-capture.exe is not in ${fromDir} even after building.`);
+  }
+  fs.copyFileSync(daemon, daemonTarget);
+  ok(`norisk-capture-${triple}.exe  (${mb(fs.statSync(daemonTarget).size)} MB)`);
+}
 
 const ffmpegBin = path.join(srcTauri, "third-party", "ffmpeg", "bin");
 const hookDir = path.join(srcTauri, "third-party", "graphics-hook");
