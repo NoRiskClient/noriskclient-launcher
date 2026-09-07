@@ -71,6 +71,9 @@ jobs:
     permissions:
       contents: read
       id-token: write # Azure OIDC login for Artifact Signing
+    env:
+      WINDOWS_LAUNCHER_EXE: ${{ github.workspace }}\src-tauri\target\release\noriskclient-launcher-v3.exe
+      WINDOWS_CAPTURE_EXE: ${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -104,11 +107,11 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: yarn install --frozen-lockfile # Use yarn install
 
-      # The sidecar is staged and signed before the bundler packs it;
-      # NRC_KEEP_STAGED_SIDECAR keeps the build from overwriting the signed file.
-      - name: Stage the capture sidecar
+      # Windows releases build and bundle in two steps so the launcher and the
+      # capture sidecar can be code signed in between.
+      - name: Build the Windows app
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
-        run: yarn native-deps && yarn stage-native
+        run: yarn tauri build --verbose --no-bundle
 
       - name: Azure login (OIDC federated credential)
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
@@ -118,38 +121,49 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign norisk-capture.exe with Azure Artifact Signing
+      - name: Sign the launcher and norisk-capture.exe with Azure Artifact Signing
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
           signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
-          files: ${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe
+          files: |
+            ${{ env.WINDOWS_LAUNCHER_EXE }}
+            ${{ env.WINDOWS_CAPTURE_EXE }}
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Azure logout and record the signed sidecar
+      - name: Azure logout and record the signed binaries
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
           az logout
           az account clear
-          $sidecar = "${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe"
-          $signature = Get-AuthenticodeSignature -FilePath $sidecar
-          if ($signature.Status -ne 'Valid') { throw "signing left norisk-capture.exe in state $($signature.Status)" }
-          echo "SIDECAR_SHA256=$((Get-FileHash -Algorithm SHA256 $sidecar).Hash)" >> $env:GITHUB_ENV
-          echo "SIDECAR_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" >> $env:GITHUB_ENV
+          $files = @{ LAUNCHER = $env:WINDOWS_LAUNCHER_EXE; SIDECAR = $env:WINDOWS_CAPTURE_EXE }
+          foreach ($entry in $files.GetEnumerator()) {
+            $signature = Get-AuthenticodeSignature -FilePath $entry.Value
+            if ($signature.Status -ne 'Valid') { throw "$($entry.Key) is in state $($signature.Status) after signing" }
+            echo "SIGNED_$($entry.Key)_SHA256=$((Get-FileHash -Algorithm SHA256 $entry.Value).Hash)" >> $env:GITHUB_ENV
+            echo "SIGNED_$($entry.Key)_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" >> $env:GITHUB_ENV
+          }
+
+      - name: Bundle the Windows app
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: yarn tauri bundle --verbose
 
       # Tauri Action now handles build and sign
       - name: Build and Sign Tauri App
+        if: ${{ !(matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')) }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Wird evtl. intern von Tauri benötigt
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          NRC_KEEP_STAGED_SIDECAR: ${{ (matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')) && '1' || '' }}
           RUSTFLAGS: ${{ matrix.platform == 'ubuntu-22.04' && '-C link-arg=-Wl,--no-as-needed -C link-arg=-layatana-appindicator3 -C link-arg=-Wl,--as-needed' || '' }}
         with:
           # Revert to using packageManager and args
@@ -193,20 +207,24 @@ jobs:
           
           echo "--- Fix Complete ---"
 
-      - name: Verify the bundled norisk-capture.exe
+      - name: Verify the bundled binaries
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          $sidecar = "${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe"
-          $hash = (Get-FileHash -Algorithm SHA256 $sidecar).Hash
-          $signature = Get-AuthenticodeSignature -FilePath $sidecar
-          if ($hash -ne $env:SIDECAR_SHA256) {
-            throw "norisk-capture.exe does not match the staged file (expected $env:SIDECAR_SHA256, got $hash)"
+          $files = @{ LAUNCHER = $env:WINDOWS_LAUNCHER_EXE; SIDECAR = $env:WINDOWS_CAPTURE_EXE }
+          foreach ($entry in $files.GetEnumerator()) {
+            $expectedHash = [Environment]::GetEnvironmentVariable("SIGNED_$($entry.Key)_SHA256")
+            $expectedThumbprint = [Environment]::GetEnvironmentVariable("SIGNED_$($entry.Key)_THUMBPRINT")
+            $hash = (Get-FileHash -Algorithm SHA256 $entry.Value).Hash
+            $signature = Get-AuthenticodeSignature -FilePath $entry.Value
+            if ($hash -ne $expectedHash) {
+              throw "$($entry.Key) does not match the signed file (expected $expectedHash, got $hash)"
+            }
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) {
+              throw "$($entry.Key) signature check failed ($($signature.Status))"
+            }
+            Write-Host "$($entry.Key) verified, signed by $($signature.SignerCertificate.Subject)"
           }
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $env:SIDECAR_THUMBPRINT) {
-            throw "norisk-capture.exe signature check failed ($($signature.Status))"
-          }
-          Write-Host "norisk-capture.exe verified, signed by $($signature.SignerCertificate.Subject)"
 
       # --- Code Signing (Windows) via Azure Artifact Signing ---
       - name: Find Windows EXE for Signing
