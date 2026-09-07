@@ -2599,6 +2599,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Пока нечего сохранять",
   "overlay.clip.error.BufferEmpty.hint": "Поиграй ещё несколько секунд и нажми снова.",
+  "overlay.clip.error.Paused": "Запись приостановлена",
+  "overlay.clip.error.Paused.hint": "Нажмите клавишу паузы снова, чтобы продолжить запись.",
   "overlay.clip.error.WindowNotFound": "Игра не найдена",
   "overlay.clip.error.WindowNotFound.hint": "Запись начнётся, как только запустится Minecraft.",
   "overlay.clip.error.EncoderUnavailable": "Кодировщик недоступен",

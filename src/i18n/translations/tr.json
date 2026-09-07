@@ -2589,6 +2589,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Henüz kaydedecek bir şey yok",
   "overlay.clip.error.BufferEmpty.hint": "Birkaç saniye oyna, sonra tekrar bas.",
+  "overlay.clip.error.Paused": "Kayıt duraklatıldı",
+  "overlay.clip.error.Paused.hint": "Yeniden kaydetmek için duraklatma tuşuna tekrar bas.",
   "overlay.clip.error.WindowNotFound": "Oyun bulunamadı",
   "overlay.clip.error.WindowNotFound.hint": "Minecraft çalışmaya başlayınca kayıt başlar.",
   "overlay.clip.error.EncoderUnavailable": "Kullanılabilir encoder yok",

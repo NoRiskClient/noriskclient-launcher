@@ -2589,6 +2589,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Ainda não há nada para salvar",
   "overlay.clip.error.BufferEmpty.hint": "Jogue por alguns segundos e pressione novamente.",
+  "overlay.clip.error.Paused": "A gravação está pausada",
+  "overlay.clip.error.Paused.hint": "Pressiona novamente a tecla de pausa para voltar a gravar.",
   "overlay.clip.error.WindowNotFound": "Nenhum jogo encontrado",
   "overlay.clip.error.WindowNotFound.hint": "A gravação começa assim que o Minecraft estiver em execução.",
   "overlay.clip.error.EncoderUnavailable": "Nenhum codificador disponível",

@@ -2351,6 +2351,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Nothing to save yet",
   "overlay.clip.error.BufferEmpty.hint": "Play for a few seconds, then press again.",
+  "overlay.clip.error.Paused": "Recording is paused",
+  "overlay.clip.error.Paused.hint": "Press the pause hotkey again to start recording.",
   "overlay.clip.error.WindowNotFound": "No game found",
   "overlay.clip.error.WindowNotFound.hint": "Recording starts once Minecraft is running.",
   "overlay.clip.error.EncoderUnavailable": "No encoder available",

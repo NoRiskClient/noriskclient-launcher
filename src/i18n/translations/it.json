@@ -2589,6 +2589,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Ancora niente da salvare",
   "overlay.clip.error.BufferEmpty.hint": "Gioca per qualche secondo, poi premi di nuovo.",
+  "overlay.clip.error.Paused": "La registrazione è in pausa",
+  "overlay.clip.error.Paused.hint": "Premi di nuovo il tasto di pausa per riprendere a registrare.",
   "overlay.clip.error.WindowNotFound": "Nessun gioco trovato",
   "overlay.clip.error.WindowNotFound.hint": "La registrazione inizia non appena Minecraft è avviato.",
   "overlay.clip.error.EncoderUnavailable": "Nessun encoder disponibile",

@@ -2589,6 +2589,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Rien à enregistrer pour l'instant",
   "overlay.clip.error.BufferEmpty.hint": "Joue quelques secondes, puis appuie à nouveau.",
+  "overlay.clip.error.Paused": "L'enregistrement est en pause",
+  "overlay.clip.error.Paused.hint": "Appuie à nouveau sur la touche de pause pour réenregistrer.",
   "overlay.clip.error.WindowNotFound": "Aucun jeu trouvé",
   "overlay.clip.error.WindowNotFound.hint": "L'enregistrement démarre dès que Minecraft est lancé.",
   "overlay.clip.error.EncoderUnavailable": "Aucun encodeur disponible",

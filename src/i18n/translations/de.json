@@ -2331,6 +2331,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Noch nichts zum Sichern da",
   "overlay.clip.error.BufferEmpty.hint": "Spiel ein paar Sekunden, dann nochmal drücken.",
+  "overlay.clip.error.Paused": "Aufnahme ist pausiert",
+  "overlay.clip.error.Paused.hint": "Drücke die Pause-Taste erneut, um wieder aufzunehmen.",
   "overlay.clip.error.WindowNotFound": "Kein Spiel gefunden",
   "overlay.clip.error.WindowNotFound.hint": "Aufgenommen wird erst, wenn Minecraft läuft.",
   "overlay.clip.error.EncoderUnavailable": "Kein Encoder verfügbar",

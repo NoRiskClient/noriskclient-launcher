@@ -2604,6 +2604,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "अभी सेव करने के लिए कुछ नहीं है",
   "overlay.clip.error.BufferEmpty.hint": "कुछ सेकंड खेलें, फिर दोबारा दबाएं।",
+  "overlay.clip.error.Paused": "रिकॉर्डिंग रुकी हुई है",
+  "overlay.clip.error.Paused.hint": "फिर से रिकॉर्ड करने के लिए पॉज़ कुंजी दोबारा दबाएँ।",
   "overlay.clip.error.WindowNotFound": "कोई गेम नहीं मिला",
   "overlay.clip.error.WindowNotFound.hint": "Minecraft चलने पर रिकॉर्डिंग शुरू हो जाती है।",
   "overlay.clip.error.EncoderUnavailable": "कोई एनकोडर उपलब्ध नहीं",
