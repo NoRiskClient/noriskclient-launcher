@@ -85,7 +85,10 @@ jobs:
         run: |
           set -euo pipefail
           test -s icon-build/Assets.car
-          strings icon-build/Assets.car | grep -q 'norisk-bolt'
+          # Keep strings and grep off one pipe: grep -q exits on the first match,
+          # which breaks the pipe under pipefail and fails an otherwise good build.
+          strings icon-build/Assets.car > icon-build/car-strings.txt
+          grep -q 'norisk-bolt' icon-build/car-strings.txt
           ls -l icon-build/Assets.car
 
       - name: Upload the compiled catalog

@@ -31,6 +31,9 @@ xcrun actool icons/NoRiskLauncher.icon \
   --platform macosx \
   --output-format human-readable-text --notices --warnings --errors
 
-strings "$out/Assets.car" | grep -q 'norisk-bolt'
+# grep -q exits on the first match and breaks the pipe, which pipefail treats
+# as a failure, so run the two separately.
+strings "$out/Assets.car" > "$out/strings.txt"
+grep -q 'norisk-bolt' "$out/strings.txt"
 cp "$out/Assets.car" Assets.car
 echo "Wrote src-tauri/Assets.car"
