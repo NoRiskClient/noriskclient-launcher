@@ -313,6 +313,7 @@ pub enum ErrorCode {
     AudioDevice,
     ClipWrite,
     BufferEmpty,
+    Paused,
     Internal,
 }
 
