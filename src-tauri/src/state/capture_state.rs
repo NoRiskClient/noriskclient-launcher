@@ -161,6 +161,14 @@ impl CaptureSupervisor {
             .map_err(|_| AppError::Other("the capture supervisor is not running".into()))
     }
 
+    pub fn buffering_wanted(&self) -> bool {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .buffering_enabled
+            .unwrap_or(true)
+    }
+
     pub fn attached(&self) -> Option<u32> {
         self.session
             .lock()
