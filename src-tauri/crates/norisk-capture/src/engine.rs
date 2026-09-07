@@ -1647,7 +1647,7 @@ fn hook_handshake(
     crate::capture::hook::HookTexture,
 )> {
     use crate::capture::hook::{self, HookStep};
-    const BUDGET: Duration = Duration::from_millis(2_500);
+    const BUDGET: Duration = Duration::from_millis(6_000);
 
     let dll = hook::locate_hook_dll()?;
 
