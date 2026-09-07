@@ -2142,7 +2142,7 @@
   "settings.clips.status.failed": "L'enregistrement s'est arrêté à cause d'une erreur. Consulte le journal pour plus de détails.",
   "settings.clips.hotkeys.title": "Touches",
   "settings.clips.hotkeys.description": "Choisis la touche que tu veux, c'est toi qui décides.",
-  "settings.clips.hotkeys.warning": "Ces touches sont envoyées au launcher, pas à Minecraft. Choisis quelque chose dont le jeu n'a pas besoin, sinon cette action cessera de fonctionner tant que les clips sont activés.",
+  "settings.clips.hotkeys.warning": "Le launcher surveille ces touches dans tout le système, elles se déclenchent donc aussi quand tu écris dans le chat. Dans Minecraft elles continuent de fonctionner normalement : rien n'est retiré au jeu.",
   "settings.clips.hotkeys.save": "Enregistrer le clip",
   "settings.clips.hotkeys.save.description": "Enregistre ce qui vient de se passer, depuis le buffer.",
   "settings.clips.hotkeys.toggle": "Mettre l'enregistrement en pause",

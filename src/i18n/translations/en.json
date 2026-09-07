@@ -2182,7 +2182,7 @@
   "settings.clips.status.failed": "Recording stopped because of an error. See the log for details.",
   "settings.clips.hotkeys.title": "Keys",
   "settings.clips.hotkeys.description": "Pick any key you like — these are yours to choose.",
-  "settings.clips.hotkeys.warning": "These keys go to the launcher, not to Minecraft. Pick something the game does not need, or that action will stop working while clips are on.",
+  "settings.clips.hotkeys.warning": "The launcher watches these keys system-wide, so they also fire while you type in chat. In Minecraft they keep working as usual — nothing is taken away from the game.",
   "settings.clips.hotkeys.save": "Save clip",
   "settings.clips.hotkeys.save.description": "Saves what just happened, from the buffer.",
   "settings.clips.hotkeys.toggle": "Pause recording",

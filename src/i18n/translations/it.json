@@ -2142,7 +2142,7 @@
   "settings.clips.status.failed": "Registrazione interrotta per un errore. Controlla il log per i dettagli.",
   "settings.clips.hotkeys.title": "Tasti",
   "settings.clips.hotkeys.description": "Scegli il tasto che preferisci, sono a tua scelta.",
-  "settings.clips.hotkeys.warning": "Questi tasti vanno al launcher, non a Minecraft. Scegli qualcosa che il gioco non usa, altrimenti quell'azione smetterà di funzionare finché le clip sono attive.",
+  "settings.clips.hotkeys.warning": "Il launcher tiene d'occhio questi tasti a livello di sistema, quindi si attivano anche mentre scrivi in chat. In Minecraft continuano a funzionare normalmente: al gioco non viene tolto nulla.",
   "settings.clips.hotkeys.save": "Salva clip",
   "settings.clips.hotkeys.save.description": "Salva quanto appena successo, dal buffer.",
   "settings.clips.hotkeys.toggle": "Metti in pausa la registrazione",

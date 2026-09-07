@@ -2140,7 +2140,7 @@
   "settings.clips.status.failed": "Nagrywanie zatrzymane z powodu błędu. Szczegóły znajdziesz w logu.",
   "settings.clips.hotkeys.title": "Klawisze",
   "settings.clips.hotkeys.description": "Wybierz dowolny klawisz, to twój wybór.",
-  "settings.clips.hotkeys.warning": "Te klawisze trafiają do launchera, nie do Minecrafta. Wybierz coś, czego gra nie potrzebuje, inaczej ta czynność przestanie działać, gdy klipy są włączone.",
+  "settings.clips.hotkeys.warning": "Launcher nasłuchuje tych klawiszy w całym systemie, więc uruchomią się także wtedy, gdy piszesz na czacie. W Minecraft działają normalnie — gra nic nie traci.",
   "settings.clips.hotkeys.save": "Zapisz klip",
   "settings.clips.hotkeys.save.description": "Zapisuje to, co właśnie się wydarzyło, z bufora.",
   "settings.clips.hotkeys.toggle": "Wstrzymaj nagrywanie",

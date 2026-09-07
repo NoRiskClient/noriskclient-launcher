@@ -2142,7 +2142,7 @@
   "settings.clips.status.failed": "La grabación se detuvo por un error. Consulta el registro para más detalles.",
   "settings.clips.hotkeys.title": "Teclas",
   "settings.clips.hotkeys.description": "Elige la tecla que quieras, tú decides.",
-  "settings.clips.hotkeys.warning": "Estas teclas van al launcher, no a Minecraft. Elige algo que el juego no necesite, o esa acción dejará de funcionar mientras los clips estén activos.",
+  "settings.clips.hotkeys.warning": "El lanzador vigila estas teclas en todo el sistema, así que también se activan mientras escribes en el chat. En Minecraft siguen funcionando con normalidad: al juego no se le quita nada.",
   "settings.clips.hotkeys.save": "Guardar clip",
   "settings.clips.hotkeys.save.description": "Guarda lo que acaba de pasar, desde el búfer.",
   "settings.clips.hotkeys.toggle": "Pausar grabación",

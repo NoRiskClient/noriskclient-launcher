@@ -2142,7 +2142,7 @@
   "settings.clips.status.failed": "Bir hata nedeniyle kayıt durduruldu. Ayrıntılar günlükte.",
   "settings.clips.hotkeys.title": "Tuşlar",
   "settings.clips.hotkeys.description": "İstediğin herhangi bir tuşu seç, seçim tamamen sana ait.",
-  "settings.clips.hotkeys.warning": "Bu tuşlar Minecraft'a değil launcher'a gider. Oyunda ihtiyaç duymadığın bir tuş seç, aksi halde klipler açıkken o eylem çalışmaz.",
+  "settings.clips.hotkeys.warning": "Launcher bu tuşları sistem genelinde dinler, bu yüzden sohbete yazarken de tetiklenirler. Minecraft'ta normal şekilde çalışmaya devam ederler — oyundan hiçbir şey alınmıyor.",
   "settings.clips.hotkeys.save": "Klip kaydet",
   "settings.clips.hotkeys.save.description": "Arabellekten az önce olanı kaydeder.",
   "settings.clips.hotkeys.toggle": "Kaydı duraklat",

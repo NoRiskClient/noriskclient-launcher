@@ -2142,7 +2142,7 @@
   "settings.clips.status.failed": "Запись остановлена из-за ошибки. Подробности смотри в логе.",
   "settings.clips.hotkeys.title": "Клавиши",
   "settings.clips.hotkeys.description": "Выбирай любую клавишу, какую хочешь, решать тебе.",
-  "settings.clips.hotkeys.warning": "Эти клавиши обрабатывает лаунчер, а не Minecraft. Выбирай то, что не нужно игре, иначе это действие перестанет работать, пока включены клипы.",
+  "settings.clips.hotkeys.warning": "Лаунчер следит за этими клавишами во всей системе, поэтому они срабатывают и когда вы пишете в чате. В Minecraft они продолжают работать как обычно — у игры ничего не отнимается.",
   "settings.clips.hotkeys.save": "Сохранить клип",
   "settings.clips.hotkeys.save.description": "Сохраняет то, что только что произошло, из буфера.",
   "settings.clips.hotkeys.toggle": "Пауза записи",
