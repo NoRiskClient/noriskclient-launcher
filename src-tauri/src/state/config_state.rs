@@ -305,6 +305,7 @@ impl ClipConfig {
                 "nvenc" => EncoderPreference::Nvenc,
                 "amf" => EncoderPreference::Amf,
                 "quick_sync" => EncoderPreference::QuickSync,
+                "video_toolbox" => EncoderPreference::VideoToolbox,
                 "software" => EncoderPreference::Software,
                 _ => EncoderPreference::Auto,
             },

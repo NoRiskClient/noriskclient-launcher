@@ -103,6 +103,7 @@ pub enum EncoderPreference {
     Nvenc,
     Amf,
     QuickSync,
+    VideoToolbox,
     Software,
 }
 
