@@ -235,6 +235,7 @@ impl CaptureSupervisor {
                         "capture_method": method,
                         "minutes": tenths(since.elapsed().as_secs_f64() / 60.0),
                         "dropped_frames": status.dropped_frames,
+                        "dropped_before_keyframe": status.dropped_before_keyframe,
                         "encode_latency_ms_p99": status.encode_latency_ms_p99,
                         "ended_with": format!("{to:?}"),
                     }),

@@ -37,6 +37,7 @@ pub struct Engine {
     paused_pid: Option<u32>,
     last_status: Instant,
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
+    keyframe_warned: std::cell::Cell<bool>,
 }
 
 enum FrameSource {
@@ -239,6 +240,7 @@ impl Engine {
             paused_pid: None,
             last_status: Instant::now(),
             rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
+            keyframe_warned: std::cell::Cell::new(false),
         }
     }
 
@@ -545,6 +547,7 @@ impl Engine {
 
     fn attach(&mut self, target: window::GameWindow) -> Result<()> {
         log::info!("Attaching to '{}' (pid {})", target.title, target.pid);
+        self.keyframe_warned.set(false);
 
         let device = CaptureDevice::new_for_window(target.hwnd)?;
         let (codec, chosen) = self.choose_encoder()?;
@@ -949,6 +952,7 @@ impl Engine {
                 capture_fps: 0.0,
                 encode_fps: 0.0,
                 dropped_frames: 0,
+                dropped_before_keyframe: 0,
                 encode_latency_ms_p99: 0.0,
                 capture_method: None,
                 active_codec: None,
@@ -958,10 +962,26 @@ impl Engine {
         };
 
         let stats = pipeline.source.stats();
-        let (buffer_fill_seconds, buffer_bytes) = {
+        let (buffer_fill_seconds, buffer_bytes, dropped_before_keyframe) = {
             let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
-            (ring.duration_seconds() as f32, ring.bytes())
+            (
+                ring.duration_seconds() as f32,
+                ring.bytes(),
+                ring.dropped_before_first_keyframe(),
+            )
         };
+
+        if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned.get()
+        {
+            self.keyframe_warned.set(true);
+            log::warn!(
+                "{} has produced {dropped_before_keyframe} packet(s) and not one keyframe, so the \
+                 replay buffer is throwing all of them away and every clip will fail. The encoder \
+                 is not honouring the keyframe request.",
+                crate::encoder::encoder_name(pipeline.settings.codec, pipeline.encoder)
+                    .unwrap_or("the encoder")
+            );
+        }
 
         let now = Instant::now();
         let (received_before, delivered_before, sampled_at) = self.rate_sample.replace((
@@ -985,6 +1005,7 @@ impl Engine {
             capture_fps: rate(stats.received, received_before),
             encode_fps: rate(stats.delivered, delivered_before),
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
+            dropped_before_keyframe: dropped_before_keyframe,
             encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
             capture_method: Some(pipeline.source.describe().to_string()),
             active_codec: Some(pipeline.settings.codec),
