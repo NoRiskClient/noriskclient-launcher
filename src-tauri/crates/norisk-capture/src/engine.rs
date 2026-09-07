@@ -24,6 +24,7 @@ const ENCODE_QUEUE_DEPTH: usize = 4;
 const PROGRESS_EVERY: Duration = Duration::from_millis(150);
 
 const MIN_CAPTURE_SIDE: u32 = 128;
+const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct Engine {
@@ -108,6 +109,7 @@ const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 struct Pipeline {
     source: FrameSource,
     encode_thread: Option<std::thread::JoinHandle<()>>,
+    encode_done: Receiver<()>,
     frames_tx: Option<SyncSender<PoolFrame>>,
     ring: Arc<Mutex<RingBuffer>>,
     extradata: Vec<u8>,
@@ -621,13 +623,17 @@ impl Engine {
         let encode_latency: LatencyWindow = Arc::new(Mutex::new(
             VecDeque::with_capacity(LATENCY_SAMPLES),
         ));
+        let (encode_done_tx, encode_done) = std::sync::mpsc::channel::<()>();
         let encode_thread = {
             let ring = Arc::clone(&ring);
             let events = self.events.clone();
             let latency = Arc::clone(&encode_latency);
             std::thread::Builder::new()
                 .name("nrc-encode".into())
-                .spawn(move || encode_loop(encoder, frames_rx, ring, events, fps, latency))
+                .spawn(move || {
+                    let _done = encode_done_tx;
+                    encode_loop(encoder, frames_rx, ring, events, fps, latency)
+                })
                 .context("could not start the encode thread")?
         };
 
@@ -726,6 +732,7 @@ impl Engine {
             audio,
             source,
             encode_thread: Some(encode_thread),
+            encode_done,
             frames_tx: Some(frames_tx),
             ring,
             extradata,
@@ -806,7 +813,14 @@ impl Engine {
         drop(pipeline.source);
         pipeline.frames_tx.take();
         if let Some(handle) = pipeline.encode_thread.take() {
-            let _ = handle.join();
+            match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
+                Err(RecvTimeoutError::Timeout) => log::warn!(
+                    "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it finish \n                     on its own so the engine stays answerable"
+                ),
+                _ => {
+                    let _ = handle.join();
+                }
+            }
         }
     }
 
