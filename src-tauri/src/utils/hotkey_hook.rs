@@ -7,8 +7,13 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN,
+    WM_MBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN,
 };
+
+pub const MOUSE_MIDDLE: u32 = 0x1_0004;
+pub const MOUSE_X1: u32 = 0x1_0005;
+pub const MOUSE_X2: u32 = 0x1_0006;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Binding {
@@ -85,6 +90,18 @@ fn virtual_key(code: &str) -> Option<u32> {
     }
 
     Some(match code {
+        "MouseMiddle" | "Mouse3" => MOUSE_MIDDLE,
+        "MouseX1" | "Mouse4" => MOUSE_X1,
+        "MouseX2" | "Mouse5" => MOUSE_X2,
+        "NumpadMultiply" => 0x6A,
+        "NumpadAdd" => 0x6B,
+        "NumpadSubtract" => 0x6D,
+        "NumpadDecimal" => 0x6E,
+        "NumpadDivide" => 0x6F,
+        "NumpadEnter" => 0x0D,
+        "CapsLock" => 0x14,
+        "NumLock" => 0x90,
+        "IntlBackslash" => 0xE2,
         "Space" => 0x20,
         "Enter" => 0x0D,
         "Tab" => 0x09,
@@ -156,20 +173,24 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::er
     let handle = std::thread::Builder::new()
         .name("nrc-hotkey-hook".into())
         .spawn(move || {
-            let hook = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(callback), None, 0) };
+            let keyboard = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(callback), None, 0) };
 
-            let hook = match hook {
-                Ok(hook) => {
-                    let _ = ready_tx.send(Ok(unsafe {
-                        windows::Win32::System::Threading::GetCurrentThreadId()
-                    }));
-                    hook
-                }
+            let keyboard = match keyboard {
+                Ok(hook) => hook,
                 Err(e) => {
                     let _ = ready_tx.send(Err(format!("{e}")));
                     return;
                 }
             };
+
+            let mouse = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_callback), None, 0) };
+            if let Err(e) = &mouse {
+                log::warn!("Mouse buttons cannot be watched for: {e}");
+            }
+
+            let _ = ready_tx.send(Ok(unsafe {
+                windows::Win32::System::Threading::GetCurrentThreadId()
+            }));
 
             let mut message = MSG::default();
             while unsafe { GetMessageW(&mut message, None, 0, 0) }.as_bool() {
@@ -178,7 +199,10 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::er
 
             log::debug!("Hotkey hook thread finished");
 
-            let _ = unsafe { UnhookWindowsHookEx(hook) };
+            if let Ok(mouse) = mouse {
+                let _ = unsafe { UnhookWindowsHookEx(mouse) };
+            }
+            let _ = unsafe { UnhookWindowsHookEx(keyboard) };
         })
         .map_err(|e| {
             crate::error::AppError::Other(format!("could not start the hotkey thread: {e}"))
@@ -220,25 +244,49 @@ pub fn uninstall() {
     }
 }
 
+fn dispatch(pressed: u32) {
+    if let Ok(watch) = WATCH.try_lock() {
+        if let Some(watch) = watch.as_ref() {
+            if let Some((_, tag)) = watch.bindings.iter().find(|(b, _)| b.matches(pressed)) {
+                let _ = watch.events.send(Press::Fired(*tag));
+            } else if watch.bindings.iter().any(|(b, _)| b.key == pressed) {
+                let _ = watch.events.send(Press::Ignored {
+                    key: pressed,
+                    ctrl: held(VK_CONTROL.0 as i32),
+                    shift: held(VK_SHIFT.0 as i32),
+                    alt: held(VK_MENU.0 as i32),
+                });
+            }
+        }
+    }
+}
+
+unsafe extern "system" fn mouse_callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let pressed = match wparam.0 as u32 {
+            WM_MBUTTONDOWN => Some(MOUSE_MIDDLE),
+            WM_XBUTTONDOWN => {
+                let info = &*(lparam.0 as *const MSLLHOOKSTRUCT);
+                match (info.mouseData >> 16) as u16 {
+                    1 => Some(MOUSE_X1),
+                    2 => Some(MOUSE_X2),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        if let Some(pressed) = pressed {
+            dispatch(pressed);
+        }
+    }
+
+    CallNextHookEx(None, code, wparam, lparam)
+}
+
 unsafe extern "system" fn callback(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 && (wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN) {
         let info = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
-
-        if let Ok(watch) = WATCH.try_lock() {
-            if let Some(watch) = watch.as_ref() {
-                if let Some((_, tag)) = watch.bindings.iter().find(|(b, _)| b.matches(info.vkCode))
-                {
-                    let _ = watch.events.send(Press::Fired(*tag));
-                } else if watch.bindings.iter().any(|(b, _)| b.key == info.vkCode) {
-                    let _ = watch.events.send(Press::Ignored {
-                        key: info.vkCode,
-                        ctrl: held(VK_CONTROL.0 as i32),
-                        shift: held(VK_SHIFT.0 as i32),
-                        alt: held(VK_MENU.0 as i32),
-                    });
-                }
-            }
-        }
+        dispatch(info.vkCode);
     }
 
     CallNextHookEx(None, code, wparam, lparam)
@@ -265,6 +313,26 @@ mod tests {
 
         let plain = Binding::parse("F8").unwrap();
         assert!(!plain.ctrl && !plain.shift && !plain.alt);
+    }
+
+    #[test]
+    fn every_key_the_settings_screen_can_record_is_bindable() {
+        let codes = [
+            "Insert", "Delete", "Home", "End", "PageUp", "PageDown", "ArrowUp", "ArrowDown",
+            "ArrowLeft", "ArrowRight", "Pause", "ScrollLock", "PrintScreen", "CapsLock",
+            "NumLock", "Numpad0", "Numpad9", "NumpadEnter", "NumpadAdd", "NumpadSubtract",
+            "NumpadMultiply", "NumpadDivide", "NumpadDecimal", "Tab", "Backspace", "Enter",
+            "Backquote", "Minus", "Equal", "BracketLeft", "BracketRight", "Backslash",
+            "Semicolon", "Quote", "Comma", "Period", "Slash", "IntlBackslash",
+            "MouseMiddle", "MouseX1", "MouseX2",
+        ];
+
+        let missing: Vec<&str> = codes
+            .into_iter()
+            .filter(|code| Binding::parse(code).is_none())
+            .collect();
+
+        assert!(missing.is_empty(), "these cannot be bound: {missing:?}");
     }
 
     #[test]
