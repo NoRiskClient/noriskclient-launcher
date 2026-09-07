@@ -21,6 +21,7 @@ pub struct CaptureStatus {
     pub audio_devices: Vec<AudioDeviceInfo>,
     pub microphones: Vec<AudioDeviceInfo>,
     pub supports_game_only_audio: bool,
+    pub runtime: crate::utils::capture_runtime::RuntimeState,
 }
 
 #[tauri::command]
@@ -47,6 +48,8 @@ pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>
 
 pub fn start_on_launch(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
+        crate::utils::capture_runtime::remove_legacy_install_files();
+
         let Ok(state) = State::get().await else {
             return;
         };
@@ -81,7 +84,8 @@ pub async fn bring_up(
         log::error!("Could not create the clip overlay: {e}");
     }
 
-    state.capture_supervisor.start().await?;
+    let engine = crate::utils::capture_runtime::ensure_engine().await?;
+    state.capture_supervisor.start(engine).await?;
     state
         .capture_supervisor
         .send(LauncherToCapture::Configure(clips.to_capture_config()))?;
@@ -152,6 +156,7 @@ pub async fn capture_status() -> Result<CaptureStatus, CommandError> {
         audio_devices: audio.0,
         microphones: audio.1,
         supports_game_only_audio: audio.2,
+        runtime: crate::utils::capture_runtime::state(),
     })
 }
 
@@ -168,8 +173,13 @@ pub async fn capture_encoder_capabilities() -> Result<Vec<EncoderCapability>, Co
         }
     }
 
+    let Some(engine) = crate::utils::capture_runtime::installed_engine() else {
+        log::debug!("Capture runtime is not installed yet; encoder capabilities come after enabling clips");
+        return Ok(Vec::new());
+    };
+
     let was_running = supervisor.is_running().await;
-    supervisor.start().await?;
+    supervisor.start(engine).await?;
 
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     let mut capabilities = Vec::new();

@@ -12,7 +12,8 @@
     "tauri": "tauri",
     "icons": "node scripts/generate-icon-bundle.mjs",
     "native-deps": "node scripts/setup-native-deps.mjs",
-    "stage-native": "node scripts/stage-native-deps.mjs"
+    "stage-native": "node scripts/stage-native-deps.mjs",
+    "pack-capture-runtime": "node scripts/pack-capture-runtime.mjs"
   },
   "dependencies": {
     "@iconify/react": "^5.2.1",

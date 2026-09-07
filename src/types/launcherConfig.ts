@@ -101,8 +101,15 @@ export interface OtherGame {
   name: string;
 }
 
+export type CaptureRuntimeState =
+  | { state: "ready" }
+  | { state: "missing" }
+  | { state: "downloading"; downloaded: number; total: number | null }
+  | { state: "failed"; message: string };
+
 export interface CaptureStatus {
   running: boolean;
+  runtime: CaptureRuntimeState;
   state:
     | "idle"
     | "attaching"

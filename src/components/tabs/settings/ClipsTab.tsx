@@ -30,6 +30,7 @@ import {
   applyClipSettings,
   releaseHotkeys,
   openClipFolder,
+  runtimeDownloadPercent,
 } from "../../../services/clip-service";
 import type {
   AudioDeviceInfo,
@@ -148,8 +149,10 @@ export function ClipsTab() {
     };
   }, []);
 
+  const runtimeReady = status?.runtime.state === "ready";
+
   useEffect(() => {
-    if (!supported) return;
+    if (!supported || !runtimeReady) return;
     let cancelled = false;
     getEncoderCapabilities()
       .then((next) => {
@@ -161,7 +164,7 @@ export function ClipsTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [supported, runtimeReady]);
 
   if (!supported) {
     return (
@@ -827,6 +830,20 @@ function describeStatus(
   applying: boolean,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): { type: "success" | "warning" | "error" | "info"; text: string } {
+  if (status?.runtime.state === "downloading") {
+    return {
+      type: "info",
+      text: t("settings.clips.status.runtime_downloading", {
+        percent: runtimeDownloadPercent(status.runtime),
+      }),
+    };
+  }
+  if (status?.runtime.state === "failed") {
+    return {
+      type: "error",
+      text: t("settings.clips.status.runtime_failed", { error: status.runtime.message }),
+    };
+  }
   if (applying) {
     return { type: "info", text: t("settings.clips.status.applying") };
   }
@@ -1113,6 +1130,9 @@ function EncoderHint({
   codec: ClipCodec;
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
+  if (status && status.runtime.state !== "ready") {
+    return <>{t("settings.clips.quality.encoder.runtime_pending")}</>;
+  }
   if (matrix === null) {
     return <>{t("settings.clips.quality.encoder.probing")}</>;
   }
