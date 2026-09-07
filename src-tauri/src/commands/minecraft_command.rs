@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::error::{AppError, CommandError};
+use crate::minecraft::api::cosmetic_api::CosmeticApi;
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;
 use crate::minecraft::api::mc_api::MinecraftApiService;
@@ -25,6 +26,29 @@ use crate::minecraft::dto::skin_payloads::{
 use crate::utils::mc_utils::{atomic_write, extract_skin_info_from_profile, fetch_skin_base64_for_uuid, get_base64_from_skin_source, normalize_uuid};
 use chrono::Utc;
 // --- End New Imports ---
+
+fn announce_skin_to_norisk(skin_url: Option<String>, skin_variant: &str) {
+    let Some(skin_url) = skin_url else {
+        debug!("No skin url returned by Mojang, skipping NoRisk announce");
+        return;
+    };
+    let skin_variant = skin_variant.to_string();
+
+    tokio::spawn(async move {
+        let announced = async {
+            let ctx = crate::commands::request_context::account_ctx(None).await?;
+            CosmeticApi::new()
+                .announce_skin(&ctx.token, &skin_url, &skin_variant, ctx.is_experimental)
+                .await
+                .map_err(CommandError::from)
+        }
+        .await;
+
+        if let Err(e) = announced {
+            debug!("Failed to announce skin to NoRisk: {:?}", e);
+        }
+    });
+}
 
 #[tauri::command]
 pub async fn get_minecraft_versions() -> Result<VersionManifest, CommandError> {
@@ -310,7 +334,10 @@ pub async fn upload_skin<R: tauri::Runtime>(
         )
         .await
     {
-        Ok(_) => debug!("Successfully uploaded skin to Minecraft API"),
+        Ok(skin_url) => {
+            debug!("Successfully uploaded skin to Minecraft API");
+            announce_skin_to_norisk(skin_url, &skin_variant);
+        }
         Err(e) => {
             debug!("Failed to upload skin to Minecraft API: {:?}", e);
             return Err(CommandError::from(e));
@@ -571,8 +598,9 @@ pub async fn apply_skin_from_base64(
         .change_skin_from_base64(&access_token, &base64_data, &skin_variant)
         .await
     {
-        Ok(_) => {
+        Ok(skin_url) => {
             debug!("Successfully applied skin from base64 data");
+            announce_skin_to_norisk(skin_url, &skin_variant);
 
             let mut props = std::collections::HashMap::new();
             props.insert("skin_name".to_string(), serde_json::Value::String(skin_name));

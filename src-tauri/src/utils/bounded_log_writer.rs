@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::roll::Roll;
@@ -11,6 +12,7 @@ pub const MAX_LOG_BYTES: u64 = 10 * 1024 * 1024;
 pub const ROTATED_BACKUP_COUNT: u32 = 5;
 const ROTATE_MARKER: &[u8] = b"[NRC] log rotated -- previous chunk gzipped to nrc-process.log.N.gz; cap is 10 MB per segment, 5 backups.\n";
 const FORWARD_BUF_BYTES: usize = 8 * 1024;
+const WRITE_RETRY_COOLDOWN: Duration = Duration::from_secs(30);
 
 pub struct BoundedLogWriter {
     file: Option<File>,
@@ -78,13 +80,21 @@ impl BoundedLogWriter {
             .map_err(io_err)?
         {
             // Roller failed -- reopen primary in append mode so writes survive.
+            // Reset the budget so the next attempt is one segment away instead of
+            // on every write; returning Err here would stop capture for good.
+            log::warn!(
+                "[Log Archive] could not rotate {:?}, appending past the size cap until the next attempt: {}",
+                self.path,
+                e
+            );
             let reopened = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(&self.path)
                 .await?;
             self.file = Some(reopened);
-            return Err(io_err(e));
+            self.bytes_written = 0;
+            return Ok(());
         }
 
         let mut new_file = OpenOptions::new()
@@ -110,22 +120,32 @@ where
 {
     let mut buf = vec![0u8; FORWARD_BUF_BYTES];
     // Keep draining after write failure; closing the pipe would SIGPIPE the game.
-    let mut writes_disabled = false;
+    let mut retry_writes_at: Option<Instant> = None;
     loop {
         match reader.read(&mut buf).await {
             Ok(0) => return,
             Ok(n) => {
-                if writes_disabled {
-                    continue;
+                if let Some(deadline) = retry_writes_at {
+                    if Instant::now() < deadline {
+                        continue;
+                    }
                 }
                 let mut w = writer.lock().await;
-                if let Err(e) = w.write_all(&buf[..n]).await {
-                    log::warn!(
-                        "[Log Archive] {} write failed, dropping further bytes for this session: {}",
-                        tag,
-                        e
-                    );
-                    writes_disabled = true;
+                match w.write_all(&buf[..n]).await {
+                    Ok(()) => {
+                        if retry_writes_at.take().is_some() {
+                            log::info!("[Log Archive] {} writes recovered", tag);
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[Log Archive] {} write failed, pausing capture for {}s: {}",
+                            tag,
+                            WRITE_RETRY_COOLDOWN.as_secs(),
+                            e
+                        );
+                        retry_writes_at = Some(Instant::now() + WRITE_RETRY_COOLDOWN);
+                    }
                 }
             }
             Err(e) => {

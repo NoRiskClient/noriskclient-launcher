@@ -18,6 +18,7 @@ pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan clea
 pub mod file_utils; // Utilities for file operations like reading archives
 pub mod export_utils;
 pub mod hash_utils;
+pub mod capture_runtime;
 pub mod clip_library;
 pub mod clip_overlay;
 #[cfg(windows)]

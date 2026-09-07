@@ -514,9 +514,11 @@ export function InstanceSidebar({
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${Math.min((selectedInstance.memoryUsage / selectedInstance.memoryMax) * 100, 100)}%`,
-                      backgroundColor: selectedInstance.memoryUsage / selectedInstance.memoryMax > 0.8
-                        ? "rgba(248, 113, 113, 0.7)"
-                        : `${accentColor.value}90`,
+                      backgroundColor: selectedInstance.memoryUsage > selectedInstance.memoryMax
+                        ? "rgba(251, 191, 36, 0.7)"
+                        : selectedInstance.memoryUsage / selectedInstance.memoryMax > 0.8
+                          ? "rgba(248, 113, 113, 0.7)"
+                          : `${accentColor.value}90`,
                     }}
                   />
                 </div>

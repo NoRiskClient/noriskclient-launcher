@@ -435,11 +435,9 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     set((state) => {
       const newLogs = new Map(state.logs);
       const newParserStates = new Map(state.parserStates);
-      const newCursors = new Map(state.cursors);
       newLogs.delete(processId);
       newParserStates.delete(processId);
-      newCursors.delete(processId);
-      return { logs: newLogs, parserStates: newParserStates, cursors: newCursors };
+      return { logs: newLogs, parserStates: newParserStates };
     });
   },
 

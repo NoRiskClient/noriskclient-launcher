@@ -1,4 +1,3 @@
-#[cfg(windows)]
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,7 +13,7 @@ use tokio::sync::{mpsc, RwLock};
 
 #[cfg(windows)]
 use crate::config::ProjectDirsExt;
-use crate::commands::analytics_command::track;
+use crate::commands::analytics_command::{megabytes, tenths, track};
 use crate::error::{AppError, Result};
 use serde_json::json;
 
@@ -58,14 +57,6 @@ fn game_kind(game: Option<&str>) -> &'static str {
         Some(_) => "other",
         None => "none",
     }
-}
-
-fn tenths(value: f64) -> f64 {
-    (value * 10.0).round() / 10.0
-}
-
-fn megabytes(bytes: u64) -> f64 {
-    tenths(bytes as f64 / 1e6)
 }
 
 fn settings_props(config: Option<&norisk_ipc::CaptureConfig>) -> serde_json::Value {
@@ -256,13 +247,12 @@ impl CaptureSupervisor {
     }
 
     #[cfg(windows)]
-    pub async fn start(self: &Arc<Self>) -> Result<()> {
+    pub async fn start(self: &Arc<Self>, exe: PathBuf) -> Result<()> {
         if *self.running.read().await {
             return Ok(());
         }
 
         let mut receiver = self.take_command_receiver().await?;
-        let exe = locate_engine()?;
 
         let mut stale = 0;
         while receiver.try_recv().is_ok() {
@@ -307,7 +297,7 @@ impl CaptureSupervisor {
     }
 
     #[cfg(not(windows))]
-    pub async fn start(self: &Arc<Self>) -> Result<()> {
+    pub async fn start(self: &Arc<Self>, _exe: PathBuf) -> Result<()> {
         log::debug!("Capture engine is unavailable on this platform");
         Ok(())
     }
@@ -760,31 +750,6 @@ impl Default for CaptureSupervisor {
 enum Outcome {
     Shutdown,
     Lost(String),
-}
-
-#[cfg(windows)]
-fn locate_engine() -> Result<PathBuf> {
-    let exe = std::env::current_exe()
-        .map_err(|e| AppError::Other(format!("could not locate the launcher executable: {e}")))?;
-    let dir = exe
-        .parent()
-        .ok_or_else(|| AppError::Other("the launcher executable has no parent directory".into()))?;
-
-    for name in [
-        "norisk-capture.exe",
-        "norisk-capture-x86_64-pc-windows-msvc.exe",
-    ] {
-        let candidate = dir.join(name);
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
-    }
-
-    Err(AppError::Other(format!(
-        "norisk-capture.exe was not found next to the launcher in {}. \
-         Build it with: cargo build -p norisk-capture",
-        dir.display()
-    )))
 }
 
 #[cfg(windows)]

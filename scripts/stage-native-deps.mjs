@@ -3,25 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { FFMPEG_DLLS, HOOK_FILES, LEGAL_FILES } from "./native-deps-manifest.mjs";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const srcTauri = path.join(repoRoot, "src-tauri");
 const staging = path.join(srcTauri, "binaries");
 const profile = process.argv.includes("--debug") ? "debug" : "release";
 const fromDir = path.join(srcTauri, "target", profile);
-
-const FFMPEG_DLLS = [
-  "avcodec-62.dll",
-  "avformat-62.dll",
-  "avutil-60.dll",
-  "swresample-6.dll",
-];
-const HOOK_FILES = ["graphics-hook64.dll", "graphics-hook32.dll"];
-
-const LEGAL_FILES = [
-  { dir: "graphics-hook", name: "NOTICE.txt", as: "graphics-hook-NOTICE.txt" },
-  { dir: "ffmpeg", name: "NOTICE.txt", as: "ffmpeg-NOTICE.txt" },
-  { dir: "ffmpeg", name: "LICENSE.txt", as: "ffmpeg-LICENSE.txt" },
-];
 
 const ok = (msg) => console.log(`  \x1b[32m+\x1b[0m ${msg}`);
 const step = (msg) => console.log(`    ${msg}`);
@@ -99,7 +87,7 @@ function copyIn(dir, name, what, as_ = name) {
 }
 
 function freeLockedHooks() {
-  for (const name of ["graphics-hook64.dll", "graphics-hook32.dll"]) {
+  for (const name of HOOK_FILES) {
     const inUse = path.join(fromDir, name);
     if (!fs.existsSync(inUse)) continue;
 

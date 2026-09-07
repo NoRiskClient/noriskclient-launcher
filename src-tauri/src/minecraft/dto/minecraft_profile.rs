@@ -65,3 +65,30 @@ pub struct TextureMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinUpdateResponse {
+    #[serde(default)]
+    pub skins: Vec<SkinUpdateEntry>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinUpdateEntry {
+    pub id: String,
+    pub state: String,
+    pub url: String,
+    pub texture_key: Option<String>,
+    pub variant: Option<String>,
+}
+
+impl SkinUpdateResponse {
+    pub fn active_skin(&self) -> Option<&SkinUpdateEntry> {
+        self.skins
+            .iter()
+            .find(|skin| skin.state.eq_ignore_ascii_case("ACTIVE"))
+            .or_else(|| self.skins.first())
+    }
+}

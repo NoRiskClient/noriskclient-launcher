@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useProcessStore } from "../store/useProcessStore";
 import { getProcessLogCursor } from "../services/process-service";
+import { logError } from "../utils/logging-utils";
 
 const POLL_INTERVAL_MS = 700;
 
@@ -35,7 +36,7 @@ export function useProcessLogCursor(
         }
         useProcessStore.getState().setCursor(processId, res.cursor);
       } catch (e) {
-        console.error("[useProcessLogCursor] poll failed:", e);
+        logError(`[useProcessLogCursor] poll for session ${sessionId} failed: ${e}`);
       } finally {
         isPolling = false;
       }

@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CaptureStatus, EncoderCapability } from "../types/launcherConfig";
+import type { CaptureRuntimeState, CaptureStatus, EncoderCapability } from "../types/launcherConfig";
+
+export function runtimeDownloadPercent(runtime: CaptureRuntimeState): number {
+  if (runtime.state !== "downloading" || !runtime.total) return 0;
+  return Math.min(100, Math.round((runtime.downloaded / runtime.total) * 100));
+}
 
 export async function applyClipSettings(): Promise<string[]> {
   return invoke<string[]>("capture_apply_settings");

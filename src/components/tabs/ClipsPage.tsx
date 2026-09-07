@@ -13,7 +13,7 @@ import { Tooltip } from "../ui/Tooltip";
 import { formatShortcut } from "../ui/HotkeyInput";
 import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
-import { getCaptureStatus, openClipFolder } from "../../services/clip-service";
+import { getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureStatus } from "../../types/launcherConfig";
 import { BetaNotice } from "../ui/BetaNotice";
@@ -43,6 +43,18 @@ function health(
 ): Health {
   if (!enabled) {
     return { tone: "off", label: t("clips.page.status.disabled"), detail: null };
+  }
+  if (status?.runtime.state === "downloading") {
+    return {
+      tone: "waiting",
+      label: t("clips.page.status.runtime_downloading", {
+        percent: runtimeDownloadPercent(status.runtime),
+      }),
+      detail: null,
+    };
+  }
+  if (status?.runtime.state === "failed") {
+    return { tone: "warn", label: t("clips.page.status.runtime_failed"), detail: status.runtime.message };
   }
   if (!status?.running) {
     return { tone: "off", label: t("clips.page.status.starting"), detail: null };

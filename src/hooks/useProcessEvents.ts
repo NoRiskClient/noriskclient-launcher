@@ -115,9 +115,11 @@ export function useProcessEvents(options: {
               // Refetch processes to get the new running process, then auto-switch to it
               const profileId = payload.target_id;
               fetchProcesses().then(() => {
-                const newProcess = useProcessStore.getState().processes.find(
-                  p => p.profile_id === profileId
-                );
+                const newProcess = useProcessStore.getState().processes
+                  .filter(p => p.profile_id === profileId)
+                  .sort((a, b) =>
+                    new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+                  )[0];
                 if (newProcess) {
                   useProcessStore.getState().selectProcess(newProcess.id);
                 }
