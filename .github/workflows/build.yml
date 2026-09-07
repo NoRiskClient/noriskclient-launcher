@@ -37,9 +37,68 @@ jobs:
         working-directory: ./src-tauri
         run: cargo test --workspace
 
+  # --- JOB 0b: compile the macOS 26 app icon ---
+  # actool only understands Icon Composer .icon documents when it comes from
+  # Xcode 26 running on a macOS 26 host, which macos-latest is not yet. Compiling
+  # here keeps NoRiskLauncher.icon as the single source of truth and keeps the
+  # rest of the matrix on macos-latest.
+  macos-icon:
+    needs: test
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          set -euo pipefail
+          DEV="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$DEV" ]; then
+            echo "::error::No Xcode 26 on this runner. actool cannot compile .icon documents without it."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$DEV/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $DEV"
+
+      - name: Compile Assets.car from NoRiskLauncher.icon
+        working-directory: ./src-tauri
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          mkdir -p icon-build
+          xcrun actool icons/NoRiskLauncher.icon \
+            --compile icon-build \
+            --app-icon NoRiskLauncher \
+            --include-all-app-icons \
+            --output-partial-info-plist icon-build/partial.plist \
+            --enable-on-demand-resources NO \
+            --development-region en \
+            --target-device mac \
+            --minimum-deployment-target 26.0 \
+            --platform macosx \
+            --output-format human-readable-text --notices --warnings --errors
+
+      - name: Verify the catalog carries the bolt
+        working-directory: ./src-tauri
+        run: |
+          set -euo pipefail
+          test -s icon-build/Assets.car
+          strings icon-build/Assets.car | grep -q 'norisk-bolt'
+          ls -l icon-build/Assets.car
+
+      - name: Upload the compiled catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-assets-car
+          path: ./src-tauri/icon-build/Assets.car
+          if-no-files-found: error
+          retention-days: 1
+
   # --- JOB 1: Build & Rename ---
   build:
-    needs: test
+    needs: [test, macos-icon]
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +137,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Replaces the committed placeholder with the catalog built from
+      # NoRiskLauncher.icon, so the shipped icon always matches the .icon source.
+      - name: Fetch the compiled macOS icon catalog
+        if: matrix.platform == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-assets-car
+          path: ./src-tauri
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
