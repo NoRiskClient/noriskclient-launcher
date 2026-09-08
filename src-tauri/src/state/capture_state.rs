@@ -411,11 +411,11 @@ impl CaptureSupervisor {
         if let Some(config) = session.config {
             replay.push(LauncherToCapture::Configure(config));
         }
-        if let Some(pid) = session.attached_pid {
-            replay.push(LauncherToCapture::AttachWindow { pid });
-        }
         if let Some(enabled) = session.buffering_enabled {
             replay.push(LauncherToCapture::SetBufferEnabled { enabled });
+        }
+        if let Some(pid) = session.attached_pid {
+            replay.push(LauncherToCapture::AttachWindow { pid });
         }
         if !replay.is_empty() {
             log::info!("Restoring {} session command(s) on the capture engine", replay.len());

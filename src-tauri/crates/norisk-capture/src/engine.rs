@@ -1020,7 +1020,7 @@ impl Engine {
             capture_fps: rate(stats.received, received_before),
             encode_fps: rate(stats.delivered, delivered_before),
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
-            dropped_before_keyframe: dropped_before_keyframe,
+            dropped_before_keyframe,
             encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
             capture_method: Some(pipeline.source.describe().to_string()),
             active_codec: Some(pipeline.settings.codec),
