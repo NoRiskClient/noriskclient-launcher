@@ -24,6 +24,7 @@ const ENCODE_QUEUE_DEPTH: usize = 4;
 const PROGRESS_EVERY: Duration = Duration::from_millis(150);
 
 const MIN_CAPTURE_SIDE: u32 = 128;
+const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct Engine {
@@ -34,8 +35,10 @@ pub struct Engine {
     resize_settling: Option<((u32, u32), Instant)>,
     retired: Option<Retired>,
     buffering_enabled: bool,
+    paused_pid: Option<u32>,
     last_status: Instant,
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
+    keyframe_warned: std::cell::Cell<bool>,
 }
 
 enum FrameSource {
@@ -106,6 +109,7 @@ const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 struct Pipeline {
     source: FrameSource,
     encode_thread: Option<std::thread::JoinHandle<()>>,
+    encode_done: Receiver<()>,
     frames_tx: Option<SyncSender<PoolFrame>>,
     ring: Arc<Mutex<RingBuffer>>,
     extradata: Vec<u8>,
@@ -235,8 +239,10 @@ impl Engine {
             resize_settling: None,
             retired: None,
             buffering_enabled: true,
+            paused_pid: None,
             last_status: Instant::now(),
             rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
+            keyframe_warned: std::cell::Cell::new(false),
         }
     }
 
@@ -330,19 +336,44 @@ impl Engine {
                 if restart {
                     log::info!("Configuration changed materially; restarting the pipeline");
                     if let Some(pid) = self.attached_pid() {
-                        self.detach();
+                        self.detach_retaining_buffer();
                         self.begin_attach(pid);
                     }
                 }
             }
             LauncherToCapture::AttachWindow { pid } => {
-                self.detach();
-                self.begin_attach(pid);
+                if !self.buffering_enabled {
+                    log::info!("Buffering is paused; process {pid} waits for the resume");
+                    self.paused_pid = Some(pid);
+                } else {
+                    if self.attached_pid() == Some(pid) {
+                        self.detach_retaining_buffer();
+                    } else {
+                        self.detach();
+                    }
+                    self.begin_attach(pid);
+                }
             }
-            LauncherToCapture::DetachWindow => self.detach(),
+            LauncherToCapture::DetachWindow => {
+                self.paused_pid = None;
+                self.detach();
+            }
             LauncherToCapture::SetBufferEnabled { enabled } => {
+                if enabled == self.buffering_enabled {
+                    return Ok(());
+                }
                 self.buffering_enabled = enabled;
-                log::info!("Buffering {}", if enabled { "resumed" } else { "paused" });
+
+                if enabled {
+                    log::info!("Buffering resumed");
+                    if let Some(pid) = self.paused_pid.take() {
+                        self.begin_attach(pid);
+                    }
+                } else {
+                    log::info!("Buffering paused; releasing the capture until it resumes");
+                    self.paused_pid = self.attached_pid();
+                    self.detach_retaining_buffer();
+                }
             }
             LauncherToCapture::SaveClip(request) => self.save_clip(request)?,
             LauncherToCapture::TrimClip(request) => self.trim_clip(request),
@@ -518,6 +549,7 @@ impl Engine {
 
     fn attach(&mut self, target: window::GameWindow) -> Result<()> {
         log::info!("Attaching to '{}' (pid {})", target.title, target.pid);
+        self.keyframe_warned.set(false);
 
         let device = CaptureDevice::new_for_window(target.hwnd)?;
         let (codec, chosen) = self.choose_encoder()?;
@@ -591,13 +623,17 @@ impl Engine {
         let encode_latency: LatencyWindow = Arc::new(Mutex::new(
             VecDeque::with_capacity(LATENCY_SAMPLES),
         ));
+        let (encode_done_tx, encode_done) = std::sync::mpsc::channel::<()>();
         let encode_thread = {
             let ring = Arc::clone(&ring);
             let events = self.events.clone();
             let latency = Arc::clone(&encode_latency);
             std::thread::Builder::new()
                 .name("nrc-encode".into())
-                .spawn(move || encode_loop(encoder, frames_rx, ring, events, fps, latency))
+                .spawn(move || {
+                    let _done = encode_done_tx;
+                    encode_loop(encoder, frames_rx, ring, events, fps, latency)
+                })
                 .context("could not start the encode thread")?
         };
 
@@ -696,6 +732,7 @@ impl Engine {
             audio,
             source,
             encode_thread: Some(encode_thread),
+            encode_done,
             frames_tx: Some(frames_tx),
             ring,
             extradata,
@@ -776,79 +813,91 @@ impl Engine {
         drop(pipeline.source);
         pipeline.frames_tx.take();
         if let Some(handle) = pipeline.encode_thread.take() {
-            let _ = handle.join();
+            match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
+                Err(RecvTimeoutError::Timeout) => log::warn!(
+                    "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it \
+                     finish on its own so the engine stays answerable"
+                ),
+                _ => {
+                    let _ = handle.join();
+                }
+            }
         }
     }
 
     fn save_clip(&mut self, request: SaveClipRequest) -> Result<()> {
-        let Some(pipeline) = self.active.as_ref() else {
+        if !self.buffering_enabled {
             self.emit_error(
-                ErrorCode::BufferEmpty,
-                "nothing is being captured".into(),
+                ErrorCode::Paused,
+                "recording is paused, so there is nothing to cut".into(),
                 true,
             );
             return Ok(());
-        };
+        }
 
-        if let Some(audio) = pipeline.audio.as_ref() {
+        if let Some(audio) = self.active.as_ref().and_then(|p| p.audio.as_ref()) {
             audio.drain_mixer();
         }
 
-        let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
-        let now = ring.newest_pts();
-        let clip = ring.extract_around(
-            now,
+        let (pre, post) = (
             request.pre_roll_seconds as f32,
             request.post_roll_seconds as f32,
         );
-        let live_seconds = clip
-            .as_ref()
-            .map_or(0.0, |c| c.duration_seconds(TIME_BASE_DEN as i64));
-        drop(ring);
+        let cut = |ring: &Arc<Mutex<RingBuffer>>| {
+            let ring = ring.lock().unwrap_or_else(|e| e.into_inner());
+            let now = ring.newest_pts();
+            ring.extract_around(now, pre, post)
+        };
 
-        let mut extradata = pipeline.extradata.clone();
-        let mut settings = pipeline.settings;
-        let mut audio = pipeline.audio.as_ref().map(AudioSelection::from);
-        let mut clip = clip;
+        let live = self.active.as_ref().and_then(|pipeline| {
+            cut(&pipeline.ring).map(|clip| {
+                (
+                    clip,
+                    pipeline.extradata.clone(),
+                    pipeline.settings,
+                    pipeline.audio.as_ref().map(AudioSelection::from),
+                )
+            })
+        });
+        let live_seconds = live
+            .as_ref()
+            .map_or(0.0, |(clip, ..)| clip.duration_seconds(TIME_BASE_DEN as i64));
+
+        let mut chosen = live;
 
         if let Some(retired) = self.retired.as_ref().filter(|r| r.at.elapsed() < RETAIN_FOR) {
-            let older = {
-                let ring = retired.ring.lock().unwrap_or_else(|e| e.into_inner());
-                let now = ring.newest_pts();
-                ring.extract_around(
-                    now,
-                    request.pre_roll_seconds as f32,
-                    request.post_roll_seconds as f32,
-                )
-            };
-
-            let older_seconds = older
-                .as_ref()
-                .map_or(0.0, |c| c.duration_seconds(TIME_BASE_DEN as i64));
-
-            if older_seconds > live_seconds + 0.1 {
-                log::info!(
-                    "Cutting from the buffer kept across the rebuild: {older_seconds:.1}s there against {live_seconds:.1}s live"
-                );
-                clip = older;
-                extradata = retired.extradata.clone();
-                settings = retired.settings;
-                audio = retired.audio.as_ref().map(AudioSelection::from);
+            if let Some(older) = cut(&retired.ring) {
+                let older_seconds = older.duration_seconds(TIME_BASE_DEN as i64);
+                if older_seconds > live_seconds + 0.1 {
+                    log::info!(
+                        "Cutting from the buffer kept across the rebuild: {older_seconds:.1}s there against {live_seconds:.1}s live"
+                    );
+                    chosen = Some((
+                        older,
+                        retired.extradata.clone(),
+                        retired.settings,
+                        retired.audio.as_ref().map(AudioSelection::from),
+                    ));
+                }
             }
         }
 
-        let Some(clip) = clip else {
-            self.emit_error(
-                ErrorCode::BufferEmpty,
-                "the replay buffer holds nothing to cut".into(),
-                true,
-            );
+        let Some((clip, extradata, settings, audio)) = chosen else {
+            let message = if self.active.is_none() {
+                "the recorder is still starting up, so there is nothing to cut yet"
+            } else {
+                "the replay buffer holds nothing to cut"
+            };
+            self.emit_error(ErrorCode::BufferEmpty, message.into(), true);
             return Ok(());
         };
 
         let created = chrono_now();
-        let file_name = format!("{}_{}.mp4", created.replace(':', "-"), request.reason.slug());
-        let path = self.config.output_dir.join(&file_name);
+        let path = free_path(
+            &self.config.output_dir,
+            &created.replace(':', "-"),
+            &request.reason.slug(),
+        );
 
         let (audio_track, audio_tracks) = match audio.as_ref() {
             Some(selection) => selection.cut(&clip),
@@ -906,7 +955,9 @@ impl Engine {
     fn emit_status(&self) {
         let Some(pipeline) = self.active.as_ref() else {
             let _ = self.events.send(CaptureToLauncher::Status(StatusReport {
-                state: if self.pending_attach.is_some() {
+                state: if !self.buffering_enabled {
+                    CaptureState::Paused
+                } else if self.pending_attach.is_some() {
                     CaptureState::Attaching
                 } else {
                     CaptureState::Idle
@@ -916,6 +967,7 @@ impl Engine {
                 capture_fps: 0.0,
                 encode_fps: 0.0,
                 dropped_frames: 0,
+                dropped_before_keyframe: 0,
                 encode_latency_ms_p99: 0.0,
                 capture_method: None,
                 active_codec: None,
@@ -925,10 +977,26 @@ impl Engine {
         };
 
         let stats = pipeline.source.stats();
-        let (buffer_fill_seconds, buffer_bytes) = {
+        let (buffer_fill_seconds, buffer_bytes, dropped_before_keyframe) = {
             let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
-            (ring.duration_seconds() as f32, ring.bytes())
+            (
+                ring.duration_seconds() as f32,
+                ring.bytes(),
+                ring.dropped_before_first_keyframe(),
+            )
         };
+
+        if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned.get()
+        {
+            self.keyframe_warned.set(true);
+            log::warn!(
+                "{} has produced {dropped_before_keyframe} packet(s) and not one keyframe, so the \
+                 replay buffer is throwing all of them away and every clip will fail. The encoder \
+                 is not honouring the keyframe request.",
+                crate::encoder::encoder_name(pipeline.settings.codec, pipeline.encoder)
+                    .unwrap_or("the encoder")
+            );
+        }
 
         let now = Instant::now();
         let (received_before, delivered_before, sampled_at) = self.rate_sample.replace((
@@ -952,6 +1020,7 @@ impl Engine {
             capture_fps: rate(stats.received, received_before),
             encode_fps: rate(stats.delivered, delivered_before),
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
+            dropped_before_keyframe,
             encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
             capture_method: Some(pipeline.source.describe().to_string()),
             active_codec: Some(pipeline.settings.codec),
@@ -1581,6 +1650,22 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.microphone_volume != next.microphone_volume
 }
 
+fn free_path(dir: &std::path::Path, stamp: &str, reason: &str) -> std::path::PathBuf {
+    let first = dir.join(format!("{stamp}_{reason}.mp4"));
+    if !first.exists() {
+        return first;
+    }
+
+    for attempt in 2..=99 {
+        let candidate = dir.join(format!("{stamp}_{reason}-{attempt}.mp4"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    dir.join(format!("{stamp}_{reason}-{}.mp4", std::process::id()))
+}
+
 fn chrono_now() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()
@@ -1598,7 +1683,7 @@ fn hook_handshake(
     crate::capture::hook::HookTexture,
 )> {
     use crate::capture::hook::{self, HookStep};
-    const BUDGET: Duration = Duration::from_millis(2_500);
+    const BUDGET: Duration = Duration::from_millis(6_000);
 
     let dll = hook::locate_hook_dll()?;
 
@@ -1675,6 +1760,27 @@ mod tests {
         let mut next = base();
         next.buffer_seconds = 60;
         assert!(!needs_restart(&base(), &next));
+    }
+
+    #[test]
+    fn a_second_clip_in_the_same_second_does_not_overwrite_the_first() {
+        let dir = std::env::temp_dir().join(format!("nrc-free-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        let first = free_path(&dir, "1788803479", "clip");
+        assert_eq!(first.file_name().unwrap(), "1788803479_clip.mp4");
+        std::fs::write(&first, b"x").expect("write");
+
+        let second = free_path(&dir, "1788803479", "clip");
+        assert_ne!(second, first, "the first clip must survive the second");
+        assert_eq!(second.file_name().unwrap(), "1788803479_clip-2.mp4");
+        std::fs::write(&second, b"x").expect("write");
+
+        let third = free_path(&dir, "1788803479", "clip");
+        assert_eq!(third.file_name().unwrap(), "1788803479_clip-3.mp4");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

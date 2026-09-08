@@ -18,3 +18,6 @@ pub mod vertical;
 pub mod watchdog;
 #[cfg(windows)]
 pub mod writer;
+
+#[cfg(target_os = "macos")]
+pub mod macos;

@@ -18,6 +18,7 @@ pub struct ClipEntry {
     pub game: Option<String>,
     pub thumbnail: Option<PathBuf>,
     pub favourite: bool,
+    pub managed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -284,7 +285,9 @@ pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
                 return None;
             }
             let details = read_details(&path);
+            let thumbnail = Some(thumbnail_path(&path)).filter(|thumb| thumb.exists());
             Some(ClipEntry {
+                managed: details.is_some() || thumbnail.is_some(),
                 name: path.file_stem()?.to_string_lossy().into_owned(),
                 size_bytes: metadata.len(),
                 created_at: metadata
@@ -299,7 +302,7 @@ pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
                     .filter(|seconds| *seconds > 0.0),
                 favourite: details.as_ref().is_some_and(|d| d.favourite),
                 game: details.as_ref().and_then(|d| d.game.clone()),
-                thumbnail: Some(thumbnail_path(&path)).filter(|thumb| thumb.exists()),
+                thumbnail,
                 path,
             })
         })
@@ -459,7 +462,7 @@ fn cleanup_plan(clips: &[ClipEntry], limit: u64) -> Cleanup {
         if total <= limit {
             break;
         }
-        if clip.favourite {
+        if clip.favourite || !clip.managed {
             plan.spared += 1;
             continue;
         }
@@ -503,7 +506,8 @@ pub fn enforce_limit(dir: &Path, limit_gb: u32) -> Result<Vec<PathBuf>> {
     }
     if plan.over_by > 0 {
         log::warn!(
-            "Still {} MB over the {limit_gb} GB limit with {} clip(s) marked to keep",
+            "Still {} MB over the {limit_gb} GB limit; {} file(s) were left alone \
+             because they are favourites or were not written by the launcher",
             plan.over_by / 1024 / 1024,
             plan.spared,
         );
@@ -830,6 +834,14 @@ mod tests {
             game: None,
             thumbnail: None,
             favourite,
+            managed: true,
+        }
+    }
+
+    fn someone_elses(name: &str, size_bytes: u64, created_at: i64) -> ClipEntry {
+        ClipEntry {
+            managed: false,
+            ..entry(name, size_bytes, created_at, false)
         }
     }
 
@@ -840,6 +852,25 @@ mod tests {
             entry("mid", 40, 200, false),
             entry("old", 40, 100, false),
         ]
+    }
+
+    #[test]
+    fn a_video_the_launcher_did_not_write_is_never_deleted() {
+        let clips = vec![
+            entry("clip", 40, 300, false),
+            someone_elses("holiday-2019", 40, 200),
+            someone_elses("wedding", 40, 100),
+        ];
+
+        let plan = cleanup_plan(&clips, 40);
+
+        assert_eq!(
+            plan.remove,
+            vec![PathBuf::from("clip.mp4")],
+            "only our own clip may go, however far over the limit we are",
+        );
+        assert_eq!(plan.spared, 2);
+        assert!(plan.over_by > 0, "the folder stays over the limit, and that is correct");
     }
 
     #[test]
