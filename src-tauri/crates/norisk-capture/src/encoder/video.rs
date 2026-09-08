@@ -224,6 +224,7 @@ unsafe fn configure_common(
     }
 
     set_option(context, codec_name, "forced-idr", "1");
+    set_option(context, codec_name, "forced_idr", "1");
     if tuned {
         for (key, value) in tuning_for(codec_name) {
             set_option(context, codec_name, key, value);
