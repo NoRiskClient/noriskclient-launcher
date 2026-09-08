@@ -39,9 +39,9 @@ jobs:
 
   # --- JOB 0b: compile the macOS 26 app icon ---
   # actool only understands Icon Composer .icon documents when it comes from
-  # Xcode 26 running on a macOS 26 host, which macos-latest is not yet. Compiling
-  # here keeps NoRiskLauncher.icon as the single source of truth and keeps the
-  # rest of the matrix on macos-latest.
+  # Xcode 26, which macos-latest does not carry yet. Compiling here keeps
+  # NoRiskLauncher.icon as the single source of truth and keeps the rest of the
+  # matrix on macos-latest.
   macos-icon:
     needs: test
     runs-on: macos-26
@@ -51,51 +51,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode 26
-        run: |
-          set -euo pipefail
-          DEV="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
-          if [ -z "$DEV" ]; then
-            echo "::error::No Xcode 26 on this runner. actool cannot compile .icon documents without it."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$DEV/Contents/Developer" >> "$GITHUB_ENV"
-          echo "Using $DEV"
-
+      # The very script contributors run locally, so the two can never drift.
+      # It finds its own Xcode 26, verifies the catalog carries the bolt, and
+      # writes src-tauri/Assets.car over the committed copy.
       - name: Compile Assets.car from NoRiskLauncher.icon
-        working-directory: ./src-tauri
-        run: |
-          set -euo pipefail
-          xcodebuild -version
-          mkdir -p icon-build
-          xcrun actool icons/NoRiskLauncher.icon \
-            --compile icon-build \
-            --app-icon NoRiskLauncher \
-            --include-all-app-icons \
-            --output-partial-info-plist icon-build/partial.plist \
-            --enable-on-demand-resources NO \
-            --development-region en \
-            --target-device mac \
-            --minimum-deployment-target 26.0 \
-            --platform macosx \
-            --output-format human-readable-text --notices --warnings --errors
-
-      - name: Verify the catalog carries the bolt
-        working-directory: ./src-tauri
-        run: |
-          set -euo pipefail
-          test -s icon-build/Assets.car
-          # Keep strings and grep off one pipe: grep -q exits on the first match,
-          # which breaks the pipe under pipefail and fails an otherwise good build.
-          strings icon-build/Assets.car > icon-build/car-strings.txt
-          grep -q 'norisk-bolt' icon-build/car-strings.txt
-          ls -l icon-build/Assets.car
+        run: bash src-tauri/icons/build-macos-icon.sh
 
       - name: Upload the compiled catalog
         uses: actions/upload-artifact@v4
         with:
           name: macos-assets-car
-          path: ./src-tauri/icon-build/Assets.car
+          path: ./src-tauri/Assets.car
           if-no-files-found: error
           retention-days: 1
 
