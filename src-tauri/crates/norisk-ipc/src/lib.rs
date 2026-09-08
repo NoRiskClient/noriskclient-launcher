@@ -263,6 +263,8 @@ pub struct StatusReport {
     pub capture_fps: f32,
     pub encode_fps: f32,
     pub dropped_frames: u64,
+    #[serde(default)]
+    pub dropped_before_keyframe: u64,
     pub encode_latency_ms_p99: f32,
     #[serde(default)]
     pub capture_method: Option<String>,
@@ -314,6 +316,7 @@ pub enum ErrorCode {
     AudioDevice,
     ClipWrite,
     BufferEmpty,
+    Paused,
     Internal,
 }
 
@@ -533,6 +536,7 @@ mod tests {
             capture_fps: 0.0,
             encode_fps: 0.0,
             dropped_frames: 0,
+            dropped_before_keyframe: 0,
             encode_latency_ms_p99: 0.0,
             capture_method: Some("graphics hook".to_string()),
             active_codec: Some(ClipCodec::Av1),
