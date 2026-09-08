@@ -815,7 +815,8 @@ impl Engine {
         if let Some(handle) = pipeline.encode_thread.take() {
             match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
                 Err(RecvTimeoutError::Timeout) => log::warn!(
-                    "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it finish \n                     on its own so the engine stays answerable"
+                    "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it \
+                     finish on its own so the engine stays answerable"
                 ),
                 _ => {
                     let _ = handle.join();

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use norisk_ipc::{CaptureState, CaptureToLauncher, LauncherToCapture, ReadyInfo};
 #[cfg(windows)]
@@ -19,7 +19,7 @@ use serde_json::json;
 
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
-const MISSED_PONGS_ALLOWED: u32 = 3;
+const HEARTBEAT_GRACE: Duration = Duration::from_secs(12);
 
 const BACKOFF: &[Duration] = &[
     Duration::from_secs(1),
@@ -433,7 +433,7 @@ impl CaptureSupervisor {
 
         let mut ping = tokio::time::interval(PING_INTERVAL);
         let mut sequence = 0u64;
-        let mut unanswered = 0u32;
+        let mut last_pong = Instant::now();
 
         loop {
             tokio::select! {
@@ -442,7 +442,7 @@ impl CaptureSupervisor {
                     Ok(Some(line)) => match decode_line::<CaptureToLauncher>(&line) {
                         Ok(event) => {
                             if matches!(event, CaptureToLauncher::Pong { .. }) {
-                                unanswered = 0;
+                                last_pong = Instant::now();
                             }
                             self.absorb(event).await;
                         }
@@ -478,12 +478,14 @@ impl CaptureSupervisor {
                 }
 
                 _ = ping.tick() => {
-                    if unanswered >= MISSED_PONGS_ALLOWED {
+                    let silent_for = last_pong.elapsed();
+                    if silent_for >= HEARTBEAT_GRACE {
                         let _ = child.kill().await;
-                        return Outcome::Lost(format!("{unanswered} heartbeats went unanswered"));
+                        return Outcome::Lost(format!(
+                            "no heartbeat answer for {silent_for:?}"
+                        ));
                     }
                     sequence += 1;
-                    unanswered += 1;
                     if let Ok(line) = encode_line(&LauncherToCapture::Ping { seq: sequence }) {
                         if writer.write_all(line.as_bytes()).await.is_err() {
                             let _ = child.kill().await;

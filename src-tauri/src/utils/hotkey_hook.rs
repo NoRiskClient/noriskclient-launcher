@@ -15,6 +15,10 @@ pub const MOUSE_MIDDLE: u32 = 0x1_0004;
 pub const MOUSE_X1: u32 = 0x1_0005;
 pub const MOUSE_X2: u32 = 0x1_0006;
 
+fn is_mouse_button(key: u32) -> bool {
+    matches!(key, MOUSE_MIDDLE | MOUSE_X1 | MOUSE_X2)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Binding {
     pub key: u32,
@@ -166,6 +170,8 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::er
         return Ok(());
     }
 
+    let wants_mouse = bindings.iter().any(|(binding, _)| is_mouse_button(binding.key));
+
     *WATCH.lock().unwrap_or_else(|e| e.into_inner()) = Some(Watch { bindings, events });
 
     let (ready_tx, ready_rx) = mpsc::channel::<std::result::Result<u32, String>>();
@@ -183,10 +189,17 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::er
                 }
             };
 
-            let mouse = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_callback), None, 0) };
-            if let Err(e) = &mouse {
-                log::warn!("Mouse buttons cannot be watched for: {e}");
-            }
+            let mouse = if wants_mouse {
+                match unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_callback), None, 0) } {
+                    Ok(hook) => Some(hook),
+                    Err(e) => {
+                        log::warn!("Mouse buttons cannot be watched for: {e}");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
 
             let _ = ready_tx.send(Ok(unsafe {
                 windows::Win32::System::Threading::GetCurrentThreadId()
@@ -199,7 +212,7 @@ pub fn install(bindings: Vec<(Binding, u8)>, events: Sender<Press>) -> crate::er
 
             log::debug!("Hotkey hook thread finished");
 
-            if let Ok(mouse) = mouse {
+            if let Some(mouse) = mouse {
                 let _ = unsafe { UnhookWindowsHookEx(mouse) };
             }
             let _ = unsafe { UnhookWindowsHookEx(keyboard) };
