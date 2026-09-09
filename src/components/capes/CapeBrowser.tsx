@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { act, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   browseCapes,
@@ -643,6 +643,10 @@ export function CapeBrowser(): JSX.Element {
       // Special handling for "no-cape" option - unequip all capes
       const actualCapeId = capeHash === "no-cape" ? null : capeHash;
       promise = useVanillaCapeStore.getState().equipCape(actualCapeId);
+      if (actualCapeId === null) {
+        await handleUnequipCape();
+        return;
+      }
     } else if (capeHash !== "null") {
       // For NoRisk capes, use the regular equip function
       promise = equipCape(capeHash);
