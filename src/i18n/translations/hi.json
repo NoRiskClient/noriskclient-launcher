@@ -544,6 +544,8 @@
   "capes.showAsCape": "केप के रूप में दिखाएं",
   "capes.showAsElytra": "Elytra के रूप में दिखाएं",
   "capes.unequipCape": "केप उतारें",
+  "capes.confirmUnequipMessage": "क्या आप वाकई अपना वर्तमान केप उतारना चाहते हैं?",
+  "capes.unequipping": "उतारा जा रहा है...",
   "capes.selectCape": "केप चुनें",
   "capes.inReview": "समीक्षा में",
   "capes.denied": "अस्वीकृत",

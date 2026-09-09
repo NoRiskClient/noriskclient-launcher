@@ -559,6 +559,8 @@
   "capes.showAsCape": "Show as Cape",
   "capes.showAsElytra": "Show as Elytra",
   "capes.unequipCape": "Unequip Cape",
+  "capes.confirmUnequipMessage": "Are you sure you want to unequip your current cape?",
+  "capes.unequipping": "Unequipping...",
   "capes.selectCape": "Select Cape",
   "capes.inReview": "In Review",
   "capes.denied": "Denied",

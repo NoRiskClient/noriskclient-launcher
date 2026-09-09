@@ -31,6 +31,7 @@ import { IconButton } from "../ui/buttons/IconButton";
 import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import type { CapeReviewState } from "../../types/noriskCapes";
+import { ConfirmUnequipModal } from "./ConfirmUnequipModal";
 
 function getCapeReviewState(cape: CosmeticCape): CapeReviewState {
   if (cape.accepted) return 'ACCEPTED';
@@ -110,27 +111,39 @@ function CapeItemDisplay({
         ? getCapeReviewImageUrl(capeId, isExperimental)
         : getCapeImageUrl(capeId, isExperimental);
 
-    showModal(`cape-preview-${capeId}`, (
-      <Modal
-        title={t('capes.capePreview')}
-        onClose={() => hideModal && hideModal(`cape-preview-${capeId}`)}
-        width="md"
-        variant="flat"
-      >
-        <Cape3DPreviewWithToggle
-          skinUrl={userSkinUrl}
-          skinVariant={userSkinVariant}
-          capeUrl={capeUrl}
-          capeId={capeId}
-          isEquipped={false}
-          isExperimental={isExperimental}
-          onEquipCape={() => {
-            onEquipCape(capeId);
-            hideModal && hideModal(`cape-preview-${capeId}`);
+    if (capeId !== "null") {
+      showModal(`cape-preview-${capeId}`, (
+        <Modal
+          title={t('capes.capePreview')}
+          onClose={() => hideModal && hideModal(`cape-preview-${capeId}`)}
+          width="md"
+          variant="flat"
+        >
+          <Cape3DPreviewWithToggle
+            skinUrl={userSkinUrl}
+            skinVariant={userSkinVariant}
+            capeUrl={capeUrl}
+            capeId={capeId}
+            isEquipped={false}
+            isExperimental={isExperimental}
+            onEquipCape={() => {
+              onEquipCape(capeId);
+              hideModal && hideModal(`cape-preview-${capeId}`);
+            }}
+          />
+        </Modal>
+      ));
+    } else {
+      showModal(`unequip-cape`, (
+        <ConfirmUnequipModal
+          onConfirmUnequip={() => {
+            onEquipCape("null");
+            hideModal && hideModal(`unequip-cape`);
           }}
+          onCancelUnequip={() => hideModal && hideModal(`unequip-cape`)}
         />
-      </Modal>
-    ));
+      ))
+    }
   }, [cape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
 
   const isFavorite = !isVanilla ? useCapeFavoritesStore((s) => s.isFavorite((cape as CosmeticCape)._id)) : false;
@@ -191,7 +204,7 @@ function CapeItemDisplay({
       onContextMenu={(e) => { e.preventDefault(); handleCapeClick(); }}
     >
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
-        {!isVanilla && (
+        {!isVanilla && (cape as CosmeticCape)._id !== "null" && (
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -210,7 +223,7 @@ function CapeItemDisplay({
           </button>
         )}
 
-        {canDelete && onDeleteCapeClick && !isVanilla && (
+        {canDelete && onDeleteCapeClick && !isVanilla && (cape as CosmeticCape)._id !== "null" && (
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -227,7 +240,7 @@ function CapeItemDisplay({
 
       </div>
 
-      {isModerator && onModeratorDeleteClick && !isVanilla && (
+      {isModerator && onModeratorDeleteClick && !isVanilla && (cape as CosmeticCape)._id !== "null" && (
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -257,6 +270,11 @@ function CapeItemDisplay({
               return <VanillaCapeImage imageUrl={imageUrl} width={displayWidth} className="rounded-sm block" />;
             }
             const cosmeticCape = cape as CosmeticCape;
+            if (cosmeticCape._id === "null") {
+              return <div className="w-full h-full flex items-center justify-center bg-white/5">
+                <Icon icon="solar:close-circle-bold-duotone" className="w-10 h-10 text-white/20" />
+              </div>;
+            }
             if (isInReview) {
               return <CapeImage imageUrl={getCapeReviewImageUrl(cosmeticCape._id, isExperimental)} part="front" width={displayWidth} className="rounded-sm block" />;
             }
@@ -295,7 +313,7 @@ function CapeItemDisplay({
             </div>
           )}
 
-          {showReviewState && (isInReview || isDenied) && (
+          {showReviewState && (isInReview || isDenied) && (cape as CosmeticCape)._id !== "null" && (
             <div className={cn(
               "absolute bottom-0 inset-x-0 z-20 flex items-center justify-center gap-1.5 py-1.5 backdrop-blur-sm",
               isInReview
@@ -322,22 +340,27 @@ function CapeItemDisplay({
 
         <div className="flex-grow min-w-0 w-full text-center">
           <h3
-            className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+            className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case"
+            style={(cape as CosmeticCape)._id === "null" ? { marginTop: 10 } : { marginBottom: 1 }}
             title={
               isVanilla
                 ? (cape as VanillaCape).name
-                : creatorName || (cape as CosmeticCape).firstSeen
+                : (cape as CosmeticCape)._id === "null"
+                  ? t('capes.noCape')
+                  : creatorName || (cape as CosmeticCape).firstSeen
             }
           >
             {isVanilla
               ? (cape as VanillaCape).name
-              : creatorLoading
-                ? t('common.loading')
-                : creatorName || t('common.unknown')
+              : (cape as CosmeticCape)._id === "null"
+                ? t('capes.noCape')
+                : creatorLoading
+                  ? t('common.loading')
+                  : creatorName || t('common.unknown')
             }
           </h3>
 
-          {!isVanilla && (
+          {!isVanilla && (cape as CosmeticCape)._id !== "null" && (
             <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon

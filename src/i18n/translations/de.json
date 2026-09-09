@@ -559,6 +559,8 @@
   "capes.showAsCape": "Als Cape anzeigen",
   "capes.showAsElytra": "Als Elytra anzeigen",
   "capes.unequipCape": "Cape ablegen",
+  "capes.confirmUnequipMessage": "Möchtest du deinen aktuellen Umhang wirklich ablegen?",
+  "capes.unequipping": "Wird abgelegt...",
   "capes.selectCape": "Cape auswählen",
   "capes.inReview": "In Prüfung",
   "capes.denied": "Abgelehnt",

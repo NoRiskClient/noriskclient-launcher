@@ -538,6 +538,8 @@
   "capes.showAsCape": "Mostra come mantello",
   "capes.showAsElytra": "Mostra come elytra",
   "capes.unequipCape": "Rimuovi mantello",
+  "capes.confirmUnequipMessage": "Sei sicuro di voler rimuovere il tuo mantello attuale?",
+  "capes.unequipping": "Rimozione in corso...",
   "capes.selectCape": "Seleziona mantello",
   "capes.inReview": "In revisione",
   "capes.denied": "Rifiutato",

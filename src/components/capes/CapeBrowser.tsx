@@ -12,6 +12,7 @@ import {
 } from "../../services/cape-service";
 import type {
   BrowseCapesOptions,
+  CapesBrowseResponse,
   CosmeticCape,
   GetPlayerCapesPayloadOptions,
   PaginationInfo,
@@ -382,7 +383,7 @@ export function CapeBrowser(): JSX.Element {
           // Browse all capes
           const browseOptions: BrowseCapesOptions = {
             page: pageToFetch,
-            page_size: 20,
+            page_size: pageToFetch == 0 ? 19 : 20, // leave space for the "None" / "No Cape" option
             sort_by:
               currentFilters.sortBy === "" ? undefined : currentFilters.sortBy,
             time_frame:
@@ -391,6 +392,20 @@ export function CapeBrowser(): JSX.Element {
                 : currentFilters.timeFrame,
           };
           response = await browseCapes(browseOptions);
+          
+          // Add "None" / "No Cape" option if we're on the first page
+          if (pageToFetch === 0) {
+            (response as CapesBrowseResponse).capes.unshift({
+              _id: "null",
+              accepted: true,
+              uses: 0,
+              firstSeen: "",
+              moderatorMessage: "",
+              creationDate: 0,
+              elytra: false,
+              blurHash: null,
+            });
+          }
 
           // Get the correct setters based on current filter
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
@@ -628,9 +643,11 @@ export function CapeBrowser(): JSX.Element {
       // Special handling for "no-cape" option - unequip all capes
       const actualCapeId = capeHash === "no-cape" ? null : capeHash;
       promise = useVanillaCapeStore.getState().equipCape(actualCapeId);
-    } else {
+    } else if (capeHash !== "null") {
       // For NoRisk capes, use the regular equip function
       promise = equipCape(capeHash);
+    } else {
+      return await handleUnequipCape();
     }
 
     toast.promise(promise, {
@@ -649,6 +666,7 @@ export function CapeBrowser(): JSX.Element {
 
   const handleUnequipCape = async () => {
     setIsUnequipping(true);
+    setIsEquippingCapeId("null");
     try {
       await unequipCape();
       toast.success(t('capes.capeUnequippedSuccess'));
@@ -656,6 +674,7 @@ export function CapeBrowser(): JSX.Element {
       console.error("Error unequipping cape:", err);
       toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
     } finally {
+      setIsEquippingCapeId(null);
       setIsUnequipping(false);
     }
   };
