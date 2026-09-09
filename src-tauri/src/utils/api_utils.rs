@@ -1,4 +1,4 @@
-use log::{debug, error};
+use log::{error, trace};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
@@ -64,7 +64,7 @@ pub async fn parse_text_response_with_logging(
     context: &str,
 ) -> Result<String, AppError> {
     let status = response.status();
-    debug!("[API Utils] {} response status: {}", context, status);
+    trace!("[API Utils] {} response status: {}", context, status);
 
     if !status.is_success() {
         return Err(api_error_from_response(response, context).await);
@@ -108,7 +108,7 @@ pub async fn expect_success_with_logging(
     context: &str,
 ) -> Result<(), AppError> {
     let status = response.status();
-    debug!("[API Utils] {} response status: {}", context, status);
+    trace!("[API Utils] {} response status: {}", context, status);
 
     if !status.is_success() {
         return Err(api_error_from_response(response, context).await);

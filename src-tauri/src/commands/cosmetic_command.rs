@@ -11,8 +11,10 @@ use crate::minecraft::dto::cosmetic_outfit::{
     CosmeticRealOutfit, CosmeticSettings, CustomTextureSource,
 };
 use crate::state::state_manager::State;
+use log::warn;
 use rand::seq::SliceRandom;
 use serde::Serialize;
+use serde_json::Value;
 
 const PACK_ID: &str = "norisk-prod";
 const ZERO_UUID: &str = "00000000-0000-0000-0000-000000000000";
@@ -48,11 +50,49 @@ pub async fn get_equipped_cosmetics(
     let uuid = MinecraftApiService::new()
         .resolve_uuid(&player_identifier)
         .await?;
+    let state = State::get().await?;
 
-    let real_value = CosmeticApi::new()
+    let real_value = match CosmeticApi::new()
         .get_player_outfit(&ctx.token, &uuid, ctx.is_experimental)
         .await
-        .map_err(CommandError::from)?;
+    {
+        Ok(value) => {
+            state.content_cache.put_player_outfit(&uuid, &value).await;
+            value
+        }
+        Err(e) => match state.content_cache.get_player_outfit::<Value>(&uuid).await {
+            Some(cached) => {
+                warn!(
+                    "Outfit request for {} failed ({}), serving cached outfit",
+                    uuid, e
+                );
+                cached
+            }
+            None => return Err(CommandError::from(e)),
+        },
+    };
+
+    build_equipped_cosmetics(&state, real_value).await
+}
+
+#[tauri::command]
+pub async fn get_equipped_cosmetics_cached(
+    player_identifier: String,
+) -> Result<Option<EquippedCosmeticsDto>, CommandError> {
+    let uuid = MinecraftApiService::new()
+        .resolve_uuid(&player_identifier)
+        .await?;
+    let state = State::get().await?;
+    match state.content_cache.get_player_outfit::<Value>(&uuid).await {
+        Some(cached) => Ok(Some(build_equipped_cosmetics(&state, cached).await?)),
+        None => Ok(None),
+    }
+}
+
+async fn build_equipped_cosmetics(
+    state: &State,
+    real_value: Value,
+) -> Result<EquippedCosmeticsDto, CommandError> {
     let real: CosmeticRealOutfit = serde_json::from_value(real_value).unwrap_or_default();
 
     let settings_by_id = &real.outfit.cosmetic_settings;
@@ -71,7 +111,6 @@ pub async fn get_equipped_cosmetics(
         });
     }
 
-    let state = State::get().await?;
     let pack = state
         .cosmetic_pack_manager
         .get_or_load(PACK_ID)

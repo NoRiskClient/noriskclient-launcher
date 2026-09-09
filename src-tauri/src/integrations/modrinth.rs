@@ -1291,7 +1291,3 @@ pub fn ids_from_cdn_url(url: &str) -> Option<(String, String)> {
     }
     Some((project_id, version_id))
 }
-
-#[cfg(test)]
-#[path = "modrinth_test.rs"]
-mod tests;

@@ -4,7 +4,7 @@ use crate::minecraft::dto::neo_forge_install_profile::NeoForgeInstallProfile;
 use crate::minecraft::dto::neo_forge_meta::NeoForgeVersion;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use async_zip::tokio::read::seek::ZipFileReader;
-use log::info;
+use log::{info, trace};
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -36,7 +36,7 @@ impl NeoForgeInstallerDownloadService {
         // Konstruiere die Download-URL
         let url = format!("https://maven.neoforged.net/releases/{}", maven_path);
 
-        info!("Downloading from: {}", url);
+        trace!("Downloading from: {}", url);
 
         // Use the new centralized download utility
         let config = DownloadConfig::new()
@@ -75,7 +75,7 @@ impl NeoForgeInstallerDownloadService {
         let mut has_version_json = false;
         let mut has_install_profile = false;
 
-        info!("Scanning JAR contents for JSON files...");
+        trace!("Scanning JAR contents for JSON files...");
         for index in 0..zip.file().entries().len() {
             let entry = &zip.file().entries().get(index).unwrap();
             let file_name = entry
@@ -84,10 +84,10 @@ impl NeoForgeInstallerDownloadService {
                 .map_err(|e| AppError::Download(format!("Failed to get filename: {}", e)))?;
 
             if file_name == "version.json" {
-                info!("Found version.json");
+                trace!("Found version.json");
                 has_version_json = true;
             } else if file_name == "install_profile.json" {
-                info!("Found install_profile.json");
+                trace!("Found install_profile.json");
                 has_install_profile = true;
             }
         }
@@ -254,7 +254,7 @@ impl NeoForgeInstallerDownloadService {
         let installer_dir = jar_path.parent().unwrap();
 
         info!("Extracting data folder from: {}", jar_path.display());
-        info!("Installer directory: {}", installer_dir.display());
+        trace!("Installer directory: {}", installer_dir.display());
 
         // Öffne die JAR-Datei
         let mut file = BufReader::new(fs::File::open(jar_path.clone()).await?);
@@ -273,20 +273,20 @@ impl NeoForgeInstallerDownloadService {
                 .map_err(|e| AppError::Download(format!("Failed to get filename: {}", e)))?;
 
             if file_name.starts_with("data/") && !file_name.ends_with('/') {
-                info!("\nFound data file: {}", file_name);
+                trace!("Found data file: {}", file_name);
 
                 // Behalte den data/ Ordner im Pfad
                 let target_path = installer_dir.join(file_name);
 
-                info!("Target path: {}", target_path.display());
-                info!(
+                trace!("Target path: {}", target_path.display());
+                trace!(
                     "Parent dir exists: {}",
                     target_path.parent().unwrap().exists()
                 );
 
                 // Create parent directories if they don't exist
                 if let Some(parent) = target_path.parent() {
-                    info!("Creating parent dir: {}", parent.display());
+                    trace!("Creating parent dir: {}", parent.display());
                     fs::create_dir_all(parent).await?;
                 }
 
@@ -306,7 +306,7 @@ impl NeoForgeInstallerDownloadService {
 
                 // Write the content asynchronously
                 writer.write_all(&buffer).await?;
-                info!("Successfully extracted to: {}", target_path.display());
+                trace!("Successfully extracted to: {}", target_path.display());
             }
         }
 
@@ -323,9 +323,9 @@ impl NeoForgeInstallerDownloadService {
         let jar_path = self.base_path.join(&maven_path);
         let libraries_dir = &self.base_path; // Direkt den Libraries-Ordner verwenden
 
-        info!("\n🔍 Starting maven folder extraction:");
-        info!("📦 Installer JAR: {}", jar_path.display());
-        info!("📚 Libraries dir: {}", libraries_dir.display());
+        trace!("🔍 Starting maven folder extraction:");
+        trace!("📦 Installer JAR: {}", jar_path.display());
+        trace!("📚 Libraries dir: {}", libraries_dir.display());
 
         // Öffne die JAR-Datei
         let mut file = BufReader::new(fs::File::open(jar_path.clone()).await?);
@@ -335,17 +335,18 @@ impl NeoForgeInstallerDownloadService {
             .await
             .map_err(|e| AppError::Download(format!("Failed to read JAR as ZIP: {}", e)))?;
 
-        info!("\n📂 Contents of installer JAR:");
+        trace!("📂 Contents of installer JAR:");
         for index in 0..zip.file().entries().len() {
             let entry = &zip.file().entries().get(index).unwrap();
             let file_name = entry
                 .filename()
                 .as_str()
                 .map_err(|e| AppError::Download(format!("Failed to get filename: {}", e)))?;
-            info!("  - {}", file_name);
+            trace!("  - {}", file_name);
         }
 
-        info!("\n🔄 Extracting maven files:");
+        let mut extracted_files = 0usize;
+        trace!("Extracting maven files:");
         // Extrahiere alle Dateien im maven/ Verzeichnis
         for index in 0..zip.file().entries().len() {
             let entry = &zip.file().entries().get(index).unwrap();
@@ -355,21 +356,21 @@ impl NeoForgeInstallerDownloadService {
                 .map_err(|e| AppError::Download(format!("Failed to get filename: {}", e)))?;
 
             if file_name.starts_with("maven/") && !file_name.ends_with('/') {
-                info!("\n📄 Found maven file: {}", file_name);
+                trace!("📄 Found maven file: {}", file_name);
 
                 // Entferne den maven/ Prefix und behalte den Rest des Pfads
                 let relative_path = file_name.trim_start_matches("maven/");
                 let target_path = libraries_dir.join(relative_path);
 
-                info!("  📍 Target path: {}", target_path.display());
-                info!(
+                trace!("  📍 Target path: {}", target_path.display());
+                trace!(
                     "  📂 Parent dir: {}",
                     target_path.parent().unwrap().display()
                 );
 
                 // Create parent directories if they don't exist
                 if let Some(parent) = target_path.parent() {
-                    info!("  📁 Creating parent dir: {}", parent.display());
+                    trace!("  📁 Creating parent dir: {}", parent.display());
                     fs::create_dir_all(parent).await?;
                 }
 
@@ -389,11 +390,12 @@ impl NeoForgeInstallerDownloadService {
 
                 // Write the content asynchronously
                 writer.write_all(&buffer).await?;
-                info!("  ✅ Successfully extracted to: {}", target_path.display());
+                extracted_files += 1;
+                trace!("  ✅ Successfully extracted to: {}", target_path.display());
             }
         }
 
-        info!("\n✨ Maven folder extraction completed!");
+        info!("Maven folder extraction completed ({} files)", extracted_files);
         Ok(())
     }
 
@@ -422,9 +424,9 @@ impl NeoForgeInstallerDownloadService {
         let jar_path = self.base_path.join(&maven_path);
         let installer_dir = jar_path.parent().unwrap();
 
-        info!("\n🔍 Starting JAR extraction:");
-        info!("📦 Installer JAR: {}", jar_path.display());
-        info!("📂 Target directory: {}", installer_dir.display());
+        trace!("🔍 Starting JAR extraction:");
+        trace!("📦 Installer JAR: {}", jar_path.display());
+        trace!("📂 Target directory: {}", installer_dir.display());
 
         // Öffne die JAR-Datei
         let mut file = BufReader::new(fs::File::open(jar_path.clone()).await?);
@@ -434,7 +436,8 @@ impl NeoForgeInstallerDownloadService {
             .await
             .map_err(|e| AppError::Download(format!("Failed to read JAR as ZIP: {}", e)))?;
 
-        info!("\n🔄 Extracting JAR files:");
+        let mut extracted_files = 0usize;
+        trace!("Extracting JAR files:");
         // Extrahiere alle JAR-Dateien
         for index in 0..zip.file().entries().len() {
             let entry = &zip.file().entries().get(index).unwrap();
@@ -444,17 +447,17 @@ impl NeoForgeInstallerDownloadService {
                 .map_err(|e| AppError::Download(format!("Failed to get filename: {}", e)))?;
 
             if file_name.ends_with(".jar") {
-                info!("\n📄 Found JAR file: {}", file_name);
+                trace!("📄 Found JAR file: {}", file_name);
 
                 // Extrahiere nur den Dateinamen ohne Pfad
                 let file_name = file_name.split('/').last().unwrap();
                 let target_path = installer_dir.join(file_name);
 
-                info!("  📍 Target path: {}", target_path.display());
+                trace!("  📍 Target path: {}", target_path.display());
 
                 // Create parent directories if they don't exist
                 if let Some(parent) = target_path.parent() {
-                    info!("  📁 Creating parent dir: {}", parent.display());
+                    trace!("  📁 Creating parent dir: {}", parent.display());
                     fs::create_dir_all(parent).await?;
                 }
 
@@ -474,11 +477,12 @@ impl NeoForgeInstallerDownloadService {
 
                 // Write the content asynchronously
                 writer.write_all(&buffer).await?;
-                info!("  ✅ Successfully extracted to: {}", target_path.display());
+                extracted_files += 1;
+                trace!("  ✅ Successfully extracted to: {}", target_path.display());
             }
         }
 
-        info!("\n✨ JAR extraction completed!");
+        info!("JAR extraction completed ({} files)", extracted_files);
         Ok(())
     }
 }

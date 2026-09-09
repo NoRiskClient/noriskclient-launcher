@@ -1,15 +1,11 @@
-use crate::error::{AppError, CommandError};
+use crate::error::CommandError;
 use crate::integrations::curseforge::{
-    get_mods_by_ids, GetModsByIdsRequestBody, CurseForgeModsResponse, CurseForgeMod,
-    import_curseforge_pack_as_profile, download_and_install_curseforge_modpack, get_file_changelog,
-    get_mod_description
+    CurseForgeModsResponse, download_and_install_curseforge_modpack, get_file_changelog
 };
 use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::profile_state::default_profile_path;
 use crate::state::State;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
-use serde::Serialize;
-use std::path::PathBuf;
 
 #[tauri::command]
 pub async fn get_curseforge_mods_by_ids(

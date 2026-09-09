@@ -1,7 +1,7 @@
 use crate::error::{AppError, CommandError};
 use crate::integrations::modrinth::{self, ModrinthVersion};
 use crate::integrations::unified_mod::{self, ModPlatform, UnifiedModVersionsParams, UnifiedVersion};
-use crate::state::profile_state::{Mod, ModLoader, ModSource, NoriskModIdentifier, Profile};
+use crate::state::profile_state::{mod_platform_ids, Mod, ModLoader, ModSource, NoriskModIdentifier, Profile};
 use crate::state::state_manager::State;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -53,6 +53,8 @@ pub enum AppliedFix {
     },
     Modver { profile_id: Uuid, mod_id: Uuid, prev: UnifiedVersion },
     Conflict { profile_id: Uuid, mods: Vec<ConflictRevert> },
+    Pack { profile_id: Uuid, prev_pack_id: Option<String> },
+    Repair { profile_id: Uuid },
 }
 
 #[derive(Serialize)]
@@ -137,15 +139,6 @@ fn pick_directional(versions: &[UnifiedVersion], current_id: &str, downgrade: bo
         .cloned()
 }
 
-/// (platform, project_id, current version/file id) for a managed Modrinth/CurseForge mod; None for local/url.
-fn managed_source(m: &Mod) -> Option<(ModPlatform, String, String)> {
-    match &m.source {
-        ModSource::Modrinth { project_id, version_id, .. } => Some((ModPlatform::Modrinth, project_id.clone(), version_id.clone())),
-        ModSource::CurseForge { project_id, file_id, .. } => Some((ModPlatform::CurseForge, project_id.clone(), file_id.clone())),
-        _ => None,
-    }
-}
-
 /// loader-compatible versions for a project on its platform (game-version filtering is done by the caller).
 async fn unified_versions(platform: ModPlatform, project_id: &str, loader: &str) -> Result<Vec<UnifiedVersion>, CommandError> {
     let resp = unified_mod::get_mod_versions_unified(UnifiedModVersionsParams {
@@ -216,7 +209,7 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                 None => return Ok(skip(&action.target)),
             };
             // platform from the installed mod's source (Modrinth or CurseForge); skip local/url mods
-            let (platform, project_id, current_id) = match managed_source(m) {
+            let (platform, project_id, current_id) = match mod_platform_ids(&m.source) {
                 Some(t) => t,
                 None => return Ok(skip(&action.target)),
             };
@@ -288,7 +281,7 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                     None => continue,
                 };
                 // platform from the installed mod's source; only managed Modrinth/CurseForge mods can be re-versioned
-                let (platform, project_id, current_id) = match managed_source(m) {
+                let (platform, project_id, current_id) = match mod_platform_ids(&m.source) {
                     Some(t) => t,
                     None => continue,
                 };
@@ -337,6 +330,27 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
             })
         }
 
+        "switch_pack" => {
+            let target = action.target.clone();
+            let prev_pack_id = profile.selected_norisk_pack_id.clone();
+            if prev_pack_id.as_deref() == Some(target.as_str())
+                || !state.norisk_pack_manager.get_config().await.packs.contains_key(&target)
+            {
+                return Ok(skip(&target));
+            }
+            let mut p = profile.clone();
+            p.selected_norisk_pack_id = Some(target);
+            pm.update_profile(profile_id, p).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
+            Ok(ApplyOutcome::Applied { fix: AppliedFix::Pack { profile_id, prev_pack_id } })
+        }
+
+        "repair_profile" => {
+            crate::utils::repair_utils::repair_profile(profile_id).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
+            Ok(ApplyOutcome::Applied { fix: AppliedFix::Repair { profile_id } })
+        }
+
         other => Ok(skip(other)),
     }
 }
@@ -376,6 +390,15 @@ pub async fn revert_crash_fix(applied: AppliedFix) -> Result<(), CommandError> {
             for r in mods {
                 pm.update_mod_to_unified_version(profile_id, r.mod_id, &r.prev).await?;
             }
+        }
+        AppliedFix::Pack { profile_id, prev_pack_id } => {
+            let mut p = pm.get_profile(profile_id).await?;
+            p.selected_norisk_pack_id = prev_pack_id;
+            pm.update_profile(profile_id, p).await?;
+            let _ = state.event_state.trigger_profile_update(profile_id).await;
+        }
+        AppliedFix::Repair { profile_id } => {
+            log::info!("Repair of profile {} is not revertible; nothing to undo.", profile_id);
         }
     }
     Ok(())

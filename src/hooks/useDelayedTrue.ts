@@ -1,25 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-/**
- * Liefert erst dann `true`, wenn `active` mindestens `delayMs` am Stück `true`
- * war. Kippt `active` zwischendurch auf `false`, wird der Timer resettet.
- *
- * Typischer Usecase: Loading-Spinner unterdruecken, wenn die Operation so
- * schnell war, dass der Spinner nur "flashen" wuerde. Setze z.B. 500ms —
- * bei Cache-Hits sieht man direkt die Daten, bei echten Waits erst spaet
- * den Spinner.
- */
-export function useDelayedTrue(active: boolean, delayMs = 500): boolean {
+export function useDelayedTrue(
+  active: boolean,
+  delayMs = 500,
+  minDurationMs = 0,
+): boolean {
   const [delayed, setDelayed] = useState(false);
+  const shownAt = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!active) {
+    if (active) {
+      if (delayed) return;
+      const timer = setTimeout(() => {
+        shownAt.current = Date.now();
+        setDelayed(true);
+      }, delayMs);
+      return () => clearTimeout(timer);
+    }
+
+    if (!delayed) return;
+
+    const shown = shownAt.current;
+    const remaining =
+      shown === null ? 0 : minDurationMs - (Date.now() - shown);
+
+    if (remaining <= 0) {
+      shownAt.current = null;
       setDelayed(false);
       return;
     }
-    const t = setTimeout(() => setDelayed(true), delayMs);
-    return () => clearTimeout(t);
-  }, [active, delayMs]);
+
+    const timer = setTimeout(() => {
+      shownAt.current = null;
+      setDelayed(false);
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [active, delayed, delayMs, minDurationMs]);
 
   return delayed;
 }

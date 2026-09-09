@@ -65,6 +65,10 @@ export interface InstallContentPayload {
   source: ModPlatform; // Added source to distinguish Modrinth/CurseForge
 }
 
+export type ContentInstallTarget =
+  | { type: "profile" }
+  | { type: "syncPack"; packId: string; packName: string };
+
 /**
  * Payload for installing local content (e.g., JARs, resource packs) into a profile.
  * Mirrors the Rust struct `InstallLocalContentPayload` in `content_command.rs`.

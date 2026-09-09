@@ -18,6 +18,7 @@ import { PERMISSION } from "../../../constants/permissions";
 import { invalidateAnalyticsCache } from "../../../services/analytics-service";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
+import { isWindows } from "../../../utils/platform";
 
 export function GeneralTab() {
   const { t } = useTranslation();
@@ -139,6 +140,35 @@ export function GeneralTab() {
             size="md"
           />
         </SettingRow>
+        {isWindows() && (
+          <SettingRow
+            label={t("settings.clips.enabled")}
+            description={t("settings.clips.enabled.short")}
+            searchKeywords={kw(
+              "settings.clips.enabled",
+              "clips",
+              "clip",
+              "replay",
+              "aufnahme",
+              "record",
+              "highlight",
+            )}
+            disabled={saving}
+          >
+            <ToggleSwitch
+              checked={tempConfig?.clips?.enabled || false}
+              onChange={(checked) =>
+                tempConfig &&
+                setTempConfig({
+                  ...tempConfig,
+                  clips: { ...tempConfig.clips, enabled: checked },
+                })
+              }
+              disabled={saving}
+              size="md"
+            />
+          </SettingRow>
+        )}
         <SettingRow
           label={t("settings.discord_presence")}
           description={t("settings.discord_presence.tooltip")}

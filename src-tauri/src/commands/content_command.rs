@@ -1,23 +1,18 @@
 use crate::commands::file_command; // Added import for file_command
 use crate::error::{AppError, CommandError};
-use crate::integrations::modrinth::ModrinthVersion; // Added for new payload
-use crate::integrations::curseforge::CurseForgeFile; // Added for CurseForge support
 use crate::integrations::unified_mod::UnifiedVersion; // Added for unified version support
 use crate::state::profile_state::ModSource;
 use crate::integrations::unified_mod::ModPlatform; // Import unified ModPlatform
 use crate::state::state_manager::State as AppStateManager;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::hash_utils; // For calculate_sha1
-use crate::utils::profile_utils::GenericModrinthInfo; // Already there or similar
 use crate::utils::resourcepack_utils::ResourcePackInfo;
 use crate::utils::shaderpack_utils::ShaderPackInfo;
 use crate::utils::{datapack_utils, profile_utils, resourcepack_utils, shaderpack_utils};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri_plugin_fs::FilePath;
 use tokio::fs;
-use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 // Updated InstallContentPayload struct
@@ -268,10 +263,160 @@ async fn toggle_single_asset_file(
     })
 }
 
+use crate::state::profile_state::NoriskModIdentifier;
+use std::collections::{HashMap, HashSet};
+
+#[derive(serde::Serialize, Debug, Default)]
+pub struct BatchToggleResult {
+    pub mods_changed: usize,
+    pub norisk_changed: usize,
+    pub files_changed: usize,
+    pub failed: usize,
+}
+
+#[tauri::command]
+pub async fn toggle_contents_from_profile(
+    payloads: Vec<ToggleContentPayload>,
+) -> Result<BatchToggleResult, CommandError> {
+    let mut perf = crate::utils::perf_utils::Phase::start("toggle_contents_batch");
+    let mut result = BatchToggleResult::default();
+    if payloads.is_empty() {
+        return Ok(result);
+    }
+
+    let state = AppStateManager::get().await.map_err(|e| {
+        CommandError::from(AppError::Other(format!("Failed to get internal state: {}", e)))
+    })?;
+
+    let mut by_profile: HashMap<Uuid, (Vec<(Uuid, bool)>, Vec<(NoriskModIdentifier, bool)>)> =
+        HashMap::new();
+    let mut leftovers: Vec<ToggleContentPayload> = Vec::new();
+    let mut mod_index: HashMap<Uuid, HashMap<String, Uuid>> = HashMap::new();
+
+    for payload in payloads {
+        if payload.file_path.is_some() {
+            leftovers.push(payload);
+            continue;
+        }
+
+        if let Some(identifier) = payload.norisk_mod_identifier.clone() {
+            by_profile
+                .entry(payload.profile_id)
+                .or_default()
+                .1
+                .push((identifier, payload.enabled));
+            continue;
+        }
+
+        let Some(hash) = payload.sha1_hash.clone() else {
+            leftovers.push(payload);
+            continue;
+        };
+
+        if !mod_index.contains_key(&payload.profile_id) {
+            let profile = state
+                .profile_manager
+                .get_profile(payload.profile_id)
+                .await
+                .map_err(CommandError::from)?;
+            let mut lookup = HashMap::new();
+            for entry in &profile.mods {
+                if let Some(sha1) = mod_sha1(&entry.source) {
+                    lookup.insert(sha1.to_string(), entry.id);
+                }
+            }
+            mod_index.insert(payload.profile_id, lookup);
+        }
+
+        match mod_index
+            .get(&payload.profile_id)
+            .and_then(|lookup| lookup.get(&hash))
+        {
+            Some(mod_id) => by_profile
+                .entry(payload.profile_id)
+                .or_default()
+                .0
+                .push((*mod_id, payload.enabled)),
+            None => leftovers.push(payload),
+        }
+    }
+
+    perf.mark(&format!(
+        "grouped {} profile(s), {} leftover(s)",
+        by_profile.len(),
+        leftovers.len()
+    ));
+
+    for (profile_id, (mods, norisk)) in by_profile {
+        for enabled in [true, false] {
+            let ids: Vec<Uuid> = mods
+                .iter()
+                .filter(|(_, want)| *want == enabled)
+                .map(|(id, _)| *id)
+                .collect();
+            match state
+                .profile_manager
+                .set_mods_enabled(profile_id, &ids, enabled)
+                .await
+            {
+                Ok(changed) => result.mods_changed += changed,
+                Err(e) => {
+                    log::error!("Batch toggle failed for profile {}: {}", profile_id, e);
+                    result.failed += ids.len();
+                }
+            }
+        }
+
+        match state
+            .profile_manager
+            .set_norisk_mod_statuses(profile_id, &norisk)
+            .await
+        {
+            Ok(changed) => result.norisk_changed += changed,
+            Err(e) => {
+                log::error!("Batch norisk toggle failed for profile {}: {}", profile_id, e);
+                result.failed += norisk.len();
+            }
+        }
+    }
+
+    perf.mark("profile writes");
+
+    for payload in leftovers {
+        match toggle_content_from_profile(payload).await {
+            Ok(()) => result.files_changed += 1,
+            Err(e) => {
+                log::error!("Batch toggle fell back and failed: {}", e.message);
+                result.failed += 1;
+            }
+        }
+    }
+
+    perf.mark("leftovers");
+    log::info!(
+        "Batch toggle: {} mods, {} norisk entries, {} files, {} failed",
+        result.mods_changed,
+        result.norisk_changed,
+        result.files_changed,
+        result.failed
+    );
+    Ok(result)
+}
+
+fn mod_sha1(source: &crate::state::profile_state::ModSource) -> Option<&str> {
+    use crate::state::profile_state::ModSource;
+    match source {
+        ModSource::Modrinth { file_hash_sha1, .. }
+        | ModSource::CurseForge { file_hash_sha1, .. } => file_hash_sha1.as_deref(),
+        _ => None,
+    }
+}
+
 #[tauri::command]
 pub async fn toggle_content_from_profile(
     payload: ToggleContentPayload,
 ) -> Result<(), CommandError> {
+    let mut perf = crate::utils::perf_utils::Phase::start("toggle_content");
     log::info!(
         "Attempting to toggle content state: profile_id={}, sha1_hash={:?}, file_path={:?}, enabled={}, norisk_mod_identifier={:?}, content_type={:?}",
         payload.profile_id,
@@ -292,6 +437,7 @@ pub async fn toggle_content_from_profile(
         return file_command::set_file_enabled(path_str.clone(), payload.enabled).await;
     }
 
+    perf.mark("entry");
     let state_manager = AppStateManager::get().await.map_err(|e| {
         log::error!("Failed to get AppStateManager: {}", e);
         CommandError::from(AppError::Other(format!(
@@ -389,6 +535,7 @@ pub async fn toggle_content_from_profile(
                     .await
                 {
                     Ok(_) => {
+                        perf.mark("set_mod_enabled");
                         log::info!(
                             "Successfully toggled Modrinth entry {} in profile {} to enabled={}.",
                             mod_entry.id,
@@ -626,6 +773,181 @@ pub async fn toggle_content_from_profile(
         current_sha1_hash, payload.profile_id, mod_entries_toggled_count, asset_files_toggled_count
     );
     Ok(())
+}
+
+#[derive(serde::Serialize, Debug, Default)]
+pub struct BatchUninstallResult {
+    pub mods_removed: usize,
+    pub files_deleted: usize,
+    pub failed: usize,
+}
+
+#[tauri::command]
+pub async fn uninstall_contents_from_profile(
+    payloads: Vec<UninstallContentPayload>,
+) -> Result<BatchUninstallResult, CommandError> {
+    let mut perf = crate::utils::perf_utils::Phase::start("uninstall_contents_batch");
+    let mut result = BatchUninstallResult::default();
+    if payloads.is_empty() {
+        return Ok(result);
+    }
+
+    let state_manager = AppStateManager::get().await.map_err(|e| {
+        CommandError::from(AppError::Other(format!("Failed to get internal state: {}", e)))
+    })?;
+
+    let mut direct_paths: Vec<String> = Vec::new();
+    let mut by_profile: HashMap<Uuid, (HashSet<String>, Option<profile_utils::ContentType>)> =
+        HashMap::new();
+
+    for payload in payloads {
+        if let Some(path) = payload.file_path {
+            direct_paths.push(path);
+            continue;
+        }
+        let Some(hash) = payload.sha1_hash else {
+            result.failed += 1;
+            continue;
+        };
+        let entry = by_profile
+            .entry(payload.profile_id)
+            .or_insert_with(|| (HashSet::new(), payload.content_type.clone()));
+        entry.0.insert(hash);
+        if entry.1 != payload.content_type {
+            entry.1 = None;
+        }
+    }
+
+    perf.mark(&format!(
+        "grouped {} profile(s), {} direct path(s)",
+        by_profile.len(),
+        direct_paths.len()
+    ));
+
+    for path in direct_paths {
+        match fs::remove_file(&path).await {
+            Ok(()) => result.files_deleted += 1,
+            Err(e) => {
+                log::error!("Batch uninstall could not delete {}: {}", path, e);
+                result.failed += 1;
+            }
+        }
+    }
+
+    for (profile_id, (hashes, content_type)) in by_profile {
+        let profile = match state_manager.profile_manager.get_profile(profile_id).await {
+            Ok(profile) => profile,
+            Err(e) => {
+                log::error!("Batch uninstall could not read profile {}: {}", profile_id, e);
+                result.failed += hashes.len();
+                continue;
+            }
+        };
+
+        let mod_ids: Vec<Uuid> = profile
+            .mods
+            .iter()
+            .filter(|entry| match &entry.source {
+                ModSource::Modrinth {
+                    file_hash_sha1: Some(hash),
+                    ..
+                }
+                | ModSource::CurseForge {
+                    file_hash_sha1: Some(hash),
+                    ..
+                } => hashes.contains(hash),
+                _ => false,
+            })
+            .map(|entry| entry.id)
+            .collect();
+
+        match state_manager
+            .profile_manager
+            .delete_mods(profile_id, &mod_ids)
+            .await
+        {
+            Ok(removed) => result.mods_removed += removed,
+            Err(e) => {
+                log::error!("Batch uninstall could not remove mods from {}: {}", profile_id, e);
+                result.failed += mod_ids.len();
+            }
+        }
+
+        result.files_deleted += delete_files_by_hash(&state_manager, &profile, &hashes, &content_type)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Batch uninstall could not sweep files for {}: {}", profile_id, e);
+                0
+            });
+    }
+
+    perf.mark("sweep");
+    log::info!(
+        "Batch uninstall: {} mod entries, {} files, {} failed",
+        result.mods_removed,
+        result.files_deleted,
+        result.failed
+    );
+    Ok(result)
+}
+
+async fn delete_files_by_hash(
+    state_manager: &Arc<AppStateManager>,
+    profile: &crate::state::profile_state::Profile,
+    hashes: &HashSet<String>,
+    content_type: &Option<profile_utils::ContentType>,
+) -> crate::error::Result<usize> {
+    let instance_path = state_manager
+        .profile_manager
+        .get_profile_instance_path(profile.id)
+        .await?;
+
+    let mut dirs_to_scan: Vec<(&str, PathBuf)> = vec![
+        ("shaderpacks", instance_path.join("shaderpacks")),
+        ("resourcepacks", instance_path.join("resourcepacks")),
+        ("datapacks", instance_path.join("datapacks")),
+    ];
+    for mods_dir in state_manager.profile_manager.mod_scan_dirs(profile)? {
+        dirs_to_scan.push(("mods", mods_dir));
+    }
+
+    if let Some(ct) = content_type {
+        let keep = match ct {
+            profile_utils::ContentType::Mod => Some("mods"),
+            profile_utils::ContentType::ShaderPack => Some("shaderpacks"),
+            profile_utils::ContentType::ResourcePack => Some("resourcepacks"),
+            profile_utils::ContentType::DataPack => Some("datapacks"),
+            _ => None,
+        };
+        if let Some(keep) = keep {
+            dirs_to_scan.retain(|(name, _)| *name == keep);
+        }
+    }
+
+    let mut deleted = 0;
+    for (_, dir) in dirs_to_scan {
+        let Ok(mut entries) = fs::read_dir(&dir).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Ok(hash) = hash_utils::calculate_sha1(&path).await else {
+                continue;
+            };
+            if !hashes.contains(&hash) {
+                continue;
+            }
+            match fs::remove_file(&path).await {
+                Ok(()) => deleted += 1,
+                Err(e) => log::error!("Could not delete {:?}: {}", path, e),
+            }
+        }
+    }
+
+    Ok(deleted)
 }
 
 #[tauri::command]
@@ -1056,18 +1378,6 @@ pub async fn install_local_content_to_profile(
                 "Local installation of NoRiskMod content type is not supported.".to_string(),
             )));
         }
-        // Handle any other ContentType variants not explicitly covered, if any exist or are added later.
-        _ => {
-            log::warn!(
-                "Local installation for content type {:?} is not yet implemented for profile {}.",
-                payload.content_type,
-                payload.profile_id
-            );
-            return Err(CommandError::from(AppError::Other(format!(
-                "Local installation for content type {:?} is not yet implemented.",
-                payload.content_type
-            ))));
-        }
     }
 
     // Emit event to trigger UI update for this profile, so the frontend can refresh.
@@ -1093,7 +1403,7 @@ pub async fn install_local_content_to_profile(
 
 // --- New Struct and Command for Switching Content Version ---
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SwitchContentVersionPayload {
     pub profile_id: Uuid,
     pub content_type: profile_utils::ContentType,
@@ -1118,6 +1428,96 @@ pub struct BulkToggleModUpdatesPayload {
 pub struct BulkModUpdateEntry {
     pub mod_id: Uuid,
     pub updates_enabled: bool,
+}
+
+#[derive(serde::Serialize, Debug, Default)]
+pub struct BatchUpdateResult {
+    pub applied: Vec<usize>,
+    pub failed: Vec<usize>,
+}
+
+#[tauri::command]
+pub async fn update_contents_from_profile(
+    payloads: Vec<SwitchContentVersionPayload>,
+) -> Result<BatchUpdateResult, CommandError> {
+    let mut perf = crate::utils::perf_utils::Phase::start("update_contents_batch");
+    let mut result = BatchUpdateResult::default();
+    if payloads.is_empty() {
+        return Ok(result);
+    }
+
+    let state = AppStateManager::get().await.map_err(|e| {
+        CommandError::from(AppError::Other(format!("Failed to get internal state: {}", e)))
+    })?;
+
+    let mut by_profile: HashMap<Uuid, Vec<usize>> = HashMap::new();
+    let mut leftovers: Vec<usize> = Vec::new();
+
+    for (slot, payload) in payloads.iter().enumerate() {
+        let managed_mod = payload.content_type == profile_utils::ContentType::Mod
+            && payload
+                .current_item_details
+                .as_ref()
+                .map_or(false, |item| item.id.is_some());
+        if managed_mod {
+            by_profile.entry(payload.profile_id).or_default().push(slot);
+        } else {
+            leftovers.push(slot);
+        }
+    }
+
+    perf.mark(&format!(
+        "grouped {} profile(s), {} leftover(s)",
+        by_profile.len(),
+        leftovers.len()
+    ));
+
+    for (profile_id, slots) in by_profile {
+        let group: Vec<&SwitchContentVersionPayload> =
+            slots.iter().map(|slot| &payloads[*slot]).collect();
+        match state
+            .profile_manager
+            .update_mods_with_switch_payloads(profile_id, &group)
+            .await
+        {
+            Ok(applied) => {
+                let done: HashSet<usize> = applied.iter().copied().collect();
+                for (offset, slot) in slots.iter().enumerate() {
+                    if done.contains(&offset) {
+                        result.applied.push(*slot);
+                    } else {
+                        result.failed.push(*slot);
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Batch update failed for profile {}: {}", profile_id, e);
+                result.failed.extend(slots);
+            }
+        }
+    }
+
+    perf.mark("profile writes");
+
+    for slot in leftovers {
+        match switch_content_version(payloads[slot].clone()).await {
+            Ok(()) => result.applied.push(slot),
+            Err(e) => {
+                log::error!("Batch update fell back and failed: {}", e.message);
+                result.failed.push(slot);
+            }
+        }
+    }
+
+    perf.mark("leftovers");
+    result.applied.sort_unstable();
+    result.failed.sort_unstable();
+    log::info!(
+        "Batch update: {} applied, {} failed",
+        result.applied.len(),
+        result.failed.len()
+    );
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1361,36 +1761,36 @@ pub async fn bulk_toggle_mod_updates(
         return Ok(());
     }
 
-    // Update all mods that need updating
-    let mut update_errors = Vec::new();
+    let mut perf = crate::utils::perf_utils::Phase::start("bulk_toggle_mod_updates");
+    let mut update_errors: Vec<(Uuid, String)> = Vec::new();
 
-    for (mod_id, updates_enabled) in mods_to_update {
-        match state_manager
+    for wanted in [true, false] {
+        let ids: Vec<Uuid> = mods_to_update
+            .iter()
+            .filter(|(_, enabled)| *enabled == wanted)
+            .map(|(id, _)| *id)
+            .collect();
+        if ids.is_empty() {
+            continue;
+        }
+
+        if let Err(e) = state_manager
             .profile_manager
-            .set_mod_updates_enabled(payload.profile_id, mod_id, updates_enabled)
+            .set_mods_updates_enabled(payload.profile_id, &ids, wanted)
             .await
         {
-            Ok(_) => {
-                log::info!(
-                    "Successfully toggled updates for mod {} in profile {} to updates_enabled={}",
-                    mod_id,
-                    payload.profile_id,
-                    updates_enabled
-                );
-            }
-            Err(e) => {
-                log::error!(
-                    "Failed to toggle updates for mod {} in profile {}: {}",
-                    mod_id,
-                    payload.profile_id,
-                    e
-                );
-                update_errors.push((mod_id, e.to_string()));
-            }
+            log::error!(
+                "Failed to toggle updates for {} mod(s) in profile {}: {}",
+                ids.len(),
+                payload.profile_id,
+                e
+            );
+            update_errors.extend(ids.into_iter().map(|id| (id, e.to_string())));
         }
     }
 
-    // If any updates failed, report the errors
+    perf.mark("bulk write");
+
     if !update_errors.is_empty() {
         return Err(CommandError::from(AppError::Other(format!(
             "Some mod updates failed: {:?}",

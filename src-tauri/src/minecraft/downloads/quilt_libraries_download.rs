@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::minecraft::dto::quilt_meta::{QuiltLibrary, QuiltVersionInfo};
 use crate::utils::download_utils::{DownloadUtils, DownloadConfig};
 use futures::stream::StreamExt;
-use log::info;
+use log::{info, trace};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -27,34 +27,34 @@ impl QuiltLibrariesDownloadService {
     }
 
     pub fn print_version_info(&self, version: &QuiltVersionInfo) {
-        info!("\n=== Quilt Version ===");
-        info!("Loader:");
-        info!("  - Version: {}", version.loader.version);
-        info!("  - Build: {}", version.loader.build);
-        info!("  - Maven: {}", version.loader.maven);
-        info!("  - Stable: {}", version.loader.stable);
-        info!("  - Separator: {}", version.loader.separator);
+        trace!("=== Quilt Version ===");
+        trace!("Loader:");
+        trace!("  - Version: {}", version.loader.version);
+        trace!("  - Build: {}", version.loader.build);
+        trace!("  - Maven: {}", version.loader.maven);
+        trace!("  - Stable: {}", version.loader.stable);
+        trace!("  - Separator: {}", version.loader.separator);
 
-        info!("\nIntermediary:");
-        info!("  - Version: {}", version.intermediary.version);
-        info!("  - Maven: {}", version.intermediary.maven);
-        info!("  - Stable: {}", version.intermediary.stable);
+        trace!("Intermediary:");
+        trace!("  - Version: {}", version.intermediary.version);
+        trace!("  - Maven: {}", version.intermediary.maven);
+        trace!("  - Stable: {}", version.intermediary.stable);
 
-        info!("\nLauncher Meta:");
-        info!("  - Version: {}", version.launcher_meta.version);
+        trace!("Launcher Meta:");
+        trace!("  - Version: {}", version.launcher_meta.version);
         if let Some(min_java) = version.launcher_meta.min_java_version {
-            info!("  - Min Java Version: {}", min_java);
+            trace!("  - Min Java Version: {}", min_java);
         }
-        info!(
+        trace!(
             "  - Main Class (Client): {}",
             version.launcher_meta.main_class.get_client()
         );
-        info!(
+        trace!(
             "  - Main Class (Server): {}",
             version.launcher_meta.main_class.get_server()
         );
 
-        info!("\nLibraries:");
+        trace!("Libraries:");
         self.print_libraries(&version.launcher_meta.libraries.common, "Common Libraries");
         self.print_libraries(&version.launcher_meta.libraries.client, "Client Libraries");
         self.print_libraries(&version.launcher_meta.libraries.server, "Server Libraries");
@@ -64,55 +64,20 @@ impl QuiltLibrariesDownloadService {
     }
 
     fn print_libraries(&self, libraries: &[QuiltLibrary], title: &str) {
-        info!("  {}:", title);
+        trace!("  {}:", title);
         for lib in libraries {
-            info!("    - Name: {}", lib.name);
+            trace!("    - Name: {}", lib.name);
             if let Some(url) = &lib.url {
-                info!("      URL: {}", url);
+                trace!("      URL: {}", url);
             }
             if let Some(size) = lib.size {
-                info!("      Size: {} bytes", size);
+                trace!("      Size: {} bytes", size);
             }
             if let Some(sha1) = &lib.sha1 {
-                info!("      SHA1: {}", sha1);
+                trace!("      SHA1: {}", sha1);
             }
-            info!("");
+            trace!("");
         }
-    }
-
-    async fn download_maven_artifact(&self, maven: &str) -> Result<()> {
-        let parts: Vec<&str> = maven.split(':').collect();
-        if parts.len() != 3 {
-            return Err(crate::error::AppError::QuiltError(
-                "Invalid Maven coordinates".to_string(),
-            ));
-        }
-
-        let (group, artifact, version) = (parts[0], parts[1], parts[2]);
-        let group_path = group.replace('.', "/");
-        let target_path = self
-            .libraries_path
-            .join(&group_path)
-            .join(artifact)
-            .join(version)
-            .join(format!("{}-{}.jar", artifact, version));
-
-        if fs::try_exists(&target_path).await? {
-            info!("📦 Maven artifact already exists: {}", maven);
-            return Ok(());
-        }
-
-        let url = format!(
-            "https://maven.quiltmc.org/repository/release/{}/{}/{}/{}-{}.jar",
-            group_path, artifact, version, artifact, version
-        );
-
-        info!("⬇️ Downloading Maven artifact: {}", maven);
-        DownloadUtils::download_file(&url, &target_path, DownloadConfig::default()).await
-            .map_err(|e| crate::error::AppError::QuiltError(format!("Failed to download Maven artifact: {}", e)))?;
-
-        info!("💾 Saved Maven artifact: {}", maven);
-        Ok(())
     }
 
     fn create_library_from_maven(&self, maven: &str) -> QuiltLibrary {
@@ -140,7 +105,7 @@ impl QuiltLibrariesDownloadService {
     }
 
     pub async fn download_quilt_libraries(&self, version: &QuiltVersionInfo) -> Result<()> {
-        info!("\nDownloading Quilt components...");
+        info!("Downloading Quilt components...");
 
         let mut all_libraries = Vec::new();
         all_libraries.push(self.create_library_from_maven(&version.loader.maven));
@@ -159,7 +124,7 @@ impl QuiltLibrariesDownloadService {
         }
 
         info!("Found {} components to download", all_libraries.len());
-        info!("Downloading with {} concurrent downloads", self.concurrent_downloads);
+        trace!("Downloading with {} concurrent downloads", self.concurrent_downloads);
 
         let downloads = futures::stream::iter(all_libraries.into_iter())
             .map(|library| {
@@ -167,7 +132,7 @@ impl QuiltLibrariesDownloadService {
                 async move {
                     let result = self_clone.download_library(&library).await;
                     match &result {
-                        Ok(_) => info!("✅ Successfully downloaded: {}", library.name),
+                        Ok(_) => trace!("✅ Successfully downloaded: {}", library.name),
                         Err(e) => info!("❌ Failed to download {}: {}", library.name, e),
                     }
                     result
@@ -179,7 +144,7 @@ impl QuiltLibrariesDownloadService {
         let errors: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
         if !errors.is_empty() {
-            info!("\n⚠️ Some downloads failed:");
+            info!("⚠️ Some downloads failed:");
             for error in errors {
                 info!("  - {}", error);
             }
@@ -188,7 +153,7 @@ impl QuiltLibrariesDownloadService {
             ));
         }
 
-        info!("\n✅ All Quilt components downloaded successfully!");
+        info!("✅ All Quilt components downloaded successfully!");
         Ok(())
     }
 
@@ -214,11 +179,11 @@ impl QuiltLibrariesDownloadService {
             .join(format!("{}-{}.jar", artifact, version));
 
         if fs::try_exists(&target_path).await? && library.sha1.is_none() {
-            info!("📦 Library already exists: {}", library.name);
+            trace!("📦 Library already exists: {}", library.name);
             return Ok(());
         }
 
-        info!("⬇️ Downloading: {} from {}", library.name, url);
+        trace!("⬇️ Downloading: {} from {}", library.name, url);
         
         let config = if let Some(sha1) = &library.sha1 {
             DownloadConfig::new().with_sha1(sha1.clone())
@@ -229,7 +194,7 @@ impl QuiltLibrariesDownloadService {
         DownloadUtils::download_file(&url, &target_path, config).await
             .map_err(|e| crate::error::AppError::QuiltError(format!("Failed to download library: {}", e)))?;
 
-        info!("💾 Saved: {}", library.name);
+        trace!("💾 Saved: {}", library.name);
         Ok(())
     }
 

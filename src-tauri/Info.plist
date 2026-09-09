@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
     <dict>
+        <key>CFBundleIconName</key>
+        <string>NoRiskLauncher</string>
         <key>NSCameraUsageDescription</key>
         <string>A Minecraft mod wants to access your camera.</string>
         <key>NSMicrophoneUsageDescription</key>
-        <string>A Minecraft mod wants to access your microphone.</string>
+        <string>NoRiskClient uses your microphone for game clips when microphone recording is enabled. Minecraft mods may also request microphone access.</string>
         <key>NSAppTransportSecurity</key>
         <dict>
             <key>NSExceptionDomains</key>

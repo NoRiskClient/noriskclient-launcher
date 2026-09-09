@@ -25,6 +25,12 @@ export interface NoriskModEntryDefinition { // Renamed from NoriskPackMod
     >;
 }
 
+export interface PackListing {
+    category?: string;
+    weight?: number;
+    hidden?: boolean;
+}
+
 // Corresponds to Rust struct NoriskPackDefinition
 export interface NoriskPackDefinition {
     displayName: string; // Correct
@@ -34,6 +40,7 @@ export interface NoriskPackDefinition {
     mods?: NoriskModEntryDefinition[]; // Updated type used
     assets?: string[]; // Added field
     isExperimental?: boolean; // Added field
+    listing?: PackListing;
 }
 
 // Corresponds to Rust struct NoriskModpacksConfig

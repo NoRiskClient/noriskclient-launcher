@@ -6,7 +6,8 @@ use crate::minecraft::api::cosmetic_icons::{
 };
 use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::dto::norisk_user::NoRiskUserMinimal;
-use serde::Serialize;
+use crate::state::state_manager::State;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 const CREATOR_CODE_VALID_MS: u64 = 14 * 24 * 60 * 60 * 1000;
@@ -22,7 +23,7 @@ async fn minimal_user(target: &Uuid) -> Result<NoRiskUserMinimal, CommandError> 
         .map_err(CommandError::from)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SelectedIconDto {
     pub url: Option<String>,
     pub plus: bool,
@@ -35,11 +36,41 @@ pub async fn get_selected_player_icon(
     let target = MinecraftApiService::new()
         .resolve_uuid(&player_identifier)
         .await?;
+    let state = State::get().await?;
     let user = match minimal_user(&target).await {
         Ok(u) => u,
-        Err(_) => return Ok(SelectedIconDto { url: None, plus: false }),
+        Err(_) => {
+            return Ok(state
+                .content_cache
+                .get_player_icon::<SelectedIconDto>(&target)
+                .await
+                .unwrap_or(SelectedIconDto { url: None, plus: false }))
+        }
     };
 
+    let icon = selected_icon_from_user(&user);
+    state
+        .content_cache
+        .put_player_icon(&target, &icon)
+        .await;
+    Ok(icon)
+}
+
+#[tauri::command]
+pub async fn get_selected_player_icon_cached(
+    player_identifier: String,
+) -> Result<Option<SelectedIconDto>, CommandError> {
+    let target = MinecraftApiService::new()
+        .resolve_uuid(&player_identifier)
+        .await?;
+    let state = State::get().await?;
+    Ok(state
+        .content_cache
+        .get_player_icon::<SelectedIconDto>(&target)
+        .await)
+}
+
+fn selected_icon_from_user(user: &NoRiskUserMinimal) -> SelectedIconDto {
     let current_icon = user.custom_icon_info.current_icon.as_deref();
     let mut url = current_icon.and_then(|i| icon_url_for_uuid(Some(i)));
 
@@ -53,10 +84,10 @@ pub async fn get_selected_player_icon(
         }
     }
 
-    Ok(SelectedIconDto {
+    SelectedIconDto {
         url,
         plus: user.is_norisk_plus(),
-    })
+    }
 }
 
 #[derive(Serialize)]

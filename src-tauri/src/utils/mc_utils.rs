@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::AssetIndex;
@@ -13,16 +14,15 @@ use log::{debug, error, info, warn};
 use serde::Deserialize;
 use serde::Serialize; // Added Serialize directly
                       // To represent NBT Compound
-use futures::future::{join_all, try_join_all};
+use futures::future::try_join_all;
 use std::env;
-use std::io::{Cursor, Read}; // Needed for reading NBT from bytes and decompression
+use std::io::Cursor;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::{AsyncReadExt as _, BufReader};
-use tokio::sync::Semaphore;
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::TokioAsyncResolver;
 use uuid::Uuid;
@@ -37,7 +37,6 @@ use crate::minecraft::dto::skin_payloads::{
 }; // Added imports for SkinSource and related types
 use crate::utils::hash_utils::calculate_sha1_from_bytes;
 use crate::utils::path_utils;
-use base64::{decode as base64_decode_str, encode as base64_encode_bytes};
 
 // --- End New Helper Imports ---
 
@@ -1679,7 +1678,7 @@ async fn download_bytes(url: &str) -> Result<Vec<u8>> {
 
 pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
     debug!("[MC Utils] Fetching image from URL: {}", url);
-    Ok(base64_encode_bytes(&download_bytes(url).await?))
+    Ok(BASE64.encode(&download_bytes(url).await?))
 }
 
 pub fn normalize_uuid(uuid: &str) -> String {
@@ -1728,7 +1727,7 @@ pub fn local_cached_skin_base64(skin_url: &str) -> Option<String> {
     if bytes.is_empty() {
         return None;
     }
-    Some(base64_encode_bytes(&bytes))
+    Some(BASE64.encode(&bytes))
 }
 
 fn write_vanilla_skin_cache(skin_url: &str, bytes: &[u8]) {
@@ -1752,7 +1751,7 @@ pub async fn fetch_skin_base64(skin_url: &str) -> Result<String> {
     }
     let bytes = download_bytes(skin_url).await?;
     write_vanilla_skin_cache(skin_url, &bytes);
-    Ok(base64_encode_bytes(&bytes))
+    Ok(BASE64.encode(&bytes))
 }
 
 pub async fn fetch_skin_base64_for_uuid(uuid: &str) -> Result<(String, SkinModelVariant)> {
@@ -1784,7 +1783,7 @@ pub fn extract_skin_info_from_profile(
             AppError::Other("Textures property not found in profile".to_string())
         })?;
 
-    let decoded_textures_value = base64_decode_str(&textures_prop.value).map_err(|e| {
+    let decoded_textures_value = BASE64.decode(&textures_prop.value).map_err(|e| {
         error!(
             "[MC Utils] Failed to decode textures base64 for profile {}: {}",
             profile.name, e
@@ -1809,10 +1808,10 @@ pub fn extract_skin_info_from_profile(
         AppError::Other(format!("Failed to parse textures JSON: {}", e))
     })?;
 
-    // Access textures.SKIN correctly
+    // Access textures.skin correctly
     let skin_texture_info = textures_data
         .textures // This is TexturesDictionary
-        .SKIN // This is Option<TextureInfo>
+        .skin // This is Option<TextureInfo>
         .ok_or_else(|| {
             error!(
                 "[MC Utils] SKIN texture info not found for profile {}",
@@ -1903,7 +1902,7 @@ pub async fn get_base64_from_skin_source(source: &SkinSource) -> Result<String> 
                 );
                 AppError::Io(e)
             })?;
-            Ok(base64_encode_bytes(&file_content))
+            Ok(BASE64.encode(&file_content))
         }
         SkinSource::Base64(base64_content_data) => {
             debug!("[MC Utils] Processing Base64 source");

@@ -150,7 +150,6 @@ export function LogViewerCore({
   const [isFileDropdownOpen, setIsFileDropdownOpen] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const programmaticScrollRef = useRef(false);
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const selectionAnchorIndexRef = useRef<number | null>(null);
@@ -189,7 +188,6 @@ export function LogViewerCore({
   useEffect(() => {
     if (isMouseSelectingRef.current) return;
     if (!isAutoscrollEnabled || filteredLogs.length === 0) return;
-    programmaticScrollRef.current = true;
     const lastIndex = filteredLogs.length - 1;
     const jumpToBottom = () =>
       virtuosoRef.current?.scrollToIndex({
@@ -199,13 +197,7 @@ export function LogViewerCore({
       });
     jumpToBottom();
     const raf = requestAnimationFrame(jumpToBottom);
-    const id = setTimeout(() => {
-      programmaticScrollRef.current = false;
-    }, 120);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(id);
-    };
+    return () => cancelAnimationFrame(raf);
   }, [filteredLogs.length, isAutoscrollEnabled]);
 
   const userScrollRef = useRef(false);
@@ -227,7 +219,6 @@ export function LogViewerCore({
       setIsAutoscrollEnabled(true);
       return;
     }
-    if (programmaticScrollRef.current) return;
     if (userScrollRef.current) setIsAutoscrollEnabled(false);
   }, []);
 
@@ -661,6 +652,7 @@ export function LogViewerCore({
         onMouseDown={() => logContainerRef.current?.focus({ preventScroll: true })}
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
+        onPointerDown={markUserScroll}
         className="flex-1 min-h-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >

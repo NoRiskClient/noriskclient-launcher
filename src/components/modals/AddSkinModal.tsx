@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
 import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
+import { WebGLBoundary } from "../WebGLBoundary";
+import { FlatSkin } from "@noriskclient/nrc-skin-renderer/react";
 import { useIdleEmote } from "../../hooks/useIdleEmote";
 import { SearchStyleInput } from "../ui/Input";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -409,7 +411,13 @@ export const AddSkinModal = memo(
 
             <div className="flex justify-center">
               <div className="w-72 h-[min(24rem,40vh)]">
-                <SkinRenderer
+                <WebGLBoundary
+                  label="add-skin preview"
+                  fallback={
+                    <FlatSkin textureUrl={previewBase64Url} variant={variant} />
+                  }
+                >
+                  <SkinRenderer
                   textureUrl={previewBase64Url}
                   variant={variant}
                   emote={idleEmote.urls}
@@ -420,6 +428,7 @@ export const AddSkinModal = memo(
                   fps={30}
                   style={{ width: "100%", height: "100%" }}
                 />
+                </WebGLBoundary>
               </div>
             </div>
 
@@ -449,7 +458,13 @@ export const AddSkinModal = memo(
                 {/* 3D Skin Preview for editing */}
                 <div className="flex justify-center">
                   <div className="w-64 h-[min(20rem,34vh)]">
-                    <SkinRenderer
+                    <WebGLBoundary
+                      label="edit-skin preview"
+                      fallback={
+                        <FlatSkin textureUrl={previewBase64Url} variant={variant} />
+                      }
+                    >
+                      <SkinRenderer
                       textureUrl={previewBase64Url}
                       variant={variant}
                       emote={idleEmote.urls}
@@ -460,6 +475,7 @@ export const AddSkinModal = memo(
                       fps={30}
                       style={{ width: "100%", height: "100%" }}
                     />
+                    </WebGLBoundary>
                   </div>
                 </div>
 

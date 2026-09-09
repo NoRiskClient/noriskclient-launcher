@@ -329,6 +329,10 @@ pub async fn remove_account(account_id: Uuid) -> Result<(), CommandError> {
         .minecraft_account_manager_v2
         .remove_account(account_id)
         .await?;
+    state
+        .content_cache
+        .forget_player(&account_id)
+        .await;
     Ok(())
 }
 

@@ -17,21 +17,17 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use uuid::Uuid;
 
-#[cfg(test)]
-#[path = "curseforge_export_test.rs"]
-mod tests;
-
 const DEFAULT_PACK_VERSION: &str = "1.0.0";
 const MANIFEST_FILE_NAME: &str = "manifest.json";
 const MODLIST_FILE_NAME: &str = "modlist.html";
 const MAX_FINGERPRINT_CANDIDATES: usize = 500;
 const MAX_FINGERPRINT_FILE_BYTES: u64 = 200 * 1024 * 1024;
 
-struct IndexEntry {
-    project_id: u32,
-    file_id: u32,
-    file_name: String,
-    display_name: Option<String>,
+pub struct IndexEntry {
+    pub project_id: u32,
+    pub file_id: u32,
+    pub file_name: String,
+    pub display_name: Option<String>,
 }
 
 pub async fn export_profile_to_curseforge(
@@ -127,7 +123,7 @@ async fn build_mod_loaders(
     }])
 }
 
-fn curseforge_loader_id(loader: ModLoader, game_version: &str, loader_version: &str) -> String {
+pub fn curseforge_loader_id(loader: ModLoader, game_version: &str, loader_version: &str) -> String {
     match loader {
         ModLoader::NeoForge if game_version == "1.20.1" => {
             format!("neoforge-1.20.1-{}", loader_version)
@@ -302,7 +298,7 @@ async fn resolve_candidates_via_fingerprint(
     }
 }
 
-fn render_modlist(entries: &[IndexEntry]) -> String {
+pub fn render_modlist(entries: &[IndexEntry]) -> String {
     let mut html = String::from("<ul>\n");
     for entry in entries {
         let label = entry.display_name.as_deref().unwrap_or(&entry.file_name);
@@ -330,4 +326,3 @@ fn escape_html(value: &str) -> String {
     }
     escaped
 }
-

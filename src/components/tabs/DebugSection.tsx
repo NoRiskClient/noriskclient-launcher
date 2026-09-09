@@ -31,6 +31,11 @@ import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileStore } from "../../store/profile-store";
 import { useContentCacheStore } from "../../store/content-cache-store";
 import { SettingsSection } from "../ui/settings/SettingsSection";
+import { SettingRow } from "../ui/settings/SettingRow";
+import { Select } from "../ui/Select";
+import { useSettingsConfig } from "./settings/settings-context";
+import { LOG_LEVELS, type LogLevel } from "../../types/launcherConfig";
+import { logError } from '../../utils/logging-utils';
 
 export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
 
@@ -86,7 +91,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
         const f = await loader();
         if (!cancelled) setFiles(f);
       } catch (e) {
-        console.error("Failed to load files:", e);
+        logError(`Failed to load files: ${e}`);
         if (!cancelled) setFiles([]);
       }
       if (!cancelled) setLoading(false);
@@ -105,7 +110,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
       await writeText(url);
       toast.success(t("debug.uploaded_copied"));
     } catch (e) {
-      console.error("Failed to upload:", e);
+      logError(`Failed to upload: ${e}`);
       toast.error(t("debug.upload_failed", { error: getErrorMessage(e) }));
     }
     setUploadingFile(null);
@@ -117,7 +122,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
       await writeText(content);
       toast.success(t("debug.copied"));
     } catch (e) {
-      console.error("Failed to copy:", e);
+      logError(`Failed to copy: ${e}`);
       toast.error(t("debug.copy_failed", { error: getErrorMessage(e) }));
     }
   }
@@ -184,6 +189,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
 
 export function DebugSection() {
   const { t } = useTranslation();
+  const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const [permissions, setPermissions] = useState<PermissionCacheState | null>(null);
   const [refreshingPerms, setRefreshingPerms] = useState(false);
 
@@ -199,7 +205,7 @@ export function DebugSection() {
       setPermissions(cached);
       toast.success(t("debug.permissions.refreshed"));
     } catch (e) {
-      console.error("Failed to refresh permissions:", e);
+      logError(`Failed to refresh permissions: ${e}`);
       toast.error(t("debug.permissions.refresh_failed", { error: getErrorMessage(e) }));
     }
     setRefreshingPerms(false);
@@ -207,6 +213,20 @@ export function DebugSection() {
 
   return (
     <div className="space-y-6">
+      <SettingsSection id="settings-section-log-level" title={t("debug.log_level.title")} icon="solar:tuning-2-bold">
+        <SettingRow label={t("debug.log_level.label")} description={t("debug.log_level.tooltip")} disabled={saving}>
+          <div className="w-40">
+            <Select
+              value={tempConfig?.log_level ?? "debug"}
+              onChange={(value) => tempConfig && setTempConfig({ ...tempConfig, log_level: value as LogLevel })}
+              options={LOG_LEVELS.map((level) => ({ value: level, label: t(`debug.log_level.${level}`) }))}
+              size="sm"
+              variant="flat"
+              disabled={saving}
+            />
+          </div>
+        </SettingRow>
+      </SettingsSection>
       <LogFileSection id="launcher" title={t("debug.tabs.launcher")} icon="solar:document-text-bold" loader={listLauncherLogs} />
       <LogFileSection id="minecraft" title={t("debug.tabs.minecraft")} icon="solar:document-text-bold" loader={listAllMcLogs} />
       <LogFileSection id="process" title={t("debug.tabs.process")} icon="solar:document-text-bold" loader={listProcessLogs} />
@@ -264,7 +284,7 @@ function TestingPanel() {
       const result = await listProfileBackups();
       setBackups(result);
     } catch (e) {
-      console.error("Failed to list profile backups:", e);
+      logError(`Failed to list profile backups: ${e}`);
       toast.error(t("settings.backups.load_failed", { error: String(e) }));
     }
     setLoadingBackups(false);
@@ -291,7 +311,7 @@ function TestingPanel() {
       await loadBackups();
       toast.success(t("settings.backups.restored", { count: backup.profile_count, date }));
     } catch (e) {
-      console.error("Failed to restore profile backup:", e);
+      logError(`Failed to restore profile backup: ${e}`);
       toast.error(t("settings.backups.restore_failed", { error: String(e) }));
     }
     setRestoringPath(null);
@@ -304,7 +324,7 @@ function TestingPanel() {
       setFilenames(result);
       toast.success(t("debug.testing.keepset_result", { count: result.length }));
     } catch (e) {
-      console.error("Failed to list expected cache filenames:", e);
+      logError(`Failed to list expected cache filenames: ${e}`);
       toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setLoading(false);
@@ -322,7 +342,7 @@ function TestingPanel() {
         toast.success(t("debug.testing.clean_result", { count: stats.deleted.length, mb }));
       }
     } catch (e) {
-      console.error("Failed to clean mod_cache:", e);
+      logError(`Failed to clean mod_cache: ${e}`);
       toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setCleaning(false);
@@ -355,7 +375,7 @@ function TestingPanel() {
         t("debug.testing.clear_cache_result", { count: stats.rows_deleted, mb }),
       );
     } catch (e) {
-      console.error("Failed to clear the content cache:", e);
+      logError(`Failed to clear the content cache: ${e}`);
       toast.error(t("debug.testing.failed", { error: String(e) }));
     }
     setClearingCache(false);
@@ -580,7 +600,7 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
     try {
       await openTesterWindow();
     } catch (e) {
-      console.error("Failed to open tester window:", e);
+      logError(`Failed to open tester window: ${e}`);
       toast.error(t("debug.testing.tester_open_failed", { error: String(e) }));
     } finally {
       setOpening(false);

@@ -6,6 +6,7 @@ import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
 import { EmptyState } from "../ui/EmptyState";
+import { Button } from "../ui/buttons/Button";
 
 import { ProfileCardV2 } from "../profiles/ProfileCardV2";
 import { toast } from "react-hot-toast";
@@ -14,12 +15,10 @@ import { MultiVersionFilter } from "../ui/MultiVersionFilter";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { ActionButtons, type ActionButton } from "../ui/ActionButtons";
 import { useNavigate } from "react-router-dom";
-import { ProfileImport } from "../profiles/ProfileImport";
 import * as ProfileService from "../../services/profile-service";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -44,7 +43,6 @@ export function ProfilesTabV2() {
   const { confirm, confirmDialog } = useConfirmDialog();
   const { openModal: openWizard } = useProfileWizardStore();
   const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
-  const { showModal, hideModal } = useGlobalModal();
   
   // Persistent filters from theme store
   const {
@@ -72,22 +70,6 @@ export function ProfilesTabV2() {
 
   // Action buttons configuration
   const actionButtons: ActionButton[] = [
-    {
-      id: "import",
-      label: t('profiles.import'),
-      icon: "solar:upload-bold",
-      tooltip: t('profiles.importProfile'),
-      onClick: () => {
-        showModal("profile-import", <ProfileImport
-          onClose={() => {
-            hideModal("profile-import");
-            navigate("/profiles");
-          }}
-          onImportComplete={handleImportComplete}
-        />);
-        navigate("/profiles");
-      },
-    },
     {
       id: "create",
       label: t('profiles.create'),
@@ -196,13 +178,6 @@ export function ProfilesTabV2() {
   const handleCreateProfile = () => {
     console.log("[ProfilesTabV2] handleCreateProfile called.");
     fetchProfiles();
-    navigate("/profiles");
-  };
-
-  const handleImportComplete = () => {
-    console.log("[ProfilesTabV2] handleImportComplete called.");
-    fetchProfiles();
-    hideModal("profile-import");
     navigate("/profiles");
   };
 
@@ -380,6 +355,16 @@ export function ProfilesTabV2() {
       <EmptyState
         icon="solar:widget-bold"
         message={t('profiles.noProfilesFound')}
+        action={
+          <Button
+            variant="default"
+            size="md"
+            onClick={() => openWizard(null)}
+            icon={<Icon icon="solar:widget-add-bold" className="w-5 h-5" />}
+          >
+            {t('profiles.createNewProfile')}
+          </Button>
+        }
       />
     );
   }

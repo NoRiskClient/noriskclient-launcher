@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::state::post_init::PostInitializationHandler;
 use crate::utils::mc_utils::{fetch_skin_base64_for_uuid, normalize_uuid};
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ pub struct ActiveSkinManager {
 
 impl ActiveSkinManager {
     pub fn new(path: PathBuf) -> Result<Self> {
-        info!("ActiveSkinManager: Initializing with path: {:?}", path);
+        trace!("ActiveSkinManager: Initializing with path: {:?}", path);
         Ok(Self {
             db: Arc::new(RwLock::new(ActiveSkinDatabase::default())),
             path,
@@ -137,7 +137,7 @@ impl ActiveSkinManager {
 #[async_trait]
 impl PostInitializationHandler for ActiveSkinManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("ActiveSkinManager: on_state_ready called. Loading active skins...");
+        trace!("ActiveSkinManager: on_state_ready called. Loading active skins...");
         self.ensure_loaded().await?;
         Ok(())
     }

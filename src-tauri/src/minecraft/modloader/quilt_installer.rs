@@ -40,7 +40,7 @@ impl QuiltInstaller {
             })
             .await?;
 
-        info!("\nInstalling Quilt...");
+        info!("Installing Quilt...");
         let quilt_api = QuiltApi::new();
         let mut quilt_libraries_download = QuiltLibrariesDownloadService::new();
 

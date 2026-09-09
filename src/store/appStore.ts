@@ -7,6 +7,8 @@ export interface AppDragDropState {
   activeDropProfileId: string | null;
   activeDropContentType: BackendContentType | null;
   activeMainTab: string | null;
+  syncPacksDropActive: boolean;
+  setSyncPacksDropActive: (active: boolean) => void;
   dragHover: { kind: DragHoverKind; fileNames: string[] } | null;
   setDragHover: (hover: { kind: DragHoverKind; fileNames: string[] } | null) => void;
   setActiveDropContext: (profileId: string | null, contentType: BackendContentType | null) => void;
@@ -25,6 +27,8 @@ export const useAppDragDropStore = create<AppDragDropState>((set, get) => ({
   activeDropProfileId: null,
   activeDropContentType: null,
   activeMainTab: null,
+  syncPacksDropActive: false,
+  setSyncPacksDropActive: (active) => set({ syncPacksDropActive: active }),
   dragHover: null,
   setDragHover: (hover) => {
     const current = get().dragHover;

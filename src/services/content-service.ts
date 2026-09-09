@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
+import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
+import { addContentToSyncPack, removeContentFromSyncPack } from './sync-pack-service';
 
 /**
  * Uninstalls content from a specified profile based on the provided payload.
@@ -33,6 +34,31 @@ export async function uninstallContentFromProfile(
  * @param payload - The criteria for identifying the content and the desired new state.
  * @returns A promise that resolves if the toggle is successful, or rejects with an error.
  */
+export interface BatchToggleResult {
+  mods_changed: number;
+  norisk_changed: number;
+  files_changed: number;
+  failed: number;
+}
+
+export interface BatchUninstallResult {
+  mods_removed: number;
+  files_deleted: number;
+  failed: number;
+}
+
+export async function uninstallContentsFromProfile(
+  payloads: UninstallContentPayload[],
+): Promise<BatchUninstallResult> {
+  return invoke<BatchUninstallResult>('uninstall_contents_from_profile', { payloads });
+}
+
+export async function toggleContentsFromProfile(
+  payloads: ToggleContentPayload[],
+): Promise<BatchToggleResult> {
+  return invoke<BatchToggleResult>('toggle_contents_from_profile', { payloads });
+}
+
 export async function toggleContentFromProfile(
   payload: ToggleContentPayload,
 ): Promise<void> {
@@ -81,6 +107,28 @@ export async function installContentToProfile(
     // Consider toast: toast.error(`Failed to install content: ${error}`);
     throw error;
   }
+}
+
+export async function installContentToTarget(
+  payload: InstallContentPayload,
+  target?: ContentInstallTarget,
+  options?: { pinVersion?: boolean },
+): Promise<void> {
+  if (target?.type === 'syncPack') {
+    return addContentToSyncPack(target.packId, payload, options?.pinVersion);
+  }
+  return installContentToProfile(payload);
+}
+
+export async function uninstallContentFromTarget(
+  payload: UninstallContentPayload,
+  projectId: string,
+  target?: ContentInstallTarget,
+): Promise<void> {
+  if (target?.type === 'syncPack') {
+    return removeContentFromSyncPack(target.packId, projectId);
+  }
+  return uninstallContentFromProfile(payload);
 }
 
 /**

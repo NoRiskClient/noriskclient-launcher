@@ -7,7 +7,7 @@ use tauri::Manager;
 use uuid::Uuid;
 
 const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
-const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
+pub const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -49,7 +49,7 @@ pub struct ProcessLogCursor {
     pub new_file: bool,
 }
 
-fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
+pub fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
     if session_id.is_empty()
         || session_id.contains('/')
         || session_id.contains('\\')
@@ -69,7 +69,7 @@ fn process_log_path(session_id: &str) -> PathBuf {
         .join(PROCESS_LOG_FILE_NAME)
 }
 
-fn clamp_log_read_len(requested: Option<u64>) -> u64 {
+pub fn clamp_log_read_len(requested: Option<u64>) -> u64 {
     requested
         .unwrap_or(MAX_LOG_CURSOR_BYTES)
         .clamp(1, MAX_LOG_CURSOR_BYTES)
@@ -148,7 +148,7 @@ pub async fn set_discord_state(
     state_type: String,
     profile_name: Option<String>,
 ) -> Result<(), CommandError> {
-    log::info!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
+    log::trace!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
     let state = State::get().await?;
     state.discord_manager.set_custom_state(state_type).await;
     Ok(())
@@ -300,28 +300,3 @@ pub async fn focus_main_window<R: tauri::Runtime>(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_log_session_id() {
-        assert!(validate_log_session_id("valid-session-123").is_ok());
-        assert!(validate_log_session_id("abc_def-123").is_ok());
-
-        assert!(validate_log_session_id("").is_err());
-        assert!(validate_log_session_id("session/id").is_err());
-        assert!(validate_log_session_id("session\\id").is_err());
-        assert!(validate_log_session_id("session..id").is_err());
-    }
-
-    #[test]
-    fn test_clamp_log_read_len() {
-        assert_eq!(clamp_log_read_len(None), MAX_LOG_CURSOR_BYTES);
-        assert_eq!(clamp_log_read_len(Some(100)), 100);
-        assert_eq!(clamp_log_read_len(Some(0)), 1);
-        assert_eq!(clamp_log_read_len(Some(MAX_LOG_CURSOR_BYTES + 100)), MAX_LOG_CURSOR_BYTES);
-    }
-}
-

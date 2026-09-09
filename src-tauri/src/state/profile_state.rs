@@ -1,16 +1,16 @@
-use crate::config::LAUNCHER_DIRECTORY;
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::AppError;
 use crate::error::Result;
 use crate::integrations::modrinth::{self, ModrinthDependencyType, ModrinthVersion};
 use crate::state::post_init::PostInitializationHandler;
-use crate::utils::backup_utils::{self, BackupConfig, safe_write_with_backup};
+use crate::utils::backup_utils::{self, BackupConfig};
 use crate::utils::hash_utils;
 use crate::utils::mc_utils;
 use crate::utils::path_utils;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::{HashMap, HashSet};
@@ -80,6 +80,8 @@ pub struct Mod {
     /// (e.g. a mod tagged only for 26.1.1 installed into a 26.1.2 profile).
     #[serde(default)]
     pub force_include_versions: Vec<String>,
+    #[serde(flatten, default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 // New struct to uniquely identify a Norisk Pack mod within a specific context
@@ -172,6 +174,10 @@ pub struct Profile {
     /// Incremented on process-exit via `ProcessManager` using `start_time - exit_time`.
     #[serde(default)]
     pub playtime_seconds: u64,
+    #[serde(default)]
+    pub sync_pack_ids: Vec<Uuid>,
+    #[serde(flatten, default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Profile {
@@ -229,8 +235,6 @@ pub struct ModPackInfo {
     /// File hash for verification (SHA1 for Modrinth, fingerprint for CurseForge)
     pub file_hash: Option<String>,
 }
-
-
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -297,7 +301,7 @@ pub struct ProfileSettings {
     pub quick_play_path: Option<String>, // Quick Play Pfad für direkten Welt-/Server-Start
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct MemorySettings {
     pub min: u32, // in MB
     pub max: u32, // in MB
@@ -359,10 +363,6 @@ pub struct ProfileBackupInfo {
     pub profile_count: usize,
 }
 
-#[cfg(test)]
-#[path = "profile_state_test.rs"]
-mod tests;
-
 pub(crate) fn mod_project_key(source: &ModSource) -> Option<(&'static str, &str)> {
     match source {
         ModSource::Modrinth { project_id, .. } => Some(("modrinth", project_id.as_str())),
@@ -371,18 +371,89 @@ pub(crate) fn mod_project_key(source: &ModSource) -> Option<(&'static str, &str)
     }
 }
 
-pub(crate) fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
+pub(crate) fn mod_platform_ids(
+    source: &ModSource,
+) -> Option<(crate::integrations::unified_mod::ModPlatform, String, String)> {
+    use crate::integrations::unified_mod::ModPlatform;
+    match source {
+        ModSource::Modrinth {
+            project_id,
+            version_id,
+            ..
+        } => Some((
+            ModPlatform::Modrinth,
+            project_id.clone(),
+            version_id.clone(),
+        )),
+        ModSource::CurseForge {
+            project_id,
+            file_id,
+            ..
+        } => Some((ModPlatform::CurseForge, project_id.clone(), file_id.clone())),
+        _ => None,
+    }
+}
+
+pub fn find_mod_by_project(mods: &[Mod], source: &ModSource) -> Option<usize> {
     let key = mod_project_key(source)?;
     mods.iter()
         .position(|m| mod_project_key(&m.source) == Some(key))
 }
 
-pub(crate) fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
+pub fn find_mod_by_project_id(mods: &[Mod], project_id: &str) -> Option<usize> {
     mods.iter()
         .position(|m| mod_project_key(&m.source).map(|(_, id)| id) == Some(project_id))
 }
 
-pub(crate) fn replace_mod_with_payload(
+pub(crate) fn mod_source_from_payload(
+    payload: &crate::commands::content_command::InstallContentPayload,
+) -> ModSource {
+    use crate::integrations::unified_mod::ModPlatform;
+
+    match payload.source {
+        ModPlatform::Modrinth => ModSource::Modrinth {
+            project_id: payload.project_id.clone(),
+            version_id: payload.version_id.clone(),
+            file_name: payload.file_name.clone(),
+            download_url: payload.download_url.clone(),
+            file_hash_sha1: payload.file_hash_sha1.clone(),
+        },
+        ModPlatform::CurseForge => ModSource::CurseForge {
+            project_id: payload.project_id.clone(),
+            file_id: payload.version_id.clone(),
+            file_name: payload.file_name.clone(),
+            download_url: payload.download_url.clone(),
+            file_hash_sha1: payload.file_hash_sha1.clone(),
+            file_fingerprint: payload.file_fingerprint,
+        },
+    }
+}
+
+pub(crate) fn mod_from_payload(
+    payload: &crate::commands::content_command::InstallContentPayload,
+    source: ModSource,
+    force_include_versions: Vec<String>,
+) -> Mod {
+    Mod {
+        extra: Default::default(),
+        id: Uuid::new_v4(),
+        source,
+        enabled: true,
+        display_name: payload.content_name.clone(),
+        version: payload.version_number.clone(),
+        game_versions: payload.game_versions.clone(),
+        file_name_override: None,
+        associated_loader: payload
+            .loaders
+            .clone()
+            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
+        modpack_origin: None,
+        updates_enabled: true,
+        force_include_versions,
+    }
+}
+
+pub fn replace_mod_with_payload(
     existing: &mut Mod,
     payload: &crate::commands::content_command::InstallContentPayload,
     source: ModSource,
@@ -399,7 +470,31 @@ pub(crate) fn replace_mod_with_payload(
     existing.enabled = true;
 }
 
-pub(crate) fn find_mod_for_version_switch(
+pub enum ModUpsert {
+    Unchanged,
+    Replaced(Mod),
+    Added(Mod),
+}
+
+pub(crate) fn upsert_mod_from_payload(
+    existing: &[Mod],
+    payload: &crate::commands::content_command::InstallContentPayload,
+    force_include_versions: Vec<String>,
+) -> ModUpsert {
+    let source = mod_source_from_payload(payload);
+
+    match find_mod_by_project(existing, &source) {
+        Some(index) if existing[index].source == source => ModUpsert::Unchanged,
+        Some(index) => {
+            let mut entry = existing[index].clone();
+            replace_mod_with_payload(&mut entry, payload, source);
+            ModUpsert::Replaced(entry)
+        }
+        None => ModUpsert::Added(mod_from_payload(payload, source, force_include_versions)),
+    }
+}
+
+pub fn find_mod_for_version_switch(
     mods: &[Mod],
     current_item: &crate::utils::profile_utils::LocalContentItem,
 ) -> Option<usize> {
@@ -427,6 +522,19 @@ pub struct ProfileManager {
     profiles_path: PathBuf,
     save_lock: Mutex<()>,
     backup_config: BackupConfig,
+    store: crate::state::profile_store::ProfileStore,
+    db: crate::state::db::DbHandle,
+    transient: RwLock<HashSet<Uuid>>,
+    persisted: Mutex<HashMap<Uuid, u64>>,
+    loading: Mutex<()>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileStoreStatus {
+    pub profile_count: usize,
+    pub mod_count: usize,
+    pub legacy_json_available: bool,
 }
 
 /// Rewrite an installed mod in-place to a [`UnifiedVersion`] (Modrinth or CurseForge): source,
@@ -481,8 +589,8 @@ fn apply_unified_version_to_mod(
 }
 
 impl ProfileManager {
-    pub fn new(profiles_path: PathBuf) -> Result<Self> {
-        info!(
+    pub fn new(profiles_path: PathBuf, db: crate::state::db::DbHandle) -> Result<Self> {
+        trace!(
             "ProfileManager: Initializing with path: {:?} (profiles loading deferred)",
             profiles_path
         );
@@ -491,7 +599,7 @@ impl ProfileManager {
         let backup_config = BackupConfig {
             max_backups_per_file: 10, // Keep more backups for profiles
             max_backup_age_seconds: 90 * 24 * 60 * 60, // 90 days for profiles
-            min_backup_interval_seconds: 60, // TEMP: Increased to 5 minutes to prevent spam during testing
+            min_backup_interval_seconds: 60, // at most one profiles.json backup per minute
             gfs: Some(backup_utils::GfsPolicy {
                 keep_recent: 10,
                 daily_days: 14,
@@ -505,197 +613,15 @@ impl ProfileManager {
             profiles_path,
             save_lock: Mutex::new(()),
             backup_config,
+            store: crate::state::profile_store::ProfileStore::new(db.clone()),
+            db,
+            transient: RwLock::new(HashSet::new()),
+            persisted: Mutex::new(HashMap::new()),
+            loading: Mutex::new(()),
         })
     }
 
     // Renamed from load_profiles to avoid conflict, made internal
-    async fn load_profiles_internal(&self, path: &PathBuf) -> Result<HashMap<Uuid, Profile>> {
-        let mut attempt_count = 0;
-        let max_attempts = 2; // Allow one retry after restoration
-
-        loop {
-            attempt_count += 1;
-
-            if !path.exists() {
-                if attempt_count == 1 {
-                    info!("ProfileManager: Profiles file doesn't exist, checking for backups to restore");
-                    // Try to restore from backup if file doesn't exist
-                    match backup_utils::restore_from_backup(path, Some("profiles")).await {
-                        Ok(restored_path) => {
-                            info!("ProfileManager: Successfully restored profiles from backup: {:?}", restored_path);
-                            continue; // Try loading again
-                        }
-                        Err(e) => {
-                            warn!("ProfileManager: No backup available to restore: {}", e);
-                            return Ok(HashMap::new());
-                        }
-                    }
-                } else {
-                    return Ok(HashMap::new());
-                }
-            }
-
-            match fs::read_to_string(path).await {
-                Ok(data) => {
-                    match serde_json::from_str::<Vec<serde_json::Value>>(&data) {
-                        Ok(raw_entries) => {
-                            // Parse each profile independently so a single
-                            // malformed entry can't wipe the entire list. A
-                            // skipped entry is logged with its name/id; every
-                            // other profile still loads.
-                            let total = raw_entries.len();
-                            let mut profiles: HashMap<Uuid, Profile> = HashMap::new();
-                            let mut failed = 0;
-                            for (idx, raw) in raw_entries.into_iter().enumerate() {
-                                match serde_json::from_value::<Profile>(raw.clone()) {
-                                    Ok(p) => {
-                                        profiles.insert(p.id, p);
-                                    }
-                                    Err(parse_err) => {
-                                        failed += 1;
-                                        let name = raw
-                                            .get("name")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("<unknown>");
-                                        let id = raw
-                                            .get("id")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("<unknown>");
-                                        error!(
-                                            "ProfileManager: Skipping unparseable profile at index {} (name='{}', id={}): {}",
-                                            idx, name, id, parse_err
-                                        );
-                                    }
-                                }
-                            }
-                            if failed > 0 {
-                                warn!(
-                                    "ProfileManager: Loaded {}/{} profiles, {} skipped due to parse errors",
-                                    profiles.len(),
-                                    total,
-                                    failed
-                                );
-                            } else {
-                                info!("ProfileManager: Successfully loaded {} profiles from file", profiles.len());
-                            }
-                            return Ok(profiles);
-                        }
-                        Err(e) => {
-                            if attempt_count < max_attempts {
-                                error!("ProfileManager: Failed to parse profiles JSON: {}. Attempting recovery from backup.", e);
-
-                                // Backup the corrupted file
-                                let corrupted_path = path.with_extension(format!(
-                                    "corrupted.{}",
-                                    Utc::now().format("%Y%m%d_%H%M%S")
-                                ));
-                                if let Err(backup_err) = fs::copy(path, &corrupted_path).await {
-                                    error!("ProfileManager: Failed to backup corrupted file: {}", backup_err);
-                                } else {
-                                    info!("ProfileManager: Corrupted profiles file saved as: {:?}", corrupted_path);
-                                }
-
-                                // Try to restore from backup
-                                match backup_utils::restore_from_backup(path, Some("profiles")).await {
-                                    Ok(restored_path) => {
-                                        info!("ProfileManager: Successfully restored profiles from backup: {:?}", restored_path);
-                                        continue; // Try loading again
-                                    }
-                                    Err(restore_err) => {
-                                        error!("ProfileManager: Failed to restore from backup: {}. Starting with empty profiles.", restore_err);
-                                        return Ok(HashMap::new());
-                                    }
-                                }
-                            } else {
-                                error!("ProfileManager: Failed to parse profiles JSON after {} attempts: {}. Starting with empty profiles.", max_attempts, e);
-                                return Ok(HashMap::new());
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    if attempt_count < max_attempts {
-                        error!("ProfileManager: Failed to read profiles file: {}. Attempting recovery from backup.", e);
-
-                        // Try to restore from backup
-                        match backup_utils::restore_from_backup(path, Some("profiles")).await {
-                            Ok(restored_path) => {
-                                info!("ProfileManager: Successfully restored profiles from backup: {:?}", restored_path);
-                                continue; // Try loading again
-                            }
-                            Err(restore_err) => {
-                                error!("ProfileManager: Failed to restore from backup: {}. Starting with empty profiles.", restore_err);
-                                return Ok(HashMap::new());
-                            }
-                        }
-                    } else {
-                        error!("ProfileManager: Failed to read profiles file after {} attempts: {}. Starting with empty profiles.", max_attempts, e);
-                        return Ok(HashMap::new());
-                    }
-                }
-            }
-        }
-    }
-
-    async fn save_profiles(&self) -> Result<()> {
-        let _guard = self.save_lock.lock().await;
-
-        info!("ProfileManager: Saving profiles to {:?}", self.profiles_path);
-
-        let profiles_data = {
-            let profiles_guard = self.profiles.read().await;
-            // Transient/temp profiles (CLI `temp` subcommand) live only in the
-            // in-memory map — their `path` starts with "noriskclient/temp/".
-            // They must never be persisted, even if an unrelated save fires
-            // while one is active.
-            let profiles_vec: Vec<&Profile> = profiles_guard
-                .values()
-                .filter(|p| !p.path.starts_with("noriskclient/temp/"))
-                .collect();
-
-            // Validate that we have profiles to save
-            if profiles_vec.is_empty() {
-                warn!("ProfileManager: Attempting to save empty profiles list - this might indicate data loss!");
-                // Don't save empty profiles if we have a backup to restore from
-                if let Ok(backups) = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await {
-                    if !backups.is_empty() {
-                        warn!("ProfileManager: Backups available, attempting automatic recovery");
-                        match backup_utils::restore_from_backup(&self.profiles_path, Some("profiles")).await {
-                            Ok(restored_path) => {
-                                info!("ProfileManager: Successfully restored profiles from backup: {:?}", restored_path);
-                                return Ok(()); // Don't save the empty list
-                            }
-                            Err(e) => {
-                                error!("ProfileManager: Failed to restore from backup: {}", e);
-                                // Continue with save despite the error
-                            }
-                        }
-                    }
-                }
-            }
-
-            serde_json::to_string_pretty(&profiles_vec)?
-        };
-
-        if let Some(parent_dir) = self.profiles_path.parent() {
-            if !parent_dir.exists() {
-                fs::create_dir_all(parent_dir).await?;
-            }
-        }
-
-        // Use safe write with automatic backup
-        safe_write_with_backup(
-            &self.profiles_path,
-            profiles_data.as_bytes(),
-            Some("profiles"),
-            &self.backup_config,
-        ).await?;
-
-        info!("ProfileManager: Successfully saved {} profiles", self.profiles.read().await.len());
-        Ok(())
-    }
-
-    /// Lists available `profiles.json` backups (newest first) for the restore UI.
     pub async fn list_profile_backups(&self) -> Result<Vec<ProfileBackupInfo>> {
         let backups = backup_utils::list_backups(&self.profiles_path, Some("profiles")).await?;
         let mut out = Vec::with_capacity(backups.len());
@@ -720,19 +646,107 @@ impl ProfileManager {
     /// Restores a user-chosen backup over `profiles.json` and reloads the
     /// in-memory map so the change is live without a restart.
     pub async fn restore_profile_backup(&self, backup_path: PathBuf) -> Result<()> {
-        // Hold the save lock so a concurrent save_profiles can't clobber the
-        // file mid-restore.
         let _guard = self.save_lock.lock().await;
-        backup_utils::restore_specific_backup(&self.profiles_path, &backup_path).await?;
-        let reloaded = self
-            .load_profiles_internal(&self.profiles_path.clone())
-            .await?;
-        *self.profiles.write().await = reloaded;
+
+        let raw = fs::read_to_string(&backup_path).await?;
+        self.snapshot_database("pre-restore").await;
+        let outcome = self.store.import_from_json(&raw).await?;
+        let reloaded = self.store.load_all().await?;
+        self.adopt_profiles(reloaded).await;
         info!(
-            "ProfileManager: Reloaded {} profiles after restore",
-            self.profiles.read().await.len()
+            "ProfileManager: restored {} profiles and {} mods from {:?} ({} quarantined)",
+            outcome.imported, outcome.mods, backup_path, outcome.unparsed
         );
         Ok(())
+    }
+
+    async fn adopt_profiles(&self, profiles: HashMap<Uuid, Profile>) {
+        let count = profiles.len();
+        *self.profiles.write().await = profiles;
+        self.persisted.lock().await.clear();
+        info!("ProfileManager: Reloaded {} profiles after restore", count);
+    }
+
+    async fn snapshot_database_for_version(&self) {
+        const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+        const VERSION_KEY: &str = "app_version";
+
+        match self.store.get_meta(VERSION_KEY).await {
+            Ok(Some(recorded)) if recorded == APP_VERSION => return,
+            Ok(_) => {}
+            Err(e) => {
+                warn!("Could not read the recorded app version: {}", e);
+                return;
+            }
+        }
+
+        self.snapshot_database(&format!("v{}", APP_VERSION)).await;
+        self.prune_database_snapshots().await;
+
+        if let Err(e) = self.store.set_meta(VERSION_KEY, APP_VERSION).await {
+            warn!("Could not record the app version: {}", e);
+        }
+    }
+
+    async fn prune_database_snapshots(&self) {
+        const KEEP: usize = 10;
+
+        let dir = LAUNCHER_DIRECTORY.meta_dir().join("backups").join("db");
+        let Ok(mut entries) = std::fs::read_dir(&dir) else {
+            return;
+        };
+
+        let mut snapshots: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
+        let mut oldest_migration: Option<(std::time::SystemTime, PathBuf)> = None;
+        while let Some(Ok(entry)) = entries.next() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let modified = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::UNIX_EPOCH);
+            let is_migration = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|name| name.ends_with(PRE_MIGRATION_SNAPSHOT));
+            if is_migration {
+                match &oldest_migration {
+                    Some((seen, _)) if *seen <= modified => snapshots.push((modified, path)),
+                    Some((_, kept)) => {
+                        snapshots.push((modified, kept.clone()));
+                        oldest_migration = Some((modified, path));
+                    }
+                    None => oldest_migration = Some((modified, path)),
+                }
+                continue;
+            }
+            snapshots.push((modified, path));
+        }
+
+        if snapshots.len() <= KEEP {
+            return;
+        }
+
+        snapshots.sort_by(|a, b| b.0.cmp(&a.0));
+        for (_, path) in snapshots.into_iter().skip(KEEP) {
+            match std::fs::remove_file(&path) {
+                Ok(()) => info!("Pruned the old database snapshot {:?}", path),
+                Err(e) => warn!("Could not prune {:?}: {}", path, e),
+            }
+        }
+    }
+
+    async fn snapshot_database(&self, label: &str) {
+        let destination = LAUNCHER_DIRECTORY
+            .meta_dir()
+            .join("backups")
+            .join("db")
+            .join(format!("app.db.{}.{}", Utc::now().timestamp(), label));
+        if let Err(e) = crate::state::db::vacuum_into(&self.db, &destination).await {
+            warn!("Could not snapshot the database before {}: {}", label, e);
+        }
     }
 
     /// Inserts a profile into the in-memory map WITHOUT persisting to
@@ -742,6 +756,7 @@ impl ProfileManager {
     /// playtime/crash handling — all succeed. `save_profiles()` filters these
     /// out by their `temp/` path prefix, so they never reach disk.
     pub async fn register_transient_profile(&self, profile: Profile) {
+        self.transient.write().await.insert(profile.id);
         let id = profile.id;
         self.profiles.write().await.insert(id, profile);
         log::info!(
@@ -783,14 +798,14 @@ impl ProfileManager {
             // Other functions will use calculate_instance_path_for_profile to resolve it.
             profiles.insert(id, profile);
         }
-        info!("Saving profiles metadata to: {:?}", self.profiles_path);
-        self.save_profiles().await?;
+        info!("Persisting the new profile {}", id);
+        self.save_profile(id).await?;
         Ok(id)
     }
 
     pub async fn get_profile(&self, id: Uuid) -> Result<Profile> {
-        let profiles = self.profiles.read().await;
-        if let Some(profile) = profiles.get(&id).cloned() {
+        let profile = self.profiles.read().await.get(&id).cloned();
+        if let Some(profile) = profile {
             Ok(profile)
         } else {
             // Profile not found in local manager, try standard versions
@@ -823,7 +838,7 @@ impl ProfileManager {
             let mut profiles = self.profiles.write().await;
             profiles.insert(id, profile);
         }
-        self.save_profiles().await?;
+        self.save_profile(id).await?;
         Ok(())
     }
 
@@ -903,8 +918,6 @@ impl ProfileManager {
         false
     }
 
-
-
     pub async fn delete_profile(&self, id: Uuid) -> Result<()> {
         let profile_to_delete: Option<Profile>;
 
@@ -939,6 +952,19 @@ impl ProfileManager {
             info!("Profile with ID {} not found for deletion.", id);
             return Err(AppError::ProfileNotFound(id)); // Return error if profile doesn't exist
         };
+
+        if let Some(profile) = &profile_to_delete {
+            if !profile.sync_pack_ids.is_empty() {
+                if let Err(e) = crate::sync::engine::SyncEngine::detach_all(
+                    id,
+                    crate::sync::model::DetachMode::Drop,
+                )
+                .await
+                {
+                    warn!("Could not detach sync packs from profile {}: {}", id, e);
+                }
+            }
+        }
 
         // Check if other profiles use the same path before attempting directory deletion
         let should_delete_directory = if let Some(path) = &profile_dir_path {
@@ -1041,8 +1067,8 @@ impl ProfileManager {
             }
         }
 
-        // Save the updated profiles list
-        self.save_profiles().await?;
+        self.store.delete_profile(id).await?;
+        self.persisted.lock().await.remove(&id);
         info!(
             "Successfully removed profile entry {} from configuration.",
             id
@@ -1052,47 +1078,6 @@ impl ProfileManager {
     }
 
     // Add a new mod to a specific profile
-    pub async fn add_mod(&self, profile_id: Uuid, mod_info: Mod) -> Result<()> {
-        info!(
-            "Adding mod '{}' (Source: {:?}) to profile {}",
-            mod_info
-                .display_name
-                .as_deref()
-                .unwrap_or(&mod_info.id.to_string()),
-            mod_info.source,
-            profile_id
-        );
-
-        let mut profiles = self.profiles.write().await;
-
-        if let Some(profile) = profiles.get_mut(&profile_id) {
-            if !profile
-                .mods
-                .iter()
-                .any(|existing_mod| existing_mod.source == mod_info.source)
-            {
-                profile.mods.push(mod_info);
-                drop(profiles);
-                self.save_profiles().await?;
-                info!("Successfully added mod to profile {}", profile_id);
-                Ok(())
-            } else {
-                info!(
-                    "Mod with the same source already exists in profile {}",
-                    profile_id
-                );
-                Err(AppError::Other(format!(
-                    "Mod already exists in profile {}",
-                    profile_id
-                )))
-            }
-        } else {
-            Err(AppError::ProfileNotFound(profile_id))
-        }
-    }
-
-    // Add a mod specifically sourced from Modrinth - Internal function with dependency logic
-    // Use BoxFuture for recursion
     fn add_modrinth_mod_internal<'a>(
         &'a self,
         profile_id: Uuid,
@@ -1140,7 +1125,7 @@ impl ProfileManager {
                 file_hash_sha1: file_hash_sha1.clone(),
             };
 
-            let mut needs_save = false;
+            let mut touched: Option<Uuid> = None;
             {
                 let mut profiles = self.profiles.write().await;
                 if let Some(profile) = profiles.get_mut(&profile_id) {
@@ -1171,9 +1156,10 @@ impl ProfileManager {
                             modpack_origin: None, // Manually added mod
                             updates_enabled: true, // Updates enabled by default
                             force_include_versions,
+                            extra: Default::default(),
                         };
+                        touched = Some(new_mod.id);
                         profile.mods.push(new_mod);
-                        needs_save = true;
                     } else {
                         info!(
                             "Mod {} ({}) already exists in profile {}. Skipping addition.",
@@ -1185,8 +1171,8 @@ impl ProfileManager {
                 }
             }
 
-            if needs_save {
-                self.save_profiles().await?;
+            if let Some(touched) = touched {
+                self.save_mods(profile_id, &[touched]).await?;
                 info!(
                     "Profile saved after adding mod {} ({})",
                     display_name_log, version_log
@@ -1399,82 +1385,50 @@ impl ProfileManager {
             platform_name, display_name_log, payload.profile_id, add_dependencies
         );
 
-        let source = match payload.source {
-            ModPlatform::Modrinth => ModSource::Modrinth {
-                project_id: payload.project_id.clone(),
-                version_id: payload.version_id.clone(),
-                file_name: payload.file_name.clone(),
-                download_url: payload.download_url.clone(),
-                file_hash_sha1: payload.file_hash_sha1.clone(),
-            },
-            ModPlatform::CurseForge => ModSource::CurseForge {
-                project_id: payload.project_id.clone(),
-                file_id: payload.version_id.clone(), // For CurseForge, version_id is actually file_id
-                file_name: payload.file_name.clone(),
-                download_url: payload.download_url.clone(),
-                file_hash_sha1: payload.file_hash_sha1.clone(),
-                file_fingerprint: payload.file_fingerprint,
-            },
-        };
-
-        let mut needs_save = false;
+        let mut touched: Option<Uuid> = None;
         {
             let mut profiles = self.profiles.write().await;
             if let Some(profile) = profiles.get_mut(&payload.profile_id) {
-                let existing_index = find_mod_by_project(&profile.mods, &source);
+                let force_include_versions = match &payload.game_versions {
+                    Some(list) if !list.contains(&profile.game_version) => {
+                        vec![profile.game_version.clone()]
+                    }
+                    _ => Vec::new(),
+                };
 
-                if let Some(index) = existing_index {
-                    if profile.mods[index].source == source {
+                match upsert_mod_from_payload(&profile.mods, payload, force_include_versions) {
+                    ModUpsert::Unchanged => {
                         info!(
                             "{} mod {} already exists in profile {}. Skipping addition.",
                             platform_name, display_name_log, payload.profile_id
                         );
-                    } else {
+                    }
+                    ModUpsert::Replaced(entry) => {
                         info!(
                             "{} mod {} already present in profile {} in a different version. Replacing it instead of adding a duplicate.",
                             platform_name, display_name_log, payload.profile_id
                         );
-                        replace_mod_with_payload(&mut profile.mods[index], payload, source.clone());
-                        needs_save = true;
-                    }
-                } else {
-                    info!(
-                        "Adding mod {} to profile {}",
-                        display_name_log, payload.profile_id
-                    );
-
-                    let force_include_versions = match &payload.game_versions {
-                        Some(list) if !list.contains(&profile.game_version) => {
-                            vec![profile.game_version.clone()]
+                        touched = Some(entry.id);
+                        if let Some(index) = profile.mods.iter().position(|m| m.id == entry.id) {
+                            profile.mods[index] = entry;
                         }
-                        _ => Vec::new(),
-                    };
-
-                    let new_mod = Mod {
-                        id: Uuid::new_v4(),
-                        source: source.clone(),
-                        enabled: true,
-                        display_name: payload.content_name.clone(),
-                        version: payload.version_number.clone(),
-                        game_versions: payload.game_versions.clone(),
-                        file_name_override: None,
-                        associated_loader: payload.loaders
-                            .clone()
-                            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
-                        modpack_origin: None, // Manually added mod
-                        updates_enabled: true, // Updates enabled by default
-                        force_include_versions,
-                    };
-                    profile.mods.push(new_mod);
-                    needs_save = true;
+                    }
+                    ModUpsert::Added(entry) => {
+                        info!(
+                            "Adding mod {} to profile {}",
+                            display_name_log, payload.profile_id
+                        );
+                        touched = Some(entry.id);
+                        profile.mods.push(entry);
+                    }
                 }
             } else {
                 return Err(AppError::ProfileNotFound(payload.profile_id));
             }
         }
 
-        if needs_save {
-            self.save_profiles().await?;
+        if let Some(touched) = touched {
+            self.save_mods(payload.profile_id, &[touched]).await?;
             info!(
                 "Successfully added {} mod {} to profile {}",
                 platform_name, display_name_log, payload.profile_id
@@ -1578,7 +1532,6 @@ impl ProfileManager {
         .await
     }
 
-
     // Public wrapper function to add a Modrinth mod and its dependencies
     pub async fn add_modrinth_mod(
         &self,
@@ -1658,120 +1611,236 @@ impl ProfileManager {
     }
 
     // Set the enabled status of a specific mod within a profile
+    async fn edit_mods<F, T>(&self, profile_id: Uuid, edit: F) -> Result<(T, bool)>
+    where
+        F: FnOnce(&mut Profile) -> T,
+    {
+        let transient = self.transient.read().await.clone();
+        let mut profiles = self.profiles.write().await;
+        let profile = profiles
+            .get_mut(&profile_id)
+            .ok_or(AppError::ProfileNotFound(profile_id))?;
+
+        let touched = edit(profile);
+        Ok((touched, should_persist(profile, &transient)))
+    }
+
+    async fn forget_persisted(&self, profile_id: Uuid) {
+        self.persisted.lock().await.remove(&profile_id);
+    }
+
+    async fn save_mods(&self, profile_id: Uuid, mod_ids: &[Uuid]) -> Result<()> {
+        if mod_ids.is_empty() {
+            return Ok(());
+        }
+
+        let transient = self.transient.read().await.clone();
+        let entries: Vec<(usize, Mod)> = {
+            let profiles = self.profiles.read().await;
+            let Some(profile) = profiles.get(&profile_id) else {
+                return Err(AppError::ProfileNotFound(profile_id));
+            };
+            if !should_persist(profile, &transient) {
+                return Ok(());
+            }
+            profile
+                .mods
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| mod_ids.contains(&entry.id))
+                .map(|(ordinal, entry)| (ordinal, entry.clone()))
+                .collect()
+        };
+
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        self.store.upsert_mods(profile_id, &entries).await?;
+        self.forget_persisted(profile_id).await;
+        Ok(())
+    }
+
+    pub async fn set_profile_sync_packs(
+        &self,
+        profile_id: Uuid,
+        pack_ids: Vec<Uuid>,
+    ) -> Result<()> {
+        let (changed, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                if profile.sync_pack_ids == pack_ids {
+                    return false;
+                }
+                profile.sync_pack_ids = pack_ids.clone();
+                true
+            })
+            .await?;
+
+        if changed && persistable {
+            self.store.set_sync_pack_ids(profile_id, &pack_ids).await?;
+            self.forget_persisted(profile_id).await;
+        }
+        Ok(())
+    }
+
+    pub async fn set_mods_enabled(
+        &self,
+        profile_id: Uuid,
+        mod_ids: &[Uuid],
+        enabled: bool,
+    ) -> Result<usize> {
+        if mod_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let wanted: HashSet<Uuid> = mod_ids.iter().copied().collect();
+        let (touched, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                let mut touched = Vec::new();
+                for entry in profile.mods.iter_mut() {
+                    if wanted.contains(&entry.id) && entry.enabled != enabled {
+                        entry.enabled = enabled;
+                        touched.push(entry.id);
+                    }
+                }
+                touched
+            })
+            .await?;
+
+        if !touched.is_empty() && persistable {
+            self.store
+                .set_mods_enabled(profile_id, &touched, enabled)
+                .await?;
+            self.forget_persisted(profile_id).await;
+        }
+
+        info!(
+            "Set {} of {} requested mod(s) to enabled={} in profile {}",
+            touched.len(),
+            mod_ids.len(),
+            enabled,
+            profile_id
+        );
+        Ok(touched.len())
+    }
+
+    pub async fn set_mods_updates_enabled(
+        &self,
+        profile_id: Uuid,
+        mod_ids: &[Uuid],
+        updates_enabled: bool,
+    ) -> Result<usize> {
+        if mod_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let wanted: HashSet<Uuid> = mod_ids.iter().copied().collect();
+        let (touched, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                let mut touched = Vec::new();
+                for entry in profile.mods.iter_mut() {
+                    if wanted.contains(&entry.id) && entry.updates_enabled != updates_enabled {
+                        entry.updates_enabled = updates_enabled;
+                        touched.push(entry.id);
+                    }
+                }
+                touched
+            })
+            .await?;
+
+        if !touched.is_empty() && persistable {
+            self.store
+                .set_mods_updates_enabled(profile_id, &touched, updates_enabled)
+                .await?;
+            self.forget_persisted(profile_id).await;
+        }
+        Ok(touched.len())
+    }
+
+    pub async fn delete_mods(&self, profile_id: Uuid, mod_ids: &[Uuid]) -> Result<usize> {
+        if mod_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let wanted: HashSet<Uuid> = mod_ids.iter().copied().collect();
+        let (touched, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                let mut touched = Vec::new();
+                profile.mods.retain(|entry| {
+                    if wanted.contains(&entry.id) {
+                        touched.push(entry.id);
+                        false
+                    } else {
+                        true
+                    }
+                });
+                touched
+            })
+            .await?;
+
+        if !touched.is_empty() && persistable {
+            self.store.delete_mods(profile_id, &touched).await?;
+            self.forget_persisted(profile_id).await;
+        }
+
+        info!("Removed {} mod(s) from profile {}", touched.len(), profile_id);
+        Ok(touched.len())
+    }
+
+    pub async fn set_norisk_mod_statuses(
+        &self,
+        profile_id: Uuid,
+        entries: &[(NoriskModIdentifier, bool)],
+    ) -> Result<usize> {
+        if entries.is_empty() {
+            return Ok(0);
+        }
+
+        let (applied, persistable) = self
+            .edit_mods(profile_id, |profile| {
+                let mut applied = Vec::new();
+                for (identifier, enabled) in entries {
+                    let touched = if *enabled {
+                        profile.disabled_norisk_mods_detailed.remove(identifier)
+                    } else {
+                        profile
+                            .disabled_norisk_mods_detailed
+                            .insert(identifier.clone())
+                    };
+                    if touched {
+                        applied.push((identifier.clone(), *enabled));
+                    }
+                }
+                applied
+            })
+            .await?;
+
+        if !applied.is_empty() && persistable {
+            self.store
+                .set_norisk_mod_statuses(profile_id, &applied)
+                .await?;
+            self.forget_persisted(profile_id).await;
+        }
+        Ok(applied.len())
+    }
+
     pub async fn set_mod_enabled(
         &self,
         profile_id: Uuid,
         mod_id: Uuid,
         enabled: bool,
     ) -> Result<()> {
-        info!(
-            "Setting mod {} enabled status to {} for profile {}",
-            mod_id, enabled, profile_id
-        );
-
-        let mut profiles = self.profiles.write().await;
-
-        if let Some(profile) = profiles.get_mut(&profile_id) {
-            if let Some(mod_to_update) = profile.mods.iter_mut().find(|m| m.id == mod_id) {
-                if mod_to_update.enabled != enabled {
-                    mod_to_update.enabled = enabled;
-                    drop(profiles);
-                    self.save_profiles().await?;
-                    info!(
-                        "Successfully updated mod {} enabled status in profile {}",
-                        mod_id, profile_id
-                    );
-                } else {
-                    info!(
-                        "Mod {} enabled status already {}. No change needed.",
-                        mod_id, enabled
-                    );
-                }
-                Ok(())
-            } else {
-                Err(AppError::Other(format!(
-                    "Mod with ID {} not found in profile {}",
-                    mod_id, profile_id
-                )))
-            }
-        } else {
-            Err(AppError::ProfileNotFound(profile_id))
-        }
+        self.require_mod(profile_id, mod_id).await?;
+        self.set_mods_enabled(profile_id, &[mod_id], enabled).await?;
+        Ok(())
     }
 
-    /// Sets the updates_enabled status for a specific mod in a profile
-    pub async fn set_mod_updates_enabled(
-        &self,
-        profile_id: Uuid,
-        mod_id: Uuid,
-        updates_enabled: bool,
-    ) -> Result<()> {
-        info!(
-            "Setting mod {} updates_enabled status to {} for profile {}",
-            mod_id, updates_enabled, profile_id
-        );
-
-        let mut profiles = self.profiles.write().await;
-
-        if let Some(profile) = profiles.get_mut(&profile_id) {
-            if let Some(mod_to_update) = profile.mods.iter_mut().find(|m| m.id == mod_id) {
-                if mod_to_update.updates_enabled != updates_enabled {
-                    mod_to_update.updates_enabled = updates_enabled;
-                    drop(profiles);
-                    self.save_profiles().await?;
-                    info!(
-                        "Successfully updated mod {} updates_enabled status in profile {}",
-                        mod_id, profile_id
-                    );
-                } else {
-                    info!(
-                        "Mod {} updates_enabled status already {}. No change needed.",
-                        mod_id, updates_enabled
-                    );
-                }
-                Ok(())
-            } else {
-                Err(AppError::Other(format!(
-                    "Mod with ID {} not found in profile {}",
-                    mod_id, profile_id
-                )))
-            }
-        } else {
-            Err(AppError::ProfileNotFound(profile_id))
-        }
-    }
-
-    // Remove a specific mod from a profile
     pub async fn delete_mod(&self, profile_id: Uuid, mod_id: Uuid) -> Result<()> {
-        info!("Deleting mod {} from profile {}", mod_id, profile_id);
-
-        let mut profiles = self.profiles.write().await;
-
-        if let Some(profile) = profiles.get_mut(&profile_id) {
-            let initial_len = profile.mods.len();
-            profile.mods.retain(|m| m.id != mod_id);
-            let final_len = profile.mods.len();
-
-            if final_len < initial_len {
-                drop(profiles);
-                self.save_profiles().await?;
-                info!(
-                    "Successfully deleted mod {} from profile {}",
-                    mod_id, profile_id
-                );
-                Ok(())
-            } else {
-                Err(AppError::Other(format!(
-                    "Mod with ID {} not found in profile {}",
-                    mod_id, profile_id
-                )))
-            }
-        } else {
-            Err(AppError::ProfileNotFound(profile_id))
-        }
+        self.require_mod(profile_id, mod_id).await?;
+        self.delete_mods(profile_id, &[mod_id]).await?;
+        Ok(())
     }
 
-    // Set the enabled/disabled status of a specific mod within a Norisk Pack for a profile's specific context
     pub async fn set_norisk_mod_status(
         &self,
         profile_id: Uuid,
@@ -1781,58 +1850,97 @@ impl ProfileManager {
         loader: ModLoader,
         disabled: bool,
     ) -> Result<()> {
-        info!(
-            "Setting disabled state for pack mod '{}' (Pack: '{}', MC: {}, Loader: {:?}) for profile {} to {}",
-            mod_id, pack_id, game_version, loader, profile_id, disabled
-        );
+        let identifier = NoriskModIdentifier {
+            pack_id,
+            mod_id,
+            game_version,
+            loader,
+        };
+        self.set_norisk_mod_statuses(profile_id, &[(identifier, !disabled)])
+            .await?;
+        Ok(())
+    }
 
-        let mut profiles = self.profiles.write().await;
-
-        if let Some(profile) = profiles.get_mut(&profile_id) {
-            let identifier = NoriskModIdentifier {
-                pack_id,
-                mod_id: mod_id.clone(),
-                game_version,
-                loader,
-            };
-
-            let changed;
-            if disabled {
-                changed = profile.disabled_norisk_mods_detailed.insert(identifier);
-            } else {
-                changed = profile.disabled_norisk_mods_detailed.remove(&identifier);
-            }
-
-            if changed {
-                info!(
-                    "Successfully {} pack mod '{}' for profile {}",
-                    if disabled { "disabled" } else { "enabled" },
-                    mod_id,
-                    profile_id
-                );
-                drop(profiles);
-                self.save_profiles().await?;
-            } else {
-                info!(
-                    "Pack mod '{}' for profile {} was already {}",
-                    mod_id,
-                    profile_id,
-                    if disabled { "disabled" } else { "enabled" }
-                );
-            }
+    async fn require_mod(&self, profile_id: Uuid, mod_id: Uuid) -> Result<()> {
+        let profiles = self.profiles.read().await;
+        let profile = profiles
+            .get(&profile_id)
+            .ok_or(AppError::ProfileNotFound(profile_id))?;
+        if profile.mods.iter().any(|entry| entry.id == mod_id) {
             Ok(())
         } else {
-            Err(AppError::ProfileNotFound(profile_id))
+            Err(AppError::Other(format!(
+                "Mod with ID {} not found in profile {}",
+                mod_id, profile_id
+            )))
         }
     }
 
-    // Utility Funktionen
     pub async fn list_profiles(&self) -> Result<Vec<Profile>> {
+        self.ensure_profiles_loaded().await?;
         let profiles = self.profiles.read().await;
         Ok(profiles.values().cloned().collect())
     }
 
+    pub async fn profiles_subscribed_to(&self, pack_id: Uuid) -> Vec<Profile> {
+        let profiles = self.profiles.read().await;
+        profiles
+            .values()
+            .filter(|p| p.sync_pack_ids.contains(&pack_id))
+            .cloned()
+            .collect()
+    }
+
+    pub async fn expected_mod_filenames(&self) -> HashSet<String> {
+        let profiles = self.profiles.read().await;
+        profiles
+            .values()
+            .flat_map(|profile| profile.mods.iter())
+            .filter_map(|entry| get_profile_mod_filename(&entry.source).ok())
+            .collect()
+    }
+
+    pub async fn list_profiles_without_mods(&self) -> Result<Vec<(Profile, usize)>> {
+        self.ensure_profiles_loaded().await?;
+        let profiles = self.profiles.read().await;
+        Ok(profiles
+            .values()
+            .map(|p| {
+                let slim = Profile {
+                    id: p.id,
+                    sync_pack_ids: p.sync_pack_ids.clone(),
+                    name: p.name.clone(),
+                    path: p.path.clone(),
+                    game_version: p.game_version.clone(),
+                    loader: p.loader.clone(),
+                    loader_version: p.loader_version.clone(),
+                    created: p.created,
+                    last_played: p.last_played,
+                    settings: p.settings.clone(),
+                    state: p.state.clone(),
+                    mods: Vec::new(),
+                    selected_norisk_pack_id: p.selected_norisk_pack_id.clone(),
+                    disabled_norisk_mods_detailed: p.disabled_norisk_mods_detailed.clone(),
+                    source_standard_profile_id: p.source_standard_profile_id,
+                    group: p.group.clone(),
+                    use_shared_minecraft_folder: p.use_shared_minecraft_folder,
+                    is_standard_version: p.is_standard_version,
+                    description: p.description.clone(),
+                    banner: p.banner.clone(),
+                    background: p.background.clone(),
+                    norisk_information: p.norisk_information.clone(),
+                    modpack_info: p.modpack_info.clone(),
+                    preferred_account_id: p.preferred_account_id,
+                    playtime_seconds: p.playtime_seconds,
+                    extra: p.extra.clone(),
+                };
+                (slim, p.mods.len())
+            })
+            .collect())
+    }
+
     pub async fn search_profiles(&self, query: &str) -> Result<Vec<Profile>> {
+        self.ensure_profiles_loaded().await?;
         let query = query.to_lowercase();
         let profiles = self.profiles.read().await;
         Ok(profiles
@@ -1842,187 +1950,6 @@ impl ProfileManager {
             .collect())
     }
 
-        /// Updates the version of a specific CurseForge mod instance within a profile,
-    /// after checking for the presence of required dependencies (by project ID).
-    /// Automatically adds missing dependencies.
-    pub async fn update_profile_curseforge_mod_version(
-        &self,
-        profile_id: Uuid,
-        mod_id: Uuid,
-        new_version_details: &crate::integrations::curseforge::CurseForgeFile,
-    ) -> Result<()> {
-        info!(
-            "Attempting to update CurseForge mod instance {} in profile {} to version '{}' (ID: {})",
-            mod_id, profile_id, new_version_details.displayName, new_version_details.id
-        );
-
-        let mut profiles = self.profiles.write().await;
-
-        let profile = profiles.get_mut(&profile_id).ok_or_else(|| {
-            error!(
-                "Profile {} not found during CurseForge mod update attempt.",
-                profile_id
-            );
-            AppError::ProfileNotFound(profile_id)
-        })?;
-
-        let profile_mc_version = profile.game_version.clone();
-
-        info!(
-            "Checking required dependencies for new CurseForge version {}...",
-            new_version_details.id
-        );
-        let existing_project_ids: HashSet<String> = profile
-            .mods
-            .iter()
-            .filter_map(|m| match &m.source {
-                ModSource::CurseForge { project_id, .. } => Some(project_id.clone()),
-                _ => None,
-            })
-            .collect();
-
-        // Track missing dependencies to install them later
-        let mut missing_deps = Vec::new();
-
-        for dependency in &new_version_details.dependencies {
-            // Only process required dependencies
-            if let Some(relation_type) = crate::integrations::curseforge::CurseForgeFileRelationType::from_u32(dependency.relationType) {
-                if relation_type.should_install() {
-                    if !existing_project_ids.contains(&dependency.modId.to_string()) {
-                        info!(
-                            "Required dependency project '{}' is missing in profile {}. Will install it automatically.",
-                            dependency.modId, profile_id
-                        );
-                        missing_deps.push(dependency.modId);
-                    } else {
-                        info!(
-                            "Required dependency project '{}' found in profile.",
-                            dependency.modId
-                        );
-                    }
-                }
-            }
-        }
-
-        // Now update the mod
-        let mod_to_update_index = profile.mods.iter().position(|m| m.id == mod_id);
-
-        if let Some(index) = mod_to_update_index {
-            let mod_to_update = &mut profile.mods[index];
-
-            if let ModSource::CurseForge {
-                project_id: old_project_id,
-                ..
-            } = &mod_to_update.source
-            {
-                if old_project_id != &new_version_details.modId.to_string() {
-                    error!(
-                        "Project ID mismatch when updating CurseForge mod {}! Expected '{}', got '{}'. Aborting update.",
-                         mod_id, old_project_id, new_version_details.modId
-                    );
-                    return Err(AppError::Other(format!(
-                        "Project ID mismatch for CurseForge mod {}",
-                        mod_id
-                    )));
-                }
-
-                info!(
-                    "Updating CurseForge mod instance {} from version {} to {} using file '{}'",
-                    mod_id,
-                    mod_to_update.version.as_deref().unwrap_or("?"),
-                    new_version_details.displayName,
-                    new_version_details.fileName
-                );
-
-                mod_to_update.source = ModSource::CurseForge {
-                    project_id: new_version_details.modId.to_string(),
-                    file_id: new_version_details.id.to_string(),
-                    file_name: new_version_details.fileName.clone(),
-                    download_url: new_version_details.downloadUrl.clone(),
-                    file_hash_sha1: new_version_details.hashes.iter()
-                        .find(|h| h.algo == 1) // SHA1 = 1
-                        .map(|h| h.value.clone()),
-                    file_fingerprint: Some(new_version_details.fileFingerprint),
-                };
-
-                mod_to_update.version = Some(new_version_details.displayName.clone());
-                mod_to_update.game_versions = Some(new_version_details.gameVersions.clone());
-                if !new_version_details.gameVersions.contains(&profile_mc_version)
-                    && !mod_to_update
-                        .force_include_versions
-                        .contains(&profile_mc_version)
-                {
-                    mod_to_update
-                        .force_include_versions
-                        .push(profile_mc_version.clone());
-                }
-                // For CurseForge, we don't have explicit loader info in the file, so we keep the existing one
-                // or try to determine it from game versions
-                if mod_to_update.associated_loader.is_none() {
-                    mod_to_update.associated_loader = crate::integrations::unified_mod::extract_loaders_from_game_versions(&new_version_details.gameVersions)
-                        .first()
-                        .and_then(|s| ModLoader::from_str(s).ok());
-                }
-
-                info!("CurseForge mod instance {} updated successfully in memory.", mod_id);
-            } else {
-                error!(
-                    "Mod instance {} in profile {} is not a CurseForge mod.",
-                    mod_id, profile_id
-                );
-                return Err(AppError::Other(format!(
-                    "Mod {} is not a CurseForge mod",
-                    mod_id
-                )));
-            }
-        } else {
-            error!(
-                "Mod instance with ID {} not found in profile {} during update.",
-                mod_id, profile_id
-            );
-            return Err(AppError::ModNotFoundInProfile { profile_id, mod_id });
-        }
-
-        // Save changes to the profile first
-        drop(profiles);
-        self.save_profiles().await?;
-        info!(
-            "Profile {} saved after updating CurseForge mod {}.",
-            profile_id, mod_id
-        );
-
-        // Now install any missing dependencies
-        if !missing_deps.is_empty() {
-            let display_name_log = new_version_details.displayName.clone();
-            info!("Installing {} missing CurseForge dependencies", missing_deps.len());
-            let unified: crate::integrations::unified_mod::UnifiedVersion =
-                new_version_details.clone().into();
-            match self
-                .install_missing_dependencies(
-                    profile_id,
-                    &unified.dependencies,
-                    &crate::integrations::unified_mod::ModPlatform::CurseForge,
-                    &unified.date_published,
-                )
-                .await
-            {
-                Ok(_) => info!("Successfully installed CurseForge dependencies for '{}'", display_name_log),
-                Err(e) => error!("Failed to install some CurseForge dependencies for '{}': {}", display_name_log, e),
-            }
-        } else {
-            info!("No missing CurseForge dependencies to install for '{}'", new_version_details.displayName);
-        }
-
-        Ok(())
-    }
-
-    /// Updates the version of a specific Modrinth mod instance within a profile,
-    /// after checking for the presence of required dependencies (by project ID).
-    /// Automatically adds missing dependencies.
-    /// Switch an installed mod (Modrinth OR CurseForge) to a specific [`UnifiedVersion`], keyed by the
-    /// mod's UUID. Pure source swap — no dependency install — so the change is fully reversible (the
-    /// crash-fix flow stores the previous version and swaps back on undo). Platform comes from the
-    /// target version; the caller resolves versions from the mod's own source so they always match.
     pub async fn update_mod_to_unified_version(
         &self,
         profile_id: Uuid,
@@ -2043,7 +1970,7 @@ impl ProfileManager {
         apply_unified_version_to_mod(&mut profile.mods[index], new_version, &profile_mc_version)?;
 
         drop(profiles);
-        self.save_profiles().await?;
+        self.save_mods(profile_id, &[mod_id]).await?;
         info!(
             "Switched mod {} to unified version {} ({:?}) in profile {}",
             mod_id, new_version.version_number, new_version.source, profile_id
@@ -2205,7 +2132,7 @@ impl ProfileManager {
 
         // Save changes to the profile first
         drop(profiles);
-        self.save_profiles().await?;
+        self.save_mods(profile_id, &[mod_id]).await?;
         info!(
             "Profile {} saved after updating mod {}.",
             profile_id, mod_id
@@ -2382,7 +2309,6 @@ impl ProfileManager {
         let normalized = group_name.to_lowercase();
         normalized == "server" || normalized == "modpacks"
     }
-
 
     /// Sanitizes a group name for safe filesystem usage
     fn sanitize_group_name(group_name: &str) -> String {
@@ -2954,9 +2880,164 @@ impl ProfileManager {
         Ok(())
     }
 
-    /// Synchronizes standard profiles by creating editable copies for each norisk_version
-    /// that doesn't already have a user copy, and updates existing copies with forced fields.
-    /// Called during launcher startup.
+    pub async fn store_status(&self) -> Result<ProfileStoreStatus> {
+        let (profiles, mods) = self.store.counts().await?;
+        Ok(ProfileStoreStatus {
+            profile_count: profiles as usize,
+            mod_count: mods as usize,
+            legacy_json_available: self.migrated_json_path().exists(),
+        })
+    }
+
+    fn migrated_json_path(&self) -> PathBuf {
+        self.profiles_path.with_extension("json.migrated")
+    }
+
+    async fn read_migration_source(&self, source: &std::path::Path) -> Result<String> {
+        let mut current = source.to_path_buf();
+
+        for attempt in 0..2 {
+            let raw = fs::read_to_string(&current).await?;
+            if serde_json::from_str::<Vec<serde_json::Value>>(&raw).is_ok() {
+                return Ok(raw);
+            }
+
+            error!(
+                "ProfileManager: {:?} is not a readable profile list, quarantining it",
+                current
+            );
+            let quarantine = current.with_extension(format!(
+                "corrupted.{}",
+                Utc::now().format("%Y%m%d_%H%M%S")
+            ));
+            match fs::copy(&current, &quarantine).await {
+                Ok(_) => info!("ProfileManager: corrupted file saved as {:?}", quarantine),
+                Err(e) => error!("ProfileManager: could not quarantine the corrupted file: {}", e),
+            }
+
+            if attempt == 1 {
+                break;
+            }
+
+            match backup_utils::restore_from_backup(&self.profiles_path, Some("profiles")).await {
+                Ok(restored) => {
+                    info!("ProfileManager: restored profiles from backup {:?}", restored);
+                    current = self.profiles_path.clone();
+                }
+                Err(e) => {
+                    error!("ProfileManager: no usable backup to restore: {}", e);
+                    break;
+                }
+            }
+        }
+
+        warn!("ProfileManager: importing an empty profile list");
+        Ok("[]".to_string())
+    }
+
+    async fn migrate_if_needed(&self) -> Result<()> {
+        if self.store.is_migrated().await? {
+            return Ok(());
+        }
+
+        if self.store.counts().await?.0 > 0 {
+            warn!(
+                "The database already holds profiles but was never marked as migrated; adopting them instead of importing over them"
+            );
+            self.store.mark_migrated().await?;
+            return Ok(());
+        }
+
+        let source = if self.profiles_path.exists() {
+            self.profiles_path.clone()
+        } else if self.migrated_json_path().exists() {
+            info!("The database is empty; re-importing from profiles.json.migrated");
+            self.migrated_json_path()
+        } else {
+            info!("No profiles.json to import; starting the database empty");
+            self.store.import_from_json("[]").await?;
+            return Ok(());
+        };
+
+        self.snapshot_database(PRE_MIGRATION_SNAPSHOT).await;
+
+        if source == self.profiles_path {
+            if let Err(e) =
+                backup_utils::create_backup(&source, Some("profiles"), &self.backup_config).await
+            {
+                warn!("Could not back up profiles.json before importing: {}", e);
+            }
+        }
+
+        let raw = self.read_migration_source(&source).await?;
+        let outcome = self.store.import_from_json(&raw).await?;
+
+        if source == self.profiles_path {
+            if let Err(e) = fs::rename(&self.profiles_path, self.migrated_json_path()).await {
+                warn!("Could not rename profiles.json after importing: {}", e);
+            }
+        }
+
+        info!(
+            "Imported {} profiles and {} mods into the database ({} quarantined)",
+            outcome.imported, outcome.mods, outcome.unparsed
+        );
+        Ok(())
+    }
+
+    pub async fn reimport_from_legacy_json(&self) -> Result<usize> {
+        let path = self.migrated_json_path();
+        if !path.exists() {
+            return Err(AppError::Other(format!(
+                "There is nothing to re-import: {:?} does not exist",
+                path
+            )));
+        }
+
+        let raw = fs::read_to_string(&path).await?;
+        self.snapshot_database("pre-reimport").await;
+        let outcome = self.store.import_from_json(&raw).await?;
+
+        let loaded = self.store.load_all().await?;
+        self.adopt_profiles(loaded).await;
+        Ok(outcome.imported)
+    }
+
+    async fn save_profile(&self, id: Uuid) -> Result<()> {
+        let _guard = self.save_lock.lock().await;
+
+        let transient = self.transient.read().await.clone();
+        let profile = {
+            let profiles = self.profiles.read().await;
+            match profiles.get(&id) {
+                Some(profile) if should_persist(profile, &transient) => profile.clone(),
+                _ => return Ok(()),
+            }
+        };
+
+        let hash = content_hash(&profile)?;
+        if self.persisted.lock().await.get(&id) == Some(&hash) {
+            return Ok(());
+        }
+
+        self.store.upsert_many(std::slice::from_ref(&profile)).await?;
+        self.persisted.lock().await.insert(id, hash);
+        Ok(())
+    }
+
+    pub async fn add_playtime(&self, profile_id: Uuid, seconds: u64) -> Result<()> {
+        {
+            let mut profiles = self.profiles.write().await;
+            if let Some(profile) = profiles.get_mut(&profile_id) {
+                profile.playtime_seconds = profile.playtime_seconds.saturating_add(seconds);
+            }
+        }
+
+        self.store.add_playtime(profile_id, seconds).await?;
+        self.persisted.lock().await.remove(&profile_id);
+        Ok(())
+    }
+
     pub async fn sync_standard_profiles(&self) -> Result<()> {
         info!("ProfileManager: Starting standard profiles synchronization...");
 
@@ -2977,6 +3058,16 @@ impl ProfileManager {
 
         if standard_profiles.is_empty() {
             info!("ProfileManager: No standard profiles found, skipping sync");
+            return Ok(());
+        }
+
+        let stored = self.store.counts().await.map(|(p, _)| p).unwrap_or(0) as usize;
+        let in_memory = self.profiles.read().await.len();
+        if stored > in_memory {
+            warn!(
+                "ProfileManager: skipping standard profile sync, the database holds {} profiles but only {} are loaded",
+                stored, in_memory
+            );
             return Ok(());
         }
 
@@ -3025,9 +3116,12 @@ impl ProfileManager {
         Ok(())
     }
 
-    /// Ensures profiles are loaded from disk if not already loaded, performing migrations if needed.
-    /// This method is used to avoid race conditions where profile operations are called before profiles are loaded.
     async fn ensure_profiles_loaded(&self) -> Result<()> {
+        let _guard = self.loading.lock().await;
+        self.load_profiles_once().await
+    }
+
+    async fn load_profiles_once(&self) -> Result<()> {
         {
             let profiles_guard = self.profiles.read().await;
             if profiles_guard.is_empty() {
@@ -3035,25 +3129,36 @@ impl ProfileManager {
                 drop(profiles_guard); // Release read lock before loading
 
                 // Load profiles from disk
-                let mut loaded_profiles = self.load_profiles_internal(&self.profiles_path.clone()).await?;
+                let mut loaded_profiles = self.store.load_all().await?;
 
                 // Perform profile migrations
-                let migration_count = crate::utils::migration_utils::migrate_profiles(&mut loaded_profiles);
+                let migrated = crate::utils::migration_utils::migrate_profiles(&mut loaded_profiles);
 
-                // Save profiles to disk if migrations were performed
-                if migration_count > 0 {
-                    info!("ProfileManager: Saving migrated profiles to disk...");
-                    // Set profiles in memory first
+                {
                     let mut profiles_write_guard = self.profiles.write().await;
                     *profiles_write_guard = loaded_profiles;
-                    drop(profiles_write_guard);
+                }
 
-                    // Then save to disk
-                    self.save_profiles().await?;
-                    info!("ProfileManager: Successfully saved migrated profiles.");
-                } else {
-                    let mut profiles_write_guard = self.profiles.write().await;
-                    *profiles_write_guard = loaded_profiles;
+                if !migrated.is_empty() {
+                    info!(
+                        "ProfileManager: Persisting {} migrated profile(s)...",
+                        migrated.len()
+                    );
+                    let transient = self.transient.read().await.clone();
+                    let touched: Vec<Profile> = {
+                        let profiles = self.profiles.read().await;
+                        migrated
+                            .iter()
+                            .filter_map(|id| profiles.get(id))
+                            .filter(|profile| should_persist(profile, &transient))
+                            .cloned()
+                            .collect()
+                    };
+                    self.store.upsert_many(&touched).await?;
+                    let mut persisted = self.persisted.lock().await;
+                    for profile in &touched {
+                        persisted.insert(profile.id, content_hash(profile)?);
+                    }
                 }
 
                 info!("ProfileManager: Profiles loaded successfully.");
@@ -3169,7 +3274,7 @@ impl ProfileManager {
             
             if changed {
                 drop(profiles);
-                self.save_profiles().await?;
+                self.save_profile(copy_id).await?;
                 info!("Saved forced field updates for copy {}", copy_id);
             }
             
@@ -3181,6 +3286,88 @@ impl ProfileManager {
 
     /// Updates a mod in a profile using SwitchContentVersionPayload
     /// This method handles the unified version update process
+    pub async fn update_mods_with_switch_payloads(
+        &self,
+        profile_id: Uuid,
+        payloads: &[&crate::commands::content_command::SwitchContentVersionPayload],
+    ) -> Result<Vec<usize>> {
+        if payloads.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut applied = Vec::new();
+        let mut touched: Vec<Uuid> = Vec::new();
+        {
+            let mut profiles = self.profiles.write().await;
+            let profile = profiles
+                .get_mut(&profile_id)
+                .ok_or(AppError::ProfileNotFound(profile_id))?;
+            let profile_mc_version = profile.game_version.clone();
+
+            for (slot, payload) in payloads.iter().enumerate() {
+                let Some(current_item) = payload.current_item_details.as_ref() else {
+                    warn!("Bulk update entry {} has no current_item_details", slot);
+                    continue;
+                };
+                let Some(index) = find_mod_for_version_switch(&profile.mods, current_item) else {
+                    warn!(
+                        "Bulk update could not find '{}' in profile {}",
+                        current_item.filename, profile_id
+                    );
+                    continue;
+                };
+                match apply_unified_version_to_mod(
+                    &mut profile.mods[index],
+                    &payload.new_version_details,
+                    &profile_mc_version,
+                ) {
+                    Ok(()) => {
+                        touched.push(profile.mods[index].id);
+                        applied.push(slot);
+                    }
+                    Err(e) => error!(
+                        "Bulk update failed for '{}': {}",
+                        current_item.filename, e
+                    ),
+                }
+            }
+        }
+
+        if applied.is_empty() {
+            return Ok(applied);
+        }
+
+        self.save_mods(profile_id, &touched).await?;
+        info!(
+            "Bulk update applied {} of {} version switches in profile {}",
+            applied.len(),
+            payloads.len(),
+            profile_id
+        );
+
+        let mut seen = std::collections::HashSet::new();
+        for slot in &applied {
+            let payload = payloads[*slot];
+            if payload.new_version_details.dependencies.is_empty() {
+                continue;
+            }
+            if let Err(e) = self
+                .install_missing_dependencies_seen(
+                    profile_id,
+                    &payload.new_version_details.dependencies,
+                    &payload.new_version_details.source,
+                    &payload.new_version_details.date_published,
+                    &mut seen,
+                )
+                .await
+            {
+                error!("Bulk update could not install dependencies: {}", e);
+            }
+        }
+
+        Ok(applied)
+    }
+
     pub async fn update_mod_with_switch_content_version_payload(
         &self,
         profile_id: Uuid,
@@ -3209,13 +3396,15 @@ impl ProfileManager {
 
         let mod_to_update_index = find_mod_for_version_switch(&profile.mods, current_item);
 
+        let touched;
         if let Some(index) = mod_to_update_index {
             apply_unified_version_to_mod(
                 &mut profile.mods[index],
                 &payload.new_version_details,
                 &profile_mc_version,
             )?;
-            info!("Successfully updated mod {} in profile {}", profile.mods[index].id, profile_id);
+            touched = profile.mods[index].id;
+            info!("Successfully updated mod {} in profile {}", touched, profile_id);
         } else {
             error!(
                 "Mod not found in profile {} for update with unified version",
@@ -3230,7 +3419,7 @@ impl ProfileManager {
         }
 
         drop(profiles);
-        self.save_profiles().await?;
+        self.save_mods(profile_id, &[touched]).await?;
 
         info!(
             "Profile {} saved after updating mod with unified version.",
@@ -3264,158 +3453,110 @@ impl ProfileManager {
             .map(|idx| (profile.mods[idx].id, profile.mods[idx].enabled))
     }
 
-    const DEPENDENCY_DEPTH: u8 = 20;
-
     async fn install_missing_dependencies(
         &self,
         profile_id: Uuid,
         dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
         platform: &crate::integrations::unified_mod::ModPlatform,
-        parent_date: &str, // release date of the mod we just switched to — pick a contemporaneous dep
+        parent_date: &str,
     ) -> Result<()> {
         let mut seen = std::collections::HashSet::new();
-        let mut queue: std::collections::VecDeque<(Vec<crate::integrations::unified_mod::UnifiedDependency>, String, u8)> =
-            std::collections::VecDeque::new();
-        queue.push_back((
-            dependencies.to_vec(),
-            parent_date.to_string(),
-            Self::DEPENDENCY_DEPTH,
-        ));
-
-        while let Some((batch, batch_parent_date, depth)) = queue.pop_front() {
-            self.install_dependency_level(
-                profile_id,
-                &batch,
-                platform,
-                &batch_parent_date,
-                &mut seen,
-                depth,
-                &mut queue,
-            )
-            .await?;
-        }
-
-        Ok(())
+        self.install_missing_dependencies_seen(
+            profile_id,
+            dependencies,
+            platform,
+            parent_date,
+            &mut seen,
+        )
+        .await
     }
 
-    async fn install_dependency_level(
+    async fn install_missing_dependencies_seen(
         &self,
         profile_id: Uuid,
         dependencies: &[crate::integrations::unified_mod::UnifiedDependency],
         platform: &crate::integrations::unified_mod::ModPlatform,
         parent_date: &str,
         seen: &mut std::collections::HashSet<String>,
-        depth: u8,
-        queue: &mut std::collections::VecDeque<(Vec<crate::integrations::unified_mod::UnifiedDependency>, String, u8)>,
     ) -> Result<()> {
-        use crate::integrations::unified_mod::UnifiedModVersionsParams;
+        use crate::integrations::mod_dependencies::{
+            resolve_required_dependencies_seen, DependencyTarget,
+        };
 
-        if depth == 0 {
-            warn!("Dependency chain too deep, stopping here");
-            return Ok(());
-        }
-
-        // Get profile once and reuse it
         let profile = self.get_profile(profile_id).await?;
+        let target = DependencyTarget {
+            loader: profile.loader.as_str().to_string(),
+            game_version: profile.game_version.clone(),
+        };
 
-        for dependency in dependencies {
-            // Only process required dependencies
-            if dependency.dependency_type != crate::integrations::unified_mod::UnifiedDependencyType::Required {
+        let resolved = resolve_required_dependencies_seen(
+            platform,
+            dependencies,
+            parent_date,
+            &target,
+            crate::integrations::mod_dependencies::DEPENDENCY_DEPTH,
+            seen,
+        )
+        .await;
+
+        for dependency in resolved {
+            if let Some((existing_id, enabled)) =
+                self.installed_dependency(&profile, &dependency.project_id)
+            {
+                if enabled {
+                    info!(
+                        "Dependency {} already installed, skipping",
+                        dependency.project_id
+                    );
+                } else {
+                    info!(
+                        "Dependency {} is installed but disabled, re-enabling instead of adding a second copy",
+                        dependency.project_id
+                    );
+                    if let Err(e) = self.set_mod_enabled(profile_id, existing_id, true).await {
+                        error!(
+                            "Failed to re-enable dependency '{}': {}",
+                            dependency.project_id, e
+                        );
+                    }
+                }
                 continue;
             }
 
-            if let Some(dep_project_id) = &dependency.project_id {
-                if !seen.insert(format!("{:?}:{}", platform, dep_project_id)) {
-                    continue;
-                }
+            let version = &dependency.version;
+            let file = version
+                .files
+                .iter()
+                .find(|f| f.primary)
+                .or_else(|| version.files.first());
 
-                if let Some((existing_id, enabled)) = self.installed_dependency(&profile, dep_project_id) {
-                    if enabled {
-                        info!("Dependency {} already installed, skipping", dep_project_id);
-                    } else {
-                        info!(
-                            "Dependency {} is installed but disabled, re-enabling instead of adding a second copy",
-                            dep_project_id
-                        );
-                        if let Err(e) = self.set_mod_enabled(profile_id, existing_id, true).await {
-                            error!("Failed to re-enable dependency '{}': {}", dep_project_id, e);
-                        }
-                    }
-                    continue;
-                }
+            let dep_payload = crate::commands::content_command::InstallContentPayload {
+                profile_id,
+                project_id: dependency.project_id.clone(),
+                version_id: version.id.clone(),
+                file_name: file
+                    .map(|f| f.filename.clone())
+                    .unwrap_or_else(|| format!("{}.jar", dependency.project_id)),
+                download_url: file.map(|f| f.url.clone()).unwrap_or_default(),
+                file_hash_sha1: file.and_then(|f| f.hashes.get("sha1").cloned()),
+                file_fingerprint: file.and_then(|f| f.fingerprint),
+                content_name: Some(version.name.clone()),
+                version_number: Some(version.version_number.clone()),
+                content_type: crate::utils::profile_utils::ContentType::Mod,
+                loaders: Some(version.loaders.clone()),
+                game_versions: Some(version.game_versions.clone()),
+                source: platform.clone(),
+            };
 
-                info!("Installing missing dependency: {}", dep_project_id);
-
-                let versions_params = UnifiedModVersionsParams {
-                    source: platform.clone(),
-                    project_id: dep_project_id.clone(),
-                    loaders: Some(vec![profile.loader.as_str().to_string()]),
-                    game_versions: Some(vec![profile.game_version.clone()]),
-                    limit: None,
-                    offset: None,
-                };
-
-                match crate::integrations::unified_mod::get_mod_versions_unified(versions_params).await {
-                    Ok(versions_response) => {
-                        let mc = &profile.game_version;
-                        let versions = &versions_response.versions;
-                        // 1) exact pin from the parent's dependency metadata (e.g. Iris -> a specific Sodium)
-                        // 2) else the dep CONTEMPORANEOUS with the parent (newest <= parent's date) for this MC
-                        // 3) else newest for this MC  4) else newest overall
-                        let chosen = dependency.version_id.as_ref()
-                            .and_then(|vid| versions.iter().find(|v| &v.id == vid))
-                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc) && v.date_published.as_str() <= parent_date).max_by(|a, b| a.date_published.cmp(&b.date_published)))
-                            .or_else(|| versions.iter().filter(|v| v.game_versions.contains(mc)).max_by(|a, b| a.date_published.cmp(&b.date_published)))
-                            .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
-                        info!(
-                            "[dep-resolve] {} pin={:?} parent_date={} candidates={} -> chosen={:?} ({:?})",
-                            dep_project_id, dependency.version_id, parent_date, versions.len(),
-                            chosen.map(|v| &v.version_number), chosen.map(|v| &v.id)
-                        );
-                        if let Some(dep_version) = chosen {
-                            let file = dep_version
-                                .files
-                                .iter()
-                                .find(|f| f.primary)
-                                .or_else(|| dep_version.files.first());
-                            // Create install payload for the dependency
-                            let dep_payload = crate::commands::content_command::InstallContentPayload {
-                                profile_id,
-                                project_id: dep_project_id.clone(),
-                                version_id: dep_version.id.clone(),
-                                file_name: file
-                                    .map(|f| f.filename.clone())
-                                    .unwrap_or_else(|| format!("{}.jar", dep_project_id)),
-                                download_url: file.map(|f| f.url.clone()).unwrap_or_default(),
-                                file_hash_sha1: file.and_then(|f| f.hashes.get("sha1").cloned()),
-                                file_fingerprint: file.and_then(|f| f.fingerprint),
-                                content_name: Some(dep_version.name.clone()),
-                                version_number: Some(dep_version.version_number.clone()),
-                                content_type: crate::utils::profile_utils::ContentType::Mod,
-                                loaders: Some(dep_version.loaders.clone()),
-                                game_versions: Some(dep_version.game_versions.clone()),
-                                source: platform.clone(),
-                            };
-
-                            match Box::pin(self.add_mod_from_payload(&dep_payload, false)).await {
-                                Ok(_) => {
-                                    info!("Successfully installed dependency '{}'", dep_project_id);
-                                    if !dep_version.dependencies.is_empty() {
-                                        queue.push_back((
-                                            dep_version.dependencies.clone(),
-                                            dep_version.date_published.clone(),
-                                            depth - 1,
-                                        ));
-                                    }
-                                }
-                                Err(e) => error!("Failed to install dependency '{}': {}", dep_project_id, e),
-                            }
-                        } else {
-                            warn!("No compatible version found for dependency '{}'", dep_project_id);
-                        }
-                    }
-                    Err(e) => error!("Failed to get versions for dependency '{}': {}", dep_project_id, e),
-                }
+            match Box::pin(self.add_mod_from_payload(&dep_payload, false)).await {
+                Ok(_) => info!(
+                    "Successfully installed dependency '{}'",
+                    dependency.project_id
+                ),
+                Err(e) => error!(
+                    "Failed to install dependency '{}': {}",
+                    dependency.project_id, e
+                ),
             }
         }
 
@@ -3481,13 +3622,13 @@ impl ProfileManager {
 #[async_trait]
 impl PostInitializationHandler for ProfileManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
-        info!("ProfileManager: on_state_ready called. Loading profiles...");
+        trace!("ProfileManager: on_state_ready called. Loading profiles...");
         // PRIORITY 0: Create backup BEFORE ANYTHING else (including loading)
-        info!("ProfileManager: Creating pre-load backup of profiles.json...");
+        trace!("ProfileManager: Creating pre-load backup of profiles.json...");
         if self.profiles_path.exists() {
             match backup_utils::create_backup(&self.profiles_path, Some("profiles"), &self.backup_config).await {
                 Ok(backup_path) => {
-                    info!("ProfileManager: Pre-load backup created: {:?}", backup_path);
+                    trace!("ProfileManager: Pre-load backup created: {:?}", backup_path);
                 }
                 Err(e) => {
                     warn!("ProfileManager: Failed to create pre-load backup: {}", e);
@@ -3498,15 +3639,25 @@ impl PostInitializationHandler for ProfileManager {
             info!("ProfileManager: profiles.json doesn't exist yet - no backup needed at this stage");
         }
 
-        // Load profiles with migrations (backup was already created above)
-        self.ensure_profiles_loaded().await?;
+        {
+            let _guard = self.loading.lock().await;
+            self.snapshot_database_for_version().await;
+            self.migrate_if_needed().await?;
+            self.load_profiles_once().await?;
+        }
+
+        let (profiles, mods) = self.store.counts().await?;
+        info!(
+            "ProfileManager: serving {} profiles and {} mods from the database",
+            profiles, mods
+        );
 
         // Sync standard profiles - create editable copies for each norisk_version
         if let Err(e) = self.sync_standard_profiles().await {
             warn!("ProfileManager: Failed to sync standard profiles: {}", e);
         }
 
-        info!("ProfileManager: Successfully loaded profiles in on_state_ready.");
+        trace!("ProfileManager: Successfully loaded profiles in on_state_ready.");
 
         // Fire-and-forget: purge trashed items and old backups after init
         let backup_config_clone = self.backup_config.clone();
@@ -3539,6 +3690,24 @@ impl PostInitializationHandler for ProfileManager {
 
         Ok(())
     }
+}
+
+const PRE_MIGRATION_SNAPSHOT: &str = "pre-profiles";
+
+pub fn should_persist(profile: &Profile, transient: &HashSet<Uuid>) -> bool {
+    if transient.contains(&profile.id) || profile.path.starts_with("noriskclient/temp/") {
+        return false;
+    }
+    !(profile.is_standard_version && profile.source_standard_profile_id.is_none())
+}
+
+fn content_hash(profile: &Profile) -> Result<u64> {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    crate::state::profile_store::canonical_value(profile)?
+        .to_string()
+        .hash(&mut hasher);
+    Ok(hasher.finish())
 }
 
 /// Helper function to determine the definitive filename for a mod defined within a Profile.
