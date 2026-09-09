@@ -3,6 +3,9 @@
     "resources": [
       "Assets.car"
     ],
+    "externalBin": [
+      "binaries/norisk-capture"
+    ],
     "macOS": {
       "minimumSystemVersion": "11.0"
     }
