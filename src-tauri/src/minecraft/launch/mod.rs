@@ -3,6 +3,7 @@ pub mod forge_arguments;
 pub mod forge_patcher;
 pub mod game_arguments;
 pub mod jvm_arguments;
+pub mod launch_summary;
 pub mod launcher;
 pub mod neo_forge_arguments;
 pub mod neo_forge_patcher;

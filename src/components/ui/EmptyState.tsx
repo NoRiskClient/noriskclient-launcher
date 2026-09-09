@@ -15,6 +15,14 @@ interface EmptyStateProps {
   action?: React.ReactNode;
   fullHeight?: boolean;
   compact?: boolean;
+  /**
+   * Render the description one step below the message instead of at the same
+   * size. Opt-in so existing empty states are untouched: today the description
+   * is `text-2xl` in both the compact and the regular branch, i.e. exactly as
+   * large as the heading above it, which looks like an oversight rather than a
+   * decision worth propagating silently.
+   */
+  smallDescription?: boolean;
   onIconClick?: () => void;
 }
 
@@ -26,6 +34,7 @@ export function EmptyState({
   action,
   fullHeight = true,
   compact = false,
+  smallDescription = false,
   onIconClick,
 }: EmptyStateProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +133,9 @@ export function EmptyState({
           <p
             className={cn(
               "text-white/70 lowercase text-center max-w-md",
-              compact ? "text-2xl mb-4" : "text-2xl mb-6",
+              smallDescription
+                ? (compact ? "text-base mb-4" : "text-lg mb-6")
+                : (compact ? "text-2xl mb-4" : "text-2xl mb-6"),
             )}
           >
             {description}

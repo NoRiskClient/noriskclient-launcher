@@ -19,8 +19,8 @@ import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickI
 import UnifiedService from "../../services/unified-service";
 import { ModrinthService } from "../../services/modrinth-service";
 import { CurseForgeService } from "../../services/curseforge-service";
-import { installContentToProfile } from "../../services/content-service";
-import { ContentType, type InstallContentPayload } from "../../types/content";
+import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 
@@ -30,6 +30,7 @@ interface ModDetailHeaderProps {
   showVersions: boolean;
   onToggleVersions: () => void;
   targetProfile?: Profile;
+  installTarget?: ContentInstallTarget;
 }
 
 function formatNumber(num: number): string {
@@ -96,7 +97,7 @@ function findBestVersionForProfile(profile: Profile, versions: UnifiedVersion[])
   return versions[0];
 }
 
-export function ModDetailHeader({ project, accentColor, showVersions, onToggleVersions, targetProfile }: ModDetailHeaderProps) {
+export function ModDetailHeader({ project, accentColor, showVersions, onToggleVersions, targetProfile, installTarget }: ModDetailHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { profiles, fetchProfiles } = useProfileStore();
@@ -286,8 +287,8 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         source: project.source,
       };
 
-      await installContentToProfile(payload);
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: profile.name }));
+      await installContentToTarget(payload, installTarget);
+      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);

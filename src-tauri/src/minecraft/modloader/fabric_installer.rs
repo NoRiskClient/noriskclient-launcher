@@ -40,7 +40,7 @@ impl FabricInstaller {
             })
             .await?;
 
-        info!("\nInstalling Fabric...");
+        info!("Installing Fabric...");
         let fabric_api = FabricApi::new();
         let mut fabric_libraries_download = FabricLibrariesDownloadService::new();
 

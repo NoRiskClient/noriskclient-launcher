@@ -22,7 +22,7 @@ impl ForgeArguments {
             let classpath_separator = if cfg!(windows) { ";" } else { ":" };
             let library_dir = library_directory.to_string_lossy().replace("\\", "/");
 
-            info!("\n=== Forge JVM Arguments Debug ===");
+            info!("=== Forge JVM Arguments Debug ===");
             info!("Library Directory: {}", library_dir);
             info!("Classpath Separator: {}", classpath_separator);
             info!("Version Name: {}", version_name);
@@ -30,7 +30,7 @@ impl ForgeArguments {
             args.jvm
                 .iter()
                 .map(|arg| {
-                    info!("\nOriginal argument: {}", arg);
+                    info!("Original argument: {}", arg);
                     let replaced = arg
                         .replace("${library_directory}", &library_dir)
                         .replace("${classpath_separator}", classpath_separator)

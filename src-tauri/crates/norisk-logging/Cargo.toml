@@ -1,0 +1,14 @@
+[package]
+name = "norisk-logging"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Shared log setup and redaction for the NoRisk launcher and capture engine."
+
+[dependencies]
+anyhow = "1.0"
+lazy_static = "1.4.0"
+log = "0.4"
+log4rs = { version = "1.3.0", features = ["gzip"] }
+once_cell = "1.18"
+regex = "1.10.2"

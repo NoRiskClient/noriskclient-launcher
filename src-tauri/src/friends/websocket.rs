@@ -5,19 +5,12 @@ use crate::friends::models::{
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use futures_util::{SinkExt, StreamExt};
 use log::error;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::Emitter;
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct WebSocketMessage {
-    channel: String,
-    payload: serde_json::Value,
-}
 
 #[derive(Debug, Clone)]
 pub enum WsCommand {

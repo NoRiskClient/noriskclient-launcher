@@ -2,7 +2,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::minecraft::dto::piston_meta::Library;
 use crate::minecraft::launch::version::compare_versions;
 use crate::minecraft::rules::RuleProcessor;
-use log::info;
+use log::{debug, info, trace};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -18,9 +18,18 @@ struct LibraryEntry {
 /// the version, which only decides which of two competing copies wins. Identity must not be
 /// derived from the file name: `forge-…-client.jar` and `forge-…-universal.jar` then look like
 /// one library in two versions and one of them gets dropped.
+#[derive(Default)]
+struct ClasspathStats {
+    added: usize,
+    replaced: usize,
+    excluded_by_rules: usize,
+    skipped: usize,
+}
+
 pub struct ClasspathBuilder {
     entries: Vec<String>,
     libraries: Vec<LibraryEntry>,
+    stats: ClasspathStats,
     /// Coordinate key -> index into `libraries`. Entries are replaced in place and never
     /// removed, so the indices stay valid.
     library_index: HashMap<String, usize>,
@@ -35,7 +44,7 @@ impl ClasspathBuilder {
             .join("versions")
             .join(minecraft_version)
             .join(format!("{}.jar", minecraft_version));
-        info!(
+        trace!(
             "Adding vanilla client jar to classpath: {}",
             client_jar.to_string_lossy()
         );
@@ -43,6 +52,7 @@ impl ClasspathBuilder {
         Self {
             entries: Vec::new(),
             libraries: Vec::new(),
+            stats: ClasspathStats::default(),
             library_index: HashMap::new(),
             custom_client_jar_path: None,
             vanilla_client_jar: Some(client_jar),
@@ -61,25 +71,28 @@ impl ClasspathBuilder {
                 std::cmp::Ordering::Less => false,
             };
             if replace {
-                info!(
+                trace!(
                     "🔄 Replacing library {} ({} -> {})",
                     key, existing.version, version
                 );
+                self.stats.replaced += 1;
                 self.libraries[index] = LibraryEntry {
                     path,
                     version,
                     priority,
                 };
             } else {
-                info!(
+                trace!(
                     "⏩ Skipping library {} (existing version {} is newer or equal to {})",
                     key, existing.version, version
                 );
+                self.stats.skipped += 1;
             }
             return;
         }
 
-        info!("✅ Adding library: {} ({})", key, version);
+        trace!("✅ Adding library: {} ({})", key, version);
+        self.stats.added += 1;
         self.library_index.insert(key, self.libraries.len());
         self.libraries.push(LibraryEntry {
             path,
@@ -89,15 +102,18 @@ impl ClasspathBuilder {
     }
 
     pub fn add_piston_libraries(&mut self, libraries: &[Library]) -> &mut Self {
-        info!("\n=== Processing Vanilla Libraries ===");
+        trace!("=== Processing Vanilla Libraries ===");
+        let mut excluded_by_rules: Vec<&str> = Vec::new();
         for lib in libraries {
             if !RuleProcessor::should_include_library(&lib.rules) {
-                info!("❌ Excluding library due to rules: {}", lib.name);
+                excluded_by_rules.push(lib.name.as_str());
+                self.stats.excluded_by_rules += 1;
                 continue;
             }
 
             let Some(artifact) = &lib.downloads.artifact else {
-                info!("❌ Skipping library without artifact: {}", lib.name);
+                trace!("❌ Skipping library without artifact: {}", lib.name);
+                self.stats.skipped += 1;
                 continue;
             };
 
@@ -105,6 +121,7 @@ impl ClasspathBuilder {
             let parts: Vec<&str> = lib.name.split(':').collect();
             if parts.len() != 3 && parts.len() != 4 {
                 info!("❌ Skipping library with invalid format: {}", lib.name);
+                self.stats.skipped += 1;
                 continue;
             }
             let (group, artifact_name, version) = (parts[0], parts[1], parts[2]);
@@ -126,19 +143,28 @@ impl ClasspathBuilder {
                 0,
             );
         }
-        info!("=== Vanilla Library Processing Complete ===\n");
+        if !excluded_by_rules.is_empty() {
+            debug!(
+                "Libraries excluded by rules ({}): {}",
+                excluded_by_rules.len(),
+                excluded_by_rules.join(", ")
+            );
+        }
+        trace!("=== Vanilla Library Processing Complete ===");
         self
     }
 
     pub fn add_additional_libraries(&mut self, libraries: &[PathBuf], priority: u32) -> &mut Self {
-        info!("\n=== Processing Additional Libraries ===");
+        trace!("=== Processing Additional Libraries ===");
         for library in libraries {
             let Some(file_name) = library.file_name().and_then(|n| n.to_str()) else {
                 info!("❌ Skipping library with invalid filename");
+                self.stats.skipped += 1;
                 continue;
             };
             if !file_name.ends_with(".jar") {
-                info!("❌ Skipping non-jar file: {}", file_name);
+                trace!("❌ Skipping non-jar file: {}", file_name);
+                self.stats.skipped += 1;
                 continue;
             }
 
@@ -150,7 +176,7 @@ impl ClasspathBuilder {
                     // it instead would be worse: on Forge 1.21 the client jar carries the
                     // patched Minecraft classes.
                     let base_name = file_name.strip_suffix(".jar").unwrap_or(file_name);
-                    info!("✅ Adding library (non-Maven path): {}", base_name);
+                    trace!("✅ Adding library (non-Maven path): {}", base_name);
                     self.apply_library(
                         base_name.to_string(),
                         library.clone(),
@@ -160,7 +186,7 @@ impl ClasspathBuilder {
                 }
             }
         }
-        info!("=== Additional Library Processing Complete ===\n");
+        trace!("=== Additional Library Processing Complete ===");
         self
     }
 
@@ -198,11 +224,11 @@ impl ClasspathBuilder {
 
         match (&self.custom_client_jar_path, &self.vanilla_client_jar) {
             (Some(custom), _) => {
-                info!("Using custom client jar: {}", custom.display());
+                debug!("Using custom client jar: {}", custom.display());
                 push(custom.to_string_lossy().to_string(), &mut seen, &mut ordered);
             }
             (None, Some(vanilla)) => {
-                info!("Using vanilla client jar: {}", vanilla.display());
+                debug!("Using vanilla client jar: {}", vanilla.display());
                 push(
                     vanilla.to_string_lossy().to_string(),
                     &mut seen,
@@ -214,7 +240,14 @@ impl ClasspathBuilder {
             }
         }
 
-        info!("Final classpath contains {} unique entries", ordered.len());
+        info!(
+            "Classpath: {} libraries added, {} excluded by rules, {} replaced, {} skipped -> {} entries",
+            self.stats.added,
+            self.stats.excluded_by_rules,
+            self.stats.replaced,
+            self.stats.skipped,
+            ordered.len()
+        );
         ordered.join(if cfg!(windows) { ";" } else { ":" })
     }
 }

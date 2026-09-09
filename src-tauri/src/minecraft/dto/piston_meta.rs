@@ -49,28 +49,16 @@ pub struct PistonMeta {
 
 impl PistonMeta {
     pub fn display_info(&self) {
-        info!("\nVersion Information:");
-        info!("ID: {}", self.id);
-        info!("Type: {}", self.version_type);
-        info!("Release Time: {}", self.release_time);
-        info!("Compliance Level: {}", self.compliance_level);
-
-        info!("\nJava Requirements:");
-        info!("Component: {}", self.java_version.component);
-        info!("Major Version: {}", self.java_version.major_version);
-
-        info!("\nAssets:");
-        info!("Asset Index: {}", self.asset_index.id);
-        info!("Total Size: {} bytes", self.asset_index.total_size);
-
-        info!("\nDownloads:");
-        info!("Client Size: {} bytes", self.downloads.client.size);
-        info!("Client SHA1: {}", self.downloads.client.sha1);
-
-        info!("\nMain Class: {}", self.main_class);
         info!(
-            "Minimum Launcher Version: {}",
-            self.minimum_launcher_version
+            "Version {} ({}, java {} {}, assets {} / {} bytes, client {} bytes, main class {})",
+            self.id,
+            self.version_type,
+            self.java_version.component,
+            self.java_version.major_version,
+            self.asset_index.id,
+            self.asset_index.total_size,
+            self.downloads.client.size,
+            self.main_class
         );
     }
 }

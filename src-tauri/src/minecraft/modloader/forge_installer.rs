@@ -8,7 +8,7 @@ use crate::minecraft::ForgePatcher;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
-use log::{info, warn};
+use log::info;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -44,7 +44,7 @@ impl ForgeInstaller {
             })
             .await?;
 
-        info!("\nInstalling Forge...");
+        info!("Installing Forge...");
 
         let forge_api = ForgeApi::new();
         let mut forge_libraries_download = ForgeLibrariesDownload::new();
@@ -346,44 +346,6 @@ pub struct ForgeInstallResult {
     pub game_args: Vec<String>,
     pub minecraft_arguments: Option<String>,
     pub custom_client_path: Option<PathBuf>,
-}
-
-/// Locates the `client-<mc>-<mcp>-extra.jar` that Forge installs alongside the patched client.
-///
-/// Forge names the directory `<mc>-<mcp-timestamp>` and we only know the MC version here, so
-/// match on the prefix and take the newest entry. Returns `None` when nothing matches — the
-/// caller then logs a warning rather than failing the launch.
-fn find_client_extra_jar(minecraft_version: &str) -> Option<PathBuf> {
-    let client_dir = LAUNCHER_DIRECTORY
-        .meta_dir()
-        .join("libraries")
-        .join("net")
-        .join("minecraft")
-        .join("client");
-    let prefix = format!("{}-", minecraft_version);
-
-    let mut candidates: Vec<PathBuf> = std::fs::read_dir(&client_dir)
-        .ok()?
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            entry.file_name().to_string_lossy().starts_with(&prefix) && entry.path().is_dir()
-        })
-        .filter_map(|entry| {
-            std::fs::read_dir(entry.path()).ok().and_then(|files| {
-                files
-                    .filter_map(|f| f.ok())
-                    .map(|f| f.path())
-                    .find(|p| {
-                        p.file_name()
-                            .and_then(|n| n.to_str())
-                            .map_or(false, |n| n.ends_with("-extra.jar"))
-                    })
-            })
-        })
-        .collect();
-
-    candidates.sort();
-    candidates.pop()
 }
 
 /// Resolves the patched client jar that the install profile declares in `data.PATCHED`,

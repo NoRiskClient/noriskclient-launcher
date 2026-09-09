@@ -7,6 +7,8 @@ import type { PromoOutlineConfig } from '@noriskclient/nrc-skin-renderer/postfx'
 import type { SnapshotCosmetic } from '@noriskclient/nrc-skin-renderer/snapshot';
 
 import { SkinViewer } from './SkinViewer';
+import { WebGLBoundary } from '../WebGLBoundary';
+import { isWebGLAvailable } from '@noriskclient/nrc-skin-renderer';
 import { useActiveSkinTexture } from '../../hooks/useActiveSkinTexture';
 import { useEquippedCosmetics } from '../../hooks/useEquippedCosmetics';
 import { useIdleEmote } from '../../hooks/useIdleEmote';
@@ -39,20 +41,34 @@ const canvasStyle: React.CSSProperties = {
   filter: RIG_SHADOW,
 };
 
+const flatStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  pointerEvents: "none",
+  filter: RIG_SHADOW,
+};
+
 interface PlayerRigProps {
   playerName: string | null | undefined;
   outline?: Partial<PromoOutlineConfig>;
 }
 
 function useMinLoading(active: boolean, minMs: number): boolean {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(!active);
   const startRef = useRef(Date.now());
   useEffect(() => {
-    if (active) return;
+    if (active) {
+      startRef.current = Date.now();
+      setDone(false);
+      return;
+    }
+    if (done) return;
     const remaining = Math.max(0, minMs - (Date.now() - startRef.current));
     const id = setTimeout(() => setDone(true), remaining);
     return () => clearTimeout(id);
-  }, [active, minMs]);
+  }, [active, minMs, done]);
   return active || !done;
 }
 
@@ -65,7 +81,9 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
     useEquippedCosmetics(activeAccount?.id);
   const selectedIcon = useSelectedIcon(activeAccount?.id);
   const idleEmote = useIdleEmote();
-  const animated = useQualitySettingsStore((s) => s.cosmeticRenderer3d);
+  const wants3d = useQualitySettingsStore((s) => s.cosmeticRenderer3d);
+  const webglOk = isWebGLAvailable();
+  const animated = wants3d && webglOk;
   const isWindowFocused = useWindowFocus();
   const hasAccount = !!activeAccount;
   const loading = useMinLoading(
@@ -114,6 +132,17 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
     fallbackUrl: null,
   });
 
+  const stillRig = (
+    <SkinViewer
+      skinUrl={stillUrl}
+      playerName={playerName?.toString()}
+      width={webglOk ? CANVAS_WIDTH : PLAYER_RIG_WIDTH}
+      height={webglOk ? CANVAS_HEIGHT : PLAYER_RIG_HEIGHT}
+      className="bg-transparent"
+      style={webglOk ? canvasStyle : flatStyle}
+    />
+  );
+
   return (
     <div
       className="relative flex-shrink-0"
@@ -123,6 +152,7 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
       }}
     >
       {animated ? (
+        <WebGLBoundary label="player rig" fallback={stillRig}>
         <SkinRenderer
           textureUrl={rigTextureUrl}
           variant={rigVariant}
@@ -141,15 +171,9 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
           className="bg-transparent"
           style={canvasStyle}
         />
+        </WebGLBoundary>
       ) : stillUrl ? (
-        <SkinViewer
-          skinUrl={stillUrl}
-          playerName={playerName?.toString()}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
-          className="bg-transparent"
-          style={canvasStyle}
-        />
+        stillRig
       ) : null}
     </div>
   );

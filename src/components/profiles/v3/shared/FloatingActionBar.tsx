@@ -31,8 +31,8 @@ export function FloatingActionBar({
   const { t } = useTranslation();
   return (
     <div
-      className={`absolute left-1/2 -translate-x-1/2 bottom-5 z-30 transition-all duration-200 ease-out ${
-        visible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"
+      className={`absolute left-1/2 -translate-x-1/2 z-30 transition-[bottom] duration-200 ease-out ${
+        visible ? "bottom-5 pointer-events-auto" : "bottom-1 pointer-events-none"
       }`}
     >
       <div
@@ -43,7 +43,9 @@ export function FloatingActionBar({
           WebkitBackdropFilter: "blur(16px)",
           boxShadow: `0 12px 32px -10px rgba(0,0,0,0.5)`,
         }}
-        className="flex items-center h-11 rounded-xl border overflow-hidden whitespace-nowrap"
+        className={`flex items-center h-11 rounded-xl border overflow-hidden whitespace-nowrap transition-opacity duration-200 ease-out ${
+          visible ? "opacity-100" : "opacity-0"
+        }`}
       >
         <div className="flex items-center gap-2 pl-3.5 pr-2 whitespace-nowrap">
           {batchProgress ? (

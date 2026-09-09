@@ -52,28 +52,6 @@ impl NeoForgePatcher {
         self
     }
 
-    fn parse_artifact(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('[') && arg.ends_with(']') {
-            let artifact_str = &arg[1..arg.len() - 1];
-            info!("Parsing artifact: {}", artifact_str);
-            if let Ok(path) = self.get_library_path(artifact_str) {
-                let path_str = path.to_string_lossy().to_string();
-                info!("Resolved artifact path: {}", path_str);
-                return Some(path_str);
-            }
-        }
-        None
-    }
-
-    fn parse_data_value(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('\'') && arg.ends_with('\'') {
-            let value = arg[1..arg.len() - 1].to_string();
-            info!("Parsed data value: {}", value);
-            return Some(value);
-        }
-        None
-    }
-
     fn replace_tokens(
         &self,
         arg: &str,
@@ -204,9 +182,9 @@ impl NeoForgePatcher {
         let mut parsed_args = Vec::new();
 
         if let Some(args) = &processor.args {
-            info!("\nProcessing arguments for processor:");
+            info!("Processing arguments for processor:");
             for arg in args {
-                info!("\nProcessing argument: {}", arg);
+                info!("Processing argument: {}", arg);
 
                 // First handle token replacement
                 let processed =
@@ -246,12 +224,12 @@ impl NeoForgePatcher {
             }
         }
 
-        info!("\nFinal parsed arguments: {:?}", parsed_args);
+        info!("Final parsed arguments: {:?}", parsed_args);
         Ok(parsed_args)
     }
 
     fn get_library_path(&self, library: &str) -> Result<PathBuf> {
-        info!("\n=== get_library_path Debug ===");
+        info!("=== get_library_path Debug ===");
         info!("Input library string: {}", library);
 
         // Remove square brackets if present
@@ -318,7 +296,7 @@ impl NeoForgePatcher {
 
         info!("Final path: {}", path.display());
         info!("Path exists: {}", path.exists());
-        info!("=== End Debug ===\n");
+        info!("=== End Debug ===");
 
         Ok(path)
     }
@@ -402,12 +380,12 @@ impl NeoForgePatcher {
     pub async fn apply_processors(
         &self,
         install_profile: &NeoForgeInstallProfile,
-        minecraft_version: &str,
+        _minecraft_version: &str,
         is_client: bool,
         installer_path: &PathBuf,
     ) -> Result<()> {
         info!(
-            "\nApplying NeoForge processors for {}...",
+            "Applying NeoForge processors for {}...",
             if is_client { "client" } else { "server" }
         );
 
@@ -449,7 +427,7 @@ impl NeoForgePatcher {
                 }
             }
 
-            info!("\nProcessor: {:?}", processor);
+            info!("Processor: {:?}", processor);
 
             // Print Sides
             if let Some(sides) = &processor.sides {
@@ -457,7 +435,7 @@ impl NeoForgePatcher {
             }
 
             // Print JAR
-            info!("\nJAR: {}", processor.jar);
+            info!("JAR: {}", processor.jar);
 
             // Print Classpath
             if let Some(classpath) = &processor.classpath {
@@ -469,19 +447,19 @@ impl NeoForgePatcher {
 
             // Get the JAR path from libraries
             let jar_path = self.get_library_path(&processor.jar)?;
-            info!("\nJAR Path: {}", jar_path.display());
+            info!("JAR Path: {}", jar_path.display());
             let main_class = self.get_main_class_from_jar(&jar_path).await?;
-            info!("\nMain Class: {}", main_class);
+            info!("Main Class: {}", main_class);
 
             // Build classpath including the processor JAR
             let mut classpath = self.build_classpath(processor)?;
             let separator = if cfg!(windows) { ";" } else { ":" };
             classpath = format!("{}{}{}", classpath, separator, jar_path.display());
-            info!("\nFull Classpath: {}", classpath);
+            info!("Full Classpath: {}", classpath);
 
             let jvm_arguments =
                 self.parse_arguments(install_profile, processor, is_client, installer_path)?;
-            info!("\nJVM Arguments: {:?}", jvm_arguments);
+            info!("JVM Arguments: {:?}", jvm_arguments);
 
             // Execute the processor
             let mut command = std::process::Command::new(&self.java_path);
@@ -497,7 +475,7 @@ impl NeoForgePatcher {
                 command.arg(arg);
             }
 
-            info!("\nExecuting command: {:?}", command);
+            info!("Executing command: {:?}", command);
 
             let output = command.output()?;
             if !output.status.success() {

@@ -24,6 +24,18 @@ export async function getSelectedIcon(
   }
 }
 
+export async function getSelectedIconCached(
+  playerIdentifier: string
+): Promise<SelectedIcon | null> {
+  try {
+    return await invoke<SelectedIcon | null>("get_selected_player_icon_cached", {
+      playerIdentifier,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function getActiveCreatorCode(): Promise<ActiveCreatorCode | null> {
   try {
     return await invoke<ActiveCreatorCode | null>("get_active_creator_code");

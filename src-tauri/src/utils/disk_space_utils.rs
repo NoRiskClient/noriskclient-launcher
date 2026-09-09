@@ -238,7 +238,7 @@ impl DiskSpaceUtils {
 }
 
 /// Format bytes in human readable format
-fn format_bytes(bytes: u64) -> String {
+pub fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
     
     if bytes == 0 {
@@ -259,7 +259,3 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.1} {}", size, UNITS[unit_index])
     }
 }
-
-#[cfg(test)]
-#[path = "disk_space_utils_test.rs"]
-mod tests; 

@@ -34,6 +34,7 @@ import { FriendsSidebar } from "../friends/FriendsSidebar";
 // TODO: Re-enable when WebSocket is stable
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
+import { useClipsStore } from "../../store/clips-store";
 import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
@@ -73,12 +74,22 @@ export function AppLayout({
   const isCustomMediaVisible = Boolean(customMediaUrl) && (!customMediaOnlyOnPlay || activeTab === 'play');
   const shouldShowEffects = !(isCustomMediaVisible && customMediaHideEffects);
 
+  const clipsEnabled = useClipsStore((state) => state.enabled);
+  const refreshClips = useClipsStore((state) => state.refresh);
+
+  useEffect(() => {
+    void refreshClips();
+  }, [refreshClips]);
+
   const navItems = [
     { id: "play", icon: "solar:play-bold", label: t("nav.play") },
     { id: "profiles", icon: "solar:user-id-bold", label: t("nav.profiles") },
     { id: "mods", icon: "solar:widget-bold", label: t("nav.mods") },
     { id: "skins", icon: "solar:emoji-funny-circle-bold", label: t("nav.skins") },
     { id: "capes", icon: "solar:shop-bold", label: t("nav.capes") },
+    ...(clipsEnabled
+      ? [{ id: "clips", icon: "solar:videocamera-record-bold", label: t("nav.clips") }]
+      : []),
     // DISABLED: Advent Calendar (seasonal feature)
     // { id: "advent-calendar", icon: "solar:gift-bold", label: t("nav.advent") },
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },

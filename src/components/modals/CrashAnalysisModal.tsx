@@ -286,13 +286,6 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
                   text={t("crash_analysis.open_log")}
                   onClick={() => openExternalUrl(`https://mclo.gs/${result.logId}`).catch(() => {})}
                 />
-                {result.wikiUrl && (
-                  <LinkRow
-                    icon="solar:book-2-linear"
-                    text={t("crash_analysis.wiki_entry")}
-                    onClick={() => openExternalUrl(result.wikiUrl!).catch(() => {})}
-                  />
-                )}
               </div>
             </div>
           )}

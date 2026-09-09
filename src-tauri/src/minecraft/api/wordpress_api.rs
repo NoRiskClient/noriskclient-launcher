@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::utils::http_client::nrc_get;
-use log::{debug, info};
+use log::trace;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -59,27 +59,27 @@ impl WordPressApi {
         let endpoint = "posts";
         let url = format!("{}/{}", base_url, endpoint);
 
-        info!("[WordPress API] Fetching blog posts");
-        debug!("[WordPress API] Full URL: {}", url);
+        trace!("[WordPress API] Fetching blog posts");
+        trace!("[WordPress API] Full URL: {}", url);
 
         let mut query_params: HashMap<String, String> = HashMap::new();
 
         if let Some(cats) = categories {
             query_params.insert("categories".to_string(), cats.to_string());
-            debug!("[WordPress API] Filtering by categories: {}", cats);
+            trace!("[WordPress API] Filtering by categories: {}", cats);
         }
 
         if let Some(pp) = per_page {
             query_params.insert("per_page".to_string(), pp.to_string());
-            debug!("[WordPress API] Posts per page: {}", pp);
+            trace!("[WordPress API] Posts per page: {}", pp);
         }
 
         if let Some(p) = page {
             query_params.insert("page".to_string(), p.to_string());
-            debug!("[WordPress API] Page number: {}", p);
+            trace!("[WordPress API] Page number: {}", p);
         }
 
-        debug!("[WordPress API] Sending GET request");
+        trace!("[WordPress API] Sending GET request");
         nrc_get(url)
             .query(&query_params)
             .json::<Vec<BlogPost>>("WordPress blog posts")
@@ -92,7 +92,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_news_and_changelogs() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching news and changelog posts");
+        trace!("[WordPress API] Fetching news and changelog posts");
         Self::get_blog_posts(Some("21,2"), Some(10), Some(1)).await
     }
 
@@ -102,7 +102,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_news() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching news posts");
+        trace!("[WordPress API] Fetching news posts");
         Self::get_blog_posts(Some("21"), Some(10), Some(1)).await
     }
 
@@ -112,7 +112,7 @@ impl WordPressApi {
     ///
     /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
     pub async fn get_changelogs() -> Result<Vec<BlogPost>> {
-        info!("[WordPress API] Fetching changelog posts");
+        trace!("[WordPress API] Fetching changelog posts");
         Self::get_blog_posts(Some("2"), Some(10), Some(1)).await
     }
 }

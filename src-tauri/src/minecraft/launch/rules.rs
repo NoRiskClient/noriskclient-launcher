@@ -1,6 +1,6 @@
 use crate::minecraft::dto::piston_meta::Rule;
 use crate::utils::system_info::{Architecture, OperatingSystem, ARCHITECTURE, OS};
-use log::info;
+use log::trace;
 
 pub struct RuleProcessor;
 
@@ -19,18 +19,18 @@ impl RuleProcessor {
             };
 
             if current_os_str.is_none() {
-                info!("    ❓ Cannot determine current OS, conditions fail");
+                trace!("    ❓ Cannot determine current OS, conditions fail");
                 return false; // Unknown OS cannot satisfy OS rules
             }
             let current_os = current_os_str.unwrap();
 
             if let Some(name) = &os.name {
-                info!("    OS check: required={}, current={}", name, current_os);
+                trace!("    OS check: required={}, current={}", name, current_os);
                 if name != current_os {
-                    info!("    ❌ OS does not match");
+                    trace!("    ❌ OS does not match");
                     conditions_met = false;
                 } else {
-                    info!("    ✅ OS matches");
+                    trace!("    ✅ OS matches");
                 }
             }
 
@@ -46,20 +46,20 @@ impl RuleProcessor {
                     };
 
                     if current_arch_str.is_none() {
-                        info!("    ❓ Cannot determine current architecture, conditions fail");
+                        trace!("    ❓ Cannot determine current architecture, conditions fail");
                         return false; // Unknown arch cannot satisfy arch rules
                     }
                     let current_arch = current_arch_str.unwrap();
 
-                    info!(
+                    trace!(
                         "    Arch check: required={}, current={}",
                         arch, current_arch
                     );
                     if arch != current_arch {
-                        info!("    ❌ Architecture does not match");
+                        trace!("    ❌ Architecture does not match");
                         conditions_met = false;
                     } else {
-                        info!("    ✅ Architecture matches");
+                        trace!("    ✅ Architecture matches");
                     }
                 }
             }
@@ -68,7 +68,7 @@ impl RuleProcessor {
         // Check features only if other conditions passed so far
         if conditions_met {
             if let Some(features) = &rule.features {
-                info!("    Features check:");
+                trace!("    Features check:");
                 // Simplified: assume none of these features are currently supported by the launcher
                 // These features, if required by a rule (set to true), will cause the condition to fail.
                 let feature_disallowed = features.is_demo_user.unwrap_or(false)
@@ -79,10 +79,10 @@ impl RuleProcessor {
                     || features.is_quick_play_realms.unwrap_or(false);
 
                 if feature_disallowed {
-                    info!("    ❌ Feature required by rule is not supported");
+                    trace!("    ❌ Feature required by rule is not supported");
                     conditions_met = false;
                 } else {
-                    info!("    ✅ Features match (or no specific features required/disallowed)");
+                    trace!("    ✅ Features match (or no specific features required/disallowed)");
                 }
             }
         }
@@ -91,16 +91,15 @@ impl RuleProcessor {
     }
 
     pub fn should_include_library(rules: &Option<Vec<Rule>>) -> bool {
-        info!("\nChecking library rules");
+        trace!("Checking library rules");
 
         if let Some(rules) = rules {
             let mut allow_found = false;
-            let mut disallow_found = false; // For clarity in logs
             let mut allow_matches = false;
             let mut disallow_matches = false;
 
             for rule in rules {
-                info!("  Rule: action={}", rule.action);
+                trace!("  Rule: action={}", rule.action);
                 let conditions_match = Self::check_rule_conditions(rule);
 
                 match rule.action.as_str() {
@@ -108,24 +107,23 @@ impl RuleProcessor {
                         allow_found = true;
                         if conditions_match {
                             allow_matches = true;
-                            info!("    ✅ Allow rule's conditions matched");
+                            trace!("    ✅ Allow rule's conditions matched");
                         } else {
-                            info!("    ❌ Allow rule's conditions did not match");
+                            trace!("    ❌ Allow rule's conditions did not match");
                         }
                     }
                     "disallow" => {
-                        disallow_found = true;
                         if conditions_match {
                             disallow_matches = true;
-                            info!("    ✅ Disallow rule's conditions matched");
+                            trace!("    ✅ Disallow rule's conditions matched");
                             // Optimization: If a disallow matches, we exclude immediately.
                             break;
                         } else {
-                            info!("    ❌ Disallow rule's conditions did not match");
+                            trace!("    ❌ Disallow rule's conditions did not match");
                         }
                     }
                     _ => {
-                        info!("    ❓ Unknown rule action: {}", rule.action);
+                        trace!("    ❓ Unknown rule action: {}", rule.action);
                     }
                 }
             }
@@ -140,7 +138,7 @@ impl RuleProcessor {
                 true
             };
 
-            info!(
+            trace!(
                 "  Final decision: {}",
                 if should_include {
                     "✅ INCLUDED"
@@ -150,35 +148,35 @@ impl RuleProcessor {
             );
             should_include
         } else {
-            info!("  ✅ No rules found, including by default");
+            trace!("  ✅ No rules found, including by default");
             true // Standard behavior: include if no rules apply
         }
     }
 
     pub fn should_apply_argument(rules: &[Rule]) -> bool {
-        info!("\nChecking argument rules");
+        trace!("Checking argument rules");
 
         for rule in rules {
-            info!("  Rule: action={}", rule.action);
+            trace!("  Rule: action={}", rule.action);
             let conditions_match = Self::check_rule_conditions(rule);
 
             match rule.action.as_str() {
                 "allow" => {
                     if !conditions_match {
-                        info!("    ❌ Allow rule conditions did not match, rejecting argument");
+                        trace!("    ❌ Allow rule conditions did not match, rejecting argument");
                         return false;
                     }
-                    info!("    ✅ Allow rule conditions matched");
+                    trace!("    ✅ Allow rule conditions matched");
                 }
                 "disallow" => {
                     if conditions_match {
-                        info!("    ❌ Disallow rule conditions matched, rejecting argument");
+                        trace!("    ❌ Disallow rule conditions matched, rejecting argument");
                         return false;
                     }
-                    info!("    ✅ Disallow rule conditions did not match");
+                    trace!("    ✅ Disallow rule conditions did not match");
                 }
                 _ => {
-                    info!(
+                    trace!(
                         "    ❓ Unknown rule action: {}, rejecting argument",
                         rule.action
                     );
@@ -187,7 +185,7 @@ impl RuleProcessor {
             }
         }
 
-        info!("  ✅ All rules allow the argument");
+        trace!("  ✅ All rules allow the argument");
         true
     }
 }

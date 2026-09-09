@@ -243,11 +243,8 @@ export const getBlockedModsConfig = async (): Promise<BlockedModsConfig> => {
         await initPromise;
       }
 
-      log('debug', 'Attempting to get blocked_mods_config flag...');
       const flagValue = flagsmith.getValue('blocked_mods_config');
-      
-      log('debug', `Raw flag value: ${flagValue}`);
-      
+
       if (!flagValue) {
         // Log all available flags for debugging
         const allFlags = flagsmith.getAllFlags();

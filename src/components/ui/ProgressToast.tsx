@@ -8,9 +8,10 @@ import {
 interface ProgressToastProps {
   message: string;
   progress: number; // 0-100
+  action?: React.ReactNode;
 }
 
-export function ProgressToast({ message, progress }: ProgressToastProps) {
+export function ProgressToast({ message, progress, action }: ProgressToastProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
   const clampedProgress = Math.min(100, Math.max(0, progress));
@@ -52,6 +53,7 @@ export function ProgressToast({ message, progress }: ProgressToastProps) {
           <span style={{ color: accentColor.value }}>
             {Math.round(clampedProgress)}%
           </span>
+          {action}
         </div>
         {/* Progress bar */}
         <div className="h-1 bg-white/20 rounded-full overflow-hidden">

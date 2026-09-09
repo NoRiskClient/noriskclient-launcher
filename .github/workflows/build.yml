@@ -35,11 +35,39 @@ jobs:
 
       - name: cargo test
         working-directory: ./src-tauri
-        run: cargo test
+        run: cargo test --workspace
+
+  # --- JOB 0b: compile the macOS 26 app icon ---
+  # actool only understands Icon Composer .icon documents when it comes from
+  # Xcode 26, which macos-latest does not carry yet. Compiling here keeps
+  # NoRiskLauncher.icon as the single source of truth and keeps the rest of the
+  # matrix on macos-latest.
+  macos-icon:
+    needs: test
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The very script contributors run locally, so the two can never drift.
+      # It finds its own Xcode 26, verifies the catalog carries the bolt, and
+      # writes src-tauri/Assets.car over the committed copy.
+      - name: Compile Assets.car from NoRiskLauncher.icon
+        run: bash src-tauri/icons/build-macos-icon.sh
+
+      - name: Upload the compiled catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-assets-car
+          path: ./src-tauri/Assets.car
+          if-no-files-found: error
+          retention-days: 1
 
   # --- JOB 1: Build & Rename ---
   build:
-    needs: test
+    needs: [test, macos-icon]
     strategy:
       fail-fast: false
       matrix:
@@ -71,9 +99,22 @@ jobs:
     permissions:
       contents: read
       id-token: write # Azure OIDC login for Artifact Signing
+    env:
+      WINDOWS_LAUNCHER_EXE: ${{ github.workspace }}\src-tauri\target\release\noriskclient-launcher-v3.exe
+      WINDOWS_CAPTURE_EXE: ${{ github.workspace }}\src-tauri\binaries\norisk-capture-x86_64-pc-windows-msvc.exe
+      CAPTURE_RUNTIME_ASSET: NoRiskClient-Windows-capture-runtime.zip
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Replaces the committed placeholder with the catalog built from
+      # NoRiskLauncher.icon, so the shipped icon always matches the .icon source.
+      - name: Fetch the compiled macOS icon catalog
+        if: matrix.platform == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-assets-car
+          path: ./src-tauri
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -104,8 +145,106 @@ jobs:
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
         run: yarn install --frozen-lockfile # Use yarn install
 
+      - name: Stage the capture runtime
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        run: yarn native-deps && yarn stage-native
+
+      - name: Azure login (OIDC federated credential)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign norisk-capture.exe with Azure Artifact Signing
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ env.WINDOWS_CAPTURE_EXE }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Azure logout and pack the capture runtime
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          az logout
+          az account clear
+          $signature = Get-AuthenticodeSignature -FilePath $env:WINDOWS_CAPTURE_EXE
+          if ($signature.Status -ne 'Valid') { throw "norisk-capture.exe is in state $($signature.Status) after signing" }
+
+          $outDir = Join-Path $env:RUNNER_TEMP "capture-runtime"
+          yarn pack-capture-runtime --out $outDir
+          if ($LASTEXITCODE -ne 0) { throw "packing the capture runtime failed" }
+          $zip = Join-Path $outDir $env:CAPTURE_RUNTIME_ASSET
+          $hash = (Get-Content "$zip.sha256" -Raw).Trim()
+          if ($hash -notmatch '^[0-9a-f]{64}$') { throw "the capture runtime hash is not a SHA256 digest: '$hash'" }
+
+          echo "CAPTURE_RUNTIME_ZIP=$zip" >> $env:GITHUB_ENV
+          echo "NRC_CAPTURE_RUNTIME_SHA256=$hash" >> $env:GITHUB_ENV
+          echo "NRC_CAPTURE_RUNTIME_URL=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$env:CAPTURE_RUNTIME_ASSET" >> $env:GITHUB_ENV
+
+      - name: Build the Windows app
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        run: yarn tauri build --verbose --no-bundle
+
+      - name: Verify the launcher carries the capture runtime hash
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $bytes = [System.IO.File]::ReadAllBytes($env:WINDOWS_LAUNCHER_EXE)
+          $text = [System.Text.Encoding]::ASCII.GetString($bytes)
+          if (-not $text.Contains($env:NRC_CAPTURE_RUNTIME_SHA256)) {
+            throw "the launcher was built without the current capture runtime hash; a cached build must have been reused"
+          }
+          Write-Host "launcher carries capture runtime $env:NRC_CAPTURE_RUNTIME_SHA256"
+
+      - name: Azure login (OIDC federated credential)
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign the launcher with Azure Artifact Signing
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ env.WINDOWS_LAUNCHER_EXE }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Azure logout and record the signed launcher
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          az logout
+          az account clear
+          $signature = Get-AuthenticodeSignature -FilePath $env:WINDOWS_LAUNCHER_EXE
+          if ($signature.Status -ne 'Valid') { throw "the launcher is in state $($signature.Status) after signing" }
+          echo "SIGNED_LAUNCHER_SHA256=$((Get-FileHash -Algorithm SHA256 $env:WINDOWS_LAUNCHER_EXE).Hash)" >> $env:GITHUB_ENV
+          echo "SIGNED_LAUNCHER_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" >> $env:GITHUB_ENV
+
+      - name: Bundle the Windows app
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: yarn tauri bundle --verbose
+
       # Tauri Action now handles build and sign
       - name: Build and Sign Tauri App
+        if: ${{ !(matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')) }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Wird evtl. intern von Tauri benötigt
@@ -153,6 +292,27 @@ jobs:
           rm -rf squashfs-root appimagetool-x86_64.AppImage
           
           echo "--- Fix Complete ---"
+
+      - name: Verify the launcher and stage the capture runtime
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 $env:WINDOWS_LAUNCHER_EXE).Hash
+          $signature = Get-AuthenticodeSignature -FilePath $env:WINDOWS_LAUNCHER_EXE
+          if ($hash -ne $env:SIGNED_LAUNCHER_SHA256) {
+            throw "the launcher does not match the signed file (expected $env:SIGNED_LAUNCHER_SHA256, got $hash)"
+          }
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $env:SIGNED_LAUNCHER_THUMBPRINT) {
+            throw "the launcher signature check failed ($($signature.Status))"
+          }
+          Write-Host "launcher verified, signed by $($signature.SignerCertificate.Subject)"
+
+          $zipHash = (Get-FileHash -Algorithm SHA256 $env:CAPTURE_RUNTIME_ZIP).Hash.ToLower()
+          if ($zipHash -ne $env:NRC_CAPTURE_RUNTIME_SHA256) {
+            throw "the capture runtime archive changed after its hash was compiled in"
+          }
+          Copy-Item $env:CAPTURE_RUNTIME_ZIP "${{ matrix.output_path }}\nsis\"
+          Write-Host "capture runtime $env:CAPTURE_RUNTIME_ASSET ($zipHash) staged for upload"
 
       # --- Code Signing (Windows) via Azure Artifact Signing ---
       - name: Find Windows EXE for Signing
@@ -325,7 +485,9 @@ jobs:
         if: matrix.platform == 'windows-latest'
         with:
           name: artifact-${{ matrix.platform }}
-          path: ${{ matrix.output_path }}\nsis\${{ matrix.asset_name_base }}.*
+          path: |
+            ${{ matrix.output_path }}\nsis\${{ matrix.asset_name_base }}.*
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}\nsis\{1}', matrix.output_path, env.CAPTURE_RUNTIME_ASSET) || '' }}
           if-no-files-found: error
           
       - name: Upload macOS Artifact

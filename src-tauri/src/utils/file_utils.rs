@@ -1,9 +1,7 @@
 use crate::error::{AppError, Result};
-use async_zip::error::ZipError;
 use async_zip::tokio::read::seek::ZipFileReader;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
-use image::{imageops::FilterType, DynamicImage, ImageFormat};
 use log::debug;
 use std::io::Write;
 use std::path::Path;
@@ -93,7 +91,7 @@ pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<
     let file = File::open(archive_path)
         .await
         .map_err(|e| AppError::Io(e))?;
-    let mut reader = tokio::io::BufReader::new(file);
+    let reader = tokio::io::BufReader::new(file);
 
     let mut zip = ZipFileReader::with_tokio(reader).await.map_err(|e| {
         AppError::ArchiveReadError(format!(
