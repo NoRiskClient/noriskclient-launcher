@@ -2,6 +2,9 @@
   "bundle": {
     "resources": [
       "Assets.car"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
   }
 }

@@ -3,15 +3,15 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use norisk_ipc::{CaptureState, CaptureToLauncher, LauncherToCapture, ReadyInfo};
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use norisk_ipc::{decode_line, encode_line};
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::ClientOptions;
 use tokio::sync::{mpsc, RwLock};
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use crate::config::ProjectDirsExt;
 use crate::commands::analytics_command::{megabytes, tenths, track};
 use crate::error::{AppError, Result};
@@ -255,7 +255,7 @@ impl CaptureSupervisor {
             .clone()
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     pub async fn start(self: &Arc<Self>, exe: PathBuf) -> Result<()> {
         if *self.running.read().await {
             return Ok(());
@@ -284,7 +284,7 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     async fn take_command_receiver(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<LauncherToCapture>> {
@@ -305,7 +305,7 @@ impl CaptureSupervisor {
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     pub async fn start(self: &Arc<Self>, _exe: PathBuf) -> Result<()> {
         log::debug!("Capture engine is unavailable on this platform");
         Ok(())
@@ -319,7 +319,7 @@ impl CaptureSupervisor {
         *running = false;
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     async fn supervise(
         &self,
         exe: PathBuf,
@@ -356,12 +356,13 @@ impl CaptureSupervisor {
         }
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     async fn run_once(
         &self,
         exe: &PathBuf,
         commands: &mut mpsc::UnboundedReceiver<LauncherToCapture>,
     ) -> Outcome {
+        #[cfg(windows)]
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
         let pipe_name = norisk_ipc::pipe_name(&self.session_id);
@@ -377,10 +378,14 @@ impl CaptureSupervisor {
             .arg(&log_dir)
             .arg("--parent-pid")
             .arg(std::process::id().to_string())
-            .creation_flags(CREATE_NO_WINDOW)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
+
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+        #[cfg(target_os = "macos")]
+        command.stdin(std::process::Stdio::piped());
 
         let mut child = match command.spawn() {
             Ok(child) => child,
@@ -388,6 +393,7 @@ impl CaptureSupervisor {
         };
         log::info!("Capture engine started (pid {:?})", child.id());
 
+        #[cfg(windows)]
         if let Some(out) = child.stdout.take() {
             forward_engine_output(out);
         }
@@ -395,6 +401,7 @@ impl CaptureSupervisor {
             forward_engine_output(err);
         }
 
+        #[cfg(windows)]
         let client = match connect_with_retry(&pipe_name).await {
             Ok(client) => client,
             Err(e) => {
@@ -403,7 +410,10 @@ impl CaptureSupervisor {
             }
         };
 
+        #[cfg(windows)]
         let (reader, mut writer) = tokio::io::split(client);
+        #[cfg(target_os = "macos")]
+        let (reader, mut writer) = (child.stdout.take().unwrap(), child.stdin.take().unwrap());
         let mut lines = BufReader::new(reader).lines();
 
         let session = self.session_snapshot();
@@ -763,7 +773,7 @@ enum Outcome {
     Lost(String),
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn forward_engine_output<R>(reader: R)
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,

@@ -26,7 +26,7 @@ pub struct CaptureStatus {
 
 #[tauri::command]
 pub async fn capture_release_hotkeys(#[allow(unused)] app: tauri::AppHandle) -> Result<(), CommandError> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     crate::utils::hotkey_manager::clear();
     Ok(())
 }
@@ -37,7 +37,7 @@ pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>
     let clips = state.config_manager.get_config().await.clips;
 
     if !clips.enabled {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         crate::utils::hotkey_manager::clear();
         state.capture_supervisor.stop().await;
         return Ok(Vec::new());
@@ -92,9 +92,9 @@ pub async fn bring_up(
 
     adopt_running_game(&state);
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     let registered = crate::utils::hotkey_manager::apply(app, clips)?;
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     let registered = Vec::new();
 
     crate::utils::game_watch::spawn();

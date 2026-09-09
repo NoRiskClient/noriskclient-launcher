@@ -1,26 +1,26 @@
 use tauri::{AppHandle, Manager};
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::Result;
 
 pub const OVERLAY_LABEL: &str = "clip-overlay";
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const WIDTH: f64 = 340.0;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 const HEIGHT: f64 = 96.0;
 
 const MARGIN: f64 = 24.0;
 
 const TOP_MARGIN: f64 = 110.0;
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn create(_app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 pub fn create(app: &AppHandle) -> Result<()> {
     if app.get_webview_window(OVERLAY_LABEL).is_some() {
         return Ok(());
@@ -38,10 +38,14 @@ pub fn create(app: &AppHandle) -> Result<()> {
     .transparent(true)
     .shadow(false)
     .always_on_top(true)
+    .visible_on_all_workspaces(true)
     .skip_taskbar(true)
     .focused(false)
     .visible(false)
     .build()?;
+
+    #[cfg(target_os = "macos")]
+    window.set_ignore_cursor_events(true)?;
 
     position(&window);
 
