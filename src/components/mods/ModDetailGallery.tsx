@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { getMotionSafeScrollBehavior } from "../../store/reduced-motion-store";
 import type { UnifiedGalleryImage } from "../../types/unified";
 import { ModDetailLightbox } from "./ModDetailLightbox";
 
@@ -21,13 +22,13 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -300, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: getMotionSafeScrollBehavior() });
     }
   };
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: getMotionSafeScrollBehavior() });
     }
   };
 

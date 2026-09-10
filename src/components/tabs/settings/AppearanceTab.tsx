@@ -16,6 +16,12 @@ import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../../ui/buttons/Button";
 import { Icon } from "@iconify/react";
+import { Select } from "../../ui/Select";
+import {
+  type ReducedMotionPreference,
+  useReducedMotionEnabled,
+  useReducedMotionStore,
+} from "../../../store/reduced-motion-store";
 
 export function AppearanceTab() {
   const { t } = useTranslation();
@@ -31,6 +37,9 @@ export function AppearanceTab() {
   const webglOk = isWebGLAvailable();
   const { qualityLevel, setQualityLevel, cosmeticRenderer3d, setCosmeticRenderer3d } =
     useQualitySettingsStore();
+  const reducedMotionPreference = useReducedMotionStore((state) => state.preference);
+  const setReducedMotionPreference = useReducedMotionStore((state) => state.setPreference);
+  const reducedMotionEnabled = useReducedMotionEnabled();
 
   const backgroundOptions = [
     { id: BACKGROUND_EFFECTS.MATRIX_RAIN, name: t("settings.background.matrix_rain"), icon: "solar:code-bold" },
@@ -78,30 +87,51 @@ export function AppearanceTab() {
         keywords={kw("settings.background.title", "color", "colour", "farbe", "hintergrund", "background", "effekt", "effect", "animation", "animationen")}
         description={t("settings.background.description")}
       >
-        <SettingRow label={t("settings.background.animations")} searchKeywords={kw("settings.background.animations", "animation", "animationen", "motion")} disabled={saving}>
+        <SettingRow
+          label={t("settings.reduced_motion")}
+          description={t("settings.reduced_motion.description")}
+          searchKeywords={kw("settings.reduced_motion", "animation", "animations", "motion", "accessibility")}
+          disabled={saving}
+        >
+          <div className="w-40">
+            <Select
+              value={reducedMotionPreference}
+              onChange={(value) => setReducedMotionPreference(value as ReducedMotionPreference)}
+              options={[
+                { value: "on", label: t("settings.reduced_motion.on") },
+                { value: "off", label: t("settings.reduced_motion.off") },
+                { value: "system", label: t("settings.reduced_motion.system") },
+              ]}
+              size="sm"
+              variant="flat"
+              disabled={saving}
+            />
+          </div>
+        </SettingRow>
+        <SettingRow label={t("settings.background.animations")} searchKeywords={kw("settings.background.animations", "animation", "animationen", "motion")} disabled={saving || reducedMotionEnabled}>
           <ToggleSwitch
             checked={!staticBackground}
             onChange={() => {
               toggleStaticBackground();
               toggleBackgroundAnimation();
             }}
-            disabled={saving}
+            disabled={saving || reducedMotionEnabled}
             size="md"
           />
         </SettingRow>
-        <SettingRow label={t("settings.background.skin_animation")} description={webglOk ? undefined : t("webgl.unavailable")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving}>
+        <SettingRow label={t("settings.background.skin_animation")} description={webglOk ? undefined : t("webgl.unavailable")} searchKeywords={kw("settings.background.skin_animation", "skin", "animation", "cape", "3d")} disabled={saving || reducedMotionEnabled}>
           <ToggleSwitch
             checked={cosmeticRenderer3d && webglOk}
             onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-            disabled={saving || !webglOk}
+            disabled={saving || !webglOk || reducedMotionEnabled}
             size="md"
           />
         </SettingRow>
         <SettingRow label={t("settings.nav_labels")} description={t("settings.nav_labels.tooltip")} searchKeywords={kw("settings.nav_labels", "sidebar", "labels", "text", "beschriftung", "navigation", "nav", "icons")}>
           <ToggleSwitch checked={showNavLabels} onChange={toggleNavLabels} size="md" />
         </SettingRow>
-        <SettingRow label={t("settings.background.snow")} searchKeywords={kw("settings.background.snow", "snow", "schnee", "winter")} disabled={saving}>
-          <SnowEffectToggle showLabel={false} size="md" disabled={saving} />
+        <SettingRow label={t("settings.background.snow")} searchKeywords={kw("settings.background.snow", "snow", "schnee", "winter")} disabled={saving || reducedMotionEnabled}>
+          <SnowEffectToggle showLabel={false} size="md" disabled={saving || reducedMotionEnabled} />
         </SettingRow>
         <SettingRow label={t("settings.background.quality")} searchKeywords={kw("settings.background.quality", "quality", "qualität", "performance", "leistung", "fps")} disabled={saving}>
           <div className="flex items-center gap-3">

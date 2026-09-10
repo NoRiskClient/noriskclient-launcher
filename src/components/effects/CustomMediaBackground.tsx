@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useBackgroundEffectStore } from "../../store/background-effect-store";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { logError } from "../../utils/logging-utils";
+import { useReducedMotionEnabled } from "../../store/reduced-motion-store";
 
 interface Props {
   activeTab: string;
@@ -11,6 +12,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
   const { customMediaUrl, customMediaType, customMediaOpacity, customMediaBlur, customMediaQuality, customMediaOnlyOnPlay } = useBackgroundEffectStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaError, setMediaError] = useState(false);
+  const reducedMotionEnabled = useReducedMotionEnabled();
 
   const hiddenByTab = customMediaOnlyOnPlay && activeTab !== "play";
 
@@ -22,7 +24,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
     if (customMediaType !== "video") return;
 
     const tryPlay = () => {
-      if (videoRef.current && !hiddenByTab && document.hasFocus()) {
+      if (videoRef.current && !hiddenByTab && !reducedMotionEnabled && document.hasFocus()) {
         videoRef.current.play().catch((e) => logError(`[CustomMediaBackground] video play failed: ${e}`));
       }
     };
@@ -34,7 +36,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
     window.addEventListener("focus", tryPlay);
     window.addEventListener("blur", handleBlur);
 
-    if (hiddenByTab) {
+    if (hiddenByTab || reducedMotionEnabled) {
       videoRef.current?.pause();
     } else {
       tryPlay();
@@ -44,7 +46,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
       window.removeEventListener("focus", tryPlay);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [customMediaType, customMediaUrl, hiddenByTab]);
+  }, [customMediaType, customMediaUrl, hiddenByTab, reducedMotionEnabled]);
 
   if (!customMediaUrl || !customMediaType || mediaError) return null;
 
@@ -96,7 +98,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
         <video
           ref={videoRef}
           src={convertFileSrc(customMediaUrl)}
-          autoPlay
+          autoPlay={!reducedMotionEnabled}
           loop
           muted
           playsInline

@@ -1,23 +1,13 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useLayoutEffect } from "react";
 import type { RefObject } from "react";
 import { gsap } from "gsap";
 import { useThemeStore } from "../store/useThemeStore";
+import { useReducedMotionEnabled } from "../store/reduced-motion-store";
 
 export function useAnimationsEnabled(): boolean {
   const enabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
-  const [prefersReduced, setPrefersReduced] = useState(
-    () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!query) return;
-    const onChange = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-
-  return enabled && !prefersReduced;
+  const reduced = useReducedMotionEnabled();
+  return enabled && !reduced;
 }
 
 export function useEntranceAnimation<T extends HTMLElement>(

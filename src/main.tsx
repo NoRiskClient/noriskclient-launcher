@@ -7,6 +7,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ClipOverlay } from "./components/overlay/ClipOverlay";
 import i18n from "./i18n/i18n";
 import "./styles/globals.css";
+import {
+  initializeReducedMotion,
+  ReducedMotionProvider,
+} from "./components/ReducedMotionProvider";
+
+initializeReducedMotion();
 
 const isOverlay = (() => {
   try {
@@ -24,6 +30,8 @@ if (isOverlay) {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <I18nextProvider i18n={i18n}>
-    {isOverlay ? <ClipOverlay /> : <RouterProvider router={router} />}
+    <ReducedMotionProvider>
+      {isOverlay ? <ClipOverlay /> : <RouterProvider router={router} />}
+    </ReducedMotionProvider>
   </I18nextProvider>,
 );

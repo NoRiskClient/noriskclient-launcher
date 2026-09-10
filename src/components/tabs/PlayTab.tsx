@@ -22,6 +22,7 @@ import { isWebGLAvailable } from "@noriskclient/nrc-skin-renderer";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { setDiscordState } from "../../utils/discordRpc";
 import { useTranslation } from "react-i18next";
+import { useReducedMotionEnabled } from "../../store/reduced-motion-store";
 
 export function PlayTab() {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export function PlayTab() {
   const { isThemeActive, selectedTheme } = useLauncherTheme();
   const { cosmeticRenderer3d, setCosmeticRenderer3d } = useQualitySettingsStore();
   const webglOk = isWebGLAvailable();
+  const reducedMotionEnabled = useReducedMotionEnabled();
 
   useEffect(() => { setDiscordState("Idling"); }, []);
 
@@ -88,15 +90,17 @@ export function PlayTab() {
         {/* Watch Ad + 3D Render Toggle - Top Right */}
         <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-3">
           <ApplixirAdButton />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
-            <ToggleSwitch
-              checked={cosmeticRenderer3d && webglOk}
-              onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-              disabled={!webglOk}
-              size="sm"
-            />
-          </div>
+          {!reducedMotionEnabled && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
+              <ToggleSwitch
+                checked={cosmeticRenderer3d && webglOk}
+                onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
+                disabled={!webglOk}
+                size="sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* <VersionInfo

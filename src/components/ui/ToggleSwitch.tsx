@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
+import { useAnimationsEnabled, useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { gsap } from "gsap";
 
 interface ToggleSwitchProps {
@@ -28,6 +28,7 @@ export function ToggleSwitch({
   const trackRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLLabelElement>(null);
+  const animationsEnabled = useAnimationsEnabled();
 
   const getSizeConfig = () => {
     switch (size) {
@@ -64,14 +65,15 @@ export function ToggleSwitch({
   );
 
   useEffect(() => {
-    if (knobRef.current) {
+    const duration = animationsEnabled ? 0.3 : 0;
+    if (knobRef.current && animationsEnabled) {
       gsap.to(knobRef.current, {
         x: checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0,
         backgroundColor: checked ? "#ffffff" : "#f0f0f0",
         boxShadow: checked
           ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
           : "0 1px 3px rgba(0,0,0,0.3)",
-        duration: 0.3,
+        duration,
         ease: "power2.inOut",
       });
     }
@@ -84,17 +86,17 @@ export function ToggleSwitch({
         borderColor: checked
           ? `${accentColor.value}CC`
           : `${accentColor.value}50`,
-        duration: 0.3,
+        duration,
         ease: "power2.inOut",
       });
     }
-  }, [checked, accentColor.value, size]);
+  }, [checked, accentColor.value, size, animationsEnabled]);
 
   const handleMouseEnter = () => {
     if (disabled) return;
     setIsHovered(true);
 
-    if (knobRef.current) {
+    if (knobRef.current && animationsEnabled) {
       gsap.to(knobRef.current, {
         scale: 1.15,
         duration: 0.2,
@@ -107,7 +109,7 @@ export function ToggleSwitch({
     if (disabled) return;
     setIsHovered(false);
 
-    if (knobRef.current) {
+    if (knobRef.current && animationsEnabled) {
       gsap.to(knobRef.current, {
         scale: 1,
         duration: 0.2,
@@ -119,7 +121,7 @@ export function ToggleSwitch({
   const handleClick = () => {
     if (disabled) return;
 
-    if (knobRef.current) {
+    if (knobRef.current && animationsEnabled) {
       gsap.to(knobRef.current, {
         scale: 0.85,
         duration: 0.1,

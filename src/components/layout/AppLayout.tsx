@@ -48,6 +48,7 @@ import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 
 const appConfig = {
   version: "v0.5.22",
@@ -97,6 +98,7 @@ export function AppLayout({
   const { qualityLevel } = useQualitySettingsStore();
   const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
+  const animationsEnabled = useAnimationsEnabled();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
   const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
@@ -165,7 +167,7 @@ export function AppLayout({
   const qualityParams = getQualityParams();
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
+    const ctx = animationsEnabled ? gsap.context(() => {
       gsap.from(launcherRef.current, {
         opacity: 0,
         scale: 0.95,
@@ -181,8 +183,12 @@ export function AppLayout({
           ease: "none",
         });
       }
-    });
+    }) : null;
 
+    return () => ctx?.revert();
+  }, [animationsEnabled]);
+
+  useEffect(() => {
     const setupWindowControls = async () => {
       try {
         const tauriModule = await import("@tauri-apps/api/window").catch(
@@ -221,8 +227,6 @@ export function AppLayout({
     };
 
     setupWindowControls();
-
-    return () => ctx.revert();
   }, []);
 
   const renderBackgroundEffect = () => {
