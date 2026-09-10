@@ -1,9 +1,10 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use once_cell::sync::Lazy;
 use crate::error::{AppError, Result};
 use crate::sync::model::SyncTargetKind;
 use crate::utils::import_safety::safe_relative_path;
 use log::warn;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 pub const SYNC_PACKS_DIR_NAME: &str = "sync_packs";
@@ -79,6 +80,101 @@ pub fn validate_target_path(path: &str, kind: &SyncTargetKind) -> Result<String>
     }
 
     Ok(normalized)
+}
+
+static PROTECTED_OS_ROOTS: Lazy<Vec<PathBuf>> = Lazy::new(|| {
+    ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+        .iter()
+        .filter_map(|key| std::env::var(key).ok())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .collect()
+});
+
+fn protected_roots() -> Vec<PathBuf> {
+    let mut roots = vec![sync_packs_root()];
+    roots.extend(PROTECTED_OS_ROOTS.iter().cloned());
+    roots
+}
+
+fn comparable(path: &Path) -> String {
+    strip_unc_prefix(&path.to_string_lossy())
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_ascii_lowercase()
+}
+
+fn is_within(inner: &str, outer: &str) -> bool {
+    inner.len() > outer.len() && inner.starts_with(outer) && inner.as_bytes()[outer.len()] == b'/'
+}
+
+fn reject_external_master(candidate: &Path, protected: &[PathBuf]) -> Result<()> {
+    let reject = |why: &str| -> AppError {
+        AppError::Other(format!(
+            "'{}' cannot be used as a shared folder: {}",
+            candidate.display(),
+            why
+        ))
+    };
+
+    if !candidate.is_absolute() {
+        return Err(reject("it is not an absolute path"));
+    }
+    if candidate.parent().is_none() {
+        return Err(reject("it is the root of a drive"));
+    }
+    if candidate
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(reject("it steps out of itself with '..'"));
+    }
+
+    let candidate_key = comparable(candidate);
+    if candidate_key.is_empty() {
+        return Err(reject("it resolves to no path"));
+    }
+
+    for root in protected {
+        let root_key = comparable(root);
+        if root_key.is_empty() {
+            continue;
+        }
+        if candidate_key == root_key {
+            return Err(reject("it is a protected folder"));
+        }
+        if is_within(&candidate_key, &root_key) {
+            return Err(reject(&format!(
+                "it is inside the protected folder '{}'",
+                root.display()
+            )));
+        }
+        if is_within(&root_key, &candidate_key) {
+            return Err(reject(&format!(
+                "it contains the protected folder '{}'",
+                root.display()
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_external_master(path: &str) -> Result<PathBuf> {
+    if path.trim().is_empty() {
+        return Err(AppError::Other(
+            "A shared folder needs a path".to_string(),
+        ));
+    }
+
+    let candidate = PathBuf::from(strip_unc_prefix(path));
+    let resolved = candidate
+        .canonicalize()
+        .map(|p| PathBuf::from(strip_unc_prefix(&p.to_string_lossy())))
+        .unwrap_or_else(|_| candidate.clone());
+
+    reject_external_master(&resolved, &protected_roots())?;
+    Ok(resolved)
 }
 
 pub fn master_path_for(pack_id: Uuid, target_path: &str) -> Result<PathBuf> {
