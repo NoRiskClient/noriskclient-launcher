@@ -569,6 +569,8 @@
   "capes.showAsCape": "Pokaż jako pelerynę",
   "capes.showAsElytra": "Pokaż jako elytra",
   "capes.unequipCape": "Zdejmij pelerynę",
+  "capes.confirmUnequipMessage": "Czy na pewno chcesz zdjąć obecną pelerynę?",
+  "capes.unequipping": "Zdejmowanie...",
   "capes.selectCape": "Wybierz pelerynę",
   "capes.inReview": "W trakcie przeglądu",
   "capes.denied": "Odrzucony",

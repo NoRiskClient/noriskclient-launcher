@@ -569,6 +569,8 @@
   "capes.showAsCape": "Afficher comme Cape",
   "capes.showAsElytra": "Afficher comme Elytra",
   "capes.unequipCape": "Retirer la Cape",
+  "capes.confirmUnequipMessage": "Êtes-vous sûr de vouloir retirer votre cape actuelle ?",
+  "capes.unequipping": "Retrait en cours...",
   "capes.selectCape": "Sélectionner une Cape",
   "capes.inReview": "En cours de révision",
   "capes.denied": "Refusé",

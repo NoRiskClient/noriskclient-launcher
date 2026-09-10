@@ -569,6 +569,8 @@
   "capes.showAsCape": "Pelerin Olarak Göster",
   "capes.showAsElytra": "Elytra Olarak Göster",
   "capes.unequipCape": "Pelerini Çıkar",
+  "capes.confirmUnequipMessage": "Mevcut pelerinini çıkarmak istediğinden emin misin?",
+  "capes.unequipping": "Çıkarılıyor...",
   "capes.selectCape": "Pelerin Seç",
   "capes.inReview": "İncelemede",
   "capes.denied": "Reddedildi",

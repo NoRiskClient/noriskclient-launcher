@@ -569,6 +569,8 @@
   "capes.showAsCape": "Показать как плащ",
   "capes.showAsElytra": "Показать как элитры",
   "capes.unequipCape": "Снять плащ",
+  "capes.confirmUnequipMessage": "Вы уверены, что хотите снять текущий плащ?",
+  "capes.unequipping": "Снятие...",
   "capes.selectCape": "Выбрать плащ",
   "capes.inReview": "На проверке",
   "capes.denied": "Отклонено",
