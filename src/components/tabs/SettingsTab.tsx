@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
-import { isWindows } from "../../utils/platform";
+import { supportsClips } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -90,7 +90,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "background", label: t("settings.background.title") },
       { id: "custom-background", label: t("settings.custom_background.title") },
     ],
-    clips: isWindows()
+    clips: supportsClips()
       ? [
           { id: "clips-general", label: t("settings.clips.title") },
           { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },

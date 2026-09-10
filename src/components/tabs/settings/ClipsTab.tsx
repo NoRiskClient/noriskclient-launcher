@@ -16,7 +16,7 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { Button } from "../../ui/buttons/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { StatusMessage } from "../../ui/StatusMessage";
-import { isWindows } from "../../../utils/platform";
+import { supportsClips } from "../../../utils/platform";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
@@ -95,7 +95,7 @@ export function ClipsTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
-  const supported = isWindows();
+  const supported = supportsClips();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -1100,6 +1100,7 @@ function encoderOptions(
     nvenc: "NVIDIA NVENC",
     amf: "AMD AMF",
     quick_sync: "Intel Quick Sync",
+    video_toolbox: "Apple VideoToolbox",
     software: t("settings.clips.quality.encoder.software"),
   };
 
