@@ -286,11 +286,11 @@ function CapeItemDisplay({
               return <CapeImage imageUrl={getCapeReviewImageUrl(cosmeticCape._id, isExperimental)} part="front" width={displayWidth} className="rounded-sm block" />;
             }
             if (isDenied) {
-              return cosmeticCape.blurHash
-                ? <CapeImage imageUrl={cosmeticCape.blurHash} part="front" width={displayWidth} className="rounded-sm block blur-sm" />
-                : <div className="w-full h-full flex items-center justify-center bg-white/5">
-                    <Icon icon="solar:close-circle-bold-duotone" className="w-10 h-10 text-white/20" />
-                  </div>;
+              return (
+                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                    <Icon icon="solar:trash-bin-trash-bold-duotone" className="w-10 h-10 text-red-400" />
+                </div>
+              );
             }
             return <CapeImage imageUrl={imageUrl} part="front" width={displayWidth} className="rounded-sm block" />;
           })()}
