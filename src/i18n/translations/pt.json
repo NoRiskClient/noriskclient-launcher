@@ -569,6 +569,8 @@
   "capes.showAsCape": "Mostrar como Capa",
   "capes.showAsElytra": "Mostrar como Elytra",
   "capes.unequipCape": "Desequipar Capa",
+  "capes.confirmUnequipMessage": "Tem certeza de que deseja desequipar sua capa atual?",
+  "capes.unequipping": "Desequipando...",
   "capes.selectCape": "Selecionar Capa",
   "capes.inReview": "Em análise",
   "capes.denied": "Rejeitado",
