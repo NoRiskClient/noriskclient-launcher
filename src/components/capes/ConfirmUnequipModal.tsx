@@ -6,7 +6,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 
 interface ConfirmUnequipModalProps {
-  onConfirmUnequip: () => void;
+  onConfirmUnequip: () => void | Promise<void>;
   onCancelUnequip: () => void;
 }
 
