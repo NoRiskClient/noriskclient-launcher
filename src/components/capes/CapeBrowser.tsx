@@ -702,7 +702,8 @@ export function CapeBrowser(): JSX.Element {
           try {
             await deleteCape(cape._id, undefined, undefined, reason);
             toast.success(t('capes.capeDeletedSuccess'));
-            refreshCurrentView();
+            cape.accepted = false;
+            cape.moderatorMessage = reason;
             hideModal('mod-delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape (moderator):", err);

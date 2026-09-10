@@ -211,7 +211,7 @@ function CapeItemDisplay({
       onContextMenu={(e) => { e.preventDefault(); handleCapeClick(); }}
     >
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
-        {!isVanilla && !isNoCape && (
+        {!isVanilla && !isNoCape && !isDenied && (
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -247,7 +247,7 @@ function CapeItemDisplay({
 
       </div>
 
-      {isModerator && onModeratorDeleteClick && !isVanilla && !isNoCape && (
+      {isModerator && onModeratorDeleteClick && !isVanilla && !isNoCape && !isDenied && (
         <button
           onClick={(e) => {
             e.preventDefault();
