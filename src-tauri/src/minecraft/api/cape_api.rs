@@ -257,10 +257,19 @@ impl CapeApi {
         match capes {
             Ok(capes) => {
                 // set blurr hash to null for custom capes with default blurr hash to render custom style in frontend
-                let capes = capes.iter().cloned().map(|mut c| {
-                    c.blur_hash = if c.blur_hash == Some(CosmeticCape::FALLBACK_BLUR_HASH.to_string()) { None } else { c.blur_hash };
-                    return c;
-                }).collect();
+                let capes = capes
+                    .into_iter()
+                    .map(|(key, capes)| {
+                        let capes = capes
+                            .into_iter()
+                            .map(|mut c| {
+                                c.blur_hash = if c.blur_hash == Some(CosmeticCape::FALLBACK_BLUR_HASH.to_string()) { None } else { c.blur_hash };
+                                return c;
+                            })
+                            .collect();
+                        (key, capes)
+                    })
+                    .collect();
                 return Ok(capes);
             },
             Err(e) => Err(e)
