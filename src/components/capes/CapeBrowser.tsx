@@ -41,6 +41,7 @@ import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
 import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { openExternalUrl } from "../../services/tauri-service";
 
 
 
@@ -954,6 +955,17 @@ export function CapeBrowser(): JSX.Element {
                 <div className="flex items-center gap-3">
                   {activeAccount && (
                     <>
+                      <button
+                        onClick={() => openExternalUrl('https://cape-creator.norisk.gg')}
+                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
+                        title={t('capes.onlineCapeCreator')}
+                      >
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          <Icon icon="mdi:open-in-new" className="w-4 h-4" />
+                        </div>
+                        <span>{t('capes.onlineCapeCreator')}</span>
+                      </button>
+
                       <div className="relative" ref={templateMenuRef}>
                         <button
                           onClick={() => setShowTemplateMenu(!showTemplateMenu)}
