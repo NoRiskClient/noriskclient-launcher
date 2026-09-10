@@ -26,7 +26,7 @@ export function GlobalModalPortal() {
           <div
             key={modal.id}
             style={{ zIndex: modal.zIndex }}
-            className="fixed inset-0"
+            className="fixed inset-0 pointer-events-none"
           >
             {modal.component}
           </div>,

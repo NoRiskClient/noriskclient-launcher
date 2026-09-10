@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAppDragDropStore, type DragHoverKind } from "../../store/appStore";
 import { useThemeStore } from "../../store/useThemeStore";
+import { Z_DRAG_OVERLAY } from "../../lib/z-layers";
 
 const MAX_NAMED_FILES = 3;
 
@@ -31,8 +32,12 @@ export function DragDropOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center p-8 pointer-events-none animate-in fade-in duration-150"
-      style={{ backgroundColor: `${rejected ? "#000000" : color}26`, backdropFilter: "blur(6px)" }}
+      className="fixed inset-0 flex items-center justify-center p-8 pointer-events-none animate-in fade-in duration-150"
+      style={{
+        zIndex: Z_DRAG_OVERLAY,
+        backgroundColor: `${rejected ? "#000000" : color}26`,
+        backdropFilter: "blur(6px)",
+      }}
     >
       <div
         className="flex flex-col items-center gap-4 rounded-2xl px-12 py-10 border-4 border-dashed"
