@@ -184,6 +184,16 @@ impl CaptureSupervisor {
             .clone()
     }
 
+    fn forget_attachment(&self) {
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        session.attached_pid = None;
+        session.attached_game = None;
+        session.attached_at = None;
+    }
+
     pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
         self.send(LauncherToCapture::AttachWindow { pid })?;
         let mut session = self
@@ -736,7 +746,9 @@ impl CaptureSupervisor {
                         "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method.clone()),
                     }),
                 );
-                if !error.recoverable {
+                if error.recoverable {
+                    self.forget_attachment();
+                } else {
                     *self.state.write().await = CaptureState::Failed;
                 }
 
