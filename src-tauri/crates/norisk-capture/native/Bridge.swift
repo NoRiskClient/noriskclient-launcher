@@ -111,3 +111,9 @@ func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convent
     if Thread.isMainThread { return install() }
     return DispatchQueue.main.sync { install() }
 }
+
+@_cdecl("nrc_capture_supported")
+func captureSupported() -> Bool {
+    if #available(macOS 15.0, *) { return true }
+    return false
+}

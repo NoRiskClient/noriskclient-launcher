@@ -1,3 +1,13 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
+
+let macOSClipsSupported = false;
+
+export async function initializeClipSupport(): Promise<void> {
+  if (isMacOS() && isTauri()) {
+    macOSClipsSupported = await invoke<boolean>("capture_supported");
+  }
+}
+
 export function isWindows(): boolean {
   if (typeof navigator === "undefined") {
     return false;
@@ -10,5 +20,5 @@ export function isMacOS(): boolean {
 }
 
 export function supportsClips(): boolean {
-  return isWindows() || isMacOS();
+  return isWindows() || (isMacOS() && macOSClipsSupported);
 }

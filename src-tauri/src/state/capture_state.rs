@@ -262,6 +262,10 @@ impl CaptureSupervisor {
 
     #[cfg(any(windows, target_os = "macos"))]
     pub async fn start(self: &Arc<Self>, exe: PathBuf) -> Result<()> {
+        #[cfg(target_os = "macos")]
+        if !norisk_capture::macos::capture_supported() {
+            return Err(AppError::Other("Clips require macOS 15 or newer.".into()));
+        }
         if *self.running.read().await {
             return Ok(());
         }

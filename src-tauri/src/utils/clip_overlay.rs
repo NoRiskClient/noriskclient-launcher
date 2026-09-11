@@ -38,14 +38,16 @@ pub fn create(app: &AppHandle) -> Result<()> {
     .transparent(true)
     .shadow(false)
     .always_on_top(true)
-    .visible_on_all_workspaces(true)
     .skip_taskbar(true)
     .focused(false)
     .visible(false)
     .build()?;
 
     #[cfg(target_os = "macos")]
-    window.set_ignore_cursor_events(true)?;
+    {
+        window.set_ignore_cursor_events(true)?;
+        window.set_visible_on_all_workspaces(true)?;
+    }
 
     position(&window);
 

@@ -7,6 +7,14 @@ use norisk_ipc::{
     LauncherToCapture,
 };
 
+#[tauri::command]
+pub fn capture_supported() -> bool {
+    #[cfg(target_os = "macos")]
+    return norisk_capture::macos::capture_supported();
+    #[cfg(not(target_os = "macos"))]
+    cfg!(windows)
+}
+
 #[derive(Serialize)]
 pub struct CaptureStatus {
     pub running: bool,
@@ -54,7 +62,7 @@ pub fn start_on_launch(app: tauri::AppHandle) {
             return;
         };
         let clips = state.config_manager.get_config().await.clips;
-        if !clips.enabled {
+        if !capture_supported() || !clips.enabled {
             log::debug!("Clip system disabled; not starting the capture engine");
             return;
         }
@@ -167,6 +175,7 @@ pub async fn capture_encoder_capabilities() -> Result<Vec<EncoderCapability>, Co
     let state = State::get().await?;
     let supervisor = &state.capture_supervisor;
 
+    if !capture_supported() { return Ok(Vec::new()); }
     if let Some(ready) = supervisor.ready_info().await {
         if !ready.capabilities.is_empty() {
             return Ok(ready.capabilities);

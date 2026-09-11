@@ -1,6 +1,7 @@
 use std::ffi::{c_char, CStr, CString};
 
 extern "C" {
+    fn nrc_capture_supported() -> bool;
     fn nrc_capture_main(logger: extern "C" fn(*const c_char));
     fn nrc_open_apps(foreground: bool) -> *mut c_char;
     fn nrc_free_string(value: *mut c_char);
@@ -55,4 +56,8 @@ extern "C" fn log_native(message: *const c_char) {
     let message = unsafe { CStr::from_ptr(message) }.to_string_lossy();
     eprintln!("{}", norisk_logging::mask_sensitive_data(&message));
     log::info!("{message}");
+}
+
+pub fn capture_supported() -> bool {
+    unsafe { nrc_capture_supported() }
 }
