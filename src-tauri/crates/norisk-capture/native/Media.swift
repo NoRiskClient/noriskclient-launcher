@@ -70,7 +70,7 @@ func export(_ asset: AVAsset, to url: URL, preset: String = AVAssetExportPresetP
     session.audioMix = mix; session.videoComposition = video; session.shouldOptimizeForNetworkUse = url.pathExtension != "m4a"
     let poll = Task {
         while !Task.isCancelled {
-            if let source = progress { emit("export_progress", ["source": source, "done": Int(session.progress * 1000), "total": 1000]) }
+            if let source = progress { emit("export_progress", ["source": source, "done": Int((session.progress.isFinite ? min(1, max(0, session.progress)) : 0) * 1000), "total": 1000]) }
             try? await Task.sleep(nanoseconds: 150_000_000)
         }
     }
@@ -79,26 +79,30 @@ func export(_ asset: AVAsset, to url: URL, preset: String = AVAssetExportPresetP
     if let source = progress { emit("export_progress", ["source": source, "done": 1000, "total": 1000]) }
 }
 
-func addTrack(_ track: AVAssetTrack, to composition: AVMutableComposition, range: CMTimeRange) throws -> AVMutableCompositionTrack {
+@available(macOS 15.0, *)
+func addTrack(_ track: AVAssetTrack, to composition: AVMutableComposition, range: CMTimeRange) async throws -> AVMutableCompositionTrack {
     guard let result = composition.addMutableTrack(withMediaType: track.mediaType, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw failure("Could not create a media track.") }
-    let intersection = CMTimeRangeGetIntersection(range, otherRange: track.timeRange)
+    let intersection = CMTimeRangeGetIntersection(range, otherRange: try await track.load(.timeRange))
     if intersection.duration > .zero {
         do { try result.insertTimeRange(intersection, of: track, at: intersection.start - range.start) }
         catch { throw failure("Could not insert a clip track: \(error.localizedDescription)") }
     }
-    result.preferredTransform = track.preferredTransform
+    result.preferredTransform = try await track.load(.preferredTransform)
     return result
 }
 
+@available(macOS 15.0, *)
 func makeMix(_ tracks: [AVAssetTrack], range: CMTimeRange, gains: [Float], to url: URL) async throws {
     let composition = AVMutableComposition()
     let mix = AVMutableAudioMix()
-    mix.inputParameters = try tracks.enumerated().map { index, track in
-        let copy = try addTrack(track, to: composition, range: range)
-        let parameters = AVMutableAudioMixInputParameters(track: copy)
-        parameters.setVolume(gains[index], at: .zero)
-        return parameters
+    var parameters: [AVMutableAudioMixInputParameters] = []
+    for (index, track) in tracks.enumerated() {
+        let copy = try await addTrack(track, to: composition, range: range)
+        let input = AVMutableAudioMixInputParameters(track: copy)
+        input.setVolume(gains[index], at: .zero)
+        parameters.append(input)
     }
+    mix.inputParameters = parameters
     try await export(composition, to: url, preset: AVAssetExportPresetAppleM4A, mix: mix)
 }
 
@@ -108,17 +112,19 @@ func temporaryDirectory() throws -> URL {
     return dir
 }
 
+@available(macOS 15.0, *)
 func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, reason: [String: Any]) async throws {
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
     let raw = temp.appendingPathComponent("capture.mov")
     let labels = try await writeSamples(samples, to: raw)
     let asset = AVURLAsset(url: raw)
     defer { withExtendedLifetime(asset) {} }
-    let fullRange = CMTimeRange(start: .zero, duration: asset.duration)
-    let range = CMTimeRange(start: seconds(samples.playbackOffset), end: asset.duration)
+    let duration = try await asset.load(.duration)
+    let fullRange = CMTimeRange(start: .zero, duration: duration)
+    let range = CMTimeRange(start: seconds(samples.playbackOffset), end: duration)
     let composition = AVMutableComposition()
-    for track in asset.tracks(withMediaType: .video) { _ = try addTrack(track, to: composition, range: range) }
-    var audio = asset.tracks(withMediaType: .audio)
+    for track in try await asset.loadTracks(withMediaType: .video) { _ = try await addTrack(track, to: composition, range: range) }
+    var audio = try await asset.loadTracks(withMediaType: .audio)
     var stemAssets: [AVAsset] = []
     defer { withExtendedLifetime(stemAssets) {} }
     if !audio.isEmpty {
@@ -131,23 +137,23 @@ func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, re
             try await makeMix([audio[index]], range: fullRange, gains: [gains[index]], to: adjusted)
             let adjustedAsset = AVURLAsset(url: adjusted)
             stemAssets.append(adjustedAsset)
-            guard let track = adjustedAsset.tracks(withMediaType: .audio).first else { throw failure("An audio stem could not be adjusted.") }
+            guard let track = (try await adjustedAsset.loadTracks(withMediaType: .audio)).first else { throw failure("An audio stem could not be adjusted.") }
             audio[index] = track
         }
         let mixed = temp.appendingPathComponent("mix.m4a")
         try await makeMix(audio, range: fullRange, gains: audio.map { _ in Float(1) }, to: mixed)
         let mixedAsset = AVURLAsset(url: mixed)
         defer { withExtendedLifetime(mixedAsset) {} }
-        for track in mixedAsset.tracks(withMediaType: .audio) { _ = try addTrack(track, to: composition, range: range) }
+        for track in try await mixedAsset.loadTracks(withMediaType: .audio) { _ = try await addTrack(track, to: composition, range: range) }
         for track in audio {
-            let stem = try addTrack(track, to: composition, range: range)
+            let stem = try await addTrack(track, to: composition, range: range)
             stem.isEnabled = false
         }
     }
     let dir = URL(fileURLWithPath: config.output_dir, isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let stamp = String(Int(Date().timeIntervalSince1970))
-    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && $0.isLetter || $0.isNumber ? String($0).lowercased() : "_" }.joined()
+    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && ($0.isLetter || $0.isNumber) ? String($0).lowercased() : "_" }.joined()
     let destination = dir.appendingPathComponent("\(stamp)_\(slug)-\(UUID().uuidString.prefix(8)).mp4")
     try await export(composition, to: destination)
     let tracks: [[String: Any]] = audio.isEmpty ? [] : [["label": "Mix", "stream": 0, "adjustable": false, "peaks": []]] + labels.enumerated().map { index, label in
@@ -170,7 +176,7 @@ func audioPeaks(_ track: AVAssetTrack) -> [UInt8] {
         CMBlockBufferCopyDataBytes(data, atOffset: 0, dataLength: bytes.count, destination: &bytes)
         bytes.withUnsafeBytes { raw in
             for value in raw.bindMemory(to: Float.self) {
-                peak = max(peak, abs(value)); count += 1
+                if value.isFinite { peak = max(peak, min(1, abs(value))) }; count += 1
                 if count == 1920 { peaks.append(UInt8(min(255, peak * 255))); peak = 0; count = 0 }
             }
         }
@@ -179,12 +185,14 @@ func audioPeaks(_ track: AVAssetTrack) -> [UInt8] {
     return peaks
 }
 
+@available(macOS 15.0, *)
 func editMedia(_ message: [String: Any]) async throws {
     guard let source = message["source"] as? String else { throw failure("The clip source is missing.") }
     let asset = AVURLAsset(url: URL(fileURLWithPath: source))
     defer { withExtendedLifetime(asset) {} }
-    let audio = asset.tracks(withMediaType: .audio)
-    let duration = asset.duration.seconds
+    let audio = try await asset.loadTracks(withMediaType: .audio)
+    let assetDuration = try await asset.load(.duration)
+    let duration = assetDuration.seconds
     guard duration.isFinite, duration > 0 else { throw failure("The clip has no readable duration.") }
     if message["type"] as? String == "prepare_audio_preview" {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("nrc-clip-preview")
@@ -193,7 +201,7 @@ func editMedia(_ message: [String: Any]) async throws {
         var tracks: [[String: Any]] = []
         for (index, track) in audio.enumerated() {
             let composition = AVMutableComposition()
-            _ = try addTrack(track, to: composition, range: CMTimeRange(start: .zero, duration: asset.duration))
+            _ = try await addTrack(track, to: composition, range: CMTimeRange(start: .zero, duration: assetDuration))
             let destination = dir.appendingPathComponent("\(UUID().uuidString)-\(index).m4a")
             try await export(composition, to: destination, preset: AVAssetExportPresetAppleM4A)
             tracks.append(["stream": index, "label": trackName(track, index: index), "path": destination.path])
@@ -208,8 +216,8 @@ func editMedia(_ message: [String: Any]) async throws {
     guard start.isFinite, end.isFinite, start >= 0, end > start else { throw failure("The trim range is outside the clip.") }
     let range = CMTimeRange(start: seconds(start), end: seconds(end))
     let composition = AVMutableComposition()
-    guard let sourceVideo = asset.tracks(withMediaType: .video).first else { throw failure("The clip has no video track.") }
-    let video = try addTrack(sourceVideo, to: composition, range: range)
+    guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first else { throw failure("The clip has no video track.") }
+    let video = try await addTrack(sourceVideo, to: composition, range: range)
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
     let levels = message["levels"] as? [[String: Int]] ?? []
     let changed = levels.contains { $0["volume"] != 100 }
@@ -223,20 +231,26 @@ func editMedia(_ message: [String: Any]) async throws {
         try await makeMix(stems, range: range, gains: gains, to: mixed)
         let mixedAsset = AVURLAsset(url: mixed)
         defer { withExtendedLifetime(mixedAsset) {} }
-        for track in mixedAsset.tracks(withMediaType: .audio) {
-            _ = try addTrack(track, to: composition, range: CMTimeRange(start: .zero, duration: range.duration))
+        for track in try await mixedAsset.loadTracks(withMediaType: .audio) {
+            _ = try await addTrack(track, to: composition, range: CMTimeRange(start: .zero, duration: range.duration))
         }
-    } else if let master = audio.first { _ = try addTrack(master, to: composition, range: range) }
+    } else if let master = audio.first { _ = try await addTrack(master, to: composition, range: range) }
     var videoComposition: AVMutableVideoComposition?
-    var width = Int(sourceVideo.naturalSize.width), height = Int(sourceVideo.naturalSize.height)
+    let sourceSize = try await sourceVideo.load(.naturalSize)
+    let sourceTransform = try await sourceVideo.load(.preferredTransform)
+    let sourceBounds = CGRect(origin: .zero, size: sourceSize).applying(sourceTransform)
+    var width = Int(sourceBounds.width), height = Int(sourceBounds.height)
     if vertical {
-        width = min(width, height * 9 / 16) / 2 * 2; height = min(height, width * 16 / 9) / 2 * 2
+        let scale = min(width / 18, height / 32)
+        guard scale > 0 else { throw failure("The video is too small for a vertical crop.") }
+        width = scale * 18; height = scale * 32
         let vc = AVMutableVideoComposition()
         vc.renderSize = CGSize(width: width, height: height)
-        vc.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, sourceVideo.nominalFrameRate)))
+        vc.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, (try await sourceVideo.load(.nominalFrameRate)))))
         let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
-        layer.setTransform(CGAffineTransform(translationX: -(sourceVideo.naturalSize.width - CGFloat(width)) / 2,
-            y: -(sourceVideo.naturalSize.height - CGFloat(height)) / 2), at: .zero)
+        layer.setTransform(sourceTransform.concatenating(CGAffineTransform(
+            translationX: -sourceBounds.minX - (sourceBounds.width - CGFloat(width)) / 2,
+            y: -sourceBounds.minY - (sourceBounds.height - CGFloat(height)) / 2)), at: .zero)
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRange(start: .zero, duration: range.duration); instruction.layerInstructions = [layer]
         vc.instructions = [instruction]; videoComposition = vc
