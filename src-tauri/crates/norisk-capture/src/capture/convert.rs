@@ -12,6 +12,7 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
     D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0,
     D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0,
+    D3D11_VIDEO_PROCESSOR_CAPS, D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_MIRROR,
     D3D11_VIDEO_PROCESSOR_STREAM, D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
     D3D11_VPIV_DIMENSION_TEXTURE2D, D3D11_VPOV_DIMENSION_TEXTURE2D,
 };
@@ -128,7 +129,14 @@ impl Converter {
                 DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709,
             );
             if flip_vertical {
-                video_context.VideoProcessorSetStreamMirror(&processor, 0, true, false, true);
+                if can_mirror(&enumerator)? {
+                    video_context.VideoProcessorSetStreamMirror(&processor, 0, true, false, true);
+                } else {
+                    log::error!(
+                        "The video processor on this driver cannot mirror, so the recording \
+                         will come out upside down"
+                    );
+                }
             }
 
             video_context.VideoProcessorSetOutputColorSpace1(
@@ -408,6 +416,13 @@ fn fit_preserving_aspect(input: (u32, u32), output: (u32, u32)) -> (i32, i32, i3
     let top = ((output.1 - height) / 2) as i32;
 
     (left, top, left + width as i32, top + height as i32)
+}
+
+fn can_mirror(enumerator: &ID3D11VideoProcessorEnumerator) -> Result<bool> {
+    let mut caps = D3D11_VIDEO_PROCESSOR_CAPS::default();
+    unsafe { enumerator.GetVideoProcessorCaps(&mut caps) }
+        .context("GetVideoProcessorCaps failed")?;
+    Ok(caps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_MIRROR.0 as u32 != 0)
 }
 
 pub fn fit_output(source: (u32, u32), cap: (u32, u32)) -> (u32, u32) {
