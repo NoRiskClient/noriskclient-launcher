@@ -4,7 +4,7 @@ extern "C" {
     fn nrc_capture_main();
     fn nrc_open_apps(foreground: bool) -> *mut c_char;
     fn nrc_free_string(value: *mut c_char);
-    fn nrc_hotkeys(bindings: *const c_char, callback: extern "C" fn(u8)) -> bool;
+    fn nrc_hotkeys(bindings: *const c_char, callback: extern "C" fn(u8)) -> i32;
 }
 
 pub fn run() {
@@ -23,9 +23,19 @@ pub fn open_apps(foreground: bool) -> String {
     }
 }
 
-pub fn hotkeys(bindings: &str, callback: extern "C" fn(u8)) -> bool {
-    let Ok(bindings) = CString::new(bindings) else {
-        return false;
-    };
-    unsafe { nrc_hotkeys(bindings.as_ptr(), callback) }
+#[derive(Debug, PartialEq, Eq)]
+pub enum HotkeyError {
+    InvalidShortcut,
+    PermissionDenied,
+    TapUnavailable,
+}
+
+pub fn hotkeys(bindings: &str, callback: extern "C" fn(u8)) -> Result<(), HotkeyError> {
+    let bindings = CString::new(bindings).map_err(|_| HotkeyError::InvalidShortcut)?;
+    match unsafe { nrc_hotkeys(bindings.as_ptr(), callback) } {
+        0 => Ok(()),
+        1 => Err(HotkeyError::InvalidShortcut),
+        2 => Err(HotkeyError::PermissionDenied),
+        _ => Err(HotkeyError::TapUnavailable),
+    }
 }

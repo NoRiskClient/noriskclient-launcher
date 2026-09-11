@@ -49,21 +49,31 @@ private let keyNames: [Int64: String] = [
 ]
 
 @_cdecl("nrc_hotkeys")
-func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convention(c) (UInt8) -> Void) -> Bool {
+func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convention(c) (UInt8) -> Void) -> Int32 {
     guard let data = String(cString: json).data(using: .utf8),
-          let specs = try? JSONDecoder().decode([String].self, from: data) else { return false }
-    func install() -> Bool {
-        if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false); CFMachPortInvalidate(tap) }
-        if let source = tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
-        eventTap = nil; tapSource = nil; bindings = []; onHotkey = callback
+          let specs = try? JSONDecoder().decode([String].self, from: data) else { return 1 }
+    func install() -> Int32 {
+        var next: [(String, UInt8)] = []
         for (index, spec) in specs.enumerated() where !spec.isEmpty {
-            let parts = spec.split(separator: "+").map(String.init)
+            let parts = spec.split(separator: "+", omittingEmptySubsequences: false).map(String.init)
             let modifiers = ["Ctrl", "Control", "Shift", "Alt", "Super", "Meta", "Cmd"]
             let keys = parts.filter { !modifiers.contains($0) }
-            guard keys.count == 1, keyNames.values.contains(keys[0]) || ["MouseMiddle", "MouseX1", "MouseX2"].contains(keys[0]) else { return false }
-            bindings.append((spec, UInt8(index)))
+            guard let tag = UInt8(exactly: index), keys.count == 1,
+                  keyNames.values.contains(keys[0]) || ["MouseMiddle", "MouseX1", "MouseX2"].contains(keys[0]) else { return 1 }
+            next.append((spec, tag))
         }
-        if bindings.isEmpty { return true }
+        if next.isEmpty {
+            if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false); CFMachPortInvalidate(tap) }
+            if let source = tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+            eventTap = nil; tapSource = nil; bindings = []; onHotkey = nil
+            return 0
+        }
+        guard CGPreflightListenEventAccess() || CGRequestListenEventAccess() else { return 2 }
+        if let tap = eventTap {
+            bindings = next; onHotkey = callback
+            CGEvent.tapEnable(tap: tap, enable: true)
+            return 0
+        }
         let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.otherMouseDown.rawValue)
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
             options: .listenOnly, eventsOfInterest: CGEventMask(mask), callback: { _, type, event, _ in
@@ -87,12 +97,16 @@ func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convent
                     }
                 }
                 return Unmanaged.passUnretained(event)
-            }, userInfo: nil) else { CGRequestListenEventAccess(); return false }
+            }, userInfo: nil) else { return 3 }
+        guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else {
+            CFMachPortInvalidate(tap)
+            return 3
+        }
         eventTap = tap
-        tapSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), tapSource, .commonModes)
+        tapSource = source; bindings = next; onHotkey = callback
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        return true
+        return 0
     }
     if Thread.isMainThread { return install() }
     return DispatchQueue.main.sync { install() }

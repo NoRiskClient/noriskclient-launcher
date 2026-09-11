@@ -14,6 +14,12 @@ func report(_ error: Error, code: String = "internal", recoverable: Bool = true)
     emit("error", ["code": code, "message": error.localizedDescription, "recoverable": recoverable])
 }
 func failure(_ message: String) -> NSError { NSError(domain: "NoRiskCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+struct CaptureFailure: LocalizedError {
+    let code: String
+    let message: String
+    var errorDescription: String? { message }
+    var recoverable: Bool { ["window_not_found", "paused", "audio_device"].contains(code) }
+}
 func seconds(_ value: Double) -> CMTime { CMTime(seconds: value, preferredTimescale: 1_000_000) }
 func time(_ sample: CMSampleBuffer) -> Double { CMSampleBufferGetPresentationTimeStamp(sample).seconds }
 func keyframe(_ sample: CMSampleBuffer) -> Bool {
@@ -82,6 +88,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var latestImage: CVPixelBuffer?
     var pendingSaves = 0
     var encoding = false
+    @MainActor var attachment: Task<Void, Never>?
     var saveRetention: [UUID: Double] = [:]
     var retainSeconds: Double { max(Double(config.buffer_seconds), saveRetention.values.max() ?? 0) }
 
@@ -115,63 +122,99 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             "capture_method": "screencapturekit", "active_codec": codec, "active_encoder": encoder])
     }
 
-    func handle(_ message: [String: Any]) async {
+    @MainActor func handle(_ message: [String: Any]) async {
         do {
             switch message["type"] as? String {
             case "configure":
                 let next = try JSONDecoder().decode(Settings.self, from: JSONSerialization.data(withJSONObject: message))
                 await stop()
                 queue.sync { config = next }
-                if let pid = queue.sync(execute: { self.pid }), queue.sync(execute: { enabled }) { try await attach(pid) }
+                startAttachment()
             case "attach_window":
                 guard let pid = message["pid"] as? Int32 else { return }
                 await stop(); queue.sync { self.pid = pid }
-                if queue.sync(execute: { enabled }) { try await attach(pid) }
+                startAttachment()
             case "detach_window": await stop(); queue.sync { pid = nil; state = "idle" }
             case "set_buffer_enabled":
                 let enabled = message["enabled"] as? Bool ?? false
                 await stop(); queue.sync { self.enabled = enabled; state = enabled ? "idle" : "paused" }
-                if enabled, let pid = queue.sync(execute: { self.pid }) { try await attach(pid) }
+                startAttachment()
             case "save_clip": queue.async { self.save(message) }
             case "trim_clip", "export_vertical", "prepare_audio_preview":
                 Task { do { try await editMedia(message) } catch { report(error, code: "clip_write") } }
             default: break
             }
         } catch {
-            await stop()
-            queue.sync { state = "failed" }
-            report(error, code: "graphics_device", recoverable: false)
+            report(error)
         }
     }
 
-    func stop() async {
+    @MainActor func startAttachment() {
+        guard let pid = queue.sync(execute: { self.pid }), queue.sync(execute: { enabled }) else { return }
+        let generation = queue.sync { self.generation }
+        attachment = Task {
+            do { try await attach(pid) }
+            catch {
+                guard !Task.isCancelled, queue.sync(execute: { self.generation == generation }) else { return }
+                await captureFailed(error)
+            }
+        }
+    }
+
+    @MainActor func captureFailed(_ error: Error) async {
+        let native = error as NSError
+        let issue: CaptureFailure
+        if let typed = error as? CaptureFailure {
+            issue = typed
+        } else if native.domain == SCStreamErrorDomain {
+            switch SCStreamError.Code(rawValue: native.code) {
+            case .userDeclined, .userStopped, .systemStoppedStream:
+                issue = CaptureFailure(code: "paused", message: "Capture was stopped or not permitted. Check Screen & System Audio Recording in System Settings > Privacy & Security, then enable clips again.")
+            case .noCaptureSource, .noWindowList:
+                issue = CaptureFailure(code: "window_not_found", message: "No capturable game window was found. Open the game window and enable clips again.")
+            case .failedToStartAudioCapture, .failedToStartMicrophoneCapture:
+                issue = CaptureFailure(code: "audio_device", message: error.localizedDescription)
+            default:
+                issue = CaptureFailure(code: "graphics_device", message: error.localizedDescription)
+            }
+        } else {
+            issue = CaptureFailure(code: "graphics_device", message: error.localizedDescription)
+        }
+        report(issue, code: issue.code, recoverable: issue.recoverable)
+        await stop(state: issue.recoverable ? "paused" : "failed")
+    }
+
+    @MainActor func stop(state nextState: String? = nil) async {
+        attachment?.cancel(); attachment = nil
         let old = queue.sync { () -> (SCStream?, SCStream?) in
             generation += 1
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
             let old = (stream, audioStream); stream = nil; audioStream = nil
+            if let session = compression { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid); VTCompressionSessionInvalidate(session) }
+            compression = nil; encoding = false
+            state = nextState ?? (enabled ? "idle" : "paused")
             return old
         }
         try? await old.0?.stopCapture(); try? await old.1?.stopCapture()
-        queue.sync {
-            if let session = compression { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid); VTCompressionSessionInvalidate(session) }
-            compression = nil; encoding = false
-            state = enabled ? "idle" : "paused"
-        }
     }
 
-    func attach(_ pid: Int32) async throws {
+    @MainActor func attach(_ pid: Int32) async throws {
+        try Task.checkCancellation()
         queue.sync { state = "attaching" }
         guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
-            throw failure("Allow NoRiskClient in System Settings > Privacy & Security > Screen & System Audio Recording, then enable clips again.")
+            throw CaptureFailure(code: "paused", message: "Allow screen recording for the app shown in the permission prompt in System Settings > Privacy & Security > Screen & System Audio Recording, then enable clips again.")
         }
         let config = queue.sync { self.config }
         if config.capture_microphone {
-            guard await AVCaptureDevice.requestAccess(for: .audio) else { throw failure("Allow microphone access in System Settings > Privacy & Security > Microphone, then enable clips again.") }
+            guard await AVCaptureDevice.requestAccess(for: .audio) else { throw CaptureFailure(code: "paused", message: "Allow microphone access for the app shown in the permission prompt in System Settings > Privacy & Security > Microphone, then enable clips again.") }
         }
+        try Task.checkCancellation()
         var content: SCShareableContent?
         var target: SCWindow?
         for _ in 0..<120 {
+            try Task.checkCancellation()
             let current = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+            try Task.checkCancellation()
             target = current.windows.filter { $0.owningApplication?.processID == pid && $0.windowLayer == 0 && $0.frame.width >= 128 && $0.frame.height >= 128 }
                 .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
             content = current
@@ -179,7 +222,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             if kill(pid, 0) != 0 { break }
             try await Task.sleep(nanoseconds: 500_000_000)
         }
-        guard let window = target, let content = content else { throw failure("No capturable game window was found for process \(pid).") }
+        guard let window = target, let content = content else { throw CaptureFailure(code: "window_not_found", message: "No capturable game window was found for process \(pid). Open the game window and enable clips again.") }
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let pixelWidth = window.frame.width * Double(filter.pointPixelScale)
         let pixelHeight = window.frame.height * Double(filter.pointPixelScale)
@@ -189,12 +232,14 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         let hardware = config.encoder != "software"
         let codec = supportsCodec(config.codec, hardware: hardware) ? config.codec : "h264"
         let session = try makeEncoder(width: width, height: height, codec: codec, hardware: hardware)
+        var installed = false
+        defer { if !installed { VTCompressionSessionInvalidate(session) } }
         try set(session, kVTCompressionPropertyKey_RealTime, kCFBooleanTrue)
         try set(session, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse)
         try set(session, kVTCompressionPropertyKey_AverageBitRate, NSNumber(value: config.bitrate_kbps * 1000))
         try set(session, kVTCompressionPropertyKey_ExpectedFrameRate, NSNumber(value: config.fps))
         try set(session, kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, NSNumber(value: config.gop_seconds))
-        guard VTCompressionSessionPrepareToEncodeFrames(session) == noErr else { throw failure("VideoToolbox could not prepare the encoder.") }
+        guard VTCompressionSessionPrepareToEncodeFrames(session) == noErr else { throw CaptureFailure(code: "encoder_unavailable", message: "VideoToolbox could not prepare the encoder.") }
         let sc = SCStreamConfiguration()
         sc.width = width; sc.height = height
         sc.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(config.fps))
@@ -223,7 +268,17 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             self.encoder = hardware ? "video_toolbox" : "software"; compression = session
             self.stream = stream; self.audioStream = audioStream
         }
-        try await stream.startCapture(); try await audioStream?.startCapture()
+        installed = true
+        do {
+            try await stream.startCapture()
+            try Task.checkCancellation()
+            try await audioStream?.startCapture()
+            try Task.checkCancellation()
+        } catch {
+            // A cancelled start can finish after stop() has already detached this stream.
+            try? await stream.stopCapture(); try? await audioStream?.stopCapture()
+            throw error
+        }
         queue.sync {
             state = "buffering"
             let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -234,9 +289,9 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        queue.async {
-            guard stream === self.stream || stream === self.audioStream else { return }
-            self.state = "failed"; report(error, code: "graphics_device", recoverable: false)
+        Task { @MainActor in
+            guard queue.sync(execute: { stream === self.stream || stream === self.audioStream }) else { return }
+            await captureFailed(error)
         }
     }
 
@@ -321,7 +376,7 @@ func makeEncoder(width: Int, height: Int, codec: String, hardware: Bool) throws 
     let status = VTCompressionSessionCreate(allocator: nil, width: Int32(width), height: Int32(height), codecType: type,
         encoderSpecification: spec as CFDictionary, imageBufferAttributes: nil, compressedDataAllocator: nil,
         outputCallback: nil, refcon: nil, compressionSessionOut: &session)
-    guard status == noErr, let session = session else { throw failure("VideoToolbox encoder is unavailable (\(status)).") }
+    guard status == noErr, let session = session else { throw CaptureFailure(code: "encoder_unavailable", message: "VideoToolbox encoder is unavailable (\(status)).") }
     return session
 }
 func supportsCodec(_ codec: String, hardware: Bool) -> Bool {
@@ -330,7 +385,7 @@ func supportsCodec(_ codec: String, hardware: Bool) -> Bool {
 }
 func set(_ session: VTCompressionSession, _ key: CFString, _ value: CFTypeRef) throws {
     let result = VTSessionSetProperty(session, key: key, value: value)
-    if result != noErr { throw failure("VideoToolbox setting \(key) failed (\(result)).") }
+    if result != noErr { throw CaptureFailure(code: "encoder_unavailable", message: "VideoToolbox setting \(key) failed (\(result)).") }
 }
 
 @_cdecl("nrc_capture_main")

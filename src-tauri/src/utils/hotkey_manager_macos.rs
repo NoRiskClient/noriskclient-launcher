@@ -1,5 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::state::config_state::ClipConfig;
+use norisk_capture::macos::HotkeyError;
 use std::sync::Mutex;
 
 static CURRENT: Mutex<Option<Vec<String>>> = Mutex::new(None);
@@ -12,17 +13,20 @@ pub fn apply(_app: &tauri::AppHandle, config: &ClipConfig) -> Result<Vec<String>
     };
     let mut current = CURRENT.lock().unwrap_or_else(|e| e.into_inner());
     if current.as_ref() != Some(&wanted) {
-        if !norisk_capture::macos::hotkeys(&serde_json::to_string(&wanted)?, pressed) {
-            *current = None;
-            return Err(AppError::Other("Could not register clip hotkeys. Check the shortcuts and allow NoRiskClient in System Settings > Privacy & Security > Input Monitoring, then apply the settings again.".into()));
-        }
+        norisk_capture::macos::hotkeys(&serde_json::to_string(&wanted)?, pressed).map_err(|error| {
+            AppError::Other(match error {
+                HotkeyError::InvalidShortcut => "A clip shortcut is invalid. Choose a supported key or mouse button and apply the settings again.",
+                HotkeyError::PermissionDenied => "Allow the launcher in System Settings > Privacy & Security > Input Monitoring, then apply the settings again.",
+                HotkeyError::TapUnavailable => "macOS could not start listening for clip hotkeys. Apply the settings again or restart the launcher.",
+            }.into())
+        })?;
         *current = Some(wanted.clone());
     }
     Ok(wanted.into_iter().filter(|key| !key.is_empty()).collect())
 }
 
 pub fn clear() {
-    norisk_capture::macos::hotkeys("[]", pressed);
+    let _ = norisk_capture::macos::hotkeys("[]", pressed);
     *CURRENT.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
