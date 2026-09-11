@@ -157,7 +157,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     if (sidebarQuery) return;
     const root = contentRef.current;
     const defs = sectionDefs[activeTab];
-    if (!root || !defs) {
+    if (!root || !defs?.length) {
       setActiveSection(null);
       return;
     }
