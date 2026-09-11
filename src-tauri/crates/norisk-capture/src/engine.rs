@@ -771,7 +771,7 @@ impl Engine {
             at: Instant::now(),
         });
 
-        self.detach();
+        let drained = self.detach();
 
         if let Some(retired) = retired {
             let held = retired
@@ -779,7 +779,14 @@ impl Engine {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .duration_seconds();
-            log::info!("Keeping {held:.1}s of the previous buffer across the rebuild");
+            if drained {
+                log::info!("Keeping {held:.1}s of the previous buffer across the rebuild");
+            } else {
+                log::info!(
+                    "Keeping the previous buffer across the rebuild; it holds {held:.1}s so far \
+                     and the encoder is still flushing into it"
+                );
+            }
             self.retired = Some(retired);
         }
     }
@@ -809,27 +816,33 @@ impl Engine {
             .shrink_window(spare as f32);
     }
 
-    fn detach(&mut self) {
+    fn detach(&mut self) -> bool {
         self.pending_attach = None;
 
         self.retired = None;
 
         let Some(mut pipeline) = self.active.take() else {
-            return;
+            return true;
         };
         log::info!("Detaching");
 
         drop(pipeline.source);
         pipeline.frames_tx.take();
-        if let Some(handle) = pipeline.encode_thread.take() {
-            match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
-                Err(RecvTimeoutError::Timeout) => log::warn!(
+        let Some(handle) = pipeline.encode_thread.take() else {
+            return true;
+        };
+
+        match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
+            Err(RecvTimeoutError::Timeout) => {
+                log::warn!(
                     "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it \
                      finish on its own so the engine stays answerable"
-                ),
-                _ => {
-                    let _ = handle.join();
-                }
+                );
+                false
+            }
+            _ => {
+                let _ = handle.join();
+                true
             }
         }
     }
