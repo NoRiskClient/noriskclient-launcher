@@ -488,6 +488,11 @@ impl Engine {
             return;
         };
 
+        if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
+            self.resize_settling = None;
+            return;
+        }
+
         let wanted = fit_output(source, (self.config.width, self.config.height));
         if wanted == (pipeline.settings.width, pipeline.settings.height) {
             self.resize_settling = None;
@@ -556,8 +561,12 @@ impl Engine {
         let device = CaptureDevice::new_for_window(target.hwnd)?;
         let (codec, chosen) = self.choose_encoder()?;
 
-        let source = window::client_size(target.hwnd)
-            .unwrap_or(((target.width.max(0)) as u32, (target.height.max(0)) as u32));
+        let Some(source) = window::client_size(target.hwnd) else {
+            anyhow::bail!(
+                "'{}' is minimised or has no drawable area, so there is nothing to record yet",
+                target.title,
+            );
+        };
 
         if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
             anyhow::bail!(

@@ -441,6 +441,12 @@ mod tests {
     }
 
     #[test]
+    fn a_minimised_window_asks_for_a_size_no_encoder_would_take() {
+        assert_eq!(fit_output((120, 1), (1280, 720)), (120, 2));
+        assert_eq!(fit_output((146, 28), (1280, 720)), (146, 28));
+    }
+
+    #[test]
     fn a_larger_source_is_scaled_down_to_the_cap() {
         assert_eq!(fit_output((2560, 1440), (1920, 1080)), (1920, 1080));
         assert_eq!(fit_output((3840, 2160), (1280, 720)), (1280, 720));
