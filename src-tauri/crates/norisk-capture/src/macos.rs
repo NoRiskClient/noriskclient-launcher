@@ -2,6 +2,8 @@ use std::ffi::{c_char, CStr, CString};
 
 extern "C" {
     fn nrc_capture_supported() -> bool;
+    fn nrc_input_monitoring(request: bool) -> bool;
+    fn nrc_open_permission_settings(permission: u8) -> bool;
     fn nrc_capture_main(logger: extern "C" fn(*const c_char));
     fn nrc_open_apps(foreground: bool) -> *mut c_char;
     fn nrc_free_string(value: *mut c_char);
@@ -60,4 +62,12 @@ extern "C" fn log_native(message: *const c_char) {
 
 pub fn capture_supported() -> bool {
     unsafe { nrc_capture_supported() }
+}
+
+pub fn input_monitoring(request: bool) -> bool {
+    unsafe { nrc_input_monitoring(request) }
+}
+
+pub fn open_permission_settings(permission: u8) -> bool {
+    unsafe { nrc_open_permission_settings(permission) }
 }

@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
-import { supportsClips } from "../../utils/platform";
+import { isMacOS, supportsClips } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -92,6 +92,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     ],
     clips: supportsClips()
       ? [
+          ...(isMacOS() ? [{ id: "clips-permissions", label: t("settings.clips.permissions.title") }] : []),
           { id: "clips-general", label: t("settings.clips.title") },
           { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
           { id: "clips-buffer", label: t("settings.clips.buffer.title") },

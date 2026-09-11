@@ -68,7 +68,7 @@ func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convent
             eventTap = nil; tapSource = nil; bindings = []; onHotkey = nil
             return 0
         }
-        guard CGPreflightListenEventAccess() || CGRequestListenEventAccess() else { return 2 }
+        guard CGPreflightListenEventAccess() else { return 2 }
         if let tap = eventTap {
             bindings = next; onHotkey = callback
             CGEvent.tapEnable(tap: tap, enable: true)

@@ -34,3 +34,4 @@ pub mod tester_command;
 pub mod vanilla_cape_command;
 pub mod analytics_command;
 pub mod font_command;
+pub mod capture_permissions;

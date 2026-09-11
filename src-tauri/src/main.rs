@@ -875,6 +875,8 @@ async fn main() {
             commands::clip_commands::capture_release_hotkeys,
             commands::clip_commands::capture_status,
             commands::clip_commands::capture_supported,
+            commands::capture_permissions::capture_permissions,
+            commands::capture_permissions::capture_open_permission_settings,
             commands::clip_commands::capture_encoder_capabilities,
             commands::clip_commands::capture_show_overlay,
             commands::clip_commands::capture_hide_overlay,

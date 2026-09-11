@@ -227,12 +227,12 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     @MainActor func attach(_ pid: Int32) async throws {
         try Task.checkCancellation()
         queue.sync { state = "attaching" }
-        guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
-            throw CaptureFailure(code: "paused", message: "Allow screen recording for the app shown in the permission prompt in System Settings > Privacy & Security > Screen & System Audio Recording, then enable clips again.")
+        guard CGPreflightScreenCaptureAccess() else {
+            throw CaptureFailure(code: "paused", message: "Allow screen recording from Settings > Clips > macOS permissions, then retry capture.")
         }
         let config = queue.sync { self.config }
         if config.capture_microphone {
-            guard await AVCaptureDevice.requestAccess(for: .audio) else { throw CaptureFailure(code: "paused", message: "Allow microphone access for the app shown in the permission prompt in System Settings > Privacy & Security > Microphone, then enable clips again.") }
+            guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { throw CaptureFailure(code: "paused", message: "Allow microphone access from Settings > Clips > macOS permissions, then retry capture.") }
         }
         try Task.checkCancellation()
         var content: SCShareableContent?
@@ -446,6 +446,13 @@ func set(_ session: VTCompressionSession, _ key: CFString, _ value: CFTypeRef) t
 func captureMain(_ logger: @escaping @convention(c) (UnsafePointer<CChar>) -> Void) {
     captureLogger = logger
     captureLog("macOS capture engine starting")
+    if CommandLine.arguments.contains("--permissions") {
+        let application = NSApplication.shared
+        application.setActivationPolicy(.accessory)
+        Task { @MainActor in await permissionCommand(); exit(0) }
+        application.run()
+        return
+    }
     guard #available(macOS 15.0, *) else { report(failure("Clips require macOS 15 or newer."), recoverable: false); exit(1) }
     let application = NSApplication.shared
     application.setActivationPolicy(.prohibited)

@@ -16,11 +16,12 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { Button } from "../../ui/buttons/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { StatusMessage } from "../../ui/StatusMessage";
-import { supportsClips } from "../../../utils/platform";
+import { isMacOS, supportsClips } from "../../../utils/platform";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 import { HotkeyInput } from "../../ui/HotkeyInput";
+import { MacCapturePermissions } from "../../clips/MacCapturePermissions";
 import { GamePicker } from "../../clips/GamePicker";
 import { useClipsStore } from "../../../store/clips-store";
 import { useSettingsModalStore } from "../../../store/settings-modal-store";
@@ -96,6 +97,7 @@ export function ClipsTab() {
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const supported = supportsClips();
+  const [permissionsReady, setPermissionsReady] = useState(!isMacOS());
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -208,6 +210,15 @@ export function ClipsTab() {
 
   return (
     <div className="space-y-6">
+      {isMacOS() && (
+        <MacCapturePermissions
+          microphone={clips.capture_microphone}
+          hotkeys={!!(clips.hotkey_save || clips.hotkey_toggle)}
+          enabled={clips.enabled}
+          saving={saving}
+          onReadyChange={setPermissionsReady}
+        />
+      )}
       <SettingsSection
         id="settings-section-clips-general"
         title={t("settings.clips.title")}
@@ -223,7 +234,7 @@ export function ClipsTab() {
           <ToggleSwitch
             checked={clips.enabled}
             onChange={(enabled) => patch({ enabled })}
-            disabled={saving}
+            disabled={saving || (!clips.enabled && !permissionsReady)}
           />
         </SettingRow>
 

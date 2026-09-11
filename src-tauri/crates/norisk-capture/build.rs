@@ -95,6 +95,7 @@ fn build_macos() {
     );
     let sources = [
         "native/Bridge.swift",
+        "native/Permissions.swift",
         "native/Capture.swift",
         "native/Media.swift",
     ];

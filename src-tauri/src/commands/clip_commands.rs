@@ -40,7 +40,10 @@ pub async fn capture_release_hotkeys(#[allow(unused)] app: tauri::AppHandle) -> 
 }
 
 #[tauri::command]
-pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>, CommandError> {
+pub async fn capture_apply_settings(
+    app: tauri::AppHandle,
+    restart: Option<bool>,
+) -> Result<Vec<String>, CommandError> {
     let state = State::get().await?;
     let clips = state.config_manager.get_config().await.clips;
 
@@ -51,6 +54,12 @@ pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>
         return Ok(Vec::new());
     }
 
+    #[cfg(target_os = "macos")]
+    if restart == Some(true) {
+        state.capture_supervisor.finish_shutdown().await;
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = restart;
     Ok(bring_up(&app, &clips).await?)
 }
 
@@ -85,6 +94,22 @@ pub async fn bring_up(
     clips: &crate::state::config_state::ClipConfig,
 ) -> crate::error::Result<Vec<String>> {
     let state = State::get().await?;
+
+    #[cfg(target_os = "macos")]
+    {
+        if !capture_supported() {
+            return Err(crate::error::AppError::Other("Clips require macOS 15 or newer.".into()));
+        }
+        if let Some(permissions) = super::capture_permissions::read_permissions(None).await? {
+            let hotkeys = !clips.hotkey_save.is_empty() || !clips.hotkey_toggle.is_empty();
+            if !permissions.screen_recording
+                || (clips.capture_microphone && !permissions.microphone)
+                || (hotkeys && !permissions.input_monitoring)
+            {
+                return Err(crate::error::AppError::Other("Grant the required permissions in Settings > Clips > macOS permissions, then retry capture.".into()));
+            }
+        }
+    }
 
     state.capture_supervisor.attach_app(app.clone()).await;
 
