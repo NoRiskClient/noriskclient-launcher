@@ -1572,9 +1572,12 @@ fn encode_loop(
     let wait =
         std::time::Duration::from_nanos((1_000_000_000 / fps as u64) * REPEAT_AFTER_FRAMES as u64);
 
+    let report_after = (fps / REPEAT_AFTER_FRAMES as i64).max(1) as u64;
+
     let mut last: Option<PoolFrame> = None;
     let mut last_pts = i64::MIN;
     let mut repeats: u64 = 0;
+    let mut reported = false;
 
     let emit = |encoder: &mut VideoEncoder, frame: &PoolFrame| -> bool {
         let started = Instant::now();
@@ -1609,10 +1612,11 @@ fn encode_loop(
     loop {
         match frames.recv_timeout(wait) {
             Ok(mut frame) => {
-                if repeats > 0 {
+                if reported {
                     log::debug!("The source drew again after {repeats} repeated frame(s)");
-                    repeats = 0;
+                    reported = false;
                 }
+                repeats = 0;
 
                 if frame.pts() <= last_pts {
                     frame.set_pts(last_pts + 1);
@@ -1634,8 +1638,9 @@ fn encode_loop(
                 }
 
                 repeats += 1;
-                if repeats == 1 {
-                    log::debug!("The source stopped drawing; holding the last frame");
+                if repeats == report_after {
+                    log::debug!("The source has not drawn for about a second; holding its last frame");
+                    reported = true;
                 }
             }
             Err(RecvTimeoutError::Disconnected) => break,
