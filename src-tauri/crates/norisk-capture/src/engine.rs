@@ -288,12 +288,14 @@ impl Engine {
             .active
             .as_ref()
             .map(|p| p.source.adapter().to_string())
-            .or_else(|| {
-                CaptureDevice::new_default()
-                    .ok()
-                    .map(|device| device.adapter_name.clone())
+            .or_else(|| match CaptureDevice::new_default() {
+                Ok(device) => Some(device.adapter_name.clone()),
+                Err(e) => {
+                    log::warn!("This machine has no graphics device we can record with: {e:#}");
+                    None
+                }
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|| "no usable graphics device".into());
 
         fn describe(
             devices: Result<Vec<crate::audio::AudioDevice>, anyhow::Error>,
