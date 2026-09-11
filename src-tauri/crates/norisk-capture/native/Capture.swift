@@ -40,17 +40,27 @@ struct Settings: Decodable {
 final class Samples {
     var video: [CMSampleBuffer] = []
     var audio: [String: [CMSampleBuffer]] = [:]
-    var bytes = 0
+    var bytes = 0, droppedBeforeKeyframe = 0
+    private var keyframes: [Int] = []
     var playbackOffset = 0.0
     func append(_ sample: CMSampleBuffer, label: String?, retain: Double) {
-        if let label = label { audio[label, default: []].append(sample) } else { video.append(sample) }
+        if let label = label {
+            audio[label, default: []].append(sample)
+        } else {
+            let sync = keyframe(sample)
+            if video.isEmpty && !sync { droppedBeforeKeyframe += 1; return }
+            if sync { keyframes.append(video.count) }
+            video.append(sample)
+        }
         bytes += CMSampleBufferGetTotalSampleSize(sample)
         guard let last = video.last else { return }
         let cutoff = time(last) - retain
-        while video.count > 1, let next = video.dropFirst().firstIndex(where: keyframe),
-              time(video[next]) <= cutoff || bytes > 512 * 1024 * 1024 {
+        while keyframes.count > 1,
+              time(video[keyframes[1]]) <= cutoff || bytes > 512 * 1024 * 1024 {
+            let next = keyframes[1]
             for sample in video[..<next] { bytes -= CMSampleBufferGetTotalSampleSize(sample) }
             video.removeFirst(next)
+            keyframes = keyframes.dropFirst().map { $0 - next }
         }
         let start = video.first.map(time) ?? cutoff
         for label in audio.keys {
@@ -60,9 +70,10 @@ final class Samples {
         }
     }
     func snapshot(from start: Double, through end: Double) throws -> Samples {
-        guard let first = video.indices.last(where: { time(video[$0]) <= start && keyframe(video[$0]) }) ?? video.indices.first(where: { keyframe(video[$0]) }) else { throw failure("The replay buffer is empty.") }
+        guard let first = keyframes.last(where: { time(video[$0]) <= start }) ?? keyframes.first else { throw failure("The replay buffer is empty.") }
         let result = Samples()
         result.video = Array(video[first...].prefix { time($0) <= end })
+        result.keyframes = keyframes.filter { $0 >= first && $0 < first + result.video.count }.map { $0 - first }
         guard !result.video.isEmpty else { throw failure("The replay buffer is empty.") }
         let beginning = time(result.video[0])
         result.playbackOffset = max(0, start - beginning)
@@ -80,14 +91,14 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var ring = Samples()
     var pid: Int32?, enabled = true, generation = 0
     var state = "idle", codec = "h264", encoder = "video_toolbox"
-    var width = 1920, height = 1080, frames = 0, dropped = 0
+    var width = 1920, height = 1080, frames = 0, captured = 0, dropped = 0
     var latencies: [Double] = []
-    var lastFrames = 0, lastReport = ProcessInfo.processInfo.systemUptime
+    var lastFrames = 0, lastCaptured = 0, lastReport = ProcessInfo.processInfo.systemUptime
     var timer: DispatchSourceTimer?
     var frameTimer: DispatchSourceTimer?
     var latestImage: CVPixelBuffer?
     var pendingSaves = 0
-    var encoding = false
+    var framesInFlight = 0
     @MainActor var attachment: Task<Void, Never>?
     var saveRetention: [UUID: Double] = [:]
     var retainSeconds: Double { max(Double(config.buffer_seconds), saveRetention.values.max() ?? 0) }
@@ -98,7 +109,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 ["codec": codec, "encoder": encoder, "available": supportsCodec(codec, hardware: encoder == "video_toolbox"), "hardware": encoder == "video_toolbox"]
             }
         }
-        let microphones = AVCaptureDevice.devices(for: .audio).map { device in
+        let microphones = AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified).devices.map { device in
             ["id": device.uniqueID, "name": device.localizedName, "is_default": device.uniqueID == AVCaptureDevice.default(for: .audio)?.uniqueID] as [String: Any]
         }
         emit("ready", ["protocol_version": 1, "engine_version": "0.1.0", "adapter": "Apple VideoToolbox",
@@ -113,12 +124,13 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     func status() {
         let now = ProcessInfo.processInfo.systemUptime
         let fps = Double(frames - lastFrames) / max(0.001, now - lastReport)
-        lastFrames = frames; lastReport = now
+        let captureFPS = Double(captured - lastCaptured) / max(0.001, now - lastReport)
+        lastFrames = frames; lastCaptured = captured; lastReport = now
         let latency = latencies.sorted()
         let p99 = latency.isEmpty ? 0 : latency[Int(Double(latency.count - 1) * 0.99)]
         emit("status", ["state": state, "buffer_fill_seconds": max(0, (ring.video.last.map(time) ?? 0) - (ring.video.first.map(time) ?? 0)),
-            "buffer_bytes": ring.bytes, "capture_fps": fps, "encode_fps": fps, "dropped_frames": dropped,
-            "dropped_before_keyframe": 0, "encode_latency_ms_p99": p99,
+            "buffer_bytes": ring.bytes, "capture_fps": captureFPS, "encode_fps": fps, "dropped_frames": dropped,
+            "dropped_before_keyframe": ring.droppedBeforeKeyframe, "encode_latency_ms_p99": p99,
             "capture_method": "screencapturekit", "active_codec": codec, "active_encoder": encoder])
     }
 
@@ -191,7 +203,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
             let old = (stream, audioStream); stream = nil; audioStream = nil
             if let session = compression { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid); VTCompressionSessionInvalidate(session) }
-            compression = nil; encoding = false
+            compression = nil; framesInFlight = 0
             state = nextState ?? (enabled ? "idle" : "paused")
             return old
         }
@@ -316,15 +328,16 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func encodeFrame() {
         guard state == "buffering", let image = latestImage, let session = compression else { return }
-        if encoding { dropped += 1; return }
-        encoding = true
+        captured += 1
+        guard framesInFlight < 4 else { dropped += 1; return }
+        framesInFlight += 1
         let began = ProcessInfo.processInfo.systemUptime
         let generation = self.generation
         let status = VTCompressionSessionEncodeFrame(session, imageBuffer: image, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()), duration: CMTime(value: 1, timescale: CMTimeScale(config.fps)), frameProperties: nil, infoFlagsOut: nil) { [weak self] status, _, compressed in
             guard let self = self else { return }
             self.queue.async {
                 guard generation == self.generation else { return }
-                self.encoding = false
+                self.framesInFlight -= 1
                 guard status == noErr else {
                     self.state = "failed"
                     report(failure("VideoToolbox encoding failed (\(status))."), code: "encoder_unavailable", recoverable: false)
@@ -337,7 +350,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             }
         }
         if status != noErr {
-            encoding = false; state = "failed"
+            framesInFlight -= 1; state = "failed"
             report(failure("VideoToolbox encoding failed (\(status))."), code: "encoder_unavailable", recoverable: false)
         }
     }
@@ -379,9 +392,18 @@ func makeEncoder(width: Int, height: Int, codec: String, hardware: Bool) throws 
     guard status == noErr, let session = session else { throw CaptureFailure(code: "encoder_unavailable", message: "VideoToolbox encoder is unavailable (\(status)).") }
     return session
 }
+private let videoEncoders: [[CFString: Any]] = {
+    var encoders: CFArray?
+    guard VTCopyVideoEncoderList(nil, &encoders) == noErr else { return [] }
+    return encoders as? [[CFString: Any]] ?? []
+}()
 func supportsCodec(_ codec: String, hardware: Bool) -> Bool {
-    guard codec != "av1", let session = try? makeEncoder(width: 1920, height: 1080, codec: codec, hardware: hardware) else { return false }
-    VTCompressionSessionInvalidate(session); return true
+    guard codec == "h264" || codec == "h265" else { return false }
+    let type = codec == "h265" ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264
+    return videoEncoders.contains {
+        ($0[kVTVideoEncoderList_CodecType] as? NSNumber)?.uint32Value == type &&
+        ($0[kVTVideoEncoderList_IsHardwareAccelerated] as? Bool ?? false) == hardware
+    }
 }
 func set(_ session: VTCompressionSession, _ key: CFString, _ value: CFTypeRef) throws {
     let result = VTSessionSetProperty(session, key: key, value: value)
