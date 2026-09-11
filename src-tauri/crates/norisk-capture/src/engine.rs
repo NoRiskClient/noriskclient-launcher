@@ -905,12 +905,18 @@ impl Engine {
         }
 
         let Some((clip, extradata, settings, audio)) = chosen else {
-            let message = if self.active.is_none() {
-                "the recorder is still starting up, so there is nothing to cut yet"
+            let (code, message) = if self.active.is_none() {
+                (
+                    ErrorCode::NotRecording,
+                    "nothing is being recorded, so there is nothing to cut",
+                )
             } else {
-                "the replay buffer holds nothing to cut"
+                (
+                    ErrorCode::BufferEmpty,
+                    "the replay buffer holds nothing to cut",
+                )
             };
-            self.emit_error(ErrorCode::BufferEmpty, message.into(), true);
+            self.emit_error(code, message.into(), true);
             return Ok(());
         };
 
