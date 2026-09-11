@@ -1,14 +1,25 @@
 use std::ffi::{c_char, CStr, CString};
 
 extern "C" {
-    fn nrc_capture_main();
+    fn nrc_capture_main(logger: extern "C" fn(*const c_char));
     fn nrc_open_apps(foreground: bool) -> *mut c_char;
     fn nrc_free_string(value: *mut c_char);
     fn nrc_hotkeys(bindings: *const c_char, callback: extern "C" fn(u8)) -> i32;
 }
 
 pub fn run() {
-    unsafe { nrc_capture_main() }
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(dir) = args
+        .iter()
+        .position(|arg| arg == "--log-dir")
+        .and_then(|i| args.get(i + 1))
+    {
+        let setup = norisk_logging::LogSetup::new(dir, "capture.log").console(false);
+        if let Err(error) = norisk_logging::init(setup) {
+            eprintln!("Could not set up capture logging: {error}");
+        }
+    }
+    unsafe { nrc_capture_main(log_native) }
 }
 
 pub fn open_apps(foreground: bool) -> String {
@@ -38,4 +49,10 @@ pub fn hotkeys(bindings: &str, callback: extern "C" fn(u8)) -> Result<(), Hotkey
         2 => Err(HotkeyError::PermissionDenied),
         _ => Err(HotkeyError::TapUnavailable),
     }
+}
+
+extern "C" fn log_native(message: *const c_char) {
+    let message = unsafe { CStr::from_ptr(message) }.to_string_lossy();
+    eprintln!("{}", norisk_logging::mask_sensitive_data(&message));
+    log::info!("{message}");
 }

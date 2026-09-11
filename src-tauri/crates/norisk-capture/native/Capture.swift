@@ -3,7 +3,13 @@ import AVFoundation
 import ScreenCaptureKit
 import VideoToolbox
 
+private var captureLogger: (@convention(c) (UnsafePointer<CChar>) -> Void)?
+func captureLog(_ message: String) {
+    if let logger = captureLogger { message.withCString(logger) }
+    else { FileHandle.standardError.write(Data((message + "\n").utf8)) }
+}
 func emit(_ type: String, _ fields: [String: Any] = [:]) {
+    if !["status", "pong", "export_progress"].contains(type) { captureLog("Event: \(type)") }
     var message = fields; message["type"] = type
     guard let data = try? JSONSerialization.data(withJSONObject: message) else { return }
     outputLock.lock(); defer { outputLock.unlock() }
@@ -11,6 +17,7 @@ func emit(_ type: String, _ fields: [String: Any] = [:]) {
 }
 private let outputLock = NSLock()
 func report(_ error: Error, code: String = "internal", recoverable: Bool = true) {
+    captureLog("Error [\(code)]: \(error.localizedDescription)")
     emit("error", ["code": code, "message": error.localizedDescription, "recoverable": recoverable])
 }
 func failure(_ message: String) -> NSError { NSError(domain: "NoRiskCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
@@ -98,6 +105,8 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var frameTimer: DispatchSourceTimer?
     var latestImage: CVPixelBuffer?
     var pendingSaves = 0
+    let pendingMedia = DispatchGroup()
+    var scheduledSaves: [UUID: DispatchWorkItem] = [:]
     var framesInFlight = 0
     @MainActor var attachment: Task<Void, Never>?
     var saveRetention: [UUID: Double] = [:]
@@ -135,6 +144,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     @MainActor func handle(_ message: [String: Any]) async {
+        captureLog("Command: \(message["type"] as? String ?? "unknown")")
         do {
             switch message["type"] as? String {
             case "configure":
@@ -153,7 +163,11 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 startAttachment()
             case "save_clip": queue.async { self.save(message) }
             case "trim_clip", "export_vertical", "prepare_audio_preview":
-                Task { do { try await editMedia(message) } catch { report(error, code: "clip_write") } }
+                pendingMedia.enter()
+                Task {
+                    defer { pendingMedia.leave() }
+                    do { try await editMedia(message) } catch { report(error, code: "clip_write") }
+                }
             default: break
             }
         } catch {
@@ -364,20 +378,38 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         let start = time(last) - pre
         let ring = self.ring, config = self.config, width = self.width, height = self.height
         let reason = request["reason"] as? [String: Any] ?? ["type": "manual"]
-        pendingSaves += 1
+        pendingSaves += 1; pendingMedia.enter()
         let id = UUID()
         saveRetention[id] = pre + post + config.gop_seconds
-        queue.asyncAfter(deadline: .now() + (state == "buffering" ? post : 0)) {
+        let work = DispatchWorkItem {
+            guard self.scheduledSaves.removeValue(forKey: id) != nil else { return }
             self.saveRetention[id] = nil
             do {
                 let snapshot = try ring.snapshot(from: start, through: end)
                 Task {
                     do { try await saveMedia(snapshot, config: config, width: width, height: height, reason: reason) }
                     catch { report(error, code: "clip_write") }
-                    self.queue.async { self.pendingSaves -= 1 }
+                    self.queue.async { self.pendingSaves -= 1; self.pendingMedia.leave() }
                 }
-            } catch { self.pendingSaves -= 1; report(error, code: "buffer_empty") }
+            } catch { self.pendingSaves -= 1; self.pendingMedia.leave(); report(error, code: "buffer_empty") }
         }
+        scheduledSaves[id] = work
+        queue.asyncAfter(deadline: .now() + (state == "buffering" ? post : 0), execute: work)
+    }
+
+    @MainActor func shutdown() async -> Bool {
+        captureLog("Shutting down; finishing pending media jobs")
+        await stop(state: "paused")
+        queue.sync {
+            for work in Array(scheduledSaves.values) { work.perform(); work.cancel() }
+        }
+        let finished = await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                continuation.resume(returning: self.pendingMedia.wait(timeout: .now() + 30) == .success)
+            }
+        }
+        if !finished { captureLog("Timed out waiting for pending media jobs") }
+        return finished
     }
 }
 
@@ -411,7 +443,9 @@ func set(_ session: VTCompressionSession, _ key: CFString, _ value: CFTypeRef) t
 }
 
 @_cdecl("nrc_capture_main")
-func captureMain() {
+func captureMain(_ logger: @escaping @convention(c) (UnsafePointer<CChar>) -> Void) {
+    captureLogger = logger
+    captureLog("macOS capture engine starting")
     guard #available(macOS 15.0, *) else { report(failure("Clips require macOS 15 or newer."), recoverable: false); exit(1) }
     let application = NSApplication.shared
     application.setActivationPolicy(.prohibited)
@@ -422,12 +456,18 @@ func captureMain() {
             while let line = readLine() {
                 guard let data = line.data(using: .utf8), let message = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
                 if message["type"] as? String == "ping" { emit("pong", ["seq": message["seq"] ?? 0]); continue }
-                if message["type"] as? String == "shutdown" { exit(0) }
                 continuation.yield(message)
+                if message["type"] as? String == "shutdown" { break }
             }
-            exit(0)
+            continuation.finish()
         }
     }
-    Task { for await command in commands { await capture.handle(command) } }
+    Task {
+        for await command in commands {
+            if command["type"] as? String == "shutdown" { break }
+            await capture.handle(command)
+        }
+        exit(await capture.shutdown() ? 0 : 1)
+    }
     application.run()
 }

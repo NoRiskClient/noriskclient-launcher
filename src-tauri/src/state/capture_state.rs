@@ -17,6 +17,11 @@ use crate::commands::analytics_command::{megabytes, tenths, track};
 use crate::error::{AppError, Result};
 use serde_json::json;
 
+#[cfg(target_os = "macos")]
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(35);
+#[cfg(not(target_os = "macos"))]
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
+
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
 const HEARTBEAT_GRACE: Duration = Duration::from_secs(12);
@@ -288,7 +293,7 @@ impl CaptureSupervisor {
     async fn take_command_receiver(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<LauncherToCapture>> {
-        const HANDOVER_TIMEOUT: Duration = Duration::from_secs(3);
+        const HANDOVER_TIMEOUT: Duration = SHUTDOWN_GRACE.saturating_add(Duration::from_secs(1));
         const POLL: Duration = Duration::from_millis(50);
 
         let deadline = tokio::time::Instant::now() + HANDOVER_TIMEOUT;
@@ -317,6 +322,15 @@ impl CaptureSupervisor {
             let _ = self.commands.send(LauncherToCapture::Shutdown);
         }
         *running = false;
+    }
+
+    #[cfg(target_os = "macos")]
+    pub async fn finish_shutdown(&self) {
+        self.stop().await;
+        let deadline = tokio::time::Instant::now() + SHUTDOWN_GRACE + Duration::from_secs(1);
+        while self.commands_rx.lock().await.is_none() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
     }
 
     #[cfg(any(windows, target_os = "macos"))]
@@ -415,6 +429,7 @@ impl CaptureSupervisor {
         #[cfg(target_os = "macos")]
         let (reader, mut writer) = (child.stdout.take().unwrap(), child.stdin.take().unwrap());
         let mut lines = BufReader::new(reader).lines();
+        let mut shutdown_deadline: Option<tokio::time::Instant> = None;
 
         let session = self.session_snapshot();
         let mut replay: Vec<LauncherToCapture> = Vec::new();
@@ -459,6 +474,10 @@ impl CaptureSupervisor {
                         Err(e) => log::warn!("Undecodable message from the capture engine: {e}"),
                     },
                     Ok(None) => {
+                        if shutdown_deadline.is_some() {
+                            let _ = child.wait().await;
+                            return Outcome::Shutdown;
+                        }
                         let _ = child.kill().await;
                         return Outcome::Lost("the engine closed the pipe".into());
                     }
@@ -482,12 +501,17 @@ impl CaptureSupervisor {
                         let _ = writer.flush().await;
                     }
                     if shutdown {
-                        let _ = tokio::time::timeout(Duration::from_secs(3), child.wait()).await;
-                        return Outcome::Shutdown;
+                        shutdown_deadline = Some(tokio::time::Instant::now() + SHUTDOWN_GRACE);
                     }
                 }
 
-                _ = ping.tick() => {
+                _ = tokio::time::sleep_until(shutdown_deadline.unwrap_or_else(tokio::time::Instant::now)), if shutdown_deadline.is_some() => {
+                    log::warn!("Capture engine did not finish shutting down in time");
+                    let _ = child.kill().await;
+                    return Outcome::Shutdown;
+                }
+
+                _ = ping.tick(), if shutdown_deadline.is_none() => {
                     let silent_for = last_pong.elapsed();
                     if silent_for >= HEARTBEAT_GRACE {
                         let _ = child.kill().await;
