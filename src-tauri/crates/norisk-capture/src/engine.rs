@@ -347,12 +347,10 @@ impl Engine {
                 if !self.buffering_enabled {
                     log::info!("Buffering is paused; process {pid} waits for the resume");
                     self.paused_pid = Some(pid);
+                } else if self.attached_pid() == Some(pid) {
+                    log::debug!("Already recording process {pid}; leaving the pipeline alone");
                 } else {
-                    if self.attached_pid() == Some(pid) {
-                        self.detach_retaining_buffer();
-                    } else {
-                        self.detach();
-                    }
+                    self.detach();
                     self.begin_attach(pid);
                 }
             }
