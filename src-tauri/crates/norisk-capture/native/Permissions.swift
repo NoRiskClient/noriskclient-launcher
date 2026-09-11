@@ -38,6 +38,8 @@ func openPermissionSettings(_ permission: UInt8) -> Bool {
         default: break
         }
     }
+    let microphone = AVCaptureDevice.authorizationStatus(for: .audio)
     emit("permissions", ["screen_recording": CGPreflightScreenCaptureAccess(),
-        "microphone": AVCaptureDevice.authorizationStatus(for: .audio) == .authorized])
+        "microphone": microphone == .authorized,
+        "microphone_denied": microphone == .denied || microphone == .restricted])
 }

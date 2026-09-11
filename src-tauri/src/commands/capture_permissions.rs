@@ -13,6 +13,7 @@ pub enum CapturePermission {
 pub struct CapturePermissions {
     pub screen_recording: bool,
     pub microphone: bool,
+    pub microphone_denied: bool,
     #[serde(skip_deserializing)]
     pub input_monitoring: bool,
 }
@@ -21,7 +22,15 @@ pub struct CapturePermissions {
 pub async fn capture_permissions(
     request: Option<CapturePermission>,
 ) -> std::result::Result<Option<CapturePermissions>, CommandError> {
-    Ok(read_permissions(request).await?)
+    let permissions = read_permissions(request).await?;
+    #[cfg(target_os = "macos")]
+    if let Some(permissions) = &permissions {
+        if !permissions.screen_recording || !permissions.microphone || !permissions.input_monitoring {
+            crate::utils::hotkey_manager::clear();
+            crate::state::State::get().await?.capture_supervisor.stop().await;
+        }
+    }
+    Ok(permissions)
 }
 
 pub async fn read_permissions(

@@ -1,5 +1,7 @@
 "use client";
 
+import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../../store/capture-permissions-store";
+
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -97,7 +99,8 @@ export function ClipsTab() {
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const supported = supportsClips();
-  const [permissionsReady, setPermissionsReady] = useState(!isMacOS());
+  const permissions = useCapturePermissionsStore((state) => state.permissions);
+  const permissionsReady = !isMacOS() || allCapturePermissionsGranted(permissions);
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -212,11 +215,8 @@ export function ClipsTab() {
     <div className="space-y-6">
       {isMacOS() && (
         <MacCapturePermissions
-          microphone={clips.capture_microphone}
-          hotkeys={!!(clips.hotkey_save || clips.hotkey_toggle)}
           enabled={clips.enabled}
           saving={saving}
-          onReadyChange={setPermissionsReady}
         />
       )}
       <SettingsSection
@@ -232,13 +232,13 @@ export function ClipsTab() {
           searchKeywords={kw("settings.clips.enabled", "clips", "aktivieren", "enable")}
         >
           <ToggleSwitch
-            checked={clips.enabled}
-            onChange={(enabled) => patch({ enabled })}
-            disabled={saving || (!clips.enabled && !permissionsReady)}
+            checked={clips.enabled && permissionsReady}
+            onChange={(enabled) => { if (!enabled || permissionsReady) patch({ enabled }); }}
+            disabled={saving || !permissionsReady}
           />
         </SettingRow>
 
-        <SettingRow
+        {permissionsReady && <SettingRow
           label={t("settings.clips.games.other")}
           description={t("settings.clips.games.other.description")}
           searchKeywords={kw(
@@ -254,18 +254,19 @@ export function ClipsTab() {
           <span className="font-minecraft text-sm text-white/60">
             {clips.other_game?.name ?? t("settings.clips.games.none")}
           </span>
-        </SettingRow>
+        </SettingRow>}
 
-        <GamePicker
+        {permissionsReady && <GamePicker
           value={clips.other_game}
           onChange={(other_game) => patch({ other_game })}
           disabled={saving || !clips.enabled}
           t={t}
-        />
+        />}
 
-        <StatusRow status={status} applying={applying} enabled={clips.enabled} t={t} />
+        {permissionsReady && <StatusRow status={status} applying={applying} enabled={clips.enabled} t={t} />}
       </SettingsSection>
 
+      {permissionsReady && <>
       <SettingsSection
         id="settings-section-clips-hotkeys"
         title={t("settings.clips.hotkeys.title")}
@@ -806,6 +807,7 @@ export function ClipsTab() {
           </Button>
         </SettingRow>
       </SettingsSection>
+      </>}
     </div>
   );
 }

@@ -101,10 +101,9 @@ pub async fn bring_up(
             return Err(crate::error::AppError::Other("Clips require macOS 15 or newer.".into()));
         }
         if let Some(permissions) = super::capture_permissions::read_permissions(None).await? {
-            let hotkeys = !clips.hotkey_save.is_empty() || !clips.hotkey_toggle.is_empty();
             if !permissions.screen_recording
-                || (clips.capture_microphone && !permissions.microphone)
-                || (hotkeys && !permissions.input_monitoring)
+                || !permissions.microphone
+                || !permissions.input_monitoring
             {
                 return Err(crate::error::AppError::Other("Grant the required permissions in Settings > Clips > macOS permissions, then retry capture.".into()));
             }

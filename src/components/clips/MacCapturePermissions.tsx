@@ -1,84 +1,54 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
 import { Button } from "../ui/buttons/Button";
 import { SettingsSection } from "../ui/settings/SettingsSection";
-import { SettingRow } from "../ui/settings/SettingRow";
 import {
   applyClipSettings,
-  getCapturePermissions,
   openCapturePermissionSettings,
   type CapturePermission,
-  type CapturePermissions,
 } from "../../services/clip-service";
+import {
+  allCapturePermissionsGranted,
+  capturePermissionKeys,
+  useCapturePermissionsStore,
+} from "../../store/capture-permissions-store";
 import { parseErrorMessage } from "../../utils/error-utils";
 
 interface Props {
-  microphone: boolean;
-  hotkeys: boolean;
   enabled: boolean;
   saving: boolean;
-  onReadyChange: (ready: boolean) => void;
 }
 
-export function MacCapturePermissions({
-  microphone,
-  hotkeys,
-  enabled,
-  saving,
-  onReadyChange,
-}: Props) {
+export function MacCapturePermissions({ enabled, saving }: Props) {
   const { t } = useTranslation();
-  const [permissions, setPermissions] = useState<CapturePermissions | null>(
-    null,
-  );
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const inFlight = useRef(false);
-  const ready =
-    !!permissions?.screen_recording &&
-    (!microphone || !!permissions?.microphone) &&
-    (!hotkeys || !!permissions?.input_monitoring);
+  const { permissions, requested, busy, error, check } =
+    useCapturePermissionsStore();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const ready = allCapturePermissionsGranted(permissions);
+  useEffect(() => {
+    void check();
+  }, [check]);
 
-  const read = useCallback(async (request?: CapturePermission) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(request ?? "refresh");
+  const openSettings = async (permission: CapturePermission) => {
     try {
-      setPermissions(await getCapturePermissions(request));
-      setError(null);
+      await openCapturePermissionSettings(permission);
+      setActionError(null);
     } catch (error) {
-      setPermissions(null);
-      setError(parseErrorMessage(error));
-    } finally {
-      inFlight.current = false;
-      setBusy(null);
+      setActionError(parseErrorMessage(error));
     }
-  }, []);
-
-  useEffect(() => {
-    void read();
-    const refresh = () => {
-      void read();
-    };
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [read]);
-
-  useEffect(() => {
-    onReadyChange(ready);
-  }, [ready, onReadyChange]);
-
-  const rows: { permission: CapturePermission; required: boolean }[] = [
-    { permission: "screen_recording", required: true },
-    { permission: "input_monitoring", required: hotkeys },
-    { permission: "microphone", required: microphone },
-  ];
+  };
 
   return (
     <SettingsSection
       id="settings-section-clips-permissions"
       title={t("settings.clips.permissions.title")}
-      description={t("settings.clips.permissions.description")}
+      description={t(
+        ready
+          ? "settings.clips.permissions.ready"
+          : "settings.clips.permissions.description",
+      )}
       icon="solar:shield-check-bold"
       keywords={[
         "macOS",
@@ -90,87 +60,97 @@ export function MacCapturePermissions({
       headerActions={
         <Button
           size="sm"
-          variant="secondary"
-          disabled={busy !== null}
-          onClick={() => void read()}
+          variant="flat"
+          disabled={!!busy || retrying}
+          onClick={() => void check()}
         >
           {t("settings.clips.permissions.refresh")}
         </Button>
       }
     >
-      {rows.map(({ permission, required }) => (
-        <SettingRow
-          key={permission}
-          label={t(`settings.clips.permissions.${permission}`)}
-          description={t(`settings.clips.permissions.${permission}.hint`)}
-          className="flex-wrap [&>div:last-child]:max-w-full"
-        >
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span
-              className={`font-minecraft text-xs ${permissions?.[permission] ? "text-green-400" : "text-white/60"}`}
-            >
-              {permissions?.[permission]
-                ? t("settings.clips.permissions.granted")
-                : !permissions
-                  ? t("settings.clips.permissions.unchecked")
-                  : t(
-                      required
-                        ? "settings.clips.permissions.required"
-                        : "settings.clips.permissions.optional",
-                    )}
-            </span>
-            {!permissions?.[permission] && (
-              <Button
-                size="sm"
-                disabled={busy !== null}
-                onClick={() => void read(permission)}
-              >
-                {t("settings.clips.permissions.request")}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy !== null}
-              onClick={() => {
-                openCapturePermissionSettings(permission).catch((error) =>
-                  setError(parseErrorMessage(error)),
-                );
-              }}
-            >
-              {t("settings.clips.permissions.settings")}
-            </Button>
-          </div>
-        </SettingRow>
-      ))}
-      <p className="font-minecraft text-xs text-white/50 py-2">
-        {t("settings.clips.permissions.hint")}
-      </p>
-      {error && (
-        <p role="alert" className="font-minecraft text-sm text-red-400 py-2">
-          {error}
+      <div className="divide-y divide-white/10">
+        {capturePermissionKeys.map((permission) => {
+          const granted = !!permissions?.[permission];
+          const settings =
+            requested.includes(permission) ||
+            (permissions?.microphone_denied && permission === "microphone");
+          return (
+            <div key={permission} className="flex items-center gap-3 py-3">
+              <Icon
+                icon={
+                  granted
+                    ? "solar:check-circle-bold"
+                    : "solar:lock-keyhole-linear"
+                }
+                className={`h-5 w-5 shrink-0 ${granted ? "text-green-400" : "text-white/40"}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-minecraft text-sm text-white">
+                  {t(`settings.clips.permissions.${permission}`)}
+                </p>
+                {!ready && (
+                  <p className="mt-1 text-xs text-white/50">
+                    {t(`settings.clips.permissions.${permission}.hint`)}
+                  </p>
+                )}
+              </div>
+              {granted ? (
+                <span className="text-xs text-green-400">
+                  {t("settings.clips.permissions.granted")}
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!!busy || retrying || !permissions}
+                  onClick={() =>
+                    void (settings
+                      ? openSettings(permission)
+                      : check(permission))
+                  }
+                >
+                  {t(
+                    busy === permission
+                      ? "settings.clips.permissions.requesting"
+                      : settings
+                        ? "settings.clips.permissions.settings"
+                        : "settings.clips.permissions.request",
+                  )}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {!ready && (
+        <p className="font-minecraft text-xs text-white/50 pt-3" role="status">
+          {t(
+            permissions
+              ? "settings.clips.permissions.blocked"
+              : "settings.clips.permissions.checking",
+          )}
         </p>
       )}
-      {ready && (
-        <p role="status" className="font-minecraft text-sm text-green-400 py-2">
-          {t("settings.clips.permissions.ready")}
+      {(error || actionError) && (
+        <p role="alert" className="font-minecraft text-sm text-red-400 pt-3">
+          {error || actionError}
         </p>
       )}
-      {enabled && (
+      {enabled && ready && (
         <Button
           size="sm"
-          disabled={!ready || saving || busy !== null}
+          className="mt-3"
+          disabled={saving || !!busy || retrying}
           onClick={async () => {
-            inFlight.current = true;
-            setBusy("retry");
+            setRetrying(true);
             try {
               await applyClipSettings(true);
-              setError(null);
+              setActionError(null);
             } catch (error) {
-              setError(parseErrorMessage(error));
+              setActionError(parseErrorMessage(error));
             } finally {
-              inFlight.current = false;
-              setBusy(null);
+              setRetrying(false);
+              void check();
             }
           }}
         >

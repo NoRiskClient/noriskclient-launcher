@@ -18,6 +18,8 @@ import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureStatus } from "../../types/launcherConfig";
 import { BetaNotice } from "../ui/BetaNotice";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
+import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../store/capture-permissions-store";
+import { isMacOS, supportsClips } from "../../utils/platform";
 import { useClipsStore } from "../../store/clips-store";
 import { setDiscordState } from "../../utils/discordRpc";
 import { trackEvent } from "../../services/analytics-service";
@@ -93,6 +95,8 @@ const TONE_DOT: Record<Tone, string> = {
 
 export function ClipsPage() {
   const { t } = useTranslation();
+  const { permissions, error: permissionError } = useCapturePermissionsStore();
+  const permissionsBlocked = isMacOS() && supportsClips() && !allCapturePermissionsGranted(permissions);
   const enabled = useClipsStore((state) => state.enabled);
   const refreshEnabled = useClipsStore((state) => state.refresh);
   const openSettings = useSettingsModalStore((state) => state.open);
@@ -148,7 +152,11 @@ export function ClipsPage() {
     };
   }, [enabled]);
 
-  const state = useMemo(() => health(status, enabled, t), [status, enabled, t]);
+  const state: Health = permissionsBlocked ? {
+    tone: "warn",
+    label: t(permissionError ? "clips.page.status.permissions_error" : permissions ? "clips.page.status.permissions_required" : "settings.clips.permissions.checking"),
+    detail: permissionError ?? t("clips.page.status.permissions_hint"),
+  } : health(status, enabled, t);
 
   const sortOptions = useMemo(
     () => [
@@ -180,8 +188,8 @@ export function ClipsPage() {
       <div className="h-full flex flex-col overflow-hidden p-4 relative">
         <EmptyState
           icon="solar:videocamera-record-bold"
-          message={t("clips.page.off.title")}
-          description={t("clips.page.off.hint")}
+          message={permissionsBlocked ? state.label : t("clips.page.off.title")}
+          description={permissionsBlocked ? state.detail : t("clips.page.off.hint")}
           smallDescription
           action={
             <Button
@@ -190,7 +198,7 @@ export function ClipsPage() {
               icon={<Icon icon="solar:settings-bold" className="w-4 h-4" />}
               onClick={toClipSettings}
             >
-              {t("clips.page.off.action")}
+              {t(permissionsBlocked ? "settings.clips.permissions.setup" : "clips.page.off.action")}
             </Button>
           }
         />
@@ -241,6 +249,11 @@ export function ClipsPage() {
           </div>
         </div>
       </div>
+
+      {permissionsBlocked && <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-yellow-400/20 bg-yellow-400/5 p-3">
+        <p className="font-minecraft text-xs text-white/70">{state.detail}</p>
+        <Button size="sm" variant="secondary" onClick={toClipSettings}>{t("settings.clips.permissions.setup")}</Button>
+      </div>}
 
       <BetaNotice
         className="mb-4"
