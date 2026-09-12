@@ -278,11 +278,7 @@ fn tuning_for(codec_name: &str) -> &'static [(&'static str, &'static str)] {
             ("spatial-aq", "1"),
             ("temporal-aq", "1"),
         ],
-        name if name.ends_with("_amf") => &[
-            ("quality", "quality"),
-            ("rc", "vbr_peak"),
-            ("preanalysis", "1"),
-        ],
+        name if name.ends_with("_amf") => &[("quality", "quality"), ("rc", "vbr_peak")],
         name if name.ends_with("_qsv") => &[("preset", "slow")],
         "libx264" => &[("preset", "veryfast"), ("tune", "zerolatency")],
         "libx265" => &[("preset", "ultrafast"), ("tune", "zerolatency")],
@@ -416,6 +412,16 @@ fn averror_again() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn amd_is_never_asked_to_look_ahead() {
+        for name in ["h264_amf", "hevc_amf", "av1_amf"] {
+            assert!(
+                !tuning_for(name).iter().any(|(key, _)| *key == "preanalysis"),
+                "{name} would stall once its lookahead queue fills"
+            );
+        }
+    }
 
     #[test]
     fn amds_h264_encoder_is_never_asked_for_b_frames() {
