@@ -37,10 +37,15 @@ pub struct VideoEncoder {
     packet: *mut ff::AVPacket,
     settings: EncoderSettings,
     frames_sent: u64,
+    packets_out: u64,
+    silence_reported: bool,
+    name: String,
     gop_ticks: i64,
     last_keyframe_pts: Option<i64>,
     download: Option<Downloader>,
 }
+
+const SILENT_AFTER_FRAMES: u64 = 120;
 
 unsafe impl Send for VideoEncoder {}
 
@@ -90,6 +95,9 @@ impl VideoEncoder {
             settings,
 
             frames_sent: 0,
+            packets_out: 0,
+            silence_reported: false,
+            name: codec_name.to_string(),
             gop_ticks: gop_ticks(settings),
             last_keyframe_pts: None,
             download,
@@ -135,7 +143,24 @@ impl VideoEncoder {
             bail!("avcodec_send_frame failed: {}", av_error(rc));
         }
         self.frames_sent += 1;
-        self.drain()
+
+        let packets = self.drain()?;
+        self.packets_out += packets.len() as u64;
+
+        if self.packets_out == 0
+            && self.frames_sent >= SILENT_AFTER_FRAMES
+            && !self.silence_reported
+        {
+            self.silence_reported = true;
+            log::error!(
+                "'{}' has taken {} frames and returned no packet at all, so nothing can be \
+                 clipped; the encoder accepted settings its hardware cannot honour",
+                self.name,
+                self.frames_sent
+            );
+        }
+
+        Ok(packets)
     }
 
     pub fn finish(&mut self) -> Result<Vec<EncodedPacket>> {
@@ -233,7 +258,7 @@ unsafe fn configure_common(
 }
 
 fn b_frames_for(codec_name: &str) -> i32 {
-    let hardware = ["_nvenc", "_amf", "_qsv"]
+    let hardware = ["_nvenc", "_qsv"]
         .iter()
         .any(|suffix| codec_name.ends_with(suffix));
     if hardware && !codec_name.starts_with("av1") {
@@ -253,11 +278,7 @@ fn tuning_for(codec_name: &str) -> &'static [(&'static str, &'static str)] {
             ("spatial-aq", "1"),
             ("temporal-aq", "1"),
         ],
-        name if name.ends_with("_amf") => &[
-            ("quality", "quality"),
-            ("rc", "vbr_peak"),
-            ("preanalysis", "1"),
-        ],
+        name if name.ends_with("_amf") => &[("quality", "quality"), ("rc", "vbr_peak")],
         name if name.ends_with("_qsv") => &[("preset", "slow")],
         "libx264" => &[("preset", "veryfast"), ("tune", "zerolatency")],
         "libx265" => &[("preset", "ultrafast"), ("tune", "zerolatency")],
@@ -391,6 +412,25 @@ fn averror_again() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn amd_is_never_asked_to_look_ahead() {
+        for name in ["h264_amf", "hevc_amf", "av1_amf"] {
+            assert!(
+                !tuning_for(name).iter().any(|(key, _)| *key == "preanalysis"),
+                "{name} would stall once its lookahead queue fills"
+            );
+        }
+    }
+
+    #[test]
+    fn amds_h264_encoder_is_never_asked_for_b_frames() {
+        assert_eq!(b_frames_for("h264_amf"), 0);
+        assert_eq!(b_frames_for("hevc_amf"), 0);
+        assert_eq!(b_frames_for("h264_nvenc"), 2);
+        assert_eq!(b_frames_for("h264_qsv"), 2);
+        assert_eq!(b_frames_for("libx264"), 0);
+    }
 
     #[test]
     fn gop_follows_the_configured_seconds() {
