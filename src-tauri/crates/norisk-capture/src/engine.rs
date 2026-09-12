@@ -283,6 +283,7 @@ impl Engine {
 
     fn announce_ready(&self) {
         let matrix = crate::encoder::capabilities();
+        report_encoders(&matrix);
         let encoders = crate::encoder::available_for(norisk_ipc::ClipCodec::H264, &matrix);
         let adapter = self
             .active
@@ -919,6 +920,23 @@ impl Engine {
                     "the replay buffer holds nothing to cut",
                 )
             };
+            if let Some(pipeline) = self.active.as_ref() {
+                let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
+                log::warn!(
+                    "Nothing to cut: the ring holds {} segment(s) over {:.1}s ({} bytes), spanning \
+                     {}..{}, and threw away {} packet(s) waiting for a first keyframe; the cut \
+                     asked for {:.0}s before and {:.0}s after",
+                    ring.segment_count(),
+                    ring.duration_seconds(),
+                    ring.bytes(),
+                    ring.oldest_pts(),
+                    ring.newest_pts(),
+                    ring.dropped_before_first_keyframe(),
+                    pre,
+                    post,
+                );
+            }
+
             self.emit_error(code, message.into(), true);
             return Ok(());
         };
@@ -1660,6 +1678,24 @@ fn encode_loop(
         let mut guard = ring.lock().unwrap_or_else(|e| e.into_inner());
         for packet in packets {
             guard.push(packet);
+        }
+    }
+}
+
+fn report_encoders(matrix: &[norisk_ipc::EncoderCapability]) {
+    for codec in norisk_ipc::ClipCodec::all() {
+        let verdicts: Vec<String> = matrix
+            .iter()
+            .filter(|c| c.codec == codec)
+            .map(|c| match (c.available, c.detail.as_deref()) {
+                (true, _) => format!("{:?} yes", c.encoder),
+                (false, Some(why)) => format!("{:?} no ({why})", c.encoder),
+                (false, None) => format!("{:?} no", c.encoder),
+            })
+            .collect();
+
+        if !verdicts.is_empty() {
+            log::info!("{codec:?} encoders: {}", verdicts.join(", "));
         }
     }
 }
