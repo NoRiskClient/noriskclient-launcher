@@ -23,6 +23,7 @@ import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportMod
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useThemeStore } from "./store/useThemeStore";
@@ -585,6 +586,7 @@ export function App() {
         <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
         {showWelcome && <WelcomeScreen />}
         <GlobalModalPortal />
+        <MacCapturePermissionMonitor />
         <ChildProtectionModal />
         <NotificationModal />
         <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>

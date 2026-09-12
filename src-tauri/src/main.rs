@@ -874,6 +874,9 @@ async fn main() {
             commands::clip_commands::capture_apply_settings,
             commands::clip_commands::capture_release_hotkeys,
             commands::clip_commands::capture_status,
+            commands::clip_commands::capture_supported,
+            commands::capture_permissions::capture_permissions,
+            commands::capture_permissions::capture_open_permission_settings,
             commands::clip_commands::capture_encoder_capabilities,
             commands::clip_commands::capture_show_overlay,
             commands::clip_commands::capture_hide_overlay,
@@ -896,11 +899,24 @@ async fn main() {
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {
-                // Removed macOS/iOS specific Opened event handling as single-instance handles args now
-                // Keep other run event handling if needed, e.g., for window events, exit requested, etc.
-                if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                    info!("Exit requested, preventing default to allow async tasks to finish if any.");
-                    // api.prevent_exit(); // Example: if you need to do cleanup before exit
+                #[cfg(target_os = "macos")]
+                if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                    use std::sync::atomic::{AtomicBool, Ordering};
+                    static EXIT_READY: AtomicBool = AtomicBool::new(false);
+                    static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+                    if !EXIT_READY.load(Ordering::SeqCst) {
+                        api.prevent_exit();
+                        if !SHUTTING_DOWN.swap(true, Ordering::SeqCst) {
+                            let app = app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                if let Ok(state) = state::State::get().await {
+                                    state.capture_supervisor.finish_shutdown().await;
+                                }
+                                EXIT_READY.store(true, Ordering::SeqCst);
+                                app.exit(code.unwrap_or(0));
+                            });
+                        }
+                    }
                 }
             },
         );

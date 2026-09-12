@@ -1,5 +1,7 @@
 "use client";
 
+import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../../store/capture-permissions-store";
+
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -16,11 +18,12 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { Button } from "../../ui/buttons/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { StatusMessage } from "../../ui/StatusMessage";
-import { isWindows } from "../../../utils/platform";
+import { isMacOS, supportsClips } from "../../../utils/platform";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
 import { HotkeyInput } from "../../ui/HotkeyInput";
+import { MacCapturePermissions } from "../../clips/MacCapturePermissions";
 import { GamePicker } from "../../clips/GamePicker";
 import { useClipsStore } from "../../../store/clips-store";
 import { useSettingsModalStore } from "../../../store/settings-modal-store";
@@ -95,7 +98,9 @@ export function ClipsTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
-  const supported = isWindows();
+  const supported = supportsClips();
+  const permissions = useCapturePermissionsStore((state) => state.permissions);
+  const permissionsReady = !isMacOS() || allCapturePermissionsGranted(permissions);
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -208,6 +213,12 @@ export function ClipsTab() {
 
   return (
     <div className="space-y-6">
+      {isMacOS() && (
+        <MacCapturePermissions
+          enabled={clips.enabled}
+          saving={saving}
+        />
+      )}
       <SettingsSection
         id="settings-section-clips-general"
         title={t("settings.clips.title")}
@@ -221,13 +232,13 @@ export function ClipsTab() {
           searchKeywords={kw("settings.clips.enabled", "clips", "aktivieren", "enable")}
         >
           <ToggleSwitch
-            checked={clips.enabled}
-            onChange={(enabled) => patch({ enabled })}
-            disabled={saving}
+            checked={clips.enabled && permissionsReady}
+            onChange={(enabled) => { if (!enabled || permissionsReady) patch({ enabled }); }}
+            disabled={saving || !permissionsReady}
           />
         </SettingRow>
 
-        <SettingRow
+        {permissionsReady && <SettingRow
           label={t("settings.clips.games.other")}
           description={t("settings.clips.games.other.description")}
           searchKeywords={kw(
@@ -243,18 +254,19 @@ export function ClipsTab() {
           <span className="font-minecraft text-sm text-white/60">
             {clips.other_game?.name ?? t("settings.clips.games.none")}
           </span>
-        </SettingRow>
+        </SettingRow>}
 
-        <GamePicker
+        {permissionsReady && <GamePicker
           value={clips.other_game}
           onChange={(other_game) => patch({ other_game })}
           disabled={saving || !clips.enabled}
           t={t}
-        />
+        />}
 
-        <StatusRow status={status} applying={applying} enabled={clips.enabled} t={t} />
+        {permissionsReady && <StatusRow status={status} applying={applying} enabled={clips.enabled} t={t} />}
       </SettingsSection>
 
+      {permissionsReady && <>
       <SettingsSection
         id="settings-section-clips-hotkeys"
         title={t("settings.clips.hotkeys.title")}
@@ -795,6 +807,7 @@ export function ClipsTab() {
           </Button>
         </SettingRow>
       </SettingsSection>
+      </>}
     </div>
   );
 }
@@ -1100,6 +1113,7 @@ function encoderOptions(
     nvenc: "NVIDIA NVENC",
     amf: "AMD AMF",
     quick_sync: "Intel Quick Sync",
+    video_toolbox: "Apple VideoToolbox",
     software: t("settings.clips.quality.encoder.software"),
   };
 

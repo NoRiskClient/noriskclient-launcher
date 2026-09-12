@@ -3721,6 +3721,7 @@ dependencies = [
  "log",
  "log4rs",
  "machineid-rs",
+ "norisk-capture",
  "norisk-ipc",
  "norisk-logging",
  "notify",

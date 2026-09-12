@@ -188,6 +188,7 @@
     }
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "fullscreen": false,

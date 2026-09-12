@@ -9,9 +9,19 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 
+#[cfg(not(target_os = "macos"))]
 const ENGINE_NAMES: [&str; 2] = [
     "norisk-capture.exe",
     "norisk-capture-x86_64-pc-windows-msvc.exe",
+];
+#[cfg(target_os = "macos")]
+const ENGINE_NAMES: [&str; 2] = [
+    "norisk-capture",
+    if cfg!(target_arch = "aarch64") {
+        "norisk-capture-aarch64-apple-darwin"
+    } else {
+        "norisk-capture-x86_64-apple-darwin"
+    },
 ];
 const COMPLETE_MARKER: &str = ".complete";
 const SHA256_LEN: usize = 64;
@@ -44,6 +54,9 @@ static STATE: Lazy<RwLock<RuntimeState>> = Lazy::new(|| RwLock::new(RuntimeState
 static INSTALL_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
 
 static PINNED: Lazy<Option<(&'static str, &'static str)>> = Lazy::new(|| {
+    if cfg!(target_os = "macos") {
+        return None;
+    }
     let sha = option_env!("NRC_CAPTURE_RUNTIME_SHA256")?;
     let url = option_env!("NRC_CAPTURE_RUNTIME_URL")?;
 
@@ -89,8 +102,8 @@ pub fn installed_engine() -> Option<PathBuf> {
 }
 
 pub async fn ensure_engine() -> Result<PathBuf> {
-    if !cfg!(windows) {
-        return Ok(PathBuf::new());
+    if !cfg!(any(windows, target_os = "macos")) {
+        return Err(AppError::Other("Clips are supported on Windows and macOS only".into()));
     }
     if let Some(engine) = installed_engine() {
         return Ok(engine);
@@ -98,7 +111,7 @@ pub async fn ensure_engine() -> Result<PathBuf> {
 
     let Some((sha, url)) = *PINNED else {
         return Err(AppError::Other(
-            "norisk-capture.exe was not found next to the launcher. \
+            "The capture engine was not found next to the launcher. \
              Build it with: cargo build -p norisk-capture"
                 .into(),
         ));

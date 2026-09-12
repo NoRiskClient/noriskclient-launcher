@@ -3,9 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { FFMPEG_DLLS, HOOK_FILES, LEGAL_FILES } from "./native-deps-manifest.mjs";
+import {
+  FFMPEG_DLLS,
+  HOOK_FILES,
+  LEGAL_FILES,
+} from "./native-deps-manifest.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const srcTauri = path.join(repoRoot, "src-tauri");
 const staging = path.join(srcTauri, "binaries");
 const profile = process.argv.includes("--debug") ? "debug" : "release";
@@ -15,8 +22,38 @@ const ok = (msg) => console.log(`  \x1b[32m+\x1b[0m ${msg}`);
 const step = (msg) => console.log(`    ${msg}`);
 const mb = (bytes) => (bytes / 1048576).toFixed(1);
 
+if (process.platform === "darwin") {
+  const targetIndex = process.argv.indexOf("--target");
+  const target = targetIndex >= 0 ? process.argv[targetIndex + 1] : null;
+  const triple = target || readHostTriple();
+  execFileSync(
+    "cargo",
+    [
+      "build",
+      "-p",
+      "norisk-capture",
+      ...(profile === "release" ? ["--release"] : []),
+      ...(target ? ["--target", target] : []),
+    ],
+    { cwd: srcTauri, stdio: "inherit" },
+  );
+  fs.mkdirSync(staging, { recursive: true });
+  const source = path.join(
+    srcTauri,
+    "target",
+    ...(target ? [target] : []),
+    profile,
+    "norisk-capture",
+  );
+  const destination = path.join(staging, `norisk-capture-${triple}`);
+  fs.copyFileSync(source, destination);
+  fs.chmodSync(destination, 0o755);
+  ok(`norisk-capture-${triple}`);
+  process.exit(0);
+}
+
 if (process.platform !== "win32") {
-  console.log("The capture engine is Windows-only; nothing to stage.");
+  console.log("No capture runtime to stage on this platform.");
   process.exit(0);
 }
 
@@ -43,7 +80,9 @@ fs.mkdirSync(staging, { recursive: true });
 
 const daemon = path.join(fromDir, "norisk-capture.exe");
 if (!fs.existsSync(daemon)) {
-  throw new Error(`norisk-capture.exe is not in ${fromDir} even after building.`);
+  throw new Error(
+    `norisk-capture.exe is not in ${fromDir} even after building.`,
+  );
 }
 const daemonTarget = path.join(staging, `norisk-capture-${triple}.exe`);
 fs.copyFileSync(daemon, daemonTarget);
@@ -95,13 +134,16 @@ function freeLockedHooks() {
       fs.closeSync(fs.openSync(inUse, "r+"));
       continue;
     } catch (e) {
-      if (e.code !== "EBUSY" && e.code !== "EPERM" && e.code !== "EACCES") throw e;
+      if (e.code !== "EBUSY" && e.code !== "EPERM" && e.code !== "EACCES")
+        throw e;
     }
 
     const parked = `${inUse}.inuse-${Date.now()}`;
     try {
       fs.renameSync(inUse, parked);
-      step(`${name} is loaded in another process; parked as ${path.basename(parked)}`);
+      step(
+        `${name} is loaded in another process; parked as ${path.basename(parked)}`,
+      );
     } catch (e) {
       throw new Error(
         `${name} is loaded in another process and could not be moved aside (${e.code}). ` +
@@ -114,8 +156,7 @@ function freeLockedHooks() {
     if (!name.includes(".dll.inuse-")) continue;
     try {
       fs.unlinkSync(path.join(fromDir, name));
-    } catch {
-    }
+    } catch {}
   }
 }
 
