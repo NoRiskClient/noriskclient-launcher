@@ -56,7 +56,8 @@ pub fn hotkeys(bindings: &str, callback: extern "C" fn(u8)) -> Result<(), Hotkey
 
 extern "C" fn log_native(message: *const c_char) {
     let message = unsafe { CStr::from_ptr(message) }.to_string_lossy();
-    eprintln!("{}", norisk_logging::mask_sensitive_data(&message));
+    let message = norisk_logging::mask_sensitive_data(&message);
+    eprintln!("{message}");
     log::info!("{message}");
 }
 

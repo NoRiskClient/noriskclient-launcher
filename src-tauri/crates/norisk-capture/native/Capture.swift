@@ -327,6 +327,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
                   let raw = attachments.first?[.status] as? Int, let status = SCFrameStatus(rawValue: raw) else { return }
             if status == .complete, let image = CMSampleBufferGetImageBuffer(sample) {
+                captured += 1
                 latestImage = image
                 if state == "paused" && enabled { state = "buffering" }
             } else if status == .blank || status == .suspended {
@@ -342,7 +343,6 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func encodeFrame() {
         guard state == "buffering", let image = latestImage, let session = compression else { return }
-        captured += 1
         guard framesInFlight < 4 else { dropped += 1; return }
         framesInFlight += 1
         let began = ProcessInfo.processInfo.systemUptime
