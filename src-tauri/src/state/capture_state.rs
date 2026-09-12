@@ -497,8 +497,9 @@ impl CaptureSupervisor {
                         Err(e) => log::warn!("Undecodable message from the capture engine: {e}"),
                     },
                     Ok(None) => {
-                        if shutdown_deadline.is_some() {
-                            let _ = child.wait().await;
+                        if let Some(deadline) = shutdown_deadline {
+                            let _ = tokio::time::timeout_at(deadline, child.wait()).await;
+                            let _ = child.kill().await;
                             return Outcome::Shutdown;
                         }
                         let _ = child.kill().await;
