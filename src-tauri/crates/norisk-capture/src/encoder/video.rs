@@ -233,7 +233,7 @@ unsafe fn configure_common(
 }
 
 fn b_frames_for(codec_name: &str) -> i32 {
-    let hardware = ["_nvenc", "_amf", "_qsv"]
+    let hardware = ["_nvenc", "_qsv"]
         .iter()
         .any(|suffix| codec_name.ends_with(suffix));
     if hardware && !codec_name.starts_with("av1") {
@@ -391,6 +391,15 @@ fn averror_again() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn amds_h264_encoder_is_never_asked_for_b_frames() {
+        assert_eq!(b_frames_for("h264_amf"), 0);
+        assert_eq!(b_frames_for("hevc_amf"), 0);
+        assert_eq!(b_frames_for("h264_nvenc"), 2);
+        assert_eq!(b_frames_for("h264_qsv"), 2);
+        assert_eq!(b_frames_for("libx264"), 0);
+    }
 
     #[test]
     fn gop_follows_the_configured_seconds() {
