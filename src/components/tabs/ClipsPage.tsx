@@ -17,6 +17,7 @@ import { getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureStatus } from "../../types/launcherConfig";
 import { BetaNotice } from "../ui/BetaNotice";
+import { StatusMessage } from "../ui/StatusMessage";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../store/capture-permissions-store";
 import { isMacOS, supportsClips } from "../../utils/platform";
@@ -250,10 +251,14 @@ export function ClipsPage() {
         </div>
       </div>
 
-      {permissionsBlocked && <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-yellow-400/20 bg-yellow-400/5 p-3">
-        <p className="font-minecraft text-xs text-white/70">{state.detail}</p>
-        <Button size="sm" variant="secondary" onClick={toClipSettings}>{t("settings.clips.permissions.setup")}</Button>
-      </div>}
+      {permissionsBlocked && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <StatusMessage type="warning" message={state.detail} className="mb-0 min-w-[16rem] flex-1" />
+          <Button size="sm" variant="secondary" onClick={toClipSettings}>
+            {t("settings.clips.permissions.setup")}
+          </Button>
+        </div>
+      )}
 
       <BetaNotice
         className="mb-4"
