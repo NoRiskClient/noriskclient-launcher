@@ -457,6 +457,9 @@ impl Engine {
         match search.poll() {
             window::SearchStep::Waiting => {}
             window::SearchStep::Found(target) => {
+                if window::client_size(target.hwnd).is_none() {
+                    return;
+                }
                 self.pending_attach = None;
                 if let Err(e) = self.attach(target) {
                     log::error!("Could not start capturing process {pid}: {e:#}");

@@ -456,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn a_minimised_window_asks_for_a_size_no_encoder_would_take() {
+    fn an_odd_or_single_pixel_side_is_rounded_to_something_even() {
         assert_eq!(fit_output((120, 1), (1280, 720)), (120, 2));
         assert_eq!(fit_output((146, 28), (1280, 720)), (146, 28));
     }
