@@ -2591,6 +2591,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Henüz kaydedecek bir şey yok",
   "overlay.clip.error.BufferEmpty.hint": "Birkaç saniye oyna, sonra tekrar bas.",
+  "overlay.clip.error.NotRecording": "Şu anda hiçbir şey kaydedilmiyor",
+  "overlay.clip.error.NotRecording.hint": "Launcher yeniden bağlanıyor. Oyun açık mı?",
   "overlay.clip.error.Paused": "Kayıt duraklatıldı",
   "overlay.clip.error.Paused.hint": "Yeniden kaydetmek için duraklatma tuşuna tekrar bas.",
   "overlay.clip.error.WindowNotFound": "Oyun bulunamadı",
