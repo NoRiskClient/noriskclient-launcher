@@ -76,3 +76,12 @@ export function sanitizeRichHtml(html: string): string {
     DOMPurify.removeHook("afterSanitizeAttributes");
   }
 }
+
+const SVG_ICON_SANITIZE_CONFIG: Config = {
+  USE_PROFILES: { svg: true, svgFilters: true },
+  ALLOW_UNKNOWN_PROTOCOLS: false,
+};
+
+export function sanitizeSvgIcon(svg: string): string {
+  return DOMPurify.sanitize(svg, SVG_ICON_SANITIZE_CONFIG) as string;
+}

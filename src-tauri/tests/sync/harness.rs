@@ -31,8 +31,16 @@ pub struct Player {
 }
 
 pub async fn shared(kind: SyncTargetKind, target_path: &str) -> Shared {
+    shared_pointing_at(kind, target_path, None).await
+}
+
+pub async fn shared_pointing_at(
+    kind: SyncTargetKind,
+    target_path: &str,
+    master_override: Option<PathBuf>,
+) -> Shared {
     let dir = tempfile::tempdir().unwrap();
-    let master = dir.path().join("pack-master").join(target_path);
+    let master = master_override.unwrap_or_else(|| dir.path().join("pack-master").join(target_path));
 
     let handle = db::new_handle();
     db::open_or_reopen_at(&handle, dir.path().join("app.db"))
@@ -113,6 +121,15 @@ impl Shared {
             .apply_pre_launch(&self.context(player, others, &HashSet::new()))
             .await
             .unwrap()
+    }
+
+    pub async fn try_launch(
+        &self,
+        player: &Player,
+    ) -> noriskclient_launcher_v3_lib::error::Result<HandlerOutcome> {
+        self.handler()
+            .apply_pre_launch(&self.context(player, &[], &HashSet::new()))
+            .await
     }
 
     pub async fn quit(&self, player: &Player) -> HandlerOutcome {

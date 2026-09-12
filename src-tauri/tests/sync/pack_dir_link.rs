@@ -301,3 +301,47 @@ async fn a_nested_folder_is_moved_whole() {
         "chunks"
     );
 }
+
+#[cfg(windows)]
+#[tokio::test]
+async fn a_pack_may_not_point_its_shared_folder_into_the_pack_storage_itself() {
+    use noriskclient_launcher_v3_lib::sync::paths::sync_packs_root;
+
+    let forbidden = sync_packs_root().join("nrc-external-master-test");
+    let _ = tokio::fs::remove_dir_all(&forbidden).await;
+
+    let shared = shared_pointing_at(
+        SyncTargetKind::DirLink {
+            adopt: AdoptStrategy::default(),
+        },
+        TARGET,
+        Some(forbidden.clone()),
+    )
+    .await;
+
+    let player = shared.player("bob");
+    let saves = player.file(TARGET);
+    tokio::fs::create_dir_all(&saves).await.unwrap();
+    tokio::fs::write(saves.join("world.dat"), "my world").await.unwrap();
+
+    assert!(
+        shared.try_launch(&player).await.is_err(),
+        "launching must refuse a shared folder inside the pack storage"
+    );
+    assert!(
+        !forbidden.exists(),
+        "nothing may have been created at {}",
+        forbidden.display()
+    );
+    assert!(
+        !symlink_utils::is_symlink(&saves).await.unwrap_or(false),
+        "the player's saves folder must not have been replaced by a link"
+    );
+    assert_eq!(
+        text(&saves.join("world.dat")).await,
+        "my world",
+        "the player's own save must still be there, untouched"
+    );
+
+    let _ = tokio::fs::remove_dir_all(&forbidden).await;
+}
