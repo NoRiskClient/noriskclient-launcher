@@ -2371,6 +2371,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Nothing to save yet",
   "overlay.clip.error.BufferEmpty.hint": "Play for a few seconds, then press again.",
+  "overlay.clip.error.NotRecording": "Nothing is being recorded",
+  "overlay.clip.error.NotRecording.hint": "The launcher is attaching again. Is the game running?",
   "overlay.clip.error.Paused": "Recording is paused",
   "overlay.clip.error.Paused.hint": "Press the pause hotkey again to start recording.",
   "overlay.clip.error.WindowNotFound": "No game found",

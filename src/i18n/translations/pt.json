@@ -2591,6 +2591,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Ainda não há nada para salvar",
   "overlay.clip.error.BufferEmpty.hint": "Jogue por alguns segundos e pressione novamente.",
+  "overlay.clip.error.NotRecording": "Nada está sendo gravado",
+  "overlay.clip.error.NotRecording.hint": "O launcher está se reconectando. O jogo está aberto?",
   "overlay.clip.error.Paused": "A gravação está pausada",
   "overlay.clip.error.Paused.hint": "Pressiona novamente a tecla de pausa para voltar a gravar.",
   "overlay.clip.error.WindowNotFound": "Nenhum jogo encontrado",

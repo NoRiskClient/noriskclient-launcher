@@ -43,6 +43,15 @@ struct Session {
     buffering_since: Option<std::time::Instant>,
 }
 
+fn attaching_failed(code: norisk_ipc::ErrorCode) -> bool {
+    use norisk_ipc::ErrorCode::{EncoderUnavailable, GraphicsDevice, Internal, WindowNotFound};
+
+    matches!(
+        code,
+        WindowNotFound | EncoderUnavailable | GraphicsDevice | Internal
+    )
+}
+
 fn gpu_vendor(adapter: &str) -> &'static str {
     let lower = adapter.to_ascii_lowercase();
     if lower.contains("nvidia") || lower.contains("geforce") {
@@ -187,6 +196,16 @@ impl CaptureSupervisor {
             .unwrap_or_else(|poison| poison.into_inner())
             .attached_game
             .clone()
+    }
+
+    fn forget_attachment(&self) {
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        session.attached_pid = None;
+        session.attached_game = None;
+        session.attached_at = None;
     }
 
     pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
@@ -774,6 +793,9 @@ impl CaptureSupervisor {
                         "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method.clone()),
                     }),
                 );
+                if attaching_failed(error.code) {
+                    self.forget_attachment();
+                }
                 if !error.recoverable {
                     *self.state.write().await = CaptureState::Failed;
                 }

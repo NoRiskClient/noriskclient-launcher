@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { getLauncherConfig } from "../services/launcher-config-service";
+import { isWindows } from "../utils/platform";
 
 interface ClipsState {
   enabled: boolean;
@@ -16,6 +17,10 @@ export const useClipsStore = create<ClipsState>((set) => ({
   loaded: false,
   applying: false,
   refresh: async () => {
+    if (!isWindows()) {
+      set({ enabled: false, loaded: true });
+      return;
+    }
     try {
       const config = await getLauncherConfig();
       set({ enabled: Boolean(config.clips?.enabled), loaded: true });
@@ -24,6 +29,6 @@ export const useClipsStore = create<ClipsState>((set) => ({
       set({ loaded: true });
     }
   },
-  set: (enabled) => set({ enabled, loaded: true }),
+  set: (enabled) => set({ enabled: enabled && isWindows(), loaded: true }),
   setApplying: (applying) => set({ applying }),
 }));

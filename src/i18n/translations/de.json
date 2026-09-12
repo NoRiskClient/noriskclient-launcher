@@ -2351,6 +2351,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Noch nichts zum Sichern da",
   "overlay.clip.error.BufferEmpty.hint": "Spiel ein paar Sekunden, dann nochmal drücken.",
+  "overlay.clip.error.NotRecording": "Es wird gerade nichts aufgenommen",
+  "overlay.clip.error.NotRecording.hint": "Der Launcher hängt sich neu an. Läuft das Spiel?",
   "overlay.clip.error.Paused": "Aufnahme ist pausiert",
   "overlay.clip.error.Paused.hint": "Drücke die Pause-Taste erneut, um wieder aufzunehmen.",
   "overlay.clip.error.WindowNotFound": "Kein Spiel gefunden",
