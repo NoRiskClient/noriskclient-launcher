@@ -37,10 +37,15 @@ pub struct VideoEncoder {
     packet: *mut ff::AVPacket,
     settings: EncoderSettings,
     frames_sent: u64,
+    packets_out: u64,
+    silence_reported: bool,
+    name: String,
     gop_ticks: i64,
     last_keyframe_pts: Option<i64>,
     download: Option<Downloader>,
 }
+
+const SILENT_AFTER_FRAMES: u64 = 120;
 
 unsafe impl Send for VideoEncoder {}
 
@@ -90,6 +95,9 @@ impl VideoEncoder {
             settings,
 
             frames_sent: 0,
+            packets_out: 0,
+            silence_reported: false,
+            name: codec_name.to_string(),
             gop_ticks: gop_ticks(settings),
             last_keyframe_pts: None,
             download,
@@ -135,7 +143,24 @@ impl VideoEncoder {
             bail!("avcodec_send_frame failed: {}", av_error(rc));
         }
         self.frames_sent += 1;
-        self.drain()
+
+        let packets = self.drain()?;
+        self.packets_out += packets.len() as u64;
+
+        if self.packets_out == 0
+            && self.frames_sent >= SILENT_AFTER_FRAMES
+            && !self.silence_reported
+        {
+            self.silence_reported = true;
+            log::error!(
+                "'{}' has taken {} frames and returned no packet at all, so nothing can be \
+                 clipped; the encoder accepted settings its hardware cannot honour",
+                self.name,
+                self.frames_sent
+            );
+        }
+
+        Ok(packets)
     }
 
     pub fn finish(&mut self) -> Result<Vec<EncodedPacket>> {
@@ -192,7 +217,7 @@ impl Drop for VideoEncoder {
     }
 }
 
-unsafe fn configure_common(
+pub(crate) unsafe fn configure_common(
     context: *mut ff::AVCodecContext,
     codec_name: &str,
     settings: EncoderSettings,
