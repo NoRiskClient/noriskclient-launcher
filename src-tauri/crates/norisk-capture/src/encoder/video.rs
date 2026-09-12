@@ -217,7 +217,7 @@ impl Drop for VideoEncoder {
     }
 }
 
-pub(crate) unsafe fn configure_common(
+unsafe fn configure_common(
     context: *mut ff::AVCodecContext,
     codec_name: &str,
     settings: EncoderSettings,

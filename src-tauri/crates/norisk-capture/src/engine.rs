@@ -1046,11 +1046,12 @@ impl Engine {
         };
 
         if buffer_fill_seconds <= 0.0
+            && dropped_before_keyframe == 0
+            && stats.delivered > 0
             && pipeline.started.elapsed() >= EMPTY_RING_GRACE
             && !self.empty_warned.get()
         {
             self.empty_warned.set(true);
-            let stats = pipeline.source.stats();
             log::error!(
                 "Nothing has reached the replay buffer in {:?} of recording: the source handed on \
                  {} frame(s), {} never reached the encoder, and {} packet(s) were thrown away \
