@@ -533,7 +533,7 @@ impl CaptureSupervisor {
                     }
                 }
 
-                status = child.wait() => {
+                status = child.wait(), if shutdown_deadline.is_none() => {
                     return Outcome::Lost(match status {
                         Ok(status) => format!("process exited with {status}"),
                         Err(e) => format!("could not wait on the process: {e}"),
