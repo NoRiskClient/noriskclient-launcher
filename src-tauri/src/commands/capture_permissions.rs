@@ -1,4 +1,6 @@
-use crate::error::{AppError, CommandError, Result};
+#[cfg(target_os = "macos")]
+use crate::error::AppError;
+use crate::error::{CommandError, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Deserialize)]
@@ -16,6 +18,8 @@ pub struct CapturePermissions {
     pub microphone_denied: bool,
     #[serde(skip_deserializing)]
     pub input_monitoring: bool,
+    #[serde(skip_deserializing)]
+    pub microphone_required: bool,
 }
 
 #[tauri::command]
@@ -25,7 +29,8 @@ pub async fn capture_permissions(
     let permissions = read_permissions(request).await?;
     #[cfg(target_os = "macos")]
     if let Some(permissions) = &permissions {
-        if !permissions.screen_recording || !permissions.microphone || !permissions.input_monitoring {
+        let microphone_missing = permissions.microphone_required && !permissions.microphone;
+        if !permissions.screen_recording || !permissions.input_monitoring || microphone_missing {
             crate::utils::hotkey_manager::clear();
             crate::state::State::get().await?.capture_supervisor.stop().await;
         }
@@ -64,6 +69,13 @@ pub async fn read_permissions(
             request,
             Some(CapturePermission::InputMonitoring)
         ));
+        permissions.microphone_required = crate::state::State::get()
+            .await?
+            .config_manager
+            .get_config()
+            .await
+            .clips
+            .capture_microphone;
         Ok(Some(permissions))
     }
     #[cfg(not(target_os = "macos"))]

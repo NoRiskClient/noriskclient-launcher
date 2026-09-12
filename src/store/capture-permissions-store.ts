@@ -13,11 +13,17 @@ export const capturePermissionKeys: CapturePermission[] = [
   "input_monitoring",
   "microphone",
 ];
+export const requiredCapturePermissions = (
+  permissions: CapturePermissions,
+): CapturePermission[] =>
+  capturePermissionKeys.filter(
+    (key) => key !== "microphone" || permissions.microphone_required,
+  );
 export const allCapturePermissionsGranted = (
   permissions: CapturePermissions | null,
 ) =>
   permissions !== null &&
-  capturePermissionKeys.every((key) => permissions[key]);
+  requiredCapturePermissions(permissions).every((key) => permissions[key]);
 
 type Notice = {
   reason: "denied" | "revoked" | "missing";
@@ -53,12 +59,11 @@ export const useCapturePermissionsStore = create<State>()(
           const permissions = await getCapturePermissions(request);
           if (!permissions)
             throw new Error("macOS capture permissions are unavailable.");
-          const revoked = capturePermissionKeys.filter(
+          const required = requiredCapturePermissions(permissions);
+          const revoked = required.filter(
             (key) => before?.[key] && !permissions[key],
           );
-          const missing = capturePermissionKeys.filter(
-            (key) => !permissions[key],
-          );
+          const missing = required.filter((key) => !permissions[key]);
           const denied = missing.filter(
             (key) =>
               get().requested.includes(key) ||

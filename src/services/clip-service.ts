@@ -154,7 +154,10 @@ export async function trimClip(
 }
 
 export type CapturePermission = "screen_recording" | "microphone" | "input_monitoring";
-export type CapturePermissions = Record<CapturePermission, boolean> & { microphone_denied: boolean };
+export type CapturePermissions = Record<CapturePermission, boolean> & {
+  microphone_denied: boolean;
+  microphone_required: boolean;
+};
 
 export async function getCapturePermissions(request?: CapturePermission): Promise<CapturePermissions | null> {
   return invoke("capture_permissions", { request: request ?? null });
