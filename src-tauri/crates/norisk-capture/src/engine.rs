@@ -26,6 +26,7 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(150);
 const MIN_CAPTURE_SIDE: u32 = 128;
 const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
+const EMPTY_RING_GRACE: Duration = Duration::from_secs(8);
 
 pub struct Engine {
     config: CaptureConfig,
@@ -39,6 +40,7 @@ pub struct Engine {
     last_status: Instant,
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
     keyframe_warned: std::cell::Cell<bool>,
+    empty_warned: std::cell::Cell<bool>,
 }
 
 enum FrameSource {
@@ -119,6 +121,7 @@ struct Pipeline {
     encoder: norisk_ipc::EncoderPreference,
     audio: Option<AudioPipeline>,
     target: window::GameWindow,
+    started: Instant,
 }
 
 type LatencyWindow = Arc<Mutex<VecDeque<u32>>>;
@@ -243,6 +246,7 @@ impl Engine {
             last_status: Instant::now(),
             rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
             keyframe_warned: std::cell::Cell::new(false),
+            empty_warned: std::cell::Cell::new(false),
         }
     }
 
@@ -559,6 +563,7 @@ impl Engine {
     fn attach(&mut self, target: window::GameWindow) -> Result<()> {
         log::info!("Attaching to '{}' (pid {})", target.title, target.pid);
         self.keyframe_warned.set(false);
+        self.empty_warned.set(false);
 
         let device = CaptureDevice::new_for_window(target.hwnd)?;
         let (codec, chosen) = self.choose_encoder()?;
@@ -753,6 +758,7 @@ impl Engine {
             encode_latency,
             settings,
             encoder: chosen,
+            started: Instant::now(),
         });
         Ok(())
     }
@@ -921,16 +927,20 @@ impl Engine {
                 )
             };
             if let Some(pipeline) = self.active.as_ref() {
+                let stats = pipeline.source.stats();
+                let dropped = pipeline.dropped.load(Ordering::Relaxed);
                 let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
                 log::warn!(
-                    "Nothing to cut: the ring holds {} segment(s) over {:.1}s ({} bytes), spanning \
-                     {}..{}, and threw away {} packet(s) waiting for a first keyframe; the cut \
-                     asked for {:.0}s before and {:.0}s after",
+                    "Nothing to cut: the source received {} frame(s) and handed on {}, of which {} \
+                     never reached the encoder; the ring holds {} segment(s) over {:.1}s ({} bytes) \
+                     and threw away {} packet(s) waiting for a first keyframe; the cut asked for \
+                     {:.0}s before and {:.0}s after",
+                    stats.received,
+                    stats.delivered,
+                    dropped,
                     ring.segment_count(),
                     ring.duration_seconds(),
                     ring.bytes(),
-                    ring.oldest_pts(),
-                    ring.newest_pts(),
                     ring.dropped_before_first_keyframe(),
                     pre,
                     post,
@@ -1034,6 +1044,23 @@ impl Engine {
                 ring.dropped_before_first_keyframe(),
             )
         };
+
+        if buffer_fill_seconds <= 0.0
+            && pipeline.started.elapsed() >= EMPTY_RING_GRACE
+            && !self.empty_warned.get()
+        {
+            self.empty_warned.set(true);
+            let stats = pipeline.source.stats();
+            log::error!(
+                "Nothing has reached the replay buffer in {:?} of recording: the source handed on \
+                 {} frame(s), {} never reached the encoder, and {} packet(s) were thrown away \
+                 waiting for a first keyframe. No clip can be cut in this state.",
+                pipeline.started.elapsed(),
+                stats.delivered,
+                pipeline.dropped.load(Ordering::Relaxed),
+                dropped_before_keyframe,
+            );
+        }
 
         if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned.get()
         {
