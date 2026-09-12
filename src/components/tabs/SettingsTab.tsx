@@ -118,7 +118,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   }[] = [
     { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
-    ...(isWindows()
+    ...(supportsClips()
       ? [{ id: "clips" as const, label: t("settings.tabs.clips"), icon: "solar:videocamera-record-bold", children: sectionDefs.clips }]
       : []),
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
