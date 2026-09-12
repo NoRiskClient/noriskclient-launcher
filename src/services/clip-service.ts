@@ -6,8 +6,8 @@ export function runtimeDownloadPercent(runtime: CaptureRuntimeState): number {
   return Math.min(100, Math.round((runtime.downloaded / runtime.total) * 100));
 }
 
-export async function applyClipSettings(): Promise<string[]> {
-  return invoke<string[]>("capture_apply_settings");
+export async function applyClipSettings(restart = false): Promise<string[]> {
+  return invoke<string[]>("capture_apply_settings", { restart });
 }
 
 export async function releaseHotkeys(): Promise<void> {
@@ -151,4 +151,18 @@ export async function trimClip(
   levels?: TrackLevel[],
 ): Promise<string> {
   return invoke<string>("clip_trim", { path, startSeconds, endSeconds, levels });
+}
+
+export type CapturePermission = "screen_recording" | "microphone" | "input_monitoring";
+export type CapturePermissions = Record<CapturePermission, boolean> & {
+  microphone_denied: boolean;
+  microphone_required: boolean;
+};
+
+export async function getCapturePermissions(request?: CapturePermission): Promise<CapturePermissions | null> {
+  return invoke("capture_permissions", { request: request ?? null });
+}
+
+export async function openCapturePermissionSettings(permission: CapturePermission): Promise<void> {
+  return invoke("capture_open_permission_settings", { permission });
 }

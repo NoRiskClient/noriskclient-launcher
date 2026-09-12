@@ -1,5 +1,5 @@
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenApp {
     pub pid: u32,
@@ -36,12 +36,12 @@ const NOT_PROGRAMS: &[&str] = &[
     "phoneexperiencehost.exe",
 ];
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn open_apps() -> Vec<OpenApp> {
     Vec::new()
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn foreground_app() -> Option<OpenApp> {
     None
 }
@@ -278,4 +278,15 @@ mod tests {
             );
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+pub fn open_apps() -> Vec<OpenApp> {
+    serde_json::from_str(&norisk_capture::macos::open_apps(false)).unwrap_or_default()
+}
+
+#[cfg(target_os = "macos")]
+pub fn foreground_app() -> Option<OpenApp> {
+    let apps: Vec<OpenApp> = serde_json::from_str(&norisk_capture::macos::open_apps(true)).unwrap_or_default();
+    apps.into_iter().next()
 }

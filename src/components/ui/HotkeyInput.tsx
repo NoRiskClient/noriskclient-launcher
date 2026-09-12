@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { isMacOS } from "../../utils/platform";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -202,9 +203,9 @@ function labelFor(token: string): string {
 
   const named: Record<string, string> = {
     Ctrl: "Ctrl",
-    Alt: "Alt",
+    Alt: isMacOS() ? "Option" : "Alt",
     Shift: "Shift",
-    Super: "Win",
+    Super: isMacOS() ? "Cmd" : "Win",
     Space: "Space",
     Enter: "Enter",
     Backquote: "`",

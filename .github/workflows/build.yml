@@ -189,6 +189,10 @@ jobs:
           echo "NRC_CAPTURE_RUNTIME_SHA256=$hash" >> $env:GITHUB_ENV
           echo "NRC_CAPTURE_RUNTIME_URL=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$env:CAPTURE_RUNTIME_ASSET" >> $env:GITHUB_ENV
 
+      - name: Stage the macOS capture engine
+        if: matrix.platform == 'macos-latest'
+        run: node scripts/stage-native-deps.mjs --target ${{ matrix.target }}
+
       - name: Build the Windows app
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         run: yarn tauri build --verbose --no-bundle
