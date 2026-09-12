@@ -39,11 +39,13 @@ struct Session {
 }
 
 fn attaching_failed(code: norisk_ipc::ErrorCode) -> bool {
-    use norisk_ipc::ErrorCode::{EncoderUnavailable, GraphicsDevice, Internal, WindowNotFound};
+    use norisk_ipc::ErrorCode::{
+        EncoderUnavailable, GraphicsDevice, Internal, NotRecording, WindowNotFound,
+    };
 
     matches!(
         code,
-        WindowNotFound | EncoderUnavailable | GraphicsDevice | Internal
+        WindowNotFound | EncoderUnavailable | GraphicsDevice | Internal | NotRecording
     )
 }
 
