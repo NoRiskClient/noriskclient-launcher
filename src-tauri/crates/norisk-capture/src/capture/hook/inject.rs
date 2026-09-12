@@ -124,13 +124,18 @@ fn inject_through_message_hook(
         .spawn()
         .context("could not start the injector")?;
 
-    let deadline = std::time::Instant::now() + MESSAGE_HOOK_BUDGET;
+    let started = std::time::Instant::now();
     let mut loaded = false;
-    while std::time::Instant::now() < deadline {
+    let mut nudging = true;
+    while started.elapsed() < MESSAGE_HOOK_BUDGET {
         if is_module_loaded(pid, file_name)? {
             loaded = true;
             break;
         }
+        if !nudging {
+            break;
+        }
+        nudging = matches!(child.try_wait(), Ok(None));
         std::thread::sleep(MESSAGE_HOOK_INTERVAL);
     }
 
@@ -138,7 +143,10 @@ fn inject_through_message_hook(
     let _ = child.wait();
 
     if !loaded {
-        anyhow::bail!("the game did not pick the hook up within {MESSAGE_HOOK_BUDGET:?}");
+        anyhow::bail!(
+            "the game did not pick the hook up within {:?}",
+            started.elapsed()
+        );
     }
     Ok(())
 }

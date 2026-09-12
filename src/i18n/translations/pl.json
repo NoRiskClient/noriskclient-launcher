@@ -2599,6 +2599,8 @@
   "overlay.clip.error.generic.hint": "",
   "overlay.clip.error.BufferEmpty": "Jeszcze nie ma czego zapisać",
   "overlay.clip.error.BufferEmpty.hint": "Pograj kilka sekund, a potem naciśnij ponownie.",
+  "overlay.clip.error.NotRecording": "Nic nie jest nagrywane",
+  "overlay.clip.error.NotRecording.hint": "Launcher próbuje połączyć się ponownie. Czy gra działa?",
   "overlay.clip.error.Paused": "Nagrywanie jest wstrzymane",
   "overlay.clip.error.Paused.hint": "Naciśnij ponownie klawisz pauzy, aby znowu nagrywać.",
   "overlay.clip.error.WindowNotFound": "Nie znaleziono gry",
