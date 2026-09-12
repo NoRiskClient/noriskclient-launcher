@@ -127,7 +127,7 @@ fn probe_one(
             result.detail = Some("no graphics device available to test with".into());
             return result;
         };
-        match try_open_hardware(codec_ptr, pool) {
+        match try_open_hardware(codec_ptr, candidate.name, pool) {
             Ok(()) => result.opens = true,
             Err(e) => result.detail = Some(shorten(&e.to_string())),
         }
@@ -141,7 +141,11 @@ fn probe_one(
     result
 }
 
-fn try_open_hardware(codec: *const ff::AVCodec, pool: &HwFramePool) -> Result<()> {
+fn try_open_hardware(
+    codec: *const ff::AVCodec,
+    name: &str,
+    pool: &HwFramePool,
+) -> Result<()> {
     unsafe {
         let context = ff::avcodec_alloc_context3(codec);
         if context.is_null() {
@@ -149,10 +153,16 @@ fn try_open_hardware(codec: *const ff::AVCodec, pool: &HwFramePool) -> Result<()
         }
         let _guard = ContextGuard(context);
 
-        (*context).width = PROBE_SIZE.0 as i32;
-        (*context).height = PROBE_SIZE.1 as i32;
-        (*context).time_base = ff::AVRational { num: 1, den: 60 };
-        (*context).framerate = ff::AVRational { num: 60, den: 1 };
+        let settings = crate::encoder::video::EncoderSettings {
+            width: PROBE_SIZE.0,
+            height: PROBE_SIZE.1,
+            fps: 60,
+            bitrate_kbps: 4_000,
+            gop_seconds: 2.0,
+            codec: ClipCodec::H264,
+        };
+        crate::encoder::video::configure_common(context, name, settings, true, true);
+
         (*context).pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_D3D11;
         (*context).sw_pix_fmt = ff::AVPixelFormat::AV_PIX_FMT_NV12;
         (*context).hw_frames_ctx = pool.frames_ref()?;
@@ -161,7 +171,55 @@ fn try_open_hardware(codec: *const ff::AVCodec, pool: &HwFramePool) -> Result<()
         if rc < 0 {
             anyhow::bail!("{}", av_error(rc));
         }
-        Ok(())
+
+        produces_a_packet(context, pool)
+    }
+}
+
+unsafe fn produces_a_packet(context: *mut ff::AVCodecContext, pool: &HwFramePool) -> Result<()> {
+    const FRAMES: i64 = 8;
+
+    let packet = ff::av_packet_alloc();
+    if packet.is_null() {
+        anyhow::bail!("av_packet_alloc failed");
+    }
+    let _packet_guard = PacketGuard(packet);
+
+    let mut frame = pool.acquire()?;
+    let mut seen = 0usize;
+
+    let collect = |packet: *mut ff::AVPacket, seen: &mut usize| loop {
+        let rc = ff::avcodec_receive_packet(context, packet);
+        if rc < 0 {
+            break;
+        }
+        *seen += 1;
+        ff::av_packet_unref(packet);
+    };
+
+    for i in 0..FRAMES {
+        frame.set_pts(i * 1_500);
+        let rc = ff::avcodec_send_frame(context, frame.as_ptr());
+        if rc < 0 {
+            anyhow::bail!("it refused a frame: {}", av_error(rc));
+        }
+        collect(packet, &mut seen);
+    }
+
+    ff::avcodec_send_frame(context, std::ptr::null());
+    collect(packet, &mut seen);
+
+    if seen == 0 {
+        anyhow::bail!("it accepted {FRAMES} frames and returned no packet");
+    }
+    Ok(())
+}
+
+struct PacketGuard(*mut ff::AVPacket);
+
+impl Drop for PacketGuard {
+    fn drop(&mut self) {
+        unsafe { ff::av_packet_free(&mut self.0) };
     }
 }
 
@@ -260,6 +318,21 @@ pub fn resolve(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "reports what the encoders on this machine actually do"]
+    fn what_this_machine_can_encode() {
+        for result in probe_all() {
+            println!(
+                "{:?} {:<11} {:<18} usable={:<5} {}",
+                result.codec,
+                result.encoder,
+                result.vendor,
+                result.opens,
+                result.detail.as_deref().unwrap_or("")
+            );
+        }
+    }
 
     #[test]
     fn every_codec_offers_hardware_before_software() {
