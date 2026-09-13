@@ -137,7 +137,6 @@ impl CaptureSession {
             .CreateCaptureSession(&item)
             .context("CreateCaptureSession failed")?;
 
-        let _ = session.SetIsCursorCaptureEnabled(false);
         let border_disabled = session.SetIsBorderRequired(false).is_ok();
 
         session.StartCapture().context("StartCapture failed")?;

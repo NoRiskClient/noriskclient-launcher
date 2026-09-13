@@ -166,10 +166,10 @@ async fn dispatch(app: &AppHandle, action: Action) {
             }
         }
         Action::ToggleBuffering => {
-            let paused = state.capture_supervisor.state().await == norisk_ipc::CaptureState::Paused;
-            let request = norisk_ipc::LauncherToCapture::SetBufferEnabled { enabled: paused };
+            let resume = !state.capture_supervisor.buffering_wanted();
+            let request = norisk_ipc::LauncherToCapture::SetBufferEnabled { enabled: resume };
             match state.capture_supervisor.send(request) {
-                Ok(()) => log::info!("Buffering {}", if paused { "resumed" } else { "paused" }),
+                Ok(()) => log::info!("Buffering {}", if resume { "resumed" } else { "paused" }),
                 Err(e) => log::warn!("Buffer toggle went nowhere: {e}"),
             }
         }

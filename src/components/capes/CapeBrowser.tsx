@@ -17,6 +17,7 @@ import type {
   PaginationInfo,
 } from "../../types/noriskCapes";
 import { CapeList } from "./CapeList";
+import { NO_CAPE_ID, createNoCapePlaceholder } from "./noCape";
 import type { CapeFiltersData } from "./CapeFilters";
 import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -114,7 +115,7 @@ export function CapeBrowser(): JSX.Element {
   // Computed equipped cape ID based on current tab
   const equippedCapeId = useMemo(() => {
     if (filters.showVanillaOnly) {
-      return equippedCape?.id || null;
+      return equippedCape?.id || NO_CAPE_ID;
     }
     // For NoRisk capes, we don't have equipped state yet
     return null;
@@ -138,7 +139,7 @@ export function CapeBrowser(): JSX.Element {
       // Add "No Cape" option at the beginning
       const hasEquippedCape = vanillaCapes.some(cape => cape.equipped);
       const noCapeOption: VanillaCape = {
-        id: "no-cape",
+        id: NO_CAPE_ID,
         name: t('capes.noCape'),
         description: t('capes.removeEquippedCape'),
         url: "", // Empty URL for no cape
@@ -156,8 +157,15 @@ export function CapeBrowser(): JSX.Element {
     }
 
     // For favorites, let CapeList handle the filtering - just provide all available capes
-    return filters.showOwnedOnly ? myCapes : allCapes;
-  }, [filters.showOwnedOnly, filters.showVanillaOnly, myCapes, allCapes, vanillaCapes, favoriteCapeIds, searchQuery]); // Add searchQuery to trigger re-render when search changes
+    if (filters.showOwnedOnly) {
+      return myCapes;
+    }
+
+    if (filters.showFavoritesOnly) {
+      return allCapes;
+    }
+    return [createNoCapePlaceholder(), ...allCapes];
+  }, [filters.showOwnedOnly, filters.showFavoritesOnly, filters.showVanillaOnly, myCapes, allCapes, vanillaCapes, favoriteCapeIds, searchQuery]); // Add searchQuery to trigger re-render when search changes
 
   const paginationInfo = useMemo(() => {
     // When searching, always use allPagination for search results
@@ -620,18 +628,16 @@ export function CapeBrowser(): JSX.Element {
   };
 
   const handleEquipCape = async (capeHash: string) => {
+    if (capeHash === NO_CAPE_ID) {
+      await handleUnequipCape(filters.showVanillaOnly);
+      return;
+    }
+
     setIsEquippingCapeId(capeHash);
 
-    let promise;
-    if (filters.showVanillaOnly) {
-      // For vanilla capes, use the vanilla store
-      // Special handling for "no-cape" option - unequip all capes
-      const actualCapeId = capeHash === "no-cape" ? null : capeHash;
-      promise = useVanillaCapeStore.getState().equipCape(actualCapeId);
-    } else {
-      // For NoRisk capes, use the regular equip function
-      promise = equipCape(capeHash);
-    }
+    const promise = filters.showVanillaOnly
+      ? useVanillaCapeStore.getState().equipCape(capeHash)
+      : equipCape(capeHash);
 
     toast.promise(promise, {
       loading: t('capes.equippingCape'),
@@ -647,15 +653,22 @@ export function CapeBrowser(): JSX.Element {
     });
   };
 
-  const handleUnequipCape = async () => {
+  const handleUnequipCape = async (alsoUnequipVanillaCape = false) => {
     setIsUnequipping(true);
+    setIsEquippingCapeId(NO_CAPE_ID);
     try {
-      await unequipCape();
+      await Promise.all([
+        unequipCape(),
+        ...(alsoUnequipVanillaCape
+          ? [useVanillaCapeStore.getState().equipCape(null)]
+          : []),
+      ]);
       toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
       toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
     } finally {
+      setIsEquippingCapeId(null);
       setIsUnequipping(false);
     }
   };

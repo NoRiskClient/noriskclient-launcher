@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use norisk_ipc::{CaptureState, CaptureToLauncher, LauncherToCapture, ReadyInfo};
 #[cfg(windows)]
@@ -19,7 +19,7 @@ use serde_json::json;
 
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
-const MISSED_PONGS_ALLOWED: u32 = 3;
+const HEARTBEAT_GRACE: Duration = Duration::from_secs(12);
 
 const BACKOFF: &[Duration] = &[
     Duration::from_secs(1),
@@ -161,6 +161,14 @@ impl CaptureSupervisor {
             .map_err(|_| AppError::Other("the capture supervisor is not running".into()))
     }
 
+    pub fn buffering_wanted(&self) -> bool {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .buffering_enabled
+            .unwrap_or(true)
+    }
+
     pub fn attached(&self) -> Option<u32> {
         self.session
             .lock()
@@ -227,6 +235,7 @@ impl CaptureSupervisor {
                         "capture_method": method,
                         "minutes": tenths(since.elapsed().as_secs_f64() / 60.0),
                         "dropped_frames": status.dropped_frames,
+                        "dropped_before_keyframe": status.dropped_before_keyframe,
                         "encode_latency_ms_p99": status.encode_latency_ms_p99,
                         "ended_with": format!("{to:?}"),
                     }),
@@ -402,11 +411,11 @@ impl CaptureSupervisor {
         if let Some(config) = session.config {
             replay.push(LauncherToCapture::Configure(config));
         }
-        if let Some(pid) = session.attached_pid {
-            replay.push(LauncherToCapture::AttachWindow { pid });
-        }
         if let Some(enabled) = session.buffering_enabled {
             replay.push(LauncherToCapture::SetBufferEnabled { enabled });
+        }
+        if let Some(pid) = session.attached_pid {
+            replay.push(LauncherToCapture::AttachWindow { pid });
         }
         if !replay.is_empty() {
             log::info!("Restoring {} session command(s) on the capture engine", replay.len());
@@ -424,7 +433,7 @@ impl CaptureSupervisor {
 
         let mut ping = tokio::time::interval(PING_INTERVAL);
         let mut sequence = 0u64;
-        let mut unanswered = 0u32;
+        let mut last_pong = Instant::now();
 
         loop {
             tokio::select! {
@@ -433,7 +442,7 @@ impl CaptureSupervisor {
                     Ok(Some(line)) => match decode_line::<CaptureToLauncher>(&line) {
                         Ok(event) => {
                             if matches!(event, CaptureToLauncher::Pong { .. }) {
-                                unanswered = 0;
+                                last_pong = Instant::now();
                             }
                             self.absorb(event).await;
                         }
@@ -469,12 +478,14 @@ impl CaptureSupervisor {
                 }
 
                 _ = ping.tick() => {
-                    if unanswered >= MISSED_PONGS_ALLOWED {
+                    let silent_for = last_pong.elapsed();
+                    if silent_for >= HEARTBEAT_GRACE {
                         let _ = child.kill().await;
-                        return Outcome::Lost(format!("{unanswered} heartbeats went unanswered"));
+                        return Outcome::Lost(format!(
+                            "no heartbeat answer for {silent_for:?}"
+                        ));
                     }
                     sequence += 1;
-                    unanswered += 1;
                     if let Ok(line) = encode_line(&LauncherToCapture::Ping { seq: sequence }) {
                         if writer.write_all(line.as_bytes()).await.is_err() {
                             let _ = child.kill().await;

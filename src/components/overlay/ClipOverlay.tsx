@@ -29,6 +29,13 @@ type Shown =
   | { kind: "saved"; clip: ClipManifest }
   | { kind: "error"; error: CaptureError };
 
+function errorKey(code: string): string {
+  return code
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
 export function ClipOverlay() {
   const { t } = useTranslation();
   const [shown, setShown] = useState<Shown | null>(null);
@@ -69,7 +76,7 @@ export function ClipOverlay() {
     });
 
     const failed = listen<CaptureError>("clip_error", (event) => {
-      if (event.payload.code === "AudioDevice") return;
+      if (event.payload.code === "audio_device") return;
       present({ kind: "error", error: event.payload });
     });
 
@@ -91,12 +98,12 @@ export function ClipOverlay() {
         />
         <div className="min-w-0 flex-1">
           <p className="truncate font-smallcaps text-base tracking-wider text-white text-shadow-sm">
-            {t(`overlay.clip.error.${shown.error.code}`, {
+            {t(`overlay.clip.error.${errorKey(shown.error.code)}`, {
               defaultValue: t("overlay.clip.error.generic"),
             })}
           </p>
           <p className="mt-0.5 truncate font-minecraft text-xs text-white/60">
-            {t(`overlay.clip.error.${shown.error.code}.hint`, { defaultValue: "" })}
+            {t(`overlay.clip.error.${errorKey(shown.error.code)}.hint`, { defaultValue: "" })}
           </p>
         </div>
       </OverlayPanel>

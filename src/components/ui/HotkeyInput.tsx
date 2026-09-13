@@ -15,6 +15,12 @@ interface HotkeyInputProps {
   className?: string;
 }
 
+const MOUSE_CODES: Record<number, string | undefined> = {
+  1: "MouseMiddle",
+  3: "MouseX1",
+  4: "MouseX2",
+};
+
 const MODIFIER_CODES = new Set([
   "ControlLeft",
   "ControlRight",
@@ -64,7 +70,7 @@ export function HotkeyInput({
         stop();
         return;
       }
-      if (event.code === "Backspace" || event.code === "Delete") {
+      if (event.code === "Backspace") {
         onChange("");
         stop();
         return;
@@ -98,11 +104,19 @@ export function HotkeyInput({
   useEffect(() => {
     if (!recording) return;
     const onPointerDown = (event: PointerEvent) => {
+      const button = MOUSE_CODES[event.button];
+      if (button) {
+        event.preventDefault();
+        event.stopPropagation();
+        onChange([...collectModifiers(event), button].join("+"));
+        stop();
+        return;
+      }
       if (!buttonRef.current?.contains(event.target as Node)) stop();
     };
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [recording, stop]);
+  }, [recording, stop, onChange]);
 
   const conflict =
     !!value && !!conflictsWith && value.toLowerCase() === conflictsWith.toLowerCase();
@@ -155,7 +169,7 @@ export function HotkeyInput({
   );
 }
 
-function collectModifiers(event: KeyboardEvent): string[] {
+function collectModifiers(event: KeyboardEvent | PointerEvent): string[] {
   const modifiers: string[] = [];
   if (event.ctrlKey) modifiers.push("Ctrl");
   if (event.altKey) modifiers.push("Alt");
@@ -169,11 +183,22 @@ export function formatShortcut(shortcut: string): string {
   return shortcut.split("+").map(labelFor).join(" + ");
 }
 
+const NUMPAD_LABELS: Record<string, string> = {
+  Add: "+",
+  Subtract: "-",
+  Multiply: "*",
+  Divide: "/",
+  Decimal: ".",
+  Enter: "Enter",
+};
+
 function labelFor(token: string): string {
   if (token.startsWith("Key")) return token.slice(3);
   if (token.startsWith("Digit")) return token.slice(5);
-  if (token.startsWith("Numpad")) return `Num ${token.slice(6)}`;
   if (token.startsWith("Arrow")) return token.slice(5);
+  if (token === "MouseMiddle") return "Middle Mouse";
+  if (token.startsWith("MouseX")) return `Mouse ${Number(token.slice(6)) + 3}`;
+  if (token.startsWith("Numpad")) return `Num ${NUMPAD_LABELS[token.slice(6)] ?? token.slice(6)}`;
 
   const named: Record<string, string> = {
     Ctrl: "Ctrl",
@@ -199,6 +224,14 @@ function labelFor(token: string): string {
     Insert: "Insert",
     Home: "Home",
     End: "End",
+    Delete: "Delete",
+    Tab: "Tab",
+    Backspace: "Backspace",
+    Pause: "Pause",
+    ScrollLock: "Scroll Lock",
+    PrintScreen: "Print",
+    NumLock: "Num Lock",
+    IntlBackslash: "\\",
   };
 
   return named[token] ?? token;

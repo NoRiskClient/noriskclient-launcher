@@ -263,7 +263,7 @@ export function ClipsTab() {
         description={t("settings.clips.hotkeys.description")}
       >
         <StatusMessage
-          type="warning"
+          type="info"
           message={t("settings.clips.hotkeys.warning")}
           className="mb-0 mt-3"
         />
