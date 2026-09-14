@@ -19,6 +19,7 @@ Do the above and share your source code with everyone; just like we do.
 - **Node.js** (v18 or higher) - [Download here](https://nodejs.org/en/download)
 - **Rust** (latest stable) - [Install here](https://www.rust-lang.org/tools/install)
 - **Yarn** package manager - `npm install -g yarn`
+- **Windows only:** `norisk-capture` needs `libclang` for `bindgen`. Follow the [bindgen Windows setup](https://rust-lang.github.io/rust-bindgen/requirements.html#windows) to install LLVM and set `LIBCLANG_PATH`, and build from a "Developer Command Prompt for VS" (or run `vcvarsall.bat x64` first) so `INCLUDE`/`LIB` point at your MSVC + Windows SDK headers.
 
 ### Setup Instructions
 1. Clone the repository:
