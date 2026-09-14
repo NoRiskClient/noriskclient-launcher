@@ -263,14 +263,24 @@ export function InstanceSidebar({
   // Track processes user has requested to stop - show START immediately
   const [stoppingProcessIds, setStoppingProcessIds] = useState<Set<string>>(new Set());
 
-  // Get processes from store
-  const { processes, stoppedProcesses, processEndTimes, metrics, fetchProcesses, stopProcess, isLoading } = useProcessStore();
+  // Individual selectors avoid re-rendering on unrelated store churn, like the per-line `logs` map or cursor updates.
+  const processes = useProcessStore((state) => state.processes);
+  const stoppedProcesses = useProcessStore((state) => state.stoppedProcesses);
+  const processEndTimes = useProcessStore((state) => state.processEndTimes);
+  const metrics = useProcessStore((state) => state.metrics);
+  const fetchProcesses = useProcessStore((state) => state.fetchProcesses);
+  const stopProcess = useProcessStore((state) => state.stopProcess);
+  const isLoading = useProcessStore((state) => state.isLoading);
 
-  // Get launch state store for launch feedback
-  const { getProfileState, initiateButtonLaunch, finalizeButtonLaunch } = useLaunchStateStore();
+  // Individual selectors - a bare destructure re-renders this sidebar on any profile's launch status change, not just these instances.
+  const getProfileState = useLaunchStateStore((s) => s.getProfileState);
+  const initiateButtonLaunch = useLaunchStateStore((s) => s.initiateButtonLaunch);
+  const finalizeButtonLaunch = useLaunchStateStore((s) => s.finalizeButtonLaunch);
 
   // Get launcher log functions
-  const { addLauncherLog, clearLauncherLogs, clearLogs } = useProcessStore();
+  const addLauncherLog = useProcessStore((state) => state.addLauncherLog);
+  const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
+  const clearLogs = useProcessStore((state) => state.clearLogs);
 
   // Fetch processes on mount
   useEffect(() => {

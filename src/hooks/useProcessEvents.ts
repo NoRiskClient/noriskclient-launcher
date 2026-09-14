@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useProcessStore, ProcessMetrics } from "../store/useProcessStore";
+import { useProcessStore, ProcessMetrics, LogEntry } from "../store/useProcessStore";
 import i18n from '../i18n/i18n';
 import { EventType, ProcessMetricsPayload, MinecraftProcessExitedPayload } from "../types/events";
 import { ProcessState } from "../types/processState";
+
+// Stable reference so the useProcessLogs selector below doesn't return a new array on unrelated store field changes.
+const EMPTY_LOGS: LogEntry[] = [];
 
 // Launch status events that should be logged
 const LAUNCH_STATUS_EVENTS = new Set([
@@ -48,16 +51,13 @@ export function useProcessEvents(options: {
 } = {}) {
   const { autoFetch = true, processFilter } = options;
 
-  const {
-    fetchProcesses,
-    updateMetrics,
-    markProcessStopped,
-    addLauncherLog,
-    clearLauncherLogs,
-    clearLogs,
-    processes,
-    stoppedProcesses,
-  } = useProcessStore();
+  // Individual selectors - a bare destructure subscribes to every field, including the high-churn `logs` and `metrics` maps.
+  const fetchProcesses = useProcessStore((state) => state.fetchProcesses);
+  const updateMetrics = useProcessStore((state) => state.updateMetrics);
+  const markProcessStopped = useProcessStore((state) => state.markProcessStopped);
+  const addLauncherLog = useProcessStore((state) => state.addLauncherLog);
+  const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
+  const clearLogs = useProcessStore((state) => state.clearLogs);
 
   const stateEventListenerRef = useRef<UnlistenFn | null>(null);
   // Track which profiles have started a new launch (to clear old MC logs)
@@ -195,8 +195,8 @@ export function useProcessEvents(options: {
     };
   }, [autoFetch, processFilter, fetchProcesses, updateMetrics, markProcessStopped, addLauncherLog, clearLauncherLogs, clearLogs]);
 
-  // Return store state and actions for convenience
-  return useProcessStore();
+  // Only select what callers actually use, rather than the entire store.
+  return { processes: useProcessStore((state) => state.processes) };
 }
 
 /**
@@ -204,10 +204,9 @@ export function useProcessEvents(options: {
  * NOTE: This hook only READS from the store. Use useProcessEvents to subscribe to log events.
  */
 export function useProcessLogs(processId: string | null) {
-  const { getLogsForProcess, logs } = useProcessStore();
+  const logs = useProcessStore((state) =>
+    processId ? state.logs.get(processId) ?? EMPTY_LOGS : EMPTY_LOGS,
+  );
 
-  return {
-    logs: processId ? getLogsForProcess(processId) : [],
-    allLogs: logs,
-  };
+  return { logs };
 }
