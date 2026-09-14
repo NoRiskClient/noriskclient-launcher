@@ -2,6 +2,22 @@ import type { NoriskPackDefinition, PackListing } from "../types/noriskPacks";
 
 export type Packs = Record<string, NoriskPackDefinition>;
 
+export const DEV_PACK_PREFIX = "dev-";
+
+/**
+ * The packs the logged in account may see: everything, minus the dev packs for anyone
+ * who is not staff.
+ */
+export function visiblePacks(packs: Packs, staff: boolean): Packs {
+  if (staff) return packs;
+
+  const visible: Packs = {};
+  for (const [id, def] of Object.entries(packs)) {
+    if (!id.startsWith(DEV_PACK_PREFIX)) visible[id] = def;
+  }
+  return visible;
+}
+
 export interface PackOption {
   id: string;
   label: string;
