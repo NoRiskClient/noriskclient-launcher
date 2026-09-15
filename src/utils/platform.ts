@@ -1,3 +1,13 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
+
+let macOSClipsSupported = false;
+
+export async function initializeClipSupport(): Promise<void> {
+  if (isMacOS() && isTauri()) {
+    macOSClipsSupported = await invoke<boolean>("capture_supported");
+  }
+}
+
 export function isWindows(): boolean {
   if (typeof navigator === "undefined") {
     return false;
@@ -5,12 +15,10 @@ export function isWindows(): boolean {
   return /Windows/i.test(navigator.userAgent);
 }
 
-let rootBlurFallback: boolean | null = null;
+export function isMacOS(): boolean {
+  return typeof navigator !== "undefined" && /Macintosh/i.test(navigator.userAgent);
+}
 
-export function needsRootBlurFallback(): boolean {
-  if (rootBlurFallback === null) {
-    const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
-    rootBlurFallback = /Linux|X11/i.test(ua) && !/Android/i.test(ua);
-  }
-  return rootBlurFallback;
+export function supportsClips(): boolean {
+  return isWindows() || (isMacOS() && macOSClipsSupported);
 }

@@ -26,6 +26,7 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(150);
 const MIN_CAPTURE_SIDE: u32 = 128;
 const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
+const EMPTY_RING_GRACE: Duration = Duration::from_secs(8);
 
 pub struct Engine {
     config: CaptureConfig,
@@ -39,6 +40,7 @@ pub struct Engine {
     last_status: Instant,
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
     keyframe_warned: std::cell::Cell<bool>,
+    empty_warned: std::cell::Cell<bool>,
 }
 
 enum FrameSource {
@@ -119,6 +121,7 @@ struct Pipeline {
     encoder: norisk_ipc::EncoderPreference,
     audio: Option<AudioPipeline>,
     target: window::GameWindow,
+    started: Instant,
 }
 
 type LatencyWindow = Arc<Mutex<VecDeque<u32>>>;
@@ -243,6 +246,7 @@ impl Engine {
             last_status: Instant::now(),
             rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
             keyframe_warned: std::cell::Cell::new(false),
+            empty_warned: std::cell::Cell::new(false),
         }
     }
 
@@ -283,17 +287,20 @@ impl Engine {
 
     fn announce_ready(&self) {
         let matrix = crate::encoder::capabilities();
+        report_encoders(&matrix);
         let encoders = crate::encoder::available_for(norisk_ipc::ClipCodec::H264, &matrix);
         let adapter = self
             .active
             .as_ref()
             .map(|p| p.source.adapter().to_string())
-            .or_else(|| {
-                CaptureDevice::new_default()
-                    .ok()
-                    .map(|device| device.adapter_name.clone())
+            .or_else(|| match CaptureDevice::new_default() {
+                Ok(device) => Some(device.adapter_name.clone()),
+                Err(e) => {
+                    log::warn!("This machine has no graphics device we can record with: {e:#}");
+                    None
+                }
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|| "no usable graphics device".into());
 
         fn describe(
             devices: Result<Vec<crate::audio::AudioDevice>, anyhow::Error>,
@@ -345,12 +352,10 @@ impl Engine {
                 if !self.buffering_enabled {
                     log::info!("Buffering is paused; process {pid} waits for the resume");
                     self.paused_pid = Some(pid);
+                } else if self.attached_pid() == Some(pid) {
+                    log::debug!("Already recording process {pid}; leaving the pipeline alone");
                 } else {
-                    if self.attached_pid() == Some(pid) {
-                        self.detach_retaining_buffer();
-                    } else {
-                        self.detach();
-                    }
+                    self.detach();
                     self.begin_attach(pid);
                 }
             }
@@ -457,6 +462,9 @@ impl Engine {
         match search.poll() {
             window::SearchStep::Waiting => {}
             window::SearchStep::Found(target) => {
+                if window::client_size(target.hwnd).is_none() {
+                    return;
+                }
                 self.pending_attach = None;
                 if let Err(e) = self.attach(target) {
                     log::error!("Could not start capturing process {pid}: {e:#}");
@@ -485,6 +493,11 @@ impl Engine {
             self.resize_settling = None;
             return;
         };
+
+        if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
+            self.resize_settling = None;
+            return;
+        }
 
         let wanted = fit_output(source, (self.config.width, self.config.height));
         if wanted == (pipeline.settings.width, pipeline.settings.height) {
@@ -550,12 +563,17 @@ impl Engine {
     fn attach(&mut self, target: window::GameWindow) -> Result<()> {
         log::info!("Attaching to '{}' (pid {})", target.title, target.pid);
         self.keyframe_warned.set(false);
+        self.empty_warned.set(false);
 
         let device = CaptureDevice::new_for_window(target.hwnd)?;
         let (codec, chosen) = self.choose_encoder()?;
 
-        let source = window::client_size(target.hwnd)
-            .unwrap_or(((target.width.max(0)) as u32, (target.height.max(0)) as u32));
+        let Some(source) = window::client_size(target.hwnd) else {
+            anyhow::bail!(
+                "'{}' is minimised or has no drawable area, so there is nothing to record yet",
+                target.title,
+            );
+        };
 
         if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
             anyhow::bail!(
@@ -740,6 +758,7 @@ impl Engine {
             encode_latency,
             settings,
             encoder: chosen,
+            started: Instant::now(),
         });
         Ok(())
     }
@@ -762,7 +781,7 @@ impl Engine {
             at: Instant::now(),
         });
 
-        self.detach();
+        let drained = self.detach();
 
         if let Some(retired) = retired {
             let held = retired
@@ -770,7 +789,14 @@ impl Engine {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .duration_seconds();
-            log::info!("Keeping {held:.1}s of the previous buffer across the rebuild");
+            if drained {
+                log::info!("Keeping {held:.1}s of the previous buffer across the rebuild");
+            } else {
+                log::info!(
+                    "Keeping the previous buffer across the rebuild; it holds {held:.1}s so far \
+                     and the encoder is still flushing into it"
+                );
+            }
             self.retired = Some(retired);
         }
     }
@@ -800,27 +826,33 @@ impl Engine {
             .shrink_window(spare as f32);
     }
 
-    fn detach(&mut self) {
+    fn detach(&mut self) -> bool {
         self.pending_attach = None;
 
         self.retired = None;
 
         let Some(mut pipeline) = self.active.take() else {
-            return;
+            return true;
         };
         log::info!("Detaching");
 
         drop(pipeline.source);
         pipeline.frames_tx.take();
-        if let Some(handle) = pipeline.encode_thread.take() {
-            match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
-                Err(RecvTimeoutError::Timeout) => log::warn!(
+        let Some(handle) = pipeline.encode_thread.take() else {
+            return true;
+        };
+
+        match pipeline.encode_done.recv_timeout(ENCODE_DRAIN_BUDGET) {
+            Err(RecvTimeoutError::Timeout) => {
+                log::warn!(
                     "The encoder is still flushing after {ENCODE_DRAIN_BUDGET:?}; letting it \
                      finish on its own so the engine stays answerable"
-                ),
-                _ => {
-                    let _ = handle.join();
-                }
+                );
+                false
+            }
+            _ => {
+                let _ = handle.join();
+                true
             }
         }
     }
@@ -883,12 +915,39 @@ impl Engine {
         }
 
         let Some((clip, extradata, settings, audio)) = chosen else {
-            let message = if self.active.is_none() {
-                "the recorder is still starting up, so there is nothing to cut yet"
+            let (code, message) = if self.active.is_none() {
+                (
+                    ErrorCode::NotRecording,
+                    "nothing is being recorded, so there is nothing to cut",
+                )
             } else {
-                "the replay buffer holds nothing to cut"
+                (
+                    ErrorCode::BufferEmpty,
+                    "the replay buffer holds nothing to cut",
+                )
             };
-            self.emit_error(ErrorCode::BufferEmpty, message.into(), true);
+            if let Some(pipeline) = self.active.as_ref() {
+                let stats = pipeline.source.stats();
+                let dropped = pipeline.dropped.load(Ordering::Relaxed);
+                let ring = pipeline.ring.lock().unwrap_or_else(|e| e.into_inner());
+                log::warn!(
+                    "Nothing to cut: the source received {} frame(s) and handed on {}, of which {} \
+                     never reached the encoder; the ring holds {} segment(s) over {:.1}s ({} bytes) \
+                     and threw away {} packet(s) waiting for a first keyframe; the cut asked for \
+                     {:.0}s before and {:.0}s after",
+                    stats.received,
+                    stats.delivered,
+                    dropped,
+                    ring.segment_count(),
+                    ring.duration_seconds(),
+                    ring.bytes(),
+                    ring.dropped_before_first_keyframe(),
+                    pre,
+                    post,
+                );
+            }
+
+            self.emit_error(code, message.into(), true);
             return Ok(());
         };
 
@@ -985,6 +1044,24 @@ impl Engine {
                 ring.dropped_before_first_keyframe(),
             )
         };
+
+        if buffer_fill_seconds <= 0.0
+            && dropped_before_keyframe == 0
+            && stats.delivered > 0
+            && pipeline.started.elapsed() >= EMPTY_RING_GRACE
+            && !self.empty_warned.get()
+        {
+            self.empty_warned.set(true);
+            log::error!(
+                "Nothing has reached the replay buffer in {:?} of recording: the source handed on \
+                 {} frame(s), {} never reached the encoder, and {} packet(s) were thrown away \
+                 waiting for a first keyframe. No clip can be cut in this state.",
+                pipeline.started.elapsed(),
+                stats.delivered,
+                pipeline.dropped.load(Ordering::Relaxed),
+                dropped_before_keyframe,
+            );
+        }
 
         if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned.get()
         {
@@ -1550,9 +1627,12 @@ fn encode_loop(
     let wait =
         std::time::Duration::from_nanos((1_000_000_000 / fps as u64) * REPEAT_AFTER_FRAMES as u64);
 
+    let report_after = (fps / REPEAT_AFTER_FRAMES as i64).max(1) as u64;
+
     let mut last: Option<PoolFrame> = None;
     let mut last_pts = i64::MIN;
     let mut repeats: u64 = 0;
+    let mut reported = false;
 
     let emit = |encoder: &mut VideoEncoder, frame: &PoolFrame| -> bool {
         let started = Instant::now();
@@ -1587,10 +1667,11 @@ fn encode_loop(
     loop {
         match frames.recv_timeout(wait) {
             Ok(mut frame) => {
-                if repeats > 0 {
+                if reported {
                     log::debug!("The source drew again after {repeats} repeated frame(s)");
-                    repeats = 0;
+                    reported = false;
                 }
+                repeats = 0;
 
                 if frame.pts() <= last_pts {
                     frame.set_pts(last_pts + 1);
@@ -1612,8 +1693,9 @@ fn encode_loop(
                 }
 
                 repeats += 1;
-                if repeats == 1 {
-                    log::debug!("The source stopped drawing; holding the last frame");
+                if repeats == report_after {
+                    log::debug!("The source has not drawn for about a second; holding its last frame");
+                    reported = true;
                 }
             }
             Err(RecvTimeoutError::Disconnected) => break,
@@ -1624,6 +1706,24 @@ fn encode_loop(
         let mut guard = ring.lock().unwrap_or_else(|e| e.into_inner());
         for packet in packets {
             guard.push(packet);
+        }
+    }
+}
+
+fn report_encoders(matrix: &[norisk_ipc::EncoderCapability]) {
+    for codec in norisk_ipc::ClipCodec::all() {
+        let verdicts: Vec<String> = matrix
+            .iter()
+            .filter(|c| c.codec == codec)
+            .map(|c| match (c.available, c.detail.as_deref()) {
+                (true, _) => format!("{:?} yes", c.encoder),
+                (false, Some(why)) => format!("{:?} no ({why})", c.encoder),
+                (false, None) => format!("{:?} no", c.encoder),
+            })
+            .collect();
+
+        if !verdicts.is_empty() {
+            log::info!("{codec:?} encoders: {}", verdicts.join(", "));
         }
     }
 }

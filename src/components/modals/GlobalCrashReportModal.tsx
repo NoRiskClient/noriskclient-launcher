@@ -5,13 +5,15 @@ import { Modal } from '../ui/Modal';
 import { StaticTooltip } from '../ui/Tooltip';
 import { useCrashModalStore } from '../../store/crash-modal-store';
 import { Button } from '../ui/buttons/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { getProfile } from '../../services/profile-service';
 import { uploadLogToMclogs } from '../../services/log-service';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { checkCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
-import type { CrashlogDto } from '../../types/processState';
+import type { CrashlogDto, ProcessMetadata } from '../../types/processState';
+import type { CrashCheckResult } from '../../types/crash-analysis';
 import { openExternalUrl } from '../../services/tauri-service';
 import { useGlobalModal } from '../../hooks/useGlobalModal';
 import { CrashAnalysisModal } from './CrashAnalysisModal';
@@ -29,6 +31,7 @@ export function GlobalCrashReportModal() {
   const [profileName, setProfileName] = useState<string>('');
   const [mclogsUrl, setMclogsUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(true);
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
   const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
@@ -52,6 +55,7 @@ export function GlobalCrashReportModal() {
       }
       setMclogsUrl(null);
       setIsProcessing(false);
+      setAnalyzeWithNoRisk(true);
       setDisplayedCrashReportContent(crashData.crash_report_content);
       setIsListeningForCrashContent(false);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag for new crash
@@ -193,80 +197,93 @@ export function GlobalCrashReportModal() {
     return null;
   }
 
+  const shareLogLink = async (url: string) => {
+    try { await writeText(url); } catch {}
+    try { await openExternalUrl(url); } catch {}
+  };
+
+  const buildLogContent = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
+    let crashReport = displayedCrashReportContent;
+    if (crashData?.process_id && !crashReport) {
+      setStatusText(t('crash_modal.toast.fetching_before_upload'));
+      try {
+        crashReport = (await fetchCrashReport(profileId, crashData.process_id, metadata.start_time)) ?? undefined;
+        if (crashReport) setDisplayedCrashReportContent(crashReport);
+      } catch (e) {
+        logWarn(`Failed to fetch crash report before upload, continuing with existing data: ${e}`);
+      }
+    }
+
+    setStatusText(t('crash_modal.toast.fetching_log'));
+    const gameLog = metadata.log_session_id
+      ? (await getProcessLogCursor(metadata.log_session_id, 0)).output
+      : "";
+
+    const content = crashReport?.trim()
+      ? `--- CRASH REPORT ---
+${crashReport}
+
+--- GAME LOG ---
+${gameLog}`
+      : gameLog;
+
+    if (!content.trim()) {
+      throw new Error(t('crash_modal.error.no_log_content'));
+    }
+    return content;
+  };
+
+  const ensureUploaded = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
+    if (mclogsUrl) return mclogsUrl;
+    const content = await buildLogContent(profileId, metadata);
+    setStatusText(t('crash_modal.toast.uploading_mclogs'));
+    const url = await uploadLogToMclogs(content);
+    setMclogsUrl(url);
+    return url;
+  };
+
+  const analyze = async (url: string, profileId: string, metadata: ProcessMetadata) => {
+    setStatusText(t('crash_modal.toast.analyzing'));
+    const payload: CrashlogDto = { mcLogsUrl: url, metadata, locale: i18n.language };
+    let result: CrashCheckResult;
+    try {
+      result = await checkCrashLog(payload);
+    } catch (e) {
+      logError(`Crash analysis failed, falling back to log link: ${e}`);
+      toast.error(t('crash_modal.toast.analyze_failed'));
+      await shareLogLink(url);
+      return;
+    }
+    closeCrashModal();
+    showModal(
+      'crash-analysis',
+      <CrashAnalysisModal
+        result={result}
+        profileId={profileId}
+        onClose={() => hideModal('crash-analysis')}
+      />,
+    );
+  };
+
   const handlePrimaryAction = async () => {
-    if (!crashData?.profile_id || !crashData?.process_metadata) {
+    const profileId = crashData?.profile_id;
+    const metadata = crashData?.process_metadata;
+    if (!profileId || !metadata) {
       toast.error(t('crash_modal.toast.missing_data'));
-      logError(`Action error: Missing profile_id or process_metadata for process ${crashData.process_id}`);
+      logError(`Action error: Missing profile_id or process_metadata for process ${crashData?.process_id}`);
       return;
     }
 
     setIsProcessing(true);
     setStatusText(t('crash_modal.toast.processing'));
-    let currentMclogsUrl = mclogsUrl;
-
     try {
-      // NEUE LOGIK: Vor dem Upload nochmal den neuesten Crash-Report holen
-      if (crashData.process_id && !displayedCrashReportContent) {
-        setStatusText(t('crash_modal.toast.fetching_before_upload'));
-        try {
-          const fetchedContent = await fetchCrashReport(crashData.profile_id, crashData.process_id, crashData.process_metadata?.start_time);
-          if (fetchedContent) {
-            setDisplayedCrashReportContent(fetchedContent);
-          }
-        } catch (e) {
-          logWarn(`Failed to fetch crash report before upload, continuing with existing data: ${e}`);
-        }
-      }
-
-      if (!currentMclogsUrl) {
-        setStatusText(t('crash_modal.toast.fetching_log'));
-        const sessionId = crashData.process_metadata?.log_session_id;
-        const logContent = sessionId
-          ? (await getProcessLogCursor(sessionId, 0)).output
-          : "";
-
-        let combinedLogContent = logContent;
-        if (displayedCrashReportContent && displayedCrashReportContent.trim() !== "") {
-          combinedLogContent = `--- CRASH REPORT ---\n${displayedCrashReportContent}\n\n--- GAME LOG ---\n${logContent}`;
-          setStatusText(t('crash_modal.toast.preparing_combined'));
-        }
-
-        if (!combinedLogContent || combinedLogContent.trim() === "") {
-          throw new Error(t('crash_modal.error.no_log_content'));
-        }
-
-        setStatusText(t('crash_modal.toast.uploading_mclogs'));
-        currentMclogsUrl = await uploadLogToMclogs(combinedLogContent);
-        setMclogsUrl(currentMclogsUrl);
-      }
-
-      if (currentMclogsUrl) {
-        const crashReportPayload: CrashlogDto = {
-          mcLogsUrl: currentMclogsUrl,
-          metadata: crashData.process_metadata!,
-          locale: i18n.language,
-        };
-
-        // single call: the discord-bot reports the crash to staff AND returns the verdict
-        setStatusText(t('crash_modal.toast.analyzing'));
-        try {
-          const result = await checkCrashLog(crashReportPayload);
-          closeCrashModal();
-          showModal(
-            'crash-analysis',
-            <CrashAnalysisModal
-              result={result}
-              profileId={crashData?.profile_id}
-              onClose={() => hideModal('crash-analysis')}
-            />,
-          );
-        } catch (analyzeError) {
-          // backend offline / analysis failed → graceful fallback: copy + open the raw log
-          logError(`Crash analysis failed, falling back to log link: ${analyzeError}`);
-          try { await writeText(currentMclogsUrl); } catch {}
-          toast.error(t('crash_modal.toast.analyze_failed'));
-          try { await openExternalUrl(currentMclogsUrl); } catch {}
-        }
+      const url = await ensureUploaded(profileId, metadata);
+      if (analyzeWithNoRisk) {
+        await analyze(url, profileId, metadata);
+      } else {
+        toast.success(t('crash_modal.toast.url_copied'));
+        await shareLogLink(url);
+        closeCrashModal();
       }
     } catch (error: any) {
       toast.error(error.message || t('crash_modal.toast.unexpected_error'));
@@ -276,7 +293,7 @@ export function GlobalCrashReportModal() {
       setStatusText(null);
     }
   };
-  
+
   const handleContactSupport = async () => {
     try {
       await openExternalUrl('https://discord.norisk.gg');
@@ -287,7 +304,7 @@ export function GlobalCrashReportModal() {
     }
   };
 
-  const primaryButtonText = t('crash_modal.button.analyze');
+  const primaryButtonText = analyzeWithNoRisk ? t('crash_modal.button.analyze') : t('crash_modal.button.upload_only');
 
   const modalFooter = (
     <div className="flex gap-3 w-full">
@@ -295,13 +312,14 @@ export function GlobalCrashReportModal() {
         <Button
           onClick={handlePrimaryAction}
           variant="secondary"
-          icon={<Icon icon="solar:shield-check-bold" className="w-5 h-5" />}
+          icon={<Icon icon={analyzeWithNoRisk ? "solar:shield-check-bold" : "solar:cloud-upload-bold"} className="w-5 h-5" />}
           disabled={isProcessing || !crashData?.process_metadata}
           className="w-full justify-center whitespace-nowrap"
         >
           {primaryButtonText}
         </Button>
         {/* BETA badge — corner overlay like the rollout blitz in MainLaunchButton; tooltip on hover */}
+        {analyzeWithNoRisk && (
         <div className="absolute -top-2 -left-2 z-10 pointer-events-auto">
           <StaticTooltip content={t('crash_modal.tooltip.beta')} delay={0}>
             <span className="rounded border border-amber-400/50 bg-amber-400/30 px-1.5 py-0.5 text-[10px] font-minecraft uppercase leading-none text-amber-200 cursor-help shadow-md">
@@ -309,6 +327,7 @@ export function GlobalCrashReportModal() {
             </span>
           </StaticTooltip>
         </div>
+        )}
       </div>
       <Button
         onClick={handleContactSupport}
@@ -354,6 +373,18 @@ export function GlobalCrashReportModal() {
             <p className="pt-4 text-base font-smallcaps text-red-400">
               {t('crash_modal.exit_code')}: {crashData.exit_code ?? 'N/A'}
             </p>
+
+            <div className="pt-4 space-y-3 text-left">
+              <p className="text-sm font-minecraft text-gray-400">
+                {t('crash_modal.upload_notice')}
+              </p>
+              <Checkbox
+                checked={analyzeWithNoRisk}
+                onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
+                label={t('crash_modal.report_checkbox')}
+                size="sm"
+              />
+            </div>
           </>
         )}
       </div>

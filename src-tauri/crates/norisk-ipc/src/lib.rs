@@ -103,6 +103,7 @@ pub enum EncoderPreference {
     Nvenc,
     Amf,
     QuickSync,
+    VideoToolbox,
     Software,
 }
 
@@ -315,6 +316,7 @@ pub enum ErrorCode {
     AudioDevice,
     ClipWrite,
     BufferEmpty,
+    NotRecording,
     Paused,
     Internal,
 }

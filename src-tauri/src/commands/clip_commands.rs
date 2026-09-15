@@ -7,6 +7,14 @@ use norisk_ipc::{
     LauncherToCapture,
 };
 
+#[tauri::command]
+pub fn capture_supported() -> bool {
+    #[cfg(target_os = "macos")]
+    return norisk_capture::macos::capture_supported();
+    #[cfg(not(target_os = "macos"))]
+    cfg!(windows)
+}
+
 #[derive(Serialize)]
 pub struct CaptureStatus {
     pub running: bool,
@@ -26,23 +34,32 @@ pub struct CaptureStatus {
 
 #[tauri::command]
 pub async fn capture_release_hotkeys(#[allow(unused)] app: tauri::AppHandle) -> Result<(), CommandError> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     crate::utils::hotkey_manager::clear();
     Ok(())
 }
 
 #[tauri::command]
-pub async fn capture_apply_settings(app: tauri::AppHandle) -> Result<Vec<String>, CommandError> {
+pub async fn capture_apply_settings(
+    app: tauri::AppHandle,
+    restart: Option<bool>,
+) -> Result<Vec<String>, CommandError> {
     let state = State::get().await?;
     let clips = state.config_manager.get_config().await.clips;
 
     if !clips.enabled {
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         crate::utils::hotkey_manager::clear();
         state.capture_supervisor.stop().await;
         return Ok(Vec::new());
     }
 
+    #[cfg(target_os = "macos")]
+    if restart == Some(true) {
+        state.capture_supervisor.finish_shutdown().await;
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = restart;
     Ok(bring_up(&app, &clips).await?)
 }
 
@@ -54,7 +71,7 @@ pub fn start_on_launch(app: tauri::AppHandle) {
             return;
         };
         let clips = state.config_manager.get_config().await.clips;
-        if !clips.enabled {
+        if !capture_supported() || !clips.enabled {
             log::debug!("Clip system disabled; not starting the capture engine");
             return;
         }
@@ -78,6 +95,19 @@ pub async fn bring_up(
 ) -> crate::error::Result<Vec<String>> {
     let state = State::get().await?;
 
+    #[cfg(target_os = "macos")]
+    {
+        if !capture_supported() {
+            return Err(crate::error::AppError::Other("Clips require macOS 15 or newer.".into()));
+        }
+        if let Some(permissions) = super::capture_permissions::read_permissions(None).await? {
+            let microphone_missing = permissions.microphone_required && !permissions.microphone;
+            if !permissions.screen_recording || !permissions.input_monitoring || microphone_missing {
+                return Err(crate::error::AppError::Other("Grant the required permissions in Settings > Clips > macOS permissions, then retry capture.".into()));
+            }
+        }
+    }
+
     state.capture_supervisor.attach_app(app.clone()).await;
 
     if let Err(e) = crate::utils::clip_overlay::create(app) {
@@ -92,9 +122,9 @@ pub async fn bring_up(
 
     adopt_running_game(&state);
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     let registered = crate::utils::hotkey_manager::apply(app, clips)?;
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     let registered = Vec::new();
 
     crate::utils::game_watch::spawn();
@@ -167,6 +197,7 @@ pub async fn capture_encoder_capabilities() -> Result<Vec<EncoderCapability>, Co
     let state = State::get().await?;
     let supervisor = &state.capture_supervisor;
 
+    if !capture_supported() { return Ok(Vec::new()); }
     if let Some(ready) = supervisor.ready_info().await {
         if !ready.capabilities.is_empty() {
             return Ok(ready.capabilities);

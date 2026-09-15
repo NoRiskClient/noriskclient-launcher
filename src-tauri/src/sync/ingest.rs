@@ -48,7 +48,12 @@ fn kind_for(name: &str, is_dir: bool) -> SyncTargetKind {
     }
 }
 
-pub async fn store_target(pack_id: Uuid, target: SyncTarget) -> Result<SyncTarget> {
+pub async fn store_target(pack_id: Uuid, mut target: SyncTarget) -> Result<SyncTarget> {
+    if let Some(external) = target.external_path.as_deref().filter(|p| !p.is_empty()) {
+        let validated = paths::validate_external_master(external)?;
+        target.external_path = Some(validated.to_string_lossy().into_owned());
+    }
+
     let state = State::get().await?;
     let stored = state.sync_pack_manager.upsert_target(pack_id, target).await?;
     shortcuts::refresh(pack_id, &stored).await;

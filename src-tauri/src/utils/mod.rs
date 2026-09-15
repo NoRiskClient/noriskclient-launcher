@@ -28,6 +28,9 @@ pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-o
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it
 #[cfg(windows)]
 pub mod hotkey_manager;
+#[cfg(target_os = "macos")]
+#[path = "hotkey_manager_macos.rs"]
+pub mod hotkey_manager;
 pub mod import_safety; // Strips execution/path primitives out of untrusted imported packs
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally

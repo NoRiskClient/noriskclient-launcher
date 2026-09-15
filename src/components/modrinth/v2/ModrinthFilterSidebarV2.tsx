@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
+import { sanitizeSvgIcon } from '../../../utils/html-sanitize';
 import type {
   ModrinthProjectType,
   ModrinthCategory,
@@ -194,7 +195,7 @@ const FilterOption = ({
         {typeof icon === "string" ? (
           <span
             className="w-4 h-4 mr-1.5 flex-shrink-0"
-            dangerouslySetInnerHTML={{ __html: icon }}
+            dangerouslySetInnerHTML={{ __html: sanitizeSvgIcon(icon) }}
           />
         ) : icon ? (
           <span className="mr-1.5 flex-shrink-0">{icon}</span>

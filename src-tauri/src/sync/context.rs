@@ -51,7 +51,7 @@ impl<'a> SyncContext<'a> {
     pub fn master_path(&self) -> Result<PathBuf> {
         if let Some(external) = self.target.external_path.as_deref() {
             if !external.is_empty() {
-                return Ok(PathBuf::from(external));
+                return paths::validate_external_master(external);
             }
         }
         paths::master_path_for(self.pack.id, &self.target.path)

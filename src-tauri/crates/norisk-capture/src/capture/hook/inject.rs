@@ -11,9 +11,9 @@ use windows::Win32::System::Memory::{
     VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
 };
 use windows::Win32::System::Threading::{
-    CreateRemoteThread, GetExitCodeThread, OpenProcess, WaitForSingleObject,
-    PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ,
-    PROCESS_VM_WRITE,
+    CreateRemoteThread, GetExitCodeThread, GetProcessIdOfThread, OpenProcess, OpenThread,
+    WaitForSingleObject, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
+    PROCESS_VM_READ, PROCESS_VM_WRITE, THREAD_QUERY_LIMITED_INFORMATION,
 };
 
 const LOAD_TIMEOUT_MS: u32 = 10_000;
@@ -85,10 +85,10 @@ pub fn inject(pid: u32, thread_id: u32, dll: &Path) -> Result<Injected> {
         return Ok(Injected::AlreadyPresent);
     }
 
-    if let Some(executable) = process_executable(pid) {
-        if is_never_hooked(&executable) {
-            anyhow::bail!("{executable} is not a program to load a capture hook into");
-        }
+    let executable = process_executable(pid)
+        .with_context(|| format!("could not read what program {pid} is"))?;
+    if is_never_hooked(&executable) {
+        anyhow::bail!("{executable} is not a program to load a capture hook into");
     }
 
     match inject_through_message_hook(pid, thread_id, &dll, &file_name) {
@@ -124,13 +124,18 @@ fn inject_through_message_hook(
         .spawn()
         .context("could not start the injector")?;
 
-    let deadline = std::time::Instant::now() + MESSAGE_HOOK_BUDGET;
+    let started = std::time::Instant::now();
     let mut loaded = false;
-    while std::time::Instant::now() < deadline {
+    let mut nudging = true;
+    while started.elapsed() < MESSAGE_HOOK_BUDGET {
         if is_module_loaded(pid, file_name)? {
             loaded = true;
             break;
         }
+        if !nudging {
+            break;
+        }
+        nudging = matches!(child.try_wait(), Ok(None));
         std::thread::sleep(MESSAGE_HOOK_INTERVAL);
     }
 
@@ -138,7 +143,10 @@ fn inject_through_message_hook(
     let _ = child.wait();
 
     if !loaded {
-        anyhow::bail!("the game did not pick the hook up within {MESSAGE_HOOK_BUDGET:?}");
+        anyhow::bail!(
+            "the game did not pick the hook up within {:?}",
+            started.elapsed()
+        );
     }
     Ok(())
 }
@@ -149,10 +157,32 @@ pub fn run_injector(thread_id: u32, dll: &Path) -> Result<()> {
         PostThreadMessageW, SetWindowsHookExW, HOOKPROC, WH_GETMESSAGE,
     };
 
-    let wide: Vec<u16> = dll.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let expected = locate_hook_dll().context("could not find the capture hook we ship")?;
+    let requested = dll
+        .canonicalize()
+        .with_context(|| format!("the hook DLL is not where it should be: {}", dll.display()))?;
+    if requested != expected {
+        anyhow::bail!(
+            "refusing to load {}: only {} may be injected",
+            requested.display(),
+            expected.display()
+        );
+    }
+
+    if let Some(executable) = process_of_thread(thread_id).and_then(process_executable) {
+        if is_never_hooked(&executable) {
+            anyhow::bail!("{executable} is not a program to load a capture hook into");
+        }
+    }
+
+    let wide: Vec<u16> = requested
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
 
     let library = unsafe { LoadLibraryW(windows::core::PCWSTR(wide.as_ptr())) }
-        .with_context(|| format!("could not load {}", dll.display()))?;
+        .with_context(|| format!("could not load {}", requested.display()))?;
 
     let entry = unsafe { GetProcAddress(library, windows::core::s!("dummy_debug_proc")) }
         .context("the hook DLL does not export dummy_debug_proc")?;
@@ -186,6 +216,15 @@ pub fn injector_request(args: &[String]) -> Option<(u32, std::path::PathBuf)> {
     let thread_id = args.get(at + 1)?.parse().ok()?;
     let dll = args.get(at + 2)?;
     Some((thread_id, std::path::PathBuf::from(dll)))
+}
+
+fn process_of_thread(thread_id: u32) -> Option<u32> {
+    let thread = unsafe { OpenThread(THREAD_QUERY_LIMITED_INFORMATION, false, thread_id) }.ok()?;
+    let thread = HandleGuard(thread);
+    match unsafe { GetProcessIdOfThread(thread.0) } {
+        0 => None,
+        pid => Some(pid),
+    }
 }
 
 fn process_executable(pid: u32) -> Option<String> {

@@ -249,6 +249,10 @@ pub fn client_size(hwnd: HWND) -> Option<(u32, u32)> {
     use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
     unsafe {
+        if IsIconic(hwnd).as_bool() {
+            return None;
+        }
+
         let mut client = RECT::default();
         GetClientRect(hwnd, &mut client).ok()?;
 

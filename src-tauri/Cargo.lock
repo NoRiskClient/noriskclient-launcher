@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "noriskclient-launcher-v3"
-version = "0.6.26-beta.15"
+version = "0.6.28-beta.4"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3766,6 +3766,7 @@ dependencies = [
  "log",
  "log4rs",
  "machineid-rs",
+ "norisk-capture",
  "norisk-ipc",
  "norisk-logging",
  "notify",
