@@ -5,83 +5,79 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { FFMPEG_DLLS, HOOK_FILES } from "./native-deps-manifest.mjs";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const thirdParty = path.join(repoRoot, "src-tauri", "third-party");
 const force = process.argv.includes("--force");
 
-const DEPENDENCIES = [
-  {
-    id: "ffmpeg",
-    label: "FFmpeg n8.1.2",
-    dir: path.join(thirdParty, "ffmpeg"),
-    stampFile: ".norisk-ffmpeg-version",
-    stamp: "autobuild-2026-09-01-13-13/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-shared-8.1.zip",
-    url:
-      "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-01-13-13/" +
-      "ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-shared-8.1.zip",
-    sha256: "799ed38939d6e7513946fb99cc2b8f9c8d7ff99fa3b898bd733801f6b680beba",
-    abi: "src-tauri/crates/norisk-capture/src/encoder/d3d11_ffi.rs",
-    take: { kind: "inner-directory" },
-    expect: ["include/libavcodec/avcodec.h", "lib", "bin"],
-    notice: [
-      "The FFmpeg DLLs in this directory are unmodified binaries from the BtbN",
-      "FFmpeg-Builds project.",
-      "",
-      "  Project:  FFmpeg",
-      "  Version:  n8.1.2 (win64-gpl-shared)",
-      "  Build:    https://github.com/BtbN/FFmpeg-Builds",
-      "  Source:   https://git.ffmpeg.org/ffmpeg.git",
-      "  Licence:  GNU General Public License v3.0 - see LICENSE.txt",
-      "",
-      "They provide the video and audio encoding, decoding and MP4 muxing the clip",
-      "system is built on.",
-      "",
-      "This launcher is licensed under GPL-3.0. Distributing these binaries carries",
-      "the obligation to make the corresponding source available; it is published at",
-      "the URLs above, and the scripts that produced this exact build are in the",
-      "BtbN repository.",
-      "",
-      "Fetched by scripts/setup-native-deps.mjs - do not edit these files by hand.",
-      "",
-    ].join("\n"),
-  },
-  {
-    id: "graphics-hook",
-    label: "OBS graphics hook 32.1.1",
-    dir: path.join(thirdParty, "graphics-hook"),
-    stampFile: ".norisk-hook-version",
-    stamp: "OBS-Studio-32.1.1-Windows-x64.zip",
-    url:
-      "https://github.com/obsproject/obs-studio/releases/download/32.1.1/" +
-      "OBS-Studio-32.1.1-Windows-x64.zip",
-    sha256: "a4cc40a06d5a5dc158c792631b596a04b02d8fe99644a0f0bc3b12199dbce011",
-    abi: "src-tauri/crates/norisk-capture/src/capture/hook/info.rs",
-    take: { kind: "files", names: ["graphics-hook64.dll", "graphics-hook32.dll"] },
-    expect: ["graphics-hook64.dll"],
-    notice: [
-      "The graphics-hook DLLs in this directory are unmodified binaries from OBS Studio.",
-      "",
-      "  Project:  OBS Studio",
-      "  Version:  32.1.1",
-      "  Source:   https://github.com/obsproject/obs-studio",
-      "  Licence:  GNU General Public License v2.0 or later",
-      "",
-      "They are loaded into the game process to capture the rendered frame, which is the",
-      "only way to record a game running in exclusive fullscreen.",
-      "",
-      "This launcher is licensed under GPL-3.0, which is compatible with GPL-2.0-or-later.",
-      "Distributing these binaries carries the obligation to make the corresponding source",
-      "available; it is published at the URL above.",
-      "",
-      "Fetched by scripts/setup-native-deps.mjs - do not edit these files by hand.",
-      "",
-    ].join("\n"),
-  },
-];
+const ARCHIVE = {
+  label: "native capture dependencies",
+  stampFile: ".norisk-native-deps-version",
+  url:
+    "https://github.com/NoRiskClient/noriskclient-launcher/releases/download/native-deps-v1/" +
+    "norisk-native-deps-win64-v1.zip",
+  sha256: "3c5ff4ed9e243a0b7374ac5b9c7342d9b2983098ed765c0ce6b95a7754ef8463",
+  abi: [
+    "src-tauri/crates/norisk-capture/src/encoder/d3d11_ffi.rs",
+    "src-tauri/crates/norisk-capture/src/capture/hook/info.rs",
+  ],
+  expect: [
+    ...FFMPEG_DLLS.map((dll) => `ffmpeg/bin/${dll}`),
+    ...["avcodec", "avformat", "avutil", "swresample"].map((lib) => `ffmpeg/lib/${lib}.lib`),
+    "ffmpeg/include/libavcodec/avcodec.h",
+    "ffmpeg/LICENSE.txt",
+    ...HOOK_FILES.map((dll) => `graphics-hook/${dll}`),
+  ],
+};
+
+const DIRS = ["ffmpeg", "graphics-hook"];
+const STAMP = ARCHIVE.url.split("/download/")[1];
+
+const NOTICES = {
+  ffmpeg: [
+    "The FFmpeg DLLs in this directory are unmodified binaries from the BtbN",
+    "FFmpeg-Builds project.",
+    "",
+    "  Project:  FFmpeg",
+    "  Version:  n8.1.2 (win64-gpl-shared)",
+    "  Build:    https://github.com/BtbN/FFmpeg-Builds",
+    "  Source:   https://git.ffmpeg.org/ffmpeg.git",
+    "  Licence:  GNU General Public License v3.0 - see LICENSE.txt",
+    "",
+    "They provide the video and audio encoding, decoding and MP4 muxing the clip",
+    "system is built on.",
+    "",
+    "This launcher is licensed under GPL-3.0. Distributing these binaries carries",
+    "the obligation to make the corresponding source available; it is published at",
+    "the URLs above, and the scripts that produced this exact build are in the",
+    "BtbN repository.",
+    "",
+    "Fetched by scripts/setup-native-deps.mjs - do not edit these files by hand.",
+    "",
+  ].join("\n"),
+  "graphics-hook": [
+    "The graphics-hook DLLs in this directory are unmodified binaries from OBS Studio.",
+    "",
+    "  Project:  OBS Studio",
+    "  Version:  32.1.1",
+    "  Source:   https://github.com/obsproject/obs-studio",
+    "  Licence:  GNU General Public License v2.0 or later",
+    "",
+    "They are loaded into the game process to capture the rendered frame, which is the",
+    "only way to record a game running in exclusive fullscreen.",
+    "",
+    "This launcher is licensed under GPL-3.0, which is compatible with GPL-2.0-or-later.",
+    "Distributing these binaries carries the obligation to make the corresponding source",
+    "available; it is published at the URL above.",
+    "",
+    "Fetched by scripts/setup-native-deps.mjs - do not edit these files by hand.",
+    "",
+  ].join("\n"),
+};
 
 const ok = (msg) => console.log(`  \x1b[32m+\x1b[0m ${msg}`);
 const info = (msg) => console.log(`    ${msg}`);
-const warn = (msg) => console.log(`  \x1b[33m!\x1b[0m ${msg}`);
 
 if (process.platform !== "win32") {
   console.log("Native capture dependencies are Windows-only; nothing to do.");
@@ -95,85 +91,88 @@ if (typeof fetch !== "function") {
 
 console.log("\nNative capture dependencies");
 
-let fetched = 0;
-for (const dep of DEPENDENCIES) {
-  if (await ensure(dep)) fetched++;
-}
-
-if (fetched === 0) {
-  info("everything already in place");
+if (!force && isCurrent()) {
+  writeNotices();
+  ok(`${ARCHIVE.label} (already there)`);
+} else {
+  await install();
+  ok(ARCHIVE.label);
 }
 console.log("");
-async function ensure(dep) {
-  if (!force && isCurrent(dep)) {
-    writeNotice(dep);
-    ok(`${dep.label} (already there)`);
-    return false;
-  }
 
+async function install() {
   const cache = path.join(os.tmpdir(), "norisk-native-deps");
   fs.mkdirSync(cache, { recursive: true });
-  const archive = path.join(cache, path.basename(new URL(dep.url).pathname));
+  const archive = path.join(cache, path.basename(new URL(ARCHIVE.url).pathname));
 
-  if (!force && fs.existsSync(archive) && (await hashOf(archive)) === dep.sha256) {
-    info(`${dep.label}: using the cached download`);
+  if (!force && fs.existsSync(archive) && (await hashOf(archive)) === ARCHIVE.sha256) {
+    info("using the cached download");
   } else {
-    await download(dep.url, archive, dep.label);
+    await download(ARCHIVE.url, archive);
     const actual = await hashOf(archive);
-    if (actual !== dep.sha256) {
+    if (actual !== ARCHIVE.sha256) {
       fs.rmSync(archive, { force: true });
       throw new Error(
-        `${dep.label}: SHA256 mismatch.\n` +
-          `  expected ${dep.sha256}\n` +
+        `${ARCHIVE.label}: SHA256 mismatch.\n` +
+          `  expected ${ARCHIVE.sha256}\n` +
           `  got      ${actual}\n` +
-          `The download was deleted; run again. If it keeps failing, the pinned\n` +
-          `release was replaced — check the version and the ABI note in ${dep.abi}.`,
+          `The download was deleted; run again. If it keeps failing, the release asset\n` +
+          `was replaced. Check the version and the ABI notes in:\n` +
+          ARCHIVE.abi.map((file) => `  ${file}`).join("\n"),
       );
     }
     info("SHA256 verified");
   }
 
-  const staging = path.join(cache, `${dep.id}-staging`);
+  const staging = path.join(cache, "staging");
   fs.rmSync(staging, { recursive: true, force: true });
   fs.mkdirSync(staging, { recursive: true });
-
   unzip(archive, staging);
-  install(dep, staging);
+
+  for (const dir of DIRS) {
+    const from = path.join(staging, dir);
+    if (!fs.existsSync(from)) {
+      throw new Error(`${ARCHIVE.label}: ${dir}/ is not in the archive.`);
+    }
+    const to = path.join(thirdParty, dir);
+    fs.rmSync(to, { recursive: true, force: true });
+    fs.mkdirSync(to, { recursive: true });
+    fs.cpSync(from, to, { recursive: true });
+  }
   fs.rmSync(staging, { recursive: true, force: true });
 
-  for (const relative of dep.expect) {
-    if (!fs.existsSync(path.join(dep.dir, relative))) {
-      throw new Error(`${dep.label}: ${relative} is missing after unpacking.`);
+  for (const relative of ARCHIVE.expect) {
+    if (!fs.existsSync(path.join(thirdParty, relative))) {
+      throw new Error(`${ARCHIVE.label}: ${relative} is missing after unpacking.`);
     }
   }
 
-  writeNotice(dep);
-  fs.writeFileSync(path.join(dep.dir, dep.stampFile), dep.stamp, "utf8");
-
-  ok(`${dep.label}`);
-  return true;
+  writeNotices();
+  fs.writeFileSync(path.join(thirdParty, ARCHIVE.stampFile), STAMP, "utf8");
 }
 
-function writeNotice(dep) {
-  if (!dep.notice) return;
-  const at = path.join(dep.dir, "NOTICE.txt");
-  if (!fs.existsSync(at) || fs.readFileSync(at, "utf8") !== dep.notice) {
-    fs.writeFileSync(at, dep.notice, "utf8");
+function writeNotices() {
+  for (const dir of DIRS) {
+    const at = path.join(thirdParty, dir, "NOTICE.txt");
+    const notice = NOTICES[dir];
+    if (!fs.existsSync(at) || fs.readFileSync(at, "utf8") !== notice) {
+      fs.writeFileSync(at, notice, "utf8");
+    }
   }
 }
 
-function isCurrent(dep) {
-  const stamp = path.join(dep.dir, dep.stampFile);
+function isCurrent() {
+  const stamp = path.join(thirdParty, ARCHIVE.stampFile);
   if (!fs.existsSync(stamp)) return false;
-  if (fs.readFileSync(stamp, "utf8").trim() !== dep.stamp) return false;
-  return dep.expect.every((relative) => fs.existsSync(path.join(dep.dir, relative)));
+  if (fs.readFileSync(stamp, "utf8").trim() !== STAMP) return false;
+  return ARCHIVE.expect.every((relative) => fs.existsSync(path.join(thirdParty, relative)));
 }
 
-async function download(url, dest, label) {
-  info(`${label}: downloading`);
+async function download(url, dest) {
+  info("downloading");
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) {
-    throw new Error(`${label}: ${response.status} ${response.statusText} from ${url}`);
+    throw new Error(`${ARCHIVE.label}: ${response.status} ${response.statusText} from ${url}`);
   }
 
   const partial = `${dest}.partial`;
@@ -210,41 +209,4 @@ function bsdtar() {
     `${bundled} is missing. It ships with Windows 10 1803 and newer; on an older\n` +
       `build it has to be installed.`,
   );
-}
-
-function install(dep, staging) {
-  fs.rmSync(dep.dir, { recursive: true, force: true });
-  fs.mkdirSync(dep.dir, { recursive: true });
-
-  if (dep.take.kind === "inner-directory") {
-    const entries = fs.readdirSync(staging, { withFileTypes: true }).filter((e) => e.isDirectory());
-    if (entries.length !== 1) {
-      throw new Error(
-        `${dep.label}: expected one directory inside the archive, found ${entries.length}.`,
-      );
-    }
-    fs.cpSync(path.join(staging, entries[0].name), dep.dir, { recursive: true });
-    return;
-  }
-
-  for (const name of dep.take.names) {
-    const found = findFile(staging, name);
-    if (!found) {
-      throw new Error(`${dep.label}: ${name} is not in the archive.`);
-    }
-    fs.copyFileSync(found, path.join(dep.dir, name));
-  }
-}
-
-function findFile(root, name) {
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const full = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      const found = findFile(full, name);
-      if (found) return found;
-    } else if (entry.name === name) {
-      return full;
-    }
-  }
-  return null;
 }

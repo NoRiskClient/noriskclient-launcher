@@ -7,7 +7,7 @@
         <key>NSCameraUsageDescription</key>
         <string>A Minecraft mod wants to access your camera.</string>
         <key>NSMicrophoneUsageDescription</key>
-        <string>A Minecraft mod wants to access your microphone.</string>
+        <string>NoRiskClient uses your microphone for game clips when microphone recording is enabled. Minecraft mods may also request microphone access.</string>
         <key>NSAppTransportSecurity</key>
         <dict>
             <key>NSExceptionDomains</key>

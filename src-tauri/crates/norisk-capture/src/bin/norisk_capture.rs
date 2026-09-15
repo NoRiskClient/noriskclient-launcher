@@ -1,4 +1,4 @@
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn main() {
     eprintln!("The capture engine is Windows-only.");
     std::process::exit(1);
@@ -87,4 +87,9 @@ fn main() -> anyhow::Result<()> {
             watchdog::leave(1)
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn main() {
+    norisk_capture::macos::run();
 }

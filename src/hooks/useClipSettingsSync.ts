@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import { applyClipSettings } from "../services/clip-service";
 import { useClipsStore } from "../store/clips-store";
 import type { LauncherConfig } from "../types/launcherConfig";
-import { isWindows } from "../utils/platform";
+import { supportsClips } from "../utils/platform";
 
 function hotkeySignature(config: LauncherConfig): string {
   const clips = config.clips;
@@ -25,7 +25,7 @@ export function useClipSettingsSync(config: LauncherConfig | null, saving: boole
   }, [config, setEnabled]);
 
   useEffect(() => {
-    if (!config || saving || !isWindows()) return;
+    if (!config || saving || !supportsClips()) return;
 
     const signature = JSON.stringify(config.clips);
     if (appliedRef.current === "") {

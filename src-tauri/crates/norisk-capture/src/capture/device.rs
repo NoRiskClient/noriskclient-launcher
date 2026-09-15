@@ -2,10 +2,13 @@ use anyhow::{anyhow, Context, Result};
 use windows::core::Interface;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL_11_1};
+use windows::Win32::Graphics::Direct3D::{
+    D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
+};
 use windows::Win32::Graphics::Direct3D11::{
     D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Multithread,
-    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_SDK_VERSION,
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_FLAG, D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
+    D3D11_SDK_VERSION,
 };
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIAdapter, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_FLAG,
@@ -40,20 +43,21 @@ impl CaptureDevice {
     fn create(adapter: IDXGIAdapter, adapter_name: String) -> Result<Self> {
         let mut device: Option<ID3D11Device> = None;
         let mut context: Option<ID3D11DeviceContext> = None;
+        let mut level = D3D_FEATURE_LEVEL::default();
 
         unsafe {
             D3D11CreateDevice(
                 &adapter,
                 D3D_DRIVER_TYPE_UNKNOWN,
                 None,
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-                Some(&[D3D_FEATURE_LEVEL_11_1]),
+                CREATE_FLAGS,
+                Some(&FEATURE_LEVELS),
                 D3D11_SDK_VERSION,
                 Some(&mut device),
-                None,
+                Some(&mut level),
                 Some(&mut context),
             )
-            .context("D3D11CreateDevice failed")?;
+            .with_context(|| refusal(&adapter, &adapter_name))?;
         }
 
         let device = device.ok_or_else(|| anyhow!("D3D11CreateDevice returned no device"))?;
@@ -74,7 +78,7 @@ impl CaptureDevice {
             .cast()
             .context("WinRT device is not an IDirect3DDevice")?;
 
-        log::info!("Capture device created on adapter: {adapter_name}");
+        log::info!("Capture device created on adapter: {adapter_name} at {}", name_of(level));
 
         Ok(Self {
             device,
@@ -82,6 +86,47 @@ impl CaptureDevice {
             winrt_device,
             adapter_name,
         })
+    }
+}
+
+const CREATE_FLAGS: D3D11_CREATE_DEVICE_FLAG =
+    D3D11_CREATE_DEVICE_FLAG(D3D11_CREATE_DEVICE_BGRA_SUPPORT.0 | D3D11_CREATE_DEVICE_VIDEO_SUPPORT.0);
+
+const FEATURE_LEVELS: [D3D_FEATURE_LEVEL; 2] = [D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0];
+
+fn name_of(level: D3D_FEATURE_LEVEL) -> &'static str {
+    match level {
+        D3D_FEATURE_LEVEL_11_1 => "feature level 11.1",
+        D3D_FEATURE_LEVEL_11_0 => "feature level 11.0",
+        _ => "an unexpected feature level",
+    }
+}
+
+fn refusal(adapter: &IDXGIAdapter, name: &str) -> String {
+    let mut probe: Option<ID3D11Device> = None;
+    let plain = D3D11_CREATE_DEVICE_FLAG(D3D11_CREATE_DEVICE_BGRA_SUPPORT.0);
+
+    let without_video = unsafe {
+        D3D11CreateDevice(
+            adapter,
+            D3D_DRIVER_TYPE_UNKNOWN,
+            None,
+            plain,
+            Some(&FEATURE_LEVELS),
+            D3D11_SDK_VERSION,
+            Some(&mut probe),
+            None,
+            None,
+        )
+    };
+
+    if without_video.is_ok() {
+        format!(
+            "'{name}' speaks Direct3D 11 but its driver offers no video support, \
+             which recording needs — a driver update usually fixes this"
+        )
+    } else {
+        format!("'{name}' supports neither Direct3D feature level 11.1 nor 11.0")
     }
 }
 
