@@ -22,7 +22,8 @@ import {
 import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportModal";
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
-import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { LegalAcceptanceModal } from "./components/modals/LegalAcceptanceModal";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
@@ -76,7 +77,6 @@ export function App() {
   const navigate = useNavigate();
   const { openCrashModal } = useCrashModalStore();
   const {
-    hasAcceptedTermsOfService,
     analyticsConsent,
     language,
     setAnalyticsConsent,
@@ -98,9 +98,7 @@ export function App() {
   }, [initializeAccounts]);
 
   const welcomeSkipped = useWelcomeStore((s) => s.skipped);
-  // Terms come first: stacking the welcome screen over that modal would hide it.
-  const showWelcome =
-    hasAcceptedTermsOfService && accountsLoaded && !activeAccount && !welcomeSkipped;
+  const showWelcome = accountsLoaded && !activeAccount && !welcomeSkipped;
 
   const activeTab = location.pathname.substring(1) || "play";
 
@@ -583,7 +581,7 @@ export function App() {
         <GlobalCrashReportModal />
         <ImportPackConfirmModal />
         <DragDropOverlay />
-        <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
+        <LegalAcceptanceModal />
         {showWelcome && <WelcomeScreen />}
         <GlobalModalPortal />
         <MacCapturePermissionMonitor />
