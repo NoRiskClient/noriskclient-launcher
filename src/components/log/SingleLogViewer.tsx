@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
-import { useProcessStore } from "../../store/useProcessStore";
+import { useProcessStore, LogEntry } from "../../store/useProcessStore";
 import { LogViewerCore } from "./LogViewerCore";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { getProcess } from "../../services/process-service";
 import { useProcessLogCursor } from "../../hooks/useProcessLogCursor";
+
+// Stable reference so the selectors below don't return a new array whenever some other process's logs update.
+const EMPTY_LOGS: LogEntry[] = [];
 
 interface SingleLogViewerProps {
   instanceId?: string;
@@ -20,8 +23,13 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
-  const logsMap = useProcessStore((state) => state.logs);
-  const launcherLogsMap = useProcessStore((state) => state.launcherLogs);
+  // Scoped to this instance/profile - selecting the whole map would re-render on every other running instance's log lines too.
+  const mcLogs = useProcessStore((state) =>
+    instanceId ? state.logs.get(instanceId) ?? EMPTY_LOGS : EMPTY_LOGS,
+  );
+  const launcherLogs = useProcessStore((state) =>
+    profileId ? state.launcherLogs.get(profileId) ?? EMPTY_LOGS : EMPTY_LOGS,
+  );
   const clearLogs = useProcessStore((state) => state.clearLogs);
   const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
 
@@ -43,13 +51,6 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
   }, [instanceId]);
 
   useProcessLogCursor(sessionId, instanceId);
-
-  const mcLogs = instanceId ? (logsMap.get(instanceId) || []) : [];
-
-  const launcherLogs = useMemo(() => {
-    if (!profileId) return [];
-    return launcherLogsMap.get(profileId) || [];
-  }, [profileId, launcherLogsMap]);
 
   const logs = mcLogs.length > 0 ? mcLogs : launcherLogs;
 
