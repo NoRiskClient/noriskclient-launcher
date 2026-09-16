@@ -5,15 +5,16 @@ export type Packs = Record<string, NoriskPackDefinition>;
 export const DEV_PACK_PREFIX = "dev-";
 
 /**
- * The packs the logged in account may see: everything, minus the dev packs for anyone
- * who is not staff.
+ * The packs the logged in account may see: everything, minus the dev packs —
+ * except for staff, and for the ones in [granted], whose own node the account
+ * holds. Empty while those checks run, so a gated pack never flashes up.
  */
-export function visiblePacks(packs: Packs, staff: boolean): Packs {
+export function visiblePacks(packs: Packs, staff: boolean, granted: ReadonlySet<string>): Packs {
   if (staff) return packs;
 
   const visible: Packs = {};
   for (const [id, def] of Object.entries(packs)) {
-    if (!id.startsWith(DEV_PACK_PREFIX)) visible[id] = def;
+    if (!id.startsWith(DEV_PACK_PREFIX) || granted.has(id)) visible[id] = def;
   }
   return visible;
 }
