@@ -98,7 +98,12 @@ fn is_alive(pid: u32) -> bool {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn is_alive(_pid: u32) -> bool {
     false
+}
+
+#[cfg(target_os = "macos")]
+fn is_alive(pid: u32) -> bool {
+    unsafe { libc::kill(pid as i32, 0) == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM) }
 }

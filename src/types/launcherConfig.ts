@@ -24,7 +24,7 @@ export interface ReferralState {
   redeemed_by_account: string | null;
 }
 
-export type ClipEncoder = "auto" | "nvenc" | "amf" | "quick_sync" | "software";
+export type ClipEncoder = "auto" | "nvenc" | "amf" | "quick_sync" | "video_toolbox" | "software";
 
 export type AudioSourceChoice = 'system' | 'game_only' | 'both';
 

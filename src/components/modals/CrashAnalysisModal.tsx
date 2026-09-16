@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { openExternalUrl } from "../../services/tauri-service";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -256,11 +257,9 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
         )}
 
         {!hasActions && (
-          <LinkRow
-            icon="solar:document-text-linear"
-            text={t("crash_analysis.open_crash_log")}
-            onClick={() => openExternalUrl(`https://mclo.gs/${result.logId}`).catch(() => {})}
-          />
+          <div className="flex flex-wrap gap-3">
+            <LogLinks logId={result.logId} openTextKey="crash_analysis.open_crash_log" />
+          </div>
         )}
 
         {/* technical details — collapsed by default, normal font */}
@@ -281,11 +280,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
               <Fact label={t("crash_analysis.fact.mod")} value={result.culpritMods.join(", ") || null} />
               <Fact label={t("crash_analysis.fact.type")} value={result.classification} />
               <div className="flex flex-wrap gap-2 p-3">
-                <LinkRow
-                  icon="solar:document-text-linear"
-                  text={t("crash_analysis.open_log")}
-                  onClick={() => openExternalUrl(`https://mclo.gs/${result.logId}`).catch(() => {})}
-                />
+                <LogLinks logId={result.logId} openTextKey="crash_analysis.open_log" />
               </div>
             </div>
           )}
@@ -302,6 +297,21 @@ function Fact({ label, value }: { label: string; value: string | null }) {
       <span className="shrink-0 w-16 text-xs uppercase tracking-wide text-white/40 font-sans pt-1">{label}</span>
       <span className="text-sm text-white/85 break-all font-sans">{value}</span>
     </div>
+  );
+}
+
+function LogLinks({ logId, openTextKey }: { logId: string; openTextKey: string }) {
+  const { t } = useTranslation();
+  const url = `https://mclo.gs/${logId}`;
+  const copy = () =>
+    writeText(url)
+      .then(() => toast.success(t("crash_analysis.toast.link_copied")))
+      .catch(() => toast.error(t("crash_analysis.toast.copy_failed")));
+  return (
+    <>
+      <LinkRow icon="solar:document-text-linear" text={t(openTextKey)} onClick={() => openExternalUrl(url).catch(() => {})} />
+      <LinkRow icon="solar:copy-linear" text={t("crash_analysis.copy_log_link")} onClick={copy} />
+    </>
   );
 }
 

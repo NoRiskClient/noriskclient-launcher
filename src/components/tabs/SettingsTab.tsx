@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
-import { isWindows } from "../../utils/platform";
+import { isMacOS, supportsClips } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -90,8 +90,9 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       { id: "background", label: t("settings.background.title") },
       { id: "custom-background", label: t("settings.custom_background.title") },
     ],
-    clips: isWindows()
+    clips: supportsClips()
       ? [
+          ...(isMacOS() ? [{ id: "clips-permissions", label: t("settings.clips.permissions.title") }] : []),
           { id: "clips-general", label: t("settings.clips.title") },
           { id: "clips-hotkeys", label: t("settings.clips.hotkeys.title") },
           { id: "clips-buffer", label: t("settings.clips.buffer.title") },
@@ -117,7 +118,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   }[] = [
     { id: "general", label: t("settings.tabs.general"), icon: "solar:settings-bold", children: sectionDefs.general },
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
-    ...(isWindows()
+    ...(supportsClips()
       ? [{ id: "clips" as const, label: t("settings.tabs.clips"), icon: "solar:videocamera-record-bold", children: sectionDefs.clips }]
       : []),
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
