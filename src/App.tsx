@@ -22,10 +22,12 @@ import {
 import { GlobalCrashReportModal } from "./components/modals/GlobalCrashReportModal";
 import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmModal";
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
-import { TermsOfServiceModal, AnalyticsConsentBanner } from "./components/modals/TermsOfServiceModal";
+import { AnalyticsConsentBanner } from "./components/modals/AnalyticsConsentBanner";
+import { LegalAcceptanceModal } from "./components/modals/LegalAcceptanceModal";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
+import { useLegalStore } from "./store/legal-store";
 import { useThemeStore } from "./store/useThemeStore";
 import { useLaunchStateStore } from "./store/launch-state-store";
 import { useGlobalModal } from "./hooks/useGlobalModal";
@@ -76,7 +78,6 @@ export function App() {
   const navigate = useNavigate();
   const { openCrashModal } = useCrashModalStore();
   const {
-    hasAcceptedTermsOfService,
     analyticsConsent,
     language,
     setAnalyticsConsent,
@@ -87,20 +88,16 @@ export function App() {
   const { activeAccount } = useMinecraftAuthStore();
   const { fetchNotifications } = useNotificationStore();
 
-  // The welcome screen covers the whole app, so the account list has to be
-  // loaded here — its usual trigger sits inside AppLayout's header, behind the
-  // overlay. `accountsLoaded` keeps the screen from flashing up during the
-  // first fetch, when there is legitimately no active account yet.
   const initializeAccounts = useMinecraftAuthStore((s) => s.initializeAccounts);
-  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const accountsLoaded = useMinecraftAuthStore((s) => s.accountsLoaded);
   useEffect(() => {
-    initializeAccounts().finally(() => setAccountsLoaded(true));
+    initializeAccounts();
   }, [initializeAccounts]);
 
   const welcomeSkipped = useWelcomeStore((s) => s.skipped);
-  // Terms come first: stacking the welcome screen over that modal would hide it.
-  const showWelcome =
-    hasAcceptedTermsOfService && accountsLoaded && !activeAccount && !welcomeSkipped;
+  const legalChecked = useLegalStore((s) => s.checked);
+  const ready = accountsLoaded && legalChecked;
+  const showWelcome = ready && !activeAccount && !welcomeSkipped;
 
   const activeTab = location.pathname.substring(1) || "play";
 
@@ -583,15 +580,17 @@ export function App() {
         <GlobalCrashReportModal />
         <ImportPackConfirmModal />
         <DragDropOverlay />
-        <TermsOfServiceModal isOpen={!hasAcceptedTermsOfService} />
+        <LegalAcceptanceModal />
         {showWelcome && <WelcomeScreen />}
         <GlobalModalPortal />
         <MacCapturePermissionMonitor />
         <ChildProtectionModal />
         <NotificationModal />
-        <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
-          <Outlet context={profilesTabContext} />
-        </AppLayout>
+        {ready && (
+          <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
+            <Outlet context={profilesTabContext} />
+          </AppLayout>
+        )}
         {shouldShowAnalyticsBanner() && (
           <AnalyticsConsentBanner
             onAccept={handleAnalyticsAccept}
