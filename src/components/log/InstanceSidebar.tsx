@@ -11,7 +11,7 @@ import { EventType } from "../../types/events";
 import * as ProcessService from "../../services/process-service";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { requireMinecraftAccount } from "../../lib/require-account";
-import { useProfileStore } from "../../store/profile-store";
+import { handleIconImgLoad } from "../profiles/IconPicker";
 
 type InstanceStatus = "running" | "idle" | "crashed" | "starting" | "stopping";
 
@@ -180,6 +180,7 @@ function InstanceItem({
               src={toAssetUrl(instance.profileImageUrl)}
               alt={instance.name}
               className="w-full h-full object-cover"
+              onLoad={handleIconImgLoad}
             />
           ) : (
             <Icon
@@ -401,7 +402,7 @@ export function InstanceSidebar({
     // No account means the backend would reject this with NoCredentialsError —
     // prompt for sign-in instead and resume once it is done.
     const signedIn = requireMinecraftAccount({
-      profileName: useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name,
+      profileName: instances.find((i) => i.profileId === profileId)?.name,
       onAuthenticated: () => handleLaunchProfile(profileId),
     });
     if (!signedIn) return;
