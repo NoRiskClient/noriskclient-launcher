@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
+import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { InstanceSidebar } from "./InstanceSidebar";
 import { LogViewerCore } from "./LogViewerCore";
@@ -47,6 +48,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     themeStore.applyAccentColorToDOM();
     themeStore.applyBorderRadiusToDOM();
     useFontStore.getState().applyFontToDOM();
+    useMinecraftAuthStore.getState().initializeAccounts();
   }, []);
 
   useEffect(() => {
