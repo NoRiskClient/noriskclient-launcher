@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::minecraft::downloads::norisk_natives_download::NoriskNativesDownloadService as Natives;
 use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
@@ -228,6 +229,10 @@ impl MinecraftLauncher {
 
             if arg_str.starts_with("-Dnorisk.token=") {
                 parts.push("-Dnorisk.token=*****".to_string());
+            } else if arg_str.starts_with("-Dtwitch.token=") {
+                parts.push("-Dtwitch.token=*****".to_string());
+            } else if arg_str.starts_with("-Dtwitch.refresh_token=") {
+                parts.push("-Dtwitch.refresh_token=*****".to_string());
             } else if arg_str == "--accessToken" {
                 parts.push(arg_str); // Push "--accessToken"
                 if args_iter.peek().is_some() {
@@ -446,6 +451,31 @@ impl MinecraftLauncher {
             }
         } else {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
+        }
+
+        // Twitch link: refresh right before launch so the game never receives a stale token.
+        if let Some(creds) = &self.credentials {
+            match state
+                .minecraft_account_manager_v2
+                .ensure_fresh_twitch_token(creds.id)
+                .await
+            {
+                Ok(Some(twitch)) => {
+                    info!("[Twitch] Passing Twitch token to the game");
+                    command.arg(format!("-Dtwitch.token={}", twitch.access_token));
+                    command.arg(format!("-Dtwitch.refresh_token={}", twitch.refresh_token));
+                }
+                Ok(None) => info!("[Twitch] No Twitch account linked, skipping -Dtwitch.token"),
+                Err(e) => warn!("[Twitch] Could not resolve Twitch token: {}", e),
+            }
+        }
+
+        // ffmpeg natives for the Twitch stream player, installed by the installer once per machine.
+        if Natives::ffmpeg_ready() {
+            info!("[NRC Natives] Passing ffmpeg natives directory to the game");
+            command.arg(format!("-Dnrc.ffmpeg.natives={}", Natives::ffmpeg_dir().display()));
+        } else {
+            info!("[NRC Natives] ffmpeg natives not installed, stream player stays disabled");
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the
