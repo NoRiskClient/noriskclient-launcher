@@ -48,6 +48,11 @@ impl NrcRequest {
         self
     }
 
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.builder = self.builder.timeout(timeout);
+        self
+    }
+
     pub fn query<T: Serialize + ?Sized>(mut self, q: &T) -> Self {
         self.builder = self.builder.query(q);
         self
