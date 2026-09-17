@@ -4,9 +4,8 @@ import { Button } from '../ui/buttons/Button';
 import { Icon } from '@iconify/react';
 import { BannerCard } from '../ui/BannerCard';
 import { openExternalUrl } from '../../services/tauri-service';
-import { DOCUMENT_URLS } from './LegalAcceptanceModal';
+import { LEGAL_DOCUMENT_URLS, legalLocale } from '../../config/legal';
 
-// Analytics Consent Banner Component
 interface AnalyticsConsentBannerProps {
   onAccept: () => void;
   onDecline: () => void;
@@ -29,7 +28,7 @@ export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: Analy
             <p className="text-sm text-gray-300 font-minecraft leading-relaxed mb-4">
               {t('analytics.banner.description')}{' '}
               <button
-                onClick={() => openExternalUrl(DOCUMENT_URLS.privacy[i18n.language?.startsWith('de') ? 'de' : 'en'])}
+                onClick={() => openExternalUrl(LEGAL_DOCUMENT_URLS.privacy[legalLocale(i18n.language)])}
                 className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors text-sm"
               >
                 {t('analytics.banner.learn_more')}
