@@ -23,7 +23,7 @@ interface LegalDocument {
   locale: string;
   title: string;
   version: number;
-  requiresAcknowledgement: boolean;
+  acknowledgementVersion: number | null;
 }
 
 type Accepted = Record<string, number>;
@@ -53,7 +53,7 @@ export function LegalAcceptanceModal() {
   const outdated = accepted === null
     ? []
     : current.filter((doc) =>
-        firstTime || (doc.requiresAcknowledgement && (accepted[keyOf(doc)] ?? 0) < doc.version));
+        firstTime || (doc.acknowledgementVersion !== null && (accepted[keyOf(doc)] ?? 0) < doc.acknowledgementVersion));
 
   if (accepted === null || outdated.length === 0) return null;
 
