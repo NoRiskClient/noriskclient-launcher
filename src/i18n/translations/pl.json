@@ -277,7 +277,6 @@
   "legal.updated_many": "Poniższe dokumenty zostały zmienione. Zaakceptuj oznaczone warunki, aby dalej korzystać z launchera.",
   "legal.updated_other": "Poniższe dokumenty zostały zmienione. Zaakceptuj oznaczone warunki, aby dalej korzystać z launchera.",
   "legal.consent_required": "Wymagana akceptacja",
-  "legal.version": "Wersja {{version}}",
   "legal.as_of": "Stan na {{date}}",
   "legal.updated_on": "Zaktualizowano {{date}}",
   "legal.open": "Otwórz",

@@ -7,7 +7,6 @@ export interface PendingLegalDocument {
   slug: string;
   locale: string;
   title: string;
-  version: number;
   updatedAt: number;
   changeSummary: string | null;
   kind: LegalDocumentKind;

@@ -57,8 +57,6 @@ export function LegalAcceptanceModal() {
                 {t("legal.consent_required")}
               </span>
             )}
-            <span className="whitespace-nowrap">{t("legal.version", { version: doc.version })}</span>
-            <span aria-hidden>·</span>
             <span className="whitespace-nowrap">{t(firstTime ? "legal.as_of" : "legal.updated_on", { date })}</span>
           </span>
           {!firstTime && doc.changeSummary && (

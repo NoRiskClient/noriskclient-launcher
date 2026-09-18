@@ -275,7 +275,6 @@
   "legal.updated_one": "Aşağıdaki belge değişti. Başlatıcıyı kullanmaya devam etmek için lütfen kabul edin.",
   "legal.updated_other": "Aşağıdaki belgeler değişti. Başlatıcıyı kullanmaya devam etmek için lütfen işaretli koşulları kabul edin.",
   "legal.consent_required": "Onay gerekli",
-  "legal.version": "Sürüm {{version}}",
   "legal.as_of": "{{date}} itibarıyla",
   "legal.updated_on": "{{date}} tarihinde güncellendi",
   "legal.open": "Aç",

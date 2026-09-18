@@ -234,7 +234,6 @@
   "legal.updated_one": "Das folgende Dokument hat sich geändert. Bitte akzeptiere es, um den Launcher weiter zu nutzen.",
   "legal.updated_other": "Die folgenden Dokumente haben sich geändert. Bitte akzeptiere die markierten Bedingungen, um den Launcher weiter zu nutzen.",
   "legal.consent_required": "Zustimmung erforderlich",
-  "legal.version": "Version {{version}}",
   "legal.as_of": "Stand {{date}}",
   "legal.updated_on": "Aktualisiert am {{date}}",
   "legal.open": "Öffnen",

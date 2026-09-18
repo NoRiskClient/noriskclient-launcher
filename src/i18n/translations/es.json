@@ -275,7 +275,6 @@
   "legal.updated_one": "El siguiente documento ha cambiado. Acéptalo para seguir usando el launcher.",
   "legal.updated_other": "Los siguientes documentos han cambiado. Acepta los términos marcados para seguir usando el launcher.",
   "legal.consent_required": "Aceptación obligatoria",
-  "legal.version": "Versión {{version}}",
   "legal.as_of": "Vigente desde el {{date}}",
   "legal.updated_on": "Actualizado el {{date}}",
   "legal.open": "Abrir",

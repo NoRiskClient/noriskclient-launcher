@@ -234,7 +234,6 @@
   "legal.updated_one": "The following document has changed. Please accept it to keep using the launcher.",
   "legal.updated_other": "The following documents have changed. Please accept the marked terms to keep using the launcher.",
   "legal.consent_required": "Acceptance required",
-  "legal.version": "Version {{version}}",
   "legal.as_of": "As of {{date}}",
   "legal.updated_on": "Updated {{date}}",
   "legal.open": "Open",
