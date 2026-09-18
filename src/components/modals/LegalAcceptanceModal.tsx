@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exit } from "@tauri-apps/plugin-process";
 import { Icon } from "@iconify/react";
@@ -7,23 +7,16 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useThemeStore } from "../../store/useThemeStore";
-import { legalDocumentUrl, legalLocale } from "../../config/legal";
+import { formatLegalDate, legalDocumentUrl, legalLocale } from "../../config/legal";
 import { useLegalStore } from "../../store/legal-store";
 import type { PendingLegalDocument } from "../../services/legal-service";
 
 export function LegalAcceptanceModal() {
   const { t, i18n } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
-  const acceptedLegacyTerms = useThemeStore((s) => s.hasAcceptedTermsOfService);
-  const locale = legalLocale(i18n.language);
   const prompt = useLegalStore((s) => s.prompt);
-  const load = useLegalStore((s) => s.load);
   const acknowledge = useLegalStore((s) => s.acknowledge);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    load(locale, acceptedLegacyTerms);
-  }, [load, locale, acceptedLegacyTerms]);
 
   if (!prompt) return null;
 
@@ -41,13 +34,10 @@ export function LegalAcceptanceModal() {
     }
   };
 
-  const formatDate = (timestamp: number) =>
-    new Date(timestamp).toLocaleDateString(i18n.language, { day: "2-digit", month: "2-digit", year: "numeric" });
-
   const renderDocument = (doc: PendingLegalDocument) => {
     const url = legalDocumentUrl(doc.slug, legalLocale(doc.locale));
     const consent = doc.kind === "consent";
-    const date = formatDate(doc.updatedAt);
+    const date = formatLegalDate(doc.updatedAt, i18n.language);
     return (
       <button
         key={`${doc.slug}:${doc.locale}`}

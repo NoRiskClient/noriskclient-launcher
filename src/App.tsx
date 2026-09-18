@@ -24,6 +24,8 @@ import { ImportPackConfirmModal } from "./components/modals/ImportPackConfirmMod
 import { DragDropOverlay } from "./components/ui/DragDropOverlay";
 import { AnalyticsConsentBanner } from "./components/modals/AnalyticsConsentBanner";
 import { LegalAcceptanceModal } from "./components/modals/LegalAcceptanceModal";
+import { LegalUpdateBanner } from "./components/modals/LegalUpdateBanner";
+import { legalLocale } from "./config/legal";
 import { MacCapturePermissionMonitor } from "./components/clips/MacCapturePermissionMonitor";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
@@ -95,7 +97,14 @@ export function App() {
   }, [initializeAccounts]);
 
   const welcomeSkipped = useWelcomeStore((s) => s.skipped);
+  const acceptedLegacyTerms = useThemeStore((s) => s.hasAcceptedTermsOfService);
+  const loadLegalStatus = useLegalStore((s) => s.load);
   const legalChecked = useLegalStore((s) => s.checked);
+  const legalNotice = useLegalStore((s) => s.notice);
+  useEffect(() => {
+    loadLegalStatus(legalLocale(language), acceptedLegacyTerms);
+  }, [loadLegalStatus, language, acceptedLegacyTerms]);
+
   const ready = accountsLoaded && legalChecked;
   const showWelcome = ready && !activeAccount && !welcomeSkipped;
 
@@ -591,7 +600,8 @@ export function App() {
             <Outlet context={profilesTabContext} />
           </AppLayout>
         )}
-        {shouldShowAnalyticsBanner() && (
+        <LegalUpdateBanner />
+        {!legalNotice && shouldShowAnalyticsBanner() && (
           <AnalyticsConsentBanner
             onAccept={handleAnalyticsAccept}
             onDecline={handleAnalyticsDecline}

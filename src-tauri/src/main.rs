@@ -87,7 +87,7 @@ use commands::file_command::{
 
 // Import config commands
 use commands::config_commands::{get_app_version, get_launcher_config, set_launcher_config};
-use commands::legal_commands::{acknowledge_legal_documents, get_pending_legal_documents};
+use commands::legal_commands::{acknowledge_legal_documents, acknowledge_legal_notice, get_legal_status};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -661,8 +661,9 @@ async fn main() {
             copy_profile,
             export_profile,
             get_launcher_config,
-            get_pending_legal_documents,
+            get_legal_status,
             acknowledge_legal_documents,
+            acknowledge_legal_notice,
             set_launcher_config,
             get_launcher_directory,
             resolve_image_path,
