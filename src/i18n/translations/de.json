@@ -118,7 +118,7 @@
   "settings.hooks.wrapper.confirm_title": "Wrapper Bearbeitung aktivieren",
   "settings.hooks.wrapper.confirm_message": "Änderungen am Wrapper Hook beeinflussen, wie Java ausgeführt wird. Fehlkonfiguration kann den Start verhindern.",
   "settings.hooks.wrapper.enabled": "Wrapper Bearbeitung aktiviert",
-  "settings.hooks.wrapper.description": "Wrapper-Befehl, um Java auszuführen (z.B. Sandbox-Tools). Der Java-Pfad wird als Argument übergeben.",
+  "settings.hooks.wrapper.description": "Wrapper-Befehl, um Java auszuführen (z. B. Sandbox-Tools). Der Java-Pfad wird als Argument übergeben.",
   "settings.hooks.wrapper.placeholder": "Beispiel: firejail oder gamemoderun",
   "settings.hooks.wrapper.disabled_tooltip": "Bearbeitung aktivieren um dieses Feld zu ändern",
 
@@ -153,7 +153,7 @@
   "settings.toast.auto_saved": "Einstellungen automatisch gespeichert!",
   "settings.toast.auto_save_failed": "Automatisches Speichern fehlgeschlagen: {{error}}",
   "settings.toast.custom_color_applied": "Eigene Farbe angewendet!",
-  "settings.toast.invalid_hex": "Bitte gib eine gültige 6-stellige Hex-Farbe ein (z.B. #FF5733)",
+  "settings.toast.invalid_hex": "Bitte gib eine gültige 6-stellige Hex-Farbe ein (z. B. #FF5733)",
   "settings.toast.reset": "Einstellungen auf gespeicherte Werte zurückgesetzt",
 
   "common.save": "Speichern",
@@ -762,7 +762,7 @@
   "profiles.settings.globalCustomJavaArgs": "Globale benutzerdefinierte Java-Argumente",
   "profiles.settings.customJavaArgs": "Benutzerdefinierte Java-Argumente",
   "profiles.settings.enterJavaArgs": "Java-Argumente eingeben …",
-  "profiles.settings.javaArgsHint": "Erweitert: JVM-Argumente überschreiben (z.B. -XX:+UseG1GC)",
+  "profiles.settings.javaArgsHint": "Erweitert: JVM-Argumente überschreiben (z. B. -XX:+UseG1GC)",
   "profiles.settings.reasonNoriskPack": "Von NoRisk-Pack gesetzt",
   "profiles.settings.reasonUserOverwrite": "Benutzerdefinierte Einstellung",
   "profiles.settings.reasonProfileDefault": "Profil-Standard",
@@ -1748,9 +1748,9 @@
   "placeholders.search_version": "Version suchen …",
   "placeholders.new_profile_name": "Name für neues Profil eingeben",
   "placeholders.enter_filename": "Dateiname ohne Erweiterung eingeben",
-  "placeholders.java_path": "Pfad zur Java-Datei (z.B.  … /bin/javaw.exe)",
+  "placeholders.java_path": "Pfad zur Java-Datei (z. B.  … /bin/javaw.exe)",
   "placeholders.profile_name_awesome": "Mein geniales Profil",
-  "placeholders.group_name": "z.B. modpacks, vanilla+",
+  "placeholders.group_name": "z. B. modpacks, vanilla+",
 
   "applixir.watch_ad": "Werbung ansehen",
   "applixir.daily_points": "Tägliche Punkte",
