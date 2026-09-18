@@ -1,6 +1,23 @@
 import type { NoriskPackDefinition, PackListing } from "../types/noriskPacks";
+import { PERMISSION } from "../constants/permissions";
 
 export type Packs = Record<string, NoriskPackDefinition>;
+
+const DEV_PACK_PREFIX = "dev-";
+
+const DEV_PACK_CATEGORY = "development";
+
+export const isDevPack = (id: string): boolean => id.startsWith(DEV_PACK_PREFIX);
+
+export const devPackPermission = (id: string): string => PERMISSION.DEV_PACK + id.slice(DEV_PACK_PREFIX.length);
+
+export function visiblePacks(packs: Packs, mayViewDevPack: (id: string) => boolean): Packs {
+  const visible: Packs = {};
+  for (const [id, def] of Object.entries(packs)) {
+    if (!isDevPack(id) || mayViewDevPack(id)) visible[id] = def;
+  }
+  return visible;
+}
 
 export interface PackOption {
   id: string;
@@ -19,12 +36,13 @@ const DEFAULTS: Required<PackListing> = { category: "", weight: 0, hidden: false
 
 function toOption(id: string, def: NoriskPackDefinition): PackOption {
   const listing = { ...DEFAULTS, ...(def.listing ?? {}) };
+  const devPack = isDevPack(id);
   return {
     id,
     label: def.displayName || id,
-    category: listing.category.trim(),
+    category: devPack ? DEV_PACK_CATEGORY : listing.category.trim(),
     weight: listing.weight,
-    hidden: listing.hidden,
+    hidden: devPack || listing.hidden,
   };
 }
 
@@ -50,5 +68,5 @@ export function packGroups(packs: Packs, selectedId?: string | null, showHidden 
 }
 
 export function hasHiddenPacks(packs: Packs, selectedId?: string | null): boolean {
-  return Object.entries(packs).some(([id, def]) => def.listing?.hidden && id !== selectedId);
+  return Object.entries(packs).some(([id, def]) => toOption(id, def).hidden && id !== selectedId);
 }
