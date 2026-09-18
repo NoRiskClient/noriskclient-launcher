@@ -1,13 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LegalLocale } from "../config/legal";
 
-export type LegalDocumentKind = "consent" | "notice";
+export type LegalDocumentKind = "consent" | "notice" | "reference";
 
 export interface PendingLegalDocument {
   slug: string;
   locale: string;
   title: string;
-  version: number;
   updatedAt: number;
   changeSummary: string | null;
   kind: LegalDocumentKind;
@@ -18,13 +17,19 @@ export interface LegalPrompt {
   documents: PendingLegalDocument[];
 }
 
-export function getPendingLegalDocuments(
-  locale: LegalLocale,
-  acceptedLegacyTerms: boolean,
-): Promise<LegalPrompt> {
-  return invoke<LegalPrompt>("get_pending_legal_documents", { locale, acceptedLegacyTerms });
+export interface LegalStatus {
+  prompt: LegalPrompt | null;
+  notice: PendingLegalDocument | null;
+}
+
+export function getLegalStatus(locale: LegalLocale, acceptedLegacyTerms: boolean): Promise<LegalStatus> {
+  return invoke<LegalStatus>("get_legal_status", { locale, acceptedLegacyTerms });
 }
 
 export function acknowledgeLegalDocuments(): Promise<void> {
   return invoke<void>("acknowledge_legal_documents");
+}
+
+export function acknowledgeLegalNotice(): Promise<void> {
+  return invoke<void>("acknowledge_legal_notice");
 }

@@ -11,3 +11,6 @@ export const legalLocale = (language: string | undefined): LegalLocale =>
 
 export const legalDocumentUrl = (slug: string, locale: LegalLocale): string | undefined =>
   LEGAL_DOCUMENT_URLS[slug as keyof typeof LEGAL_DOCUMENT_URLS]?.[locale];
+
+export const formatLegalDate = (timestamp: number, language: string): string =>
+  new Date(timestamp).toLocaleDateString(language, { day: "2-digit", month: "2-digit", year: "numeric" });
