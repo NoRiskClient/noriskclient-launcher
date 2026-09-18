@@ -4,6 +4,8 @@ export type Packs = Record<string, NoriskPackDefinition>;
 
 export const DEV_PACK_PREFIX = "dev-";
 
+const DEV_PACK_CATEGORY = "development";
+
 /**
  * The packs the logged in account may see: everything, minus the dev packs —
  * except for staff, and for the ones in [granted], whose own node the account
@@ -36,12 +38,13 @@ const DEFAULTS: Required<PackListing> = { category: "", weight: 0, hidden: false
 
 function toOption(id: string, def: NoriskPackDefinition): PackOption {
   const listing = { ...DEFAULTS, ...(def.listing ?? {}) };
+  const devPack = id.startsWith(DEV_PACK_PREFIX);
   return {
     id,
     label: def.displayName || id,
-    category: listing.category.trim(),
+    category: devPack ? DEV_PACK_CATEGORY : listing.category.trim(),
     weight: listing.weight,
-    hidden: listing.hidden,
+    hidden: devPack || listing.hidden,
   };
 }
 
@@ -67,5 +70,5 @@ export function packGroups(packs: Packs, selectedId?: string | null, showHidden 
 }
 
 export function hasHiddenPacks(packs: Packs, selectedId?: string | null): boolean {
-  return Object.entries(packs).some(([id, def]) => def.listing?.hidden && id !== selectedId);
+  return Object.entries(packs).some(([id, def]) => toOption(id, def).hidden && id !== selectedId);
 }
