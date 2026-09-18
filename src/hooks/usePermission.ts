@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { hasPermission } from "../services/permission-service";
+import { usePermissionStore } from "../store/permission-store";
 
 export function usePermission(node: string): boolean {
   const [allowed, setAllowed] = useState(false);
+  const revision = usePermissionStore((s) => s.revision);
 
   useEffect(() => {
     let active = true;
@@ -16,7 +18,7 @@ export function usePermission(node: string): boolean {
     return () => {
       active = false;
     };
-  }, [node]);
+  }, [node, revision]);
 
   return allowed;
 }

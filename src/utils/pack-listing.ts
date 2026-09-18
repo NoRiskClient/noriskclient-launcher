@@ -6,17 +6,10 @@ export const DEV_PACK_PREFIX = "dev-";
 
 const DEV_PACK_CATEGORY = "development";
 
-/**
- * The packs the logged in account may see: everything, minus the dev packs —
- * except for staff, and for the ones in [granted], whose own node the account
- * holds. Empty while those checks run, so a gated pack never flashes up.
- */
-export function visiblePacks(packs: Packs, staff: boolean, granted: ReadonlySet<string>): Packs {
-  if (staff) return packs;
-
+export function visiblePacks(packs: Packs, allowedDevPacks: ReadonlySet<string>): Packs {
   const visible: Packs = {};
   for (const [id, def] of Object.entries(packs)) {
-    if (!id.startsWith(DEV_PACK_PREFIX) || granted.has(id)) visible[id] = def;
+    if (!id.startsWith(DEV_PACK_PREFIX) || allowedDevPacks.has(id)) visible[id] = def;
   }
   return visible;
 }
