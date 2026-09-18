@@ -1,11 +1,12 @@
 import { create } from "zustand";
+import { listen } from "@tauri-apps/api/event";
 
 interface PermissionState {
   revision: number;
-  bump: () => void;
 }
 
-export const usePermissionStore = create<PermissionState>((set) => ({
-  revision: 0,
-  bump: () => set((state) => ({ revision: state.revision + 1 })),
-}));
+export const usePermissionStore = create<PermissionState>(() => ({ revision: 0 }));
+
+listen("permissions:changed", () => {
+  usePermissionStore.setState((state) => ({ revision: state.revision + 1 }));
+}).catch((error) => console.error("[PermissionStore] Failed to listen for permission changes:", error));

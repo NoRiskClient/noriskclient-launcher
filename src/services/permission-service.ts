@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { usePermissionStore } from "../store/permission-store";
 
 export interface PermissionCacheState {
   nodes: string[];
@@ -8,10 +7,13 @@ export interface PermissionCacheState {
 }
 
 export const refreshPermissions = (): Promise<void> =>
-  invoke<void>("refresh_permissions").finally(() => usePermissionStore.getState().bump());
+  invoke("refresh_permissions");
 
 export const getCachedPermissions = (): Promise<PermissionCacheState> =>
   invoke("get_cached_permissions");
 
 export const hasPermission = (node: string): Promise<boolean> =>
   invoke("has_permission", { node });
+
+export const getGrantedPermissions = (nodes: readonly string[]): Promise<string[]> =>
+  invoke("get_granted_permissions", { nodes });

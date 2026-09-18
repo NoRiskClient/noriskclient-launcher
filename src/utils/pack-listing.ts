@@ -1,15 +1,20 @@
 import type { NoriskPackDefinition, PackListing } from "../types/noriskPacks";
+import { PERMISSION } from "../constants/permissions";
 
 export type Packs = Record<string, NoriskPackDefinition>;
 
-export const DEV_PACK_PREFIX = "dev-";
+const DEV_PACK_PREFIX = "dev-";
 
 const DEV_PACK_CATEGORY = "development";
 
-export function visiblePacks(packs: Packs, allowedDevPacks: ReadonlySet<string>): Packs {
+export const isDevPack = (id: string): boolean => id.startsWith(DEV_PACK_PREFIX);
+
+export const devPackPermission = (id: string): string => PERMISSION.DEV_PACK + id.slice(DEV_PACK_PREFIX.length);
+
+export function visiblePacks(packs: Packs, mayViewDevPack: (id: string) => boolean): Packs {
   const visible: Packs = {};
   for (const [id, def] of Object.entries(packs)) {
-    if (!id.startsWith(DEV_PACK_PREFIX) || allowedDevPacks.has(id)) visible[id] = def;
+    if (!isDevPack(id) || mayViewDevPack(id)) visible[id] = def;
   }
   return visible;
 }
@@ -31,7 +36,7 @@ const DEFAULTS: Required<PackListing> = { category: "", weight: 0, hidden: false
 
 function toOption(id: string, def: NoriskPackDefinition): PackOption {
   const listing = { ...DEFAULTS, ...(def.listing ?? {}) };
-  const devPack = id.startsWith(DEV_PACK_PREFIX);
+  const devPack = isDevPack(id);
   return {
     id,
     label: def.displayName || id,

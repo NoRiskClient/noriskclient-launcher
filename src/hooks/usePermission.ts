@@ -1,24 +1,29 @@
 import { useEffect, useState } from "react";
-import { hasPermission } from "../services/permission-service";
+import { getGrantedPermissions } from "../services/permission-service";
 import { usePermissionStore } from "../store/permission-store";
 
-export function usePermission(node: string): boolean {
-  const [allowed, setAllowed] = useState(false);
+const NONE: ReadonlySet<string> = new Set();
+
+export function usePermissions(nodes: readonly string[]): ReadonlySet<string> {
   const revision = usePermissionStore((s) => s.revision);
+  const [granted, setGranted] = useState<ReadonlySet<string>>(NONE);
+  const key = nodes.join("\n");
 
   useEffect(() => {
     let active = true;
-    hasPermission(node)
-      .then((v) => {
-        if (active) setAllowed(v);
-      })
-      .catch(() => {
-        if (active) setAllowed(false);
+    getGrantedPermissions(key ? key.split("\n") : [])
+      .catch(() => [])
+      .then((allowed) => {
+        if (active) setGranted(new Set(allowed));
       });
     return () => {
       active = false;
     };
-  }, [node, revision]);
+  }, [key, revision]);
 
-  return allowed;
+  return granted;
+}
+
+export function usePermission(node: string): boolean {
+  return usePermissions([node]).has(node);
 }
