@@ -11,7 +11,7 @@ type Result<T> = std::result::Result<T, CommandError>;
 
 const FALLBACK_LOCALE: &str = "en";
 
-const LEGACY_ACCEPTANCE_CUTOFF_MS: i64 = 1_789_689_600_000;
+const LEGACY_ACCEPTED_TERMS: [(&str, &str, u32); 2] = [("terms", "de", 3), ("terms", "en", 2)];
 
 #[derive(Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,6 @@ pub struct PendingLegalDocument {
     slug: String,
     locale: String,
     title: String,
-    version: u32,
     updated_at: i64,
     change_summary: Option<String>,
     kind: LegalDocumentKind,
@@ -88,17 +87,17 @@ async fn acknowledged_versions(pool: &SqlitePool) -> Result<Acknowledged> {
         .collect())
 }
 
-async fn store_versions(pool: &SqlitePool, documents: &[&LegalDocumentUpdate]) -> Result<()> {
+async fn store_versions(pool: &SqlitePool, versions: &[(&str, &str, u32)]) -> Result<()> {
     let acknowledged_at = chrono::Utc::now().timestamp_millis();
     let mut tx = pool.begin().await.map_err(AppError::from)?;
-    for doc in documents {
+    for (slug, locale, version) in versions {
         sqlx::query(
             "INSERT INTO legal_acceptances (slug, locale, version, accepted_at) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT (slug, locale) DO UPDATE SET version = excluded.version, accepted_at = excluded.accepted_at",
         )
-        .bind(&doc.slug)
-        .bind(&doc.locale)
-        .bind(doc.version as i64)
+        .bind(slug)
+        .bind(locale)
+        .bind(*version as i64)
         .bind(acknowledged_at)
         .execute(&mut *tx)
         .await
@@ -110,11 +109,12 @@ async fn store_versions(pool: &SqlitePool, documents: &[&LegalDocumentUpdate]) -
 
 async fn acknowledge_where(keep: impl Fn(LegalDocumentKind) -> bool) -> Result<()> {
     let updates = fetch_updates().await?;
-    let documents: Vec<&LegalDocumentUpdate> = updates
+    let versions: Vec<(&str, &str, u32)> = updates
         .iter()
         .filter(|doc| kind_of(doc).is_some_and(&keep))
+        .map(|doc| (doc.slug.as_str(), doc.locale.as_str(), doc.version))
         .collect();
-    store_versions(&pool().await?, &documents).await
+    store_versions(&pool().await?, &versions).await
 }
 
 fn document_for<'a>(
@@ -133,13 +133,6 @@ fn is_outdated(doc: &LegalDocumentUpdate, acknowledged: &Acknowledged) -> bool {
     })
 }
 
-fn carries_over_from_legacy(doc: &LegalDocumentUpdate) -> bool {
-    kind_of(doc).is_some_and(|kind| kind != LegalDocumentKind::Notice)
-        && doc
-            .acknowledgement_updated_at
-            .is_none_or(|at| at <= LEGACY_ACCEPTANCE_CUTOFF_MS)
-}
-
 fn pending_document(
     doc: &LegalDocumentUpdate,
     kind: LegalDocumentKind,
@@ -150,7 +143,6 @@ fn pending_document(
         slug: doc.slug.clone(),
         locale: doc.locale.clone(),
         title: doc.title.clone(),
-        version: doc.version,
         updated_at: if first_time {
             doc.updated_at
         } else {
@@ -181,55 +173,30 @@ pub async fn get_legal_status(locale: String, accepted_legacy_terms: bool) -> Re
 
     if acknowledged.is_empty() && accepted_legacy_terms {
         info!("Carrying over the terms accepted in an earlier launcher version");
-        let carried: Vec<&LegalDocumentUpdate> =
-            updates.iter().filter(|doc| carries_over_from_legacy(doc)).collect();
-        store_versions(&pool, &carried).await?;
+        store_versions(&pool, &LEGACY_ACCEPTED_TERMS).await?;
         acknowledged = acknowledged_versions(&pool).await?;
     }
 
     let first_time = acknowledged.is_empty();
-    let current: Vec<(&LegalDocumentUpdate, LegalDocumentKind)> = LEGAL_DOCUMENTS
+    let pending: Vec<PendingLegalDocument> = LEGAL_DOCUMENTS
         .iter()
         .filter_map(|(slug, kind)| document_for(&updates, slug, &locale).map(|doc| (doc, *kind)))
+        .filter(|(doc, kind)| {
+            first_time || (*kind != LegalDocumentKind::Reference && is_outdated(doc, &acknowledged))
+        })
+        .map(|(doc, kind)| pending_document(doc, kind, first_time))
         .collect();
 
-    let outdated = |kind: LegalDocumentKind| -> Vec<&(&LegalDocumentUpdate, LegalDocumentKind)> {
-        current
-            .iter()
-            .filter(|(doc, doc_kind)| *doc_kind == kind && is_outdated(doc, &acknowledged))
-            .collect()
-    };
-    let outdated_consent = outdated(LegalDocumentKind::Consent);
-    let outdated_notice = outdated(LegalDocumentKind::Notice);
-
-    if first_time && current.iter().any(|(_, kind)| *kind == LegalDocumentKind::Consent) {
-        let documents = current
-            .iter()
-            .map(|(doc, kind)| pending_document(doc, *kind, true))
-            .collect();
+    if pending.iter().any(|doc| doc.kind == LegalDocumentKind::Consent) {
         return Ok(LegalStatus {
-            prompt: Some(LegalPrompt { first_time, documents }),
-            notice: None,
-        });
-    }
-
-    if !outdated_consent.is_empty() {
-        let documents = outdated_consent
-            .iter()
-            .chain(outdated_notice.iter())
-            .map(|(doc, kind)| pending_document(doc, *kind, false))
-            .collect();
-        return Ok(LegalStatus {
-            prompt: Some(LegalPrompt { first_time, documents }),
+            prompt: Some(LegalPrompt { first_time, documents: pending }),
             notice: None,
         });
     }
 
     Ok(LegalStatus {
         prompt: None,
-        notice: outdated_notice
-            .first()
-            .map(|(doc, kind)| pending_document(doc, *kind, false)),
+        notice: pending.into_iter().find(|doc| doc.kind == LegalDocumentKind::Notice),
     })
 }
 
