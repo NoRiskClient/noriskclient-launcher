@@ -15,11 +15,12 @@ export function MacCapturePermissionMonitor() {
   const { check, notice, dismiss } = useCapturePermissionsStore();
   const supported = isMacOS() && supportsClips();
   useEffect(() => {
-    if (!supported || !loaded || !enabled) return;
+    if (!supported || !loaded) return;
     const refresh = () => {
       void check();
     };
     refresh();
+    if (!enabled) return;
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [check, enabled, loaded, supported]);
