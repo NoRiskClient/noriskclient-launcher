@@ -113,6 +113,7 @@ impl Flipper {
         };
         if stale {
             *target = Some(self.make_target(size, desc.Format)?);
+            self.sources.lock().unwrap_or_else(|e| e.into_inner()).clear();
         }
         let target = target.as_ref().expect("the target was just built");
 
