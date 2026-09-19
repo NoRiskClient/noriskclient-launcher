@@ -31,6 +31,7 @@ pub struct Converter {
     fps: u32,
     source_window: Option<windows::Win32::Foundation::HWND>,
     flip_vertical: bool,
+    flipper: Option<super::flip::Flipper>,
     inner: Mutex<Option<Processor>>,
 }
 
@@ -76,13 +77,48 @@ impl Converter {
             fps,
             source_window,
             flip_vertical: false,
+            flipper: None,
             inner: Mutex::new(None),
         })
     }
 
     pub fn set_flip_vertical(&mut self, flip: bool) {
         self.flip_vertical = flip;
+        self.flipper = None;
+
+        if flip && !self.processor_can_mirror() {
+            match super::flip::Flipper::new(&self._device) {
+                Ok(flipper) => self.flipper = Some(flipper),
+                Err(e) => log::error!(
+                    "This driver cannot mirror and the flip shader would not build, so the \
+                     recording will come out upside down: {e:#}"
+                ),
+            }
+        }
+
         *self.inner.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    fn processor_can_mirror(&self) -> bool {
+        let rate = DXGI_RATIONAL {
+            Numerator: self.fps.max(1),
+            Denominator: 1,
+        };
+        let content = D3D11_VIDEO_PROCESSOR_CONTENT_DESC {
+            InputFrameFormat: D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
+            InputFrameRate: rate,
+            InputWidth: self.output.0,
+            InputHeight: self.output.1,
+            OutputFrameRate: rate,
+            OutputWidth: self.output.0,
+            OutputHeight: self.output.1,
+            Usage: D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
+        };
+
+        unsafe { self.video_device.CreateVideoProcessorEnumerator(&content) }
+            .ok()
+            .and_then(|enumerator| can_mirror(&enumerator).ok())
+            .unwrap_or(false)
     }
 
     fn build_processor(
@@ -241,6 +277,15 @@ impl Converter {
             }
         };
 
+        let flipped;
+        let source = match self.flipper.as_ref() {
+            Some(flipper) => {
+                flipped = flipper.flip(source, source_size)?;
+                &flipped
+            }
+            None => source,
+        };
+
         let mut inner = self
             .inner
             .lock()
@@ -277,7 +322,7 @@ impl Converter {
                 crop,
                 self.output,
                 self.fps,
-                self.flip_vertical,
+                self.flip_vertical && self.flipper.is_none(),
             )?);
         }
 
