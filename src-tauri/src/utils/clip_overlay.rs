@@ -137,7 +137,20 @@ pub fn show(app: &AppHandle) {
 }
 
 pub fn hide(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
-        let _ = window.hide();
+    let Some(window) = app.get_webview_window(OVERLAY_LABEL) else {
+        return;
+    };
+
+    #[cfg(windows)]
+    if let Ok(handle) = window.hwnd() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+
+        unsafe {
+            let _ = ShowWindow(HWND(handle.0), SW_HIDE);
+        }
+        return;
     }
+
+    let _ = window.hide();
 }
