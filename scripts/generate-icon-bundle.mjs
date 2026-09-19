@@ -20,7 +20,7 @@ const COLLECTIONS = [
 /** `prefix:name` shaped string literals that are not icons (tailwind variants, CSS values). */
 const NOT_ICONS = new Set([
   "hover", "group-hover", "focus", "active", "data", "0",
-  "visibility", "overflow",
+  "visibility", "overflow", "permissions",
 ]);
 
 const ICON_RE = /["'`]([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)["'`]/g;
