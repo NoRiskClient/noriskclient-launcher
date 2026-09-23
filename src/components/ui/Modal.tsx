@@ -19,6 +19,7 @@ interface ModalProps {
   footer?: React.ReactNode;
   width?: "sm" | "md" | "lg" | "xl" | "full";
   closeOnClickOutside?: boolean;
+  hideCloseButton?: boolean;
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
@@ -34,6 +35,7 @@ export function Modal({
   footer,
   width = "md",
   closeOnClickOutside = true,
+  hideCloseButton = false,
   headerActions,
   variant = "default",
   className,
@@ -171,17 +173,19 @@ export function Modal({
           </div>
           <div className="flex items-center space-x-2">
             {headerActions}
-            <IconButton
-              ref={closeButtonRef}
-              icon={<Icon icon="solar:close-circle-bold" />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              variant="ghost"
-              size="sm"
-              aria-label={t('common.close_modal')}
-            />
+            {!hideCloseButton && (
+              <IconButton
+                ref={closeButtonRef}
+                icon={<Icon icon="solar:close-circle-bold" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                variant="ghost"
+                size="sm"
+                aria-label={t('common.close_modal')}
+              />
+            )}
           </div>
         </div>
 

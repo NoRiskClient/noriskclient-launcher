@@ -20,12 +20,9 @@ export function MacCapturePermissionMonitor() {
       void check();
     };
     refresh();
+    if (!enabled) return;
     window.addEventListener("focus", refresh);
-    const timer = enabled ? window.setInterval(refresh, 15000) : undefined;
-    return () => {
-      window.removeEventListener("focus", refresh);
-      window.clearInterval(timer);
-    };
+    return () => window.removeEventListener("focus", refresh);
   }, [check, enabled, loaded, supported]);
 
   if (!supported || !notice) return null;

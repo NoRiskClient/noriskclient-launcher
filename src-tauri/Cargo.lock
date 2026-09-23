@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "noriskclient-launcher-v3"
-version = "0.6.28-beta.4"
+version = "0.6.29-beta.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
