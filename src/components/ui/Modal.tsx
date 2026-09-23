@@ -2,10 +2,12 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useModalStackEntry } from "../../hooks/useModalStackEntry";
 import { IconButton } from "./buttons/IconButton";
 
 interface ModalProps {
@@ -50,6 +52,7 @@ export function Modal({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isClosing, setIsClosing] = useState(false);
+  const zIndex = useModalStackEntry();
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isClosing) {
@@ -118,15 +121,16 @@ export function Modal({
     }
     return "none";
   };
-  return (
+  return createPortal(
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="modal-backdrop fixed inset-0 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      style={{ zIndex }}
       onClick={handleBackdropClick}
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh] backdrop-blur-md-anyos",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
@@ -201,6 +205,7 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
