@@ -1,7 +1,7 @@
 use crate::state::state_manager::State;
 use log::{error, info, warn};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
 
 #[derive(Clone, Serialize)]
@@ -16,11 +16,21 @@ pub struct AuthBridgeResult {
     pub message: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct TwitchDeepLinkRequest {
+    pub action: String,
+}
+
 /// Handles incoming deep link URLs.
 /// Parses the URL scheme and dispatches to the appropriate handler.
 pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
     for url in urls {
-        info!("[DeepLink] Received URL: {}", url);
+        info!(
+            "[DeepLink] Received URL: {}://{}{}",
+            url.scheme(),
+            url.host_str().unwrap_or_default(),
+            url.path()
+        );
 
         if url.scheme() != "norisk" {
             warn!("[DeepLink] Ignoring URL with unknown scheme: {}", url.scheme());
@@ -35,6 +45,7 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
                     warn!("[DeepLink] Unknown auth path: {}", url.path());
                 }
             }
+            Some("twitch") => handle_twitch_deep_link(app_handle, &url).await,
             Some(host) => {
                 warn!("[DeepLink] Unknown deep link host: {}", host);
             }
@@ -42,6 +53,42 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
                 warn!("[DeepLink] Deep link URL has no host: {}", url);
             }
         }
+    }
+}
+
+async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
+    let action = match url.path() {
+        "/link" => "link",
+        "/unlink" => "unlink",
+        "/change" => "change",
+        path => {
+            warn!("[DeepLink] Unknown Twitch path: {}", path);
+            return;
+        }
+    };
+    focus_main_window(app_handle);
+    info!("[DeepLink] Twitch {} request received", action);
+    let _ = app_handle.emit(
+        "deep-link-twitch-request",
+        TwitchDeepLinkRequest {
+            action: action.to_string(),
+        },
+    );
+}
+
+fn focus_main_window(app_handle: &AppHandle) {
+    let Some(window) = app_handle.get_webview_window("main") else {
+        return;
+    };
+
+    if let Err(error) = window.show() {
+        warn!("[DeepLink] Could not show main window for Twitch request: {}", error);
+    }
+    if let Err(error) = window.unminimize() {
+        warn!("[DeepLink] Could not restore main window for Twitch request: {}", error);
+    }
+    if let Err(error) = window.set_focus() {
+        warn!("[DeepLink] Could not focus main window for Twitch request: {}", error);
     }
 }
 

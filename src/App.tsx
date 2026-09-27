@@ -58,6 +58,7 @@ import { NotificationModal } from "./components/modals/NotificationModal";
 import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
 import { useWelcomeStore } from "./store/welcome-store";
+import { useTwitchDeepLinkRequests } from "./components/account/TwitchLinkCard";
 import { WelcomeScreen } from "./components/welcome/WelcomeScreen";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
@@ -320,6 +321,8 @@ export function App() {
       unlistenResult.then((f) => f());
     };
   }, [showModal, hideModal, t]);
+
+  useTwitchDeepLinkRequests();
 
   useEffect(() => {
     refreshNrcDataOnMount();

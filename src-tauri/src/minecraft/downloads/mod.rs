@@ -12,6 +12,7 @@ pub mod mod_resolver;
 pub mod neo_forge_installer_download;
 pub mod neo_forge_libraries_download;
 pub mod norisk_assets_download;
+pub mod norisk_natives_download;
 pub mod norisk_pack_downloader;
 pub mod quilt_libraries_download;
 
