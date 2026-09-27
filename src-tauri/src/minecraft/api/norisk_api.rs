@@ -874,6 +874,10 @@ pub enum KnownNotificationContent {
         grantor: NotificationUser,
         #[serde(rename = "expirationDate")]
         expiration_date: Option<String>,
+        #[serde(default)]
+        anonymous: bool,
+        #[serde(default)]
+        message: Option<String>,
     },
     #[serde(rename = "gg.norisk.networking.model.notifications.notification.ShopItemBoughtNotification")]
     ShopItemBought {
