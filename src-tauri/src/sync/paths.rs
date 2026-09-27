@@ -202,6 +202,14 @@ pub fn is_temp_profile_path(profile_path: &str) -> bool {
         || normalized.contains("/noriskclient/temp/")
 }
 
+pub async fn list_pack_local_jar_names(pack_id: Uuid) -> Result<Vec<String>> {
+    Ok(list_pack_local_jars(pack_id)
+        .await?
+        .into_iter()
+        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .collect())
+}
+
 pub async fn list_pack_local_jars(pack_id: Uuid) -> Result<Vec<PathBuf>> {
     let dir = pack_mods_dir(pack_id);
     if !dir.exists() {
