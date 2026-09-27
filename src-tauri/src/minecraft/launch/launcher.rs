@@ -470,12 +470,12 @@ impl MinecraftLauncher {
             }
         }
 
-        // ffmpeg natives for the Twitch stream player, installed by the installer once per machine.
-        if Natives::ffmpeg_ready() {
-            info!("[NRC Natives] Passing ffmpeg natives directory to the game");
-            command.arg(format!("-Dnrc.ffmpeg.natives={}", Natives::ffmpeg_dir().display()));
-        } else {
-            info!("[NRC Natives] ffmpeg natives not installed, stream player stays disabled");
+        match Natives::installed_ffmpeg_dir() {
+            Some(dir) => {
+                info!("[NRC Natives] Passing ffmpeg natives directory to the game");
+                command.arg(format!("-Dnrc.ffmpeg.natives={}", dir.display()));
+            }
+            None => info!("[NRC Natives] ffmpeg natives not installed, stream player stays disabled"),
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the

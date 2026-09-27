@@ -459,9 +459,7 @@ pub async fn install_minecraft_version(
             .await?
     });
 
-    // ffmpeg natives for the Twitch stream player, installed once per machine for every account.
-    // A failure must not block the launch, the client degrades gracefully without them.
-    if !NoriskNativesDownloadService::ffmpeg_ready() {
+    if NoriskNativesDownloadService::installed_ffmpeg_dir().is_none() {
         let natives_download = NoriskNativesDownloadService::new();
         timed_step(&state, &summary, EventType::DownloadingNoRiskClientAssets, profile.id, "ffmpeg natives", || async {
             if let Err(e) = natives_download.install(&FFMPEG).await {
