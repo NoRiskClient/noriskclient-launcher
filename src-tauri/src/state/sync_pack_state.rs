@@ -1,6 +1,7 @@
 use crate::error::{AppError, Result};
 use crate::state::db::DbHandle;
 use crate::state::post_init::PostInitializationHandler;
+use crate::integrations::mod_lookup::{project_titles_for, title_for};
 use crate::state::profile_state::Mod;
 use crate::sync::model::{
     SyncPack, SyncPackModEntry, SyncTarget, SyncTargetKind, SyncTargetState,
@@ -652,6 +653,39 @@ impl SyncPackManager {
         }
     }
 
+    async fn repair_display_names(&self) -> Result<()> {
+        for pack in self.list_packs().await? {
+            let broken: Vec<Mod> = pack
+                .plain_mods()
+                .into_iter()
+                .filter(shows_version_as_name)
+                .collect();
+            if broken.is_empty() {
+                continue;
+            }
+
+            let titles = project_titles_for(broken.iter().map(|m| &m.source)).await;
+            let fixed: Vec<Mod> = broken
+                .into_iter()
+                .filter_map(|mut entry| {
+                    entry.display_name = Some(title_for(&titles, &entry.source)?.clone());
+                    Some(entry)
+                })
+                .collect();
+            if fixed.is_empty() {
+                continue;
+            }
+
+            info!(
+                "Restoring {} mod name(s) in sync pack '{}'",
+                fixed.len(),
+                pack.name
+            );
+            self.add_mods(pack.id, &fixed).await?;
+        }
+        Ok(())
+    }
+
     pub async fn get_mod_resolutions(
         &self,
         pack_id: Uuid,
@@ -928,8 +962,19 @@ impl PostInitializationHandler for SyncPackManager {
             if let Err(e) = this.reap_orphans().await {
                 warn!("Sync pack orphan reap failed: {}", e);
             }
+            if let Err(e) = this.repair_display_names().await {
+                warn!("Sync pack name repair failed: {}", e);
+            }
         });
 
         Ok(())
+    }
+}
+
+fn shows_version_as_name(entry: &Mod) -> bool {
+    match (&entry.display_name, &entry.version) {
+        (None, _) => true,
+        (Some(name), Some(version)) if !version.is_empty() => name.contains(version.as_str()),
+        _ => false,
     }
 }
