@@ -3552,7 +3552,7 @@ impl ProfileManager {
                 download_url: file.map(|f| f.url.clone()).unwrap_or_default(),
                 file_hash_sha1: file.and_then(|f| f.hashes.get("sha1").cloned()),
                 file_fingerprint: file.and_then(|f| f.fingerprint),
-                content_name: Some(version.name.clone()),
+                content_name: Some(dependency.display_name()),
                 version_number: Some(version.version_number.clone()),
                 content_type: crate::utils::profile_utils::ContentType::Mod,
                 loaders: Some(version.loaders.clone()),
