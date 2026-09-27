@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Z_TOOLTIP } from "../../lib/z-layers";
 import { useThemeStore } from "../../store/useThemeStore";
 
 interface TooltipProps {
@@ -126,7 +125,8 @@ export function Tooltip({
   }, [isVisible, isStatic]);
 
   const getTooltipClasses = () => {
-    const baseClasses = "fixed px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+    // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
+    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
 
     return `${baseClasses} ${className}`;
   };
@@ -156,7 +156,6 @@ export function Tooltip({
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             position: 'fixed',
-            zIndex: Z_TOOLTIP,
             // static mode: center horizontally on the anchor point and sit above/below it
             transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
             textAlign: isStatic ? 'center' : undefined,

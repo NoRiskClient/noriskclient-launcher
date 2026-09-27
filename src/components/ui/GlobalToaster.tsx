@@ -1,9 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Z_TOAST } from "../../lib/z-layers";
+import { useEffect, useRef } from "react";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -110,11 +108,6 @@ export function GlobalToaster() {
     (state) => state.isBackgroundAnimationEnabled,
   );
   const toasterRef = useRef<HTMLDivElement>(null);
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalRoot(document.body);
-  }, []);
 
   const borderRadiusStyle = createRadiusStyle(borderRadius);
   const borderRadiusClass = getBorderRadiusClass(borderRadius);
@@ -136,54 +129,49 @@ export function GlobalToaster() {
   }, [accentColor, isBackgroundAnimationEnabled]);
 
   return (
-    portalRoot &&
-    createPortal(
-      <div ref={toasterRef} style={{ position: "relative", zIndex: Z_TOAST }}>
-        <HotToaster
-          position="bottom-right"
-          containerStyle={{ zIndex: Z_TOAST }}
-          toastOptions={{
-            className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
-            style: baseStyles,
-            success: {
-              style: {
-                ...getToastVariantStyles("success", accentColor.value),
-                boxShadow: "none",
-                ...borderRadiusStyle,
-              },
-              iconTheme: {
-                primary: "#059669",
-                secondary: "#d1fae5",
-              },
+    <div ref={toasterRef}>
+      <HotToaster
+        position="bottom-right"
+        toastOptions={{
+          className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
+          style: baseStyles,
+          success: {
+            style: {
+              ...getToastVariantStyles("success", accentColor.value),
+              boxShadow: "none",
+              ...borderRadiusStyle,
             },
-            error: {
-              style: {
-                ...getToastVariantStyles("error", accentColor.value),
-                boxShadow: "none",
-                ...borderRadiusStyle,
-              },
-              iconTheme: {
-                primary: "#dc2626",
-                secondary: "#fee2e2",
-              },
+            iconTheme: {
+              primary: "#059669",
+              secondary: "#d1fae5",
             },
-            loading: {
-              style: {
-                ...getToastVariantStyles("default", accentColor.value),
-                boxShadow: "none",
-                ...borderRadiusStyle,
-              },
-              iconTheme: {
-                primary: accentColor.value,
-                secondary: "#ffffff",
-              },
-              duration: Infinity,
+          },
+          error: {
+            style: {
+              ...getToastVariantStyles("error", accentColor.value),
+              boxShadow: "none",
+              ...borderRadiusStyle,
             },
-            duration: 3000,
-          }}
-        />
-      </div>,
-      portalRoot,
-    )
+            iconTheme: {
+              primary: "#dc2626",
+              secondary: "#fee2e2",
+            },
+          },
+          loading: {
+            style: {
+              ...getToastVariantStyles("default", accentColor.value),
+              boxShadow: "none",
+              ...borderRadiusStyle,
+            },
+            iconTheme: {
+              primary: accentColor.value,
+              secondary: "#ffffff",
+            },
+            duration: Infinity,
+          },
+          duration: 3000,
+        }}
+      />
+    </div>
   );
 }
