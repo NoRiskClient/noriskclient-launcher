@@ -836,6 +836,8 @@ async fn main() {
             commands::sync_pack_command::delete_sync_pack,
             commands::sync_pack_command::set_profile_sync_packs,
             commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::get_profile_sync_pack_mods,
+            commands::sync_pack_command::set_profile_sync_mods_excluded,
             commands::sync_pack_command::sync_profile_now,
             commands::sync_pack_command::set_sync_pack_mod_enabled,
             commands::sync_pack_command::remove_sync_pack_entries,

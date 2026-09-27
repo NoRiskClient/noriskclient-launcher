@@ -4,6 +4,7 @@ use crate::state::post_init::PostInitializationHandler;
 use crate::integrations::mod_lookup::{project_titles_for, title_for};
 use crate::state::profile_state::Mod;
 use crate::sync::model::{
+    mod_exclusion_key,
     SyncPack, SyncPackModEntry, SyncTarget, SyncTargetKind, SyncTargetState,
     VersionOverride,
 };
@@ -13,7 +14,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use dashmap::DashMap;
 use log::{debug, info, warn};
 use sqlx::{Row, SqlitePool};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -349,6 +350,7 @@ impl SyncPackManager {
 
         let key = pack_id.to_string();
         for stmt in [
+            "DELETE FROM profile_sync_mod_exclusions WHERE pack_id = ?1",
             "DELETE FROM sync_pack_adoptions WHERE pack_id = ?1",
             "DELETE FROM sync_pack_target_state WHERE pack_id = ?1",
             "DELETE FROM sync_pack_mods WHERE pack_id = ?1",
@@ -595,6 +597,9 @@ impl SyncPackManager {
             removed += query.execute(&pool).await?.rows_affected() as usize;
         }
 
+        let exclusion_keys: Vec<String> = mod_ids.iter().map(|id| mod_exclusion_key(*id)).collect();
+        self.clear_exclusions(pack_id, &exclusion_keys).await?;
+
         for key in keys {
             self.clear_mod_resolutions(pack_id, &key).await.ok();
         }
@@ -682,6 +687,76 @@ impl SyncPackManager {
                 pack.name
             );
             self.add_mods(pack.id, &fixed).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn get_profile_exclusions(
+        &self,
+        profile_id: Uuid,
+    ) -> Result<HashMap<Uuid, HashSet<String>>> {
+        let pool = self.pool().await?;
+        let rows = sqlx::query(
+            "SELECT pack_id, mod_key FROM profile_sync_mod_exclusions WHERE profile_id = ?1",
+        )
+        .bind(profile_id.to_string())
+        .fetch_all(&pool)
+        .await?;
+
+        let mut out: HashMap<Uuid, HashSet<String>> = HashMap::new();
+        for row in &rows {
+            let pack_id: String = row.get("pack_id");
+            match Uuid::parse_str(&pack_id) {
+                Ok(pack_id) => {
+                    out.entry(pack_id)
+                        .or_default()
+                        .insert(row.get::<String, _>("mod_key"));
+                }
+                Err(e) => warn!("Ignoring sync exclusion with invalid pack id '{}': {}", pack_id, e),
+            }
+        }
+        Ok(out)
+    }
+
+    pub async fn set_profile_exclusions(
+        &self,
+        profile_id: Uuid,
+        entries: &[(Uuid, String)],
+        excluded: bool,
+    ) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let pool = self.pool().await?;
+        let mut tx = pool.begin().await?;
+        let statement = if excluded {
+            "INSERT OR IGNORE INTO profile_sync_mod_exclusions (profile_id, pack_id, mod_key) VALUES (?1, ?2, ?3)"
+        } else {
+            "DELETE FROM profile_sync_mod_exclusions WHERE profile_id = ?1 AND pack_id = ?2 AND mod_key = ?3"
+        };
+        for (pack_id, mod_key) in entries {
+            sqlx::query(statement)
+                .bind(profile_id.to_string())
+                .bind(pack_id.to_string())
+                .bind(mod_key)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn clear_exclusions(&self, pack_id: Uuid, mod_keys: &[String]) -> Result<()> {
+        if mod_keys.is_empty() {
+            return Ok(());
+        }
+        let pool = self.pool().await?;
+        for mod_key in mod_keys {
+            sqlx::query("DELETE FROM profile_sync_mod_exclusions WHERE pack_id = ?1 AND mod_key = ?2")
+                .bind(pack_id.to_string())
+                .bind(mod_key)
+                .execute(&pool)
+                .await?;
         }
         Ok(())
     }
