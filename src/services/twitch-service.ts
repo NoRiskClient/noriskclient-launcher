@@ -1,23 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type {
-  TwitchDeviceLogin,
-  TwitchLoginPayload,
-  TwitchStatus,
-} from "../types/twitch";
+import type { TwitchLoginPayload } from "../types/twitch";
 
-/** Window event the backend emits while the device code flow runs. */
 export const TWITCH_LOGIN_EVENT = "twitch:device_login";
 
 export class TwitchService {
-  static async beginDeviceLogin(): Promise<TwitchDeviceLogin> {
-    return await invoke<TwitchDeviceLogin>("twitch_begin_device_login");
+  static async getAvailableScopes(): Promise<string[]> {
+    return await invoke<string[]>("twitch_available_scopes");
   }
 
-  static async beginDeeplinkDeviceLogin(exportKey: string): Promise<TwitchDeviceLogin> {
-    return await invoke<TwitchDeviceLogin>("twitch_begin_deeplink_device_login", {
-      exportKey,
-    });
+  static async beginDeviceLogin(scopes: string[]): Promise<void> {
+    await invoke("twitch_begin_device_login", { scopes });
   }
 
   static async cancelLogin(): Promise<void> {
@@ -28,8 +21,8 @@ export class TwitchService {
     await invoke("twitch_unlink");
   }
 
-  static async getStatus(): Promise<TwitchStatus> {
-    return await invoke<TwitchStatus>("twitch_get_status");
+  static async isLinked(): Promise<boolean> {
+    return await invoke<boolean>("twitch_is_linked");
   }
 
   static onLoginEvent(

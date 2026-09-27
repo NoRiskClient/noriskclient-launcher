@@ -23,79 +23,8 @@ import {
 } from "../../services/nrc-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { AccountLinkRow } from "../account/AccountLinkRow";
 import { TwitchLinkCard } from "../account/TwitchLinkCard";
-
-interface AccountLinkRowProps {
-  icon: string;
-  name: string;
-  info?: string;
-  iconClassName?: string;
-  isLoading: boolean;
-  isLinked: boolean;
-  isProcessing: boolean;
-  onLink: () => void;
-  onUnlink: () => void;
-  visitUrl?: string;
-}
-
-function AccountLinkRow({
-  icon,
-  name,
-  info,
-  iconClassName,
-  isLoading,
-  isLinked,
-  isProcessing,
-  onLink,
-  onUnlink,
-  visitUrl,
-}: AccountLinkRowProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2 bg-black/20 rounded-md min-h-[58px]">
-      <div className="flex items-center min-w-0">
-        <Icon icon={icon} className={`w-6 h-6 mr-3 ${iconClassName ?? "text-white/80"}`} />
-        <div className="min-w-0">
-          <p className="text-white/90 font-minecraft text-xs">{name}</p>
-          {info && <p className="text-white/55 font-minecraft text-[10px] leading-tight">{info}</p>}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {isLinked ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onUnlink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-off"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.unlink')}
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onLink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-variant"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.link')}
-          </Button>
-        )}
-        <IconButton
-          variant="ghost"
-          size="sm"
-          onClick={() => visitUrl && openExternalUrl(visitUrl)}
-          icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
-          disabled={!visitUrl}
-          className={!visitUrl ? "invisible" : ""}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function SocialsModal() {
   const { t } = useTranslation();
@@ -319,7 +248,13 @@ export function SocialsModal() {
             className="w-16 h-16 text-accent"
           />
           <p className="text-white/90 font-minecraft text-sm select-none">
-            {t('socials.referral_text')}
+            {t('socials.referral_text')}{" "}
+            <span
+              className="text-accent underline cursor-pointer hover:text-accent/80"
+              onClick={() => openExternalUrl(navigator.language.startsWith("de") ? "https://nrc.gg/freunde-werben" : "https://nrc.gg/invite-friends")}
+            >
+              {t('socials.referral_more')}
+            </span>
           </p>
 
           <div className="flex gap-2 mt-4">
@@ -413,8 +348,6 @@ export function SocialsModal() {
           <AccountLinkRow
             icon="ic:baseline-discord"
             name="Discord"
-            info={t('socials.discord_info')}
-            iconClassName={isDiscordLinked ? "text-[#5865F2]" : "text-white/80"}
             isLoading={isLoadingDiscord}
             isLinked={isDiscordLinked}
             isProcessing={isProcessingDiscord}
