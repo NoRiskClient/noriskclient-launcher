@@ -84,6 +84,18 @@ pub struct Mod {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
+impl Mod {
+    pub fn targets_game_version(&self, mc_version: &str) -> bool {
+        match &self.game_versions {
+            Some(versions) if !versions.is_empty() => {
+                versions.iter().any(|v| v == mc_version)
+                    || self.force_include_versions.iter().any(|v| v == mc_version)
+            }
+            _ => true,
+        }
+    }
+}
+
 // New struct to uniquely identify a Norisk Pack mod within a specific context
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct NoriskModIdentifier {
