@@ -12,7 +12,7 @@ use crate::sync::model::{
     VersionOverride,
 };
 use crate::sync::report::{SyncConflict, SyncPreviewEntry, SyncReport};
-use crate::sync::profile_mods::{self, ProfilePackInput, ProfileSyncPackMod};
+use crate::sync::profile_mods::{self, ProfileSyncPackMod};
 use crate::sync::resolution::{self, SyncPackModMatrix, SyncPackModMatrixRow};
 use crate::sync::{paths, shortcuts, subscribers};
 use crate::utils::{import_safety, trash_utils};
@@ -600,43 +600,7 @@ pub async fn get_profile_sync_pack_mods(
 ) -> Result<Vec<ProfileSyncPackMod>, CommandError> {
     let state = State::get().await?;
     let profile = state.profile_manager.get_profile(profile_id).await?;
-    if profile.sync_pack_ids.is_empty() || paths::is_temp_profile_path(&profile.path) {
-        return Ok(Vec::new());
-    }
-
-    let packs = state
-        .sync_pack_manager
-        .get_packs(&profile.sync_pack_ids)
-        .await?;
-
-    let mut exclusions = state
-        .sync_pack_manager
-        .get_profile_exclusions(profile.id)
-        .await
-        .unwrap_or_default();
-
-    let mut inputs = Vec::new();
-    for pack in packs.into_iter().filter(|pack| pack.enabled) {
-        inputs.push(ProfilePackInput {
-            excluded: exclusions.remove(&pack.id).unwrap_or_default(),
-            cache: state
-                .sync_pack_manager
-                .get_mod_resolutions(pack.id)
-                .await
-                .unwrap_or_default(),
-            local_jars: paths::list_pack_local_jar_names(pack.id)
-                .await
-                .unwrap_or_default(),
-            pack,
-        });
-    }
-
-    Ok(profile_mods::profile_pack_mods(
-        &inputs,
-        &profile.mods,
-        &profile.game_version,
-        profile.loader,
-    ))
+    Ok(profile_mods::load_for_profile(&state, &profile).await?)
 }
 
 #[derive(Debug, Deserialize)]

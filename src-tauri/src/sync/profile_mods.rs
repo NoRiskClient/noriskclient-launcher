@@ -1,4 +1,7 @@
-use crate::state::profile_state::{mod_project_key, Mod, ModLoader};
+use crate::error::Result;
+use crate::state::profile_state::{mod_project_key, Mod, ModLoader, Profile};
+use crate::state::state_manager::State;
+use crate::sync::paths;
 use crate::sync::model::{
     jar_exclusion_key, mod_exclusion_key, SyncPack, SyncPackModEntry, VersionOverride,
 };
@@ -39,6 +42,15 @@ pub struct ProfileSyncPackMod {
 }
 
 impl ProfileSyncPackMod {
+    pub fn is_switched_on(&self) -> bool {
+        !matches!(
+            self.status,
+            ProfileSyncModStatus::Disabled
+                | ProfileSyncModStatus::DisabledForVersion
+                | ProfileSyncModStatus::ExcludedHere
+        )
+    }
+
     fn in_pack(pack: &SyncPack, mod_key: String, display_name: String) -> Self {
         Self {
             pack_id: pack.id,
@@ -216,4 +228,43 @@ pub fn profile_pack_mods(
                 )
         })
         .collect()
+}
+
+pub async fn load_for_profile(state: &State, profile: &Profile) -> Result<Vec<ProfileSyncPackMod>> {
+    if profile.sync_pack_ids.is_empty() || paths::is_temp_profile_path(&profile.path) {
+        return Ok(Vec::new());
+    }
+
+    let packs = state
+        .sync_pack_manager
+        .get_packs(&profile.sync_pack_ids)
+        .await?;
+    let mut exclusions = state
+        .sync_pack_manager
+        .get_profile_exclusions(profile.id)
+        .await
+        .unwrap_or_default();
+
+    let mut inputs = Vec::new();
+    for pack in packs.into_iter().filter(|pack| pack.enabled) {
+        inputs.push(ProfilePackInput {
+            excluded: exclusions.remove(&pack.id).unwrap_or_default(),
+            cache: state
+                .sync_pack_manager
+                .get_mod_resolutions(pack.id)
+                .await
+                .unwrap_or_default(),
+            local_jars: paths::list_pack_local_jar_names(pack.id)
+                .await
+                .unwrap_or_default(),
+            pack,
+        });
+    }
+
+    Ok(profile_pack_mods(
+        &inputs,
+        &profile.mods,
+        &profile.game_version,
+        profile.loader,
+    ))
 }
