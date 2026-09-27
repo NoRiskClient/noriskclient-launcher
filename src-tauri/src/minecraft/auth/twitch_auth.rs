@@ -1,9 +1,5 @@
-use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::{Aes256Gcm, Nonce};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
 use log::{info, warn};
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 use reqwest::StatusCode;
@@ -11,10 +7,9 @@ use reqwest::StatusCode;
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 
-pub const TWITCH_CLIENT_ID: &str = "p60nwofs8at0mc615hsbgxu7psdluk";
+pub const TWITCH_CLIENT_ID: &str = "ea4f0mik4kzwc8e2r42aqj0h4kbnb1";
 
-pub const TWITCH_SCOPES: &'static [&'static str] = &[
-    "user:read:chat",
+pub const TWITCH_SCOPES: &[&str] = &[
     "user:read:follows",
     "user:write:chat",
     "moderator:read:followers",
@@ -22,13 +17,13 @@ pub const TWITCH_SCOPES: &'static [&'static str] = &[
     "bits:read",
     "channel:read:redemptions",
     "channel:read:goals",
-    "channel:manage:raids"
 ];
 
 const DEVICE_CODE_URL: &str = "https://id.twitch.tv/oauth2/device";
 const TOKEN_URL: &str = "https://id.twitch.tv/oauth2/token";
+const REVOKE_URL: &str = "https://id.twitch.tv/oauth2/revoke";
 
-const REFRESH_SKEW: Duration = Duration::hours(2);
+const REFRESH_SKEW: Duration = Duration::minutes(15);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TwitchToken {
@@ -43,57 +38,6 @@ impl TwitchToken {
     pub fn needs_refresh(&self) -> bool {
         self.expires <= Utc::now() + REFRESH_SKEW
     }
-
-    pub fn is_expired(&self) -> bool {
-        self.expires <= Utc::now()
-    }
-}
-
-#[derive(Serialize)]
-struct TwitchTokenExport<'a> {
-    #[serde(rename = "a")]
-    access_token: &'a str,
-    #[serde(rename = "r")]
-    refresh_token: &'a str,
-}
-
-/// Encrypts the Twitch token pair with a caller-provided 32-byte AES-256 key.
-/// The compact output is `v1.<base64url nonce>.<base64url ciphertext-and-tag>`.
-pub fn encrypt_token_export(token: &TwitchToken, key: &[u8]) -> Result<String> {
-    let key: [u8; 32] = key.try_into().map_err(|_| {
-        AppError::Other("The Twitch deeplink key must decode to exactly 32 bytes.".to_string())
-    })?;
-    let payload = serde_json::to_vec(&TwitchTokenExport {
-        access_token: &token.access_token,
-        refresh_token: &token.refresh_token,
-    })
-    .map_err(|e| AppError::Other(format!("Could not serialize Twitch token export: {e}")))?;
-
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| AppError::Other(format!("Could not initialize token encryption: {e}")))?;
-    let mut nonce = [0u8; 12];
-    rand::thread_rng().fill_bytes(&mut nonce);
-    let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), payload.as_ref())
-        .map_err(|e| AppError::Other(format!("Could not encrypt Twitch token export: {e}")))?;
-
-    Ok(format!(
-        "v1.{}.{}",
-        URL_SAFE_NO_PAD.encode(nonce),
-        URL_SAFE_NO_PAD.encode(ciphertext)
-    ))
-}
-
-pub fn decode_export_key(encoded_key: &str) -> Result<Vec<u8>> {
-    let key = URL_SAFE_NO_PAD.decode(encoded_key).map_err(|_| {
-        AppError::Other("The Twitch deeplink key must be base64url encoded.".to_string())
-    })?;
-    if key.len() != 32 {
-        return Err(AppError::Other(
-            "The Twitch deeplink key must decode to exactly 32 bytes.".to_string(),
-        ));
-    }
-    Ok(key)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -137,10 +81,22 @@ fn token_from_response(res: TokenResponse) -> TwitchToken {
     }
 }
 
-pub async fn request_device_code() -> Result<DeviceCodeResponse> {
+pub fn requested_scopes(selected: &[String]) -> Result<String> {
+    if let Some(unknown) = selected.iter().find(|scope| !TWITCH_SCOPES.contains(&scope.as_str())) {
+        return Err(AppError::Other(format!("Unsupported Twitch scope: {}", unknown)));
+    }
+    Ok(TWITCH_SCOPES
+        .iter()
+        .filter(|scope| selected.iter().any(|chosen| chosen == *scope))
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" "))
+}
+
+pub async fn request_device_code(scopes: &str) -> Result<DeviceCodeResponse> {
     let response = HTTP_CLIENT
         .post(DEVICE_CODE_URL)
-        .form(&[("client_id", TWITCH_CLIENT_ID), ("scopes", TWITCH_SCOPES.join(" ").as_str())])
+        .form(&[("client_id", TWITCH_CLIENT_ID), ("scopes", scopes)])
         .send()
         .await
         .map_err(|e| AppError::RequestError(format!("Twitch device code request failed: {}", e)))?;
@@ -163,29 +119,34 @@ pub async fn request_device_code() -> Result<DeviceCodeResponse> {
         .map_err(|e| AppError::Other(format!("Invalid Twitch device code response: {}", e)))
 }
 
-pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
+pub async fn poll_device_token(device_code: &str, scopes: &str) -> Result<PollOutcome> {
     let response = HTTP_CLIENT
         .post(TOKEN_URL)
         .form(&[
             ("client_id", TWITCH_CLIENT_ID),
             ("device_code", device_code),
-            ("scopes", TWITCH_SCOPES.join(" ").as_str()),
+            ("scopes", scopes),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ])
         .send()
-        .await
-        .map_err(|e| AppError::RequestError(format!("Twitch token poll failed: {}", e)))?;
-
+        .await;
+    let response = match response {
+        Ok(response) => response,
+        Err(e) => return Ok(retry(format!("token poll failed: {}", e))),
+    };
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| AppError::RequestError(format!("Twitch token poll read failed: {}", e)))?;
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(e) => return Ok(retry(format!("token poll read failed: {}", e))),
+    };
 
     if status.is_success() {
         let parsed: TokenResponse = serde_json::from_str(&body)
             .map_err(|e| AppError::Other(format!("Invalid Twitch token response: {}", e)))?;
         return Ok(PollOutcome::Token(token_from_response(parsed)));
+    }
+    if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
+        return Ok(retry(format!("token poll answered {}", status)));
     }
 
     let message = error_message(&body).to_lowercase();
@@ -201,9 +162,7 @@ pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
         ));
     }
     if message.contains("denied") {
-        return Err(AppError::Other(
-            "Twitch authorization was denied.".to_string(),
-        ));
+        return Err(AppError::Other("Twitch authorization was denied.".to_string()));
     }
 
     Err(AppError::Other(format!(
@@ -211,6 +170,24 @@ pub async fn poll_device_token(device_code: &str) -> Result<PollOutcome> {
         status,
         error_message(&body)
     )))
+}
+
+fn retry(reason: String) -> PollOutcome {
+    warn!("[Twitch] {}, polling again", reason);
+    PollOutcome::Pending
+}
+
+pub async fn revoke(access_token: &str) {
+    let result = HTTP_CLIENT
+        .post(REVOKE_URL)
+        .form(&[("client_id", TWITCH_CLIENT_ID), ("token", access_token)])
+        .send()
+        .await;
+    match result {
+        Ok(response) if response.status().is_success() => info!("[Twitch] Revoked unlinked token"),
+        Ok(response) => warn!("[Twitch] Token revoke answered {}", response.status()),
+        Err(e) => warn!("[Twitch] Token revoke failed: {}", e),
+    }
 }
 
 pub enum RefreshOutcome {
@@ -295,6 +272,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keeps_only_known_scopes_in_canonical_order() {
+        let selected = vec!["bits:read".to_string(), "user:write:chat".to_string()];
+        assert_eq!(requested_scopes(&selected).unwrap(), "user:write:chat bits:read");
+        assert_eq!(requested_scopes(&[]).unwrap(), "");
+    }
+
+    #[test]
+    fn rejects_scopes_we_never_offer() {
+        assert!(requested_scopes(&["channel:manage:raids".to_string()]).is_err());
+    }
+
+    #[test]
     fn invalid_refresh_token_is_terminal() {
         assert!(is_terminal_refresh_failure(
             StatusCode::BAD_REQUEST,
@@ -330,27 +319,23 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn needs_refresh_fires_before_actual_expiry() {
-        let token = TwitchToken {
+    fn token_expiring_in(minutes: i64) -> TwitchToken {
+        TwitchToken {
             access_token: "a".to_string(),
             refresh_token: "r".to_string(),
-            expires: Utc::now() + Duration::minutes(30),
+            expires: Utc::now() + Duration::minutes(minutes),
             scopes: Vec::new(),
-        };
-        assert!(token.needs_refresh());
-        assert!(!token.is_expired());
+        }
     }
 
     #[test]
-    fn expired_token_reports_both() {
-        let token = TwitchToken {
-            access_token: "a".to_string(),
-            refresh_token: "r".to_string(),
-            expires: Utc::now() - Duration::minutes(1),
-            scopes: Vec::new(),
-        };
-        assert!(token.needs_refresh());
-        assert!(token.is_expired());
+    fn refreshes_shortly_before_expiry() {
+        assert!(token_expiring_in(10).needs_refresh());
+        assert!(token_expiring_in(-1).needs_refresh());
+    }
+
+    #[test]
+    fn keeps_a_token_with_time_left() {
+        assert!(!token_expiring_in(60).needs_refresh());
     }
 }

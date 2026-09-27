@@ -19,7 +19,6 @@ pub struct AuthBridgeResult {
 #[derive(Clone, Serialize)]
 pub struct TwitchDeepLinkRequest {
     pub action: String,
-    pub export_key: Option<String>,
 }
 
 /// Handles incoming deep link URLs.
@@ -67,28 +66,12 @@ async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
             return;
         }
     };
-    let export_key = url
-        .query_pairs()
-        .find(|(key, _)| key == "key")
-        .map(|(_, value)| value.to_string());
-
-    if action != "unlink" {
-        match export_key.as_deref().and_then(|key| crate::minecraft::auth::twitch_auth::decode_export_key(key).ok()) {
-            Some(_) => {}
-            None => {
-                warn!("[DeepLink] Twitch {} request missing a valid export key", action);
-                return;
-            }
-        }
-    }
-
     focus_main_window(app_handle);
     info!("[DeepLink] Twitch {} request received", action);
     let _ = app_handle.emit(
         "deep-link-twitch-request",
         TwitchDeepLinkRequest {
             action: action.to_string(),
-            export_key,
         },
     );
 }

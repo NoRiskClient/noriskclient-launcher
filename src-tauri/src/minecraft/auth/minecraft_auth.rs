@@ -79,7 +79,6 @@ pub struct Credentials {
     /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
     #[serde(default)]
     pub mc_access_token_expires: Option<DateTime<Utc>>,
-    /// Twitch credential linked to this account. `None` when the user has not linked / has unlinked.
     #[serde(default)]
     pub twitch_token: Option<TwitchToken>,
 }
@@ -1156,50 +1155,44 @@ impl MinecraftAuthStore {
         self.save().await
     }
 
-    pub async fn ensure_fresh_twitch_token(&self, id: Uuid) -> Result<Option<TwitchToken>> {
-        let current = match self.get_account_by_id(id).await? {
-            Some(account) => account.twitch_token,
-            None => return Ok(None),
-        };
+    pub async fn ensure_fresh_twitch_token(&self, id: Uuid) -> Result<()> {
+        static REFRESHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+        let _guard = REFRESHING.lock().await;
 
-        let Some(current) = current else {
-            return Ok(None);
+        let Some(current) = self.get_account_by_id(id).await?.and_then(|a| a.twitch_token) else {
+            return Ok(());
         };
-
         if !current.needs_refresh() {
-            return Ok(Some(current));
+            return Ok(());
         }
 
         info!("[Twitch] Stored token for account {} is stale, refreshing", id);
         match twitch_auth::refresh_token(&current.refresh_token).await {
-            RefreshOutcome::Refreshed(refreshed) => {
-                let refreshed = *refreshed;
-                self.set_twitch_token(id, Some(refreshed.clone())).await?;
-                Ok(Some(refreshed))
-            }
+            RefreshOutcome::Refreshed(refreshed) => self.set_twitch_token(id, Some(*refreshed)).await,
             RefreshOutcome::Rejected(reason) => {
-                error!(
-                    "[Twitch] Refresh token for account {} is no longer valid ({}). Clearing link.",
-                    id, reason
-                );
-                self.set_twitch_token(id, None).await?;
-                Ok(None)
-            }
-            RefreshOutcome::Transient(reason) if current.is_expired() => {
-                warn!(
-                    "[Twitch] Could not refresh account {} ({}) and the token has expired. Keeping the link for the next attempt.",
-                    id, reason
-                );
-                Ok(None)
+                error!("[Twitch] Refresh token for account {} is no longer valid ({}). Clearing link.", id, reason);
+                self.set_twitch_token(id, None).await
             }
             RefreshOutcome::Transient(reason) => {
-                warn!(
-                    "[Twitch] Could not refresh account {} ({}). Using the still-valid token.",
-                    id, reason
-                );
-                Ok(Some(current))
+                warn!("[Twitch] Could not refresh account {} ({}), keeping the link for the next attempt", id, reason);
+                Ok(())
             }
         }
+    }
+
+    pub async fn adopt_rotated_twitch_token(&self, id: Uuid, token: TwitchToken) -> Result<bool> {
+        {
+            let mut accounts = self.accounts.write().await;
+            let Some(account) = accounts.iter_mut().find(|acc| acc.id == id) else {
+                return Ok(false);
+            };
+            match &account.twitch_token {
+                Some(current) if token.expires > current.expires => account.twitch_token = Some(token),
+                _ => return Ok(false),
+            }
+        }
+        self.save().await?;
+        Ok(true)
     }
 
     pub async fn update_norisk_and_microsoft_token(
