@@ -31,6 +31,7 @@ const STATUS_POLL_MS = 2000;
 const DROP_SHARE = 0.05;
 const HOOK = "graphics hook";
 const WINDOW = "window capture";
+const SCREEN = "screen capture";
 
 const ENCODER_NAME: Partial<Record<ClipEncoder, string>> = {
   nvenc: "NVENC",
@@ -106,7 +107,9 @@ function liveDetail(
       ? t("clips.page.status.via_hook")
       : status.capture_method === WINDOW
         ? t("clips.page.status.via_window")
-        : null;
+        : status.capture_method === SCREEN
+          ? t("clips.page.status.via_screen")
+          : null;
   const encoder = status.active_encoder
     ? (ENCODER_NAME[status.active_encoder] ?? t("settings.clips.quality.encoder.software"))
     : null;

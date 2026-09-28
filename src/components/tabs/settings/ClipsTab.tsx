@@ -254,13 +254,15 @@ export function ClipsTab() {
           )}
         >
           <span className="font-minecraft text-sm text-white/60">
-            {clips.other_game?.name ?? t("settings.clips.games.none")}
+            {clips.other_screen?.name ?? clips.other_game?.name ?? t("settings.clips.games.none")}
           </span>
         </SettingRow>}
 
         {permissionsReady && <GamePicker
           value={clips.other_game}
-          onChange={(other_game) => patch({ other_game })}
+          onChange={(other_game) => patch({ other_game, other_screen: null })}
+          screen={clips.other_screen ?? null}
+          onScreen={(other_screen) => patch({ other_screen, other_game: null })}
           disabled={saving || !clips.enabled}
           t={t}
         />}

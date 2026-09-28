@@ -173,6 +173,17 @@ export async function listOpenApps(): Promise<OpenApp[]> {
   return invoke<OpenApp[]>("clip_open_apps");
 }
 
+export interface ScreenInfo {
+  device: string;
+  width: number;
+  height: number;
+  primary: boolean;
+}
+
+export async function listScreens(): Promise<ScreenInfo[]> {
+  return invoke<ScreenInfo[]>("clip_list_screens");
+}
+
 export async function setClipFavourite(path: string, favourite: boolean): Promise<void> {
   return invoke("clip_set_favourite", { path, favourite });
 }

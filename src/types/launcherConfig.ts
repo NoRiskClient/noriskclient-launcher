@@ -97,10 +97,16 @@ export interface ClipConfig {
   hotkey_save: string;
   hotkey_toggle: string;
   other_game: OtherGame | null;
+  other_screen?: OtherScreen | null;
 }
 
 export interface OtherGame {
   executable: string;
+  name: string;
+}
+
+export interface OtherScreen {
+  device: string;
   name: string;
 }
 

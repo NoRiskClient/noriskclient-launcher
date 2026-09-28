@@ -5,9 +5,10 @@ import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
-import { listOpenApps, type OpenApp } from "../../services/clip-service";
-import type { OtherGame } from "../../types/launcherConfig";
+import { listOpenApps, listScreens, type OpenApp, type ScreenInfo } from "../../services/clip-service";
+import type { OtherGame, OtherScreen } from "../../types/launcherConfig";
 import { cn } from "../../lib/utils";
+import { isMacOS } from "../../utils/platform";
 
 interface Props {
   value: OtherGame | null;
@@ -16,6 +17,8 @@ interface Props {
   t: (key: string, options?: Record<string, unknown>) => string;
   icon?: string;
   noneDescription?: string;
+  screen?: OtherScreen | null;
+  onScreen?: (screen: OtherScreen) => void;
 }
 
 export function GamePicker({
@@ -25,21 +28,30 @@ export function GamePicker({
   t,
   icon = "solar:gamepad-bold",
   noneDescription,
+  screen = null,
+  onScreen,
 }: Props) {
   const [apps, setApps] = useState<OpenApp[] | null>(null);
+  const [screens, setScreens] = useState<ScreenInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const offerScreens = Boolean(onScreen) && !isMacOS();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setApps(await listOpenApps());
+      const [open, shown] = await Promise.all([
+        listOpenApps(),
+        offerScreens ? listScreens() : Promise.resolve([]),
+      ]);
+      setApps(open);
+      setScreens(shown);
     } catch (e) {
       console.error("Could not list the open programs", e);
       setApps([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [offerScreens]);
 
   useEffect(() => {
     void refresh();
@@ -77,7 +89,7 @@ export function GamePicker({
           icon="solar:close-circle-bold"
           name={t("settings.clips.games.none")}
           detail={noneDescription ?? t("settings.clips.games.none.description")}
-          selected={value === null}
+          selected={value === null && screen === null}
           disabled={disabled}
           onSelect={() => onChange(null)}
         />
@@ -105,7 +117,38 @@ export function GamePicker({
             {t("settings.clips.games.empty")}
           </p>
         )}
+
+        {offerScreens && screens.length > 0 && (
+          <>
+            <p className="px-2 pt-2 font-minecraft text-xs text-white/50">
+              {t("settings.clips.games.screens")}
+            </p>
+            {screens.map((shown, index) => {
+              const name = t("settings.clips.games.screen", { number: index + 1 });
+              return (
+                <Row
+                  key={shown.device}
+                  icon="solar:monitor-bold"
+                  name={name}
+                  detail={`${shown.width} × ${shown.height}${
+                    shown.primary ? ` · ${t("settings.clips.games.screen.primary")}` : ""
+                  }`}
+                  selected={screen?.device === shown.device}
+                  disabled={disabled}
+                  onSelect={() => onScreen?.({ device: shown.device, name })}
+                />
+              );
+            })}
+          </>
+        )}
       </div>
+
+      {offerScreens && screen && (
+        <p className="flex items-start gap-2 px-1 font-minecraft text-xs leading-relaxed text-amber-300">
+          <Icon icon="solar:danger-triangle-bold" className="mt-0.5 h-4 w-4 shrink-0" />
+          {t("settings.clips.games.screen.hint")}
+        </p>
+      )}
     </div>
   );
 }
