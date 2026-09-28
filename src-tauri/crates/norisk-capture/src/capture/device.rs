@@ -34,6 +34,11 @@ impl CaptureDevice {
         Self::create(adapter, adapter_name)
     }
 
+    pub fn new_for_monitor(monitor: HMONITOR) -> Result<Self> {
+        let (adapter, adapter_name) = adapter_for_monitor(monitor)?;
+        Self::create(adapter, adapter_name)
+    }
+
     pub fn new_default() -> Result<Self> {
         let (adapter, adapter_name) = hardware_adapters()?
             .into_iter()

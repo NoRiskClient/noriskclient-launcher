@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 pub fn pipe_name(session_id: &str) -> String {
     format!(r"\\.\pipe\norisk-capture-{session_id}")
@@ -13,6 +13,7 @@ pub fn pipe_name(session_id: &str) -> String {
 pub enum LauncherToCapture {
     Configure(CaptureConfig),
     AttachWindow { pid: u32 },
+    AttachScreen { device: String },
     DetachWindow,
     SaveClip(SaveClipRequest),
     TrimClip(TrimClipRequest),

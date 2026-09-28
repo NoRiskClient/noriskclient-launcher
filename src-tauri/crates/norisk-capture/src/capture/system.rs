@@ -1,14 +1,8 @@
 use windows::core::{Interface, HSTRING};
-use windows::Win32::Foundation::{BOOL, LPARAM, RECT};
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
 };
-use windows::Win32::Graphics::Gdi::{
-    EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
-};
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
-use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-use windows::Win32::UI::WindowsAndMessaging::MONITORINFOF_PRIMARY;
 
 const NVIDIA: u32 = 0x10DE;
 
@@ -112,38 +106,6 @@ fn windows_version() -> String {
     format!("{family} build {build}{patch}{release}")
 }
 
-fn monitors() -> Vec<String> {
-    unsafe extern "system" fn visit(monitor: HMONITOR, _: HDC, _: *mut RECT, found: LPARAM) -> BOOL {
-        let found = &mut *(found.0 as *mut Vec<String>);
-
-        let mut info = MONITORINFO {
-            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
-            ..Default::default()
-        };
-        if !GetMonitorInfoW(monitor, &mut info).as_bool() {
-            return true.into();
-        }
-        let area = info.rcMonitor;
-        let (mut dpi, mut unused) = (96u32, 96u32);
-        let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi, &mut unused);
-
-        found.push(format!(
-            "{}x{} at {}%{}",
-            area.right - area.left,
-            area.bottom - area.top,
-            dpi * 100 / 96,
-            if info.dwFlags & MONITORINFOF_PRIMARY != 0 { " (primary)" } else { "" }
-        ));
-        true.into()
-    }
-
-    let mut found: Vec<String> = Vec::new();
-    unsafe {
-        let _ = EnumDisplayMonitors(None, None, Some(visit), LPARAM(&mut found as *mut _ as isize));
-    }
-    found
-}
-
 fn ffmpeg_version() -> String {
     unsafe {
         let version = ffmpeg_next::ffi::av_version_info();
@@ -164,8 +126,16 @@ pub fn log_system(gpus: &[Gpu]) {
             gpu.driver.as_deref().unwrap_or("unknown")
         );
     }
-    for (number, monitor) in monitors().iter().enumerate() {
-        log::info!("Monitor {}: {monitor}", number + 1);
+    for (number, screen) in super::screen::screens().iter().enumerate() {
+        log::info!(
+            "Monitor {}: {}x{} at {}%{} ({})",
+            number + 1,
+            screen.width,
+            screen.height,
+            screen.scale_percent,
+            if screen.primary { " (primary)" } else { "" },
+            screen.device
+        );
     }
 }
 

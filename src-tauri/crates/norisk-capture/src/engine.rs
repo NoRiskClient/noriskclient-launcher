@@ -97,7 +97,7 @@ pub struct Engine {
     resize_settling: Option<((u32, u32), Instant, Instant)>,
     retired: Option<Retired>,
     buffering_enabled: bool,
-    paused_pid: Option<u32>,
+    paused: Option<Aim>,
     trouble: Trouble,
     last_status: Instant,
     rate_sample: std::cell::Cell<(u64, u64, Instant)>,
@@ -115,13 +115,6 @@ impl FrameSource {
         match self {
             Self::Window(session) => session.adapter(),
             Self::Hook(hook) => hook.adapter(),
-        }
-    }
-
-    fn window_pid(&self) -> u32 {
-        match self {
-            Self::Window(session) => session.window_pid(),
-            Self::Hook(hook) => hook.pid(),
         }
     }
 
@@ -153,8 +146,55 @@ impl FrameSource {
 
     fn describe(&self) -> &'static str {
         match self {
+            Self::Window(session) if session.is_screen() => "screen capture",
             Self::Window(_) => "window capture",
             Self::Hook(_) => "graphics hook",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Aim {
+    Process(u32),
+    Screen(String),
+}
+
+#[derive(Clone)]
+enum Target {
+    Window(window::GameWindow),
+    Screen(crate::capture::screen::Screen),
+}
+
+impl Target {
+    fn aim(&self) -> Aim {
+        match self {
+            Self::Window(window) => Aim::Process(window.pid),
+            Self::Screen(screen) => Aim::Screen(screen.device.clone()),
+        }
+    }
+
+    fn pid(&self) -> u32 {
+        match self {
+            Self::Window(window) => window.pid,
+            Self::Screen(_) => 0,
+        }
+    }
+
+    fn size(&self) -> Option<(u32, u32)> {
+        match self {
+            Self::Window(window) => window::client_size(window.hwnd),
+            Self::Screen(screen) => {
+                crate::capture::screen::find(&screen.device).map(|found| (found.width, found.height))
+            }
+        }
+    }
+
+    fn label(&self) -> String {
+        match self {
+            Self::Window(window) => format!("'{}' (pid {})", window.title, window.pid),
+            Self::Screen(screen) => {
+                format!("screen {} ({}x{})", screen.device, screen.width, screen.height)
+            }
         }
     }
 }
@@ -192,7 +232,7 @@ struct Pipeline {
     settings: EncoderSettings,
     encoder: norisk_ipc::EncoderPreference,
     audio: Option<AudioPipeline>,
-    target: window::GameWindow,
+    target: Target,
     started: Instant,
 }
 
@@ -314,7 +354,7 @@ impl Engine {
             resize_settling: None,
             retired: None,
             buffering_enabled: true,
-            paused_pid: None,
+            paused: None,
             trouble: Trouble::default(),
             last_status: Instant::now(),
             rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
@@ -425,17 +465,17 @@ impl Engine {
                 self.config = config;
                 if restart {
                     log::info!("Configuration changed materially; restarting the pipeline");
-                    if let Some(pid) = self.attached_pid() {
+                    if let Some(aim) = self.attached_aim() {
                         self.detach_retaining_buffer(Duration::ZERO);
-                        self.begin_attach(pid);
+                        self.aim_at(aim);
                     }
                 }
             }
             LauncherToCapture::AttachWindow { pid } => {
                 if !self.buffering_enabled {
                     log::info!("Buffering is paused; process {pid} waits for the resume");
-                    self.paused_pid = Some(pid);
-                } else if self.attached_pid() == Some(pid) {
+                    self.paused = Some(Aim::Process(pid));
+                } else if self.attached_aim() == Some(Aim::Process(pid)) {
                     log::debug!("Already recording process {pid}; leaving the pipeline alone");
                 } else if self.trouble.resting(pid, Instant::now()) {
                     log::debug!("Recording process {pid} kept failing; waiting before trying again");
@@ -444,8 +484,22 @@ impl Engine {
                     self.begin_attach(pid);
                 }
             }
+            LauncherToCapture::AttachScreen { device } => {
+                let aim = Aim::Screen(device.clone());
+                if !self.buffering_enabled {
+                    log::info!("Buffering is paused; screen {device} waits for the resume");
+                    self.paused = Some(aim);
+                } else if self.attached_aim() == Some(aim.clone()) {
+                    log::debug!("Already recording screen {device}; leaving the pipeline alone");
+                } else if self.trouble.resting(0, Instant::now()) {
+                    log::debug!("Recording screen {device} kept failing; waiting before trying again");
+                } else {
+                    self.detach();
+                    self.aim_at(aim);
+                }
+            }
             LauncherToCapture::DetachWindow => {
-                self.paused_pid = None;
+                self.paused = None;
                 self.trouble = Trouble::default();
                 self.detach();
             }
@@ -458,12 +512,12 @@ impl Engine {
 
                 if enabled {
                     log::info!("Buffering resumed");
-                    if let Some(pid) = self.paused_pid.take() {
-                        self.begin_attach(pid);
+                    if let Some(aim) = self.paused.take() {
+                        self.aim_at(aim);
                     }
                 } else {
                     log::info!("Buffering paused; releasing the capture until it resumes");
-                    self.paused_pid = self.attached_pid();
+                    self.paused = self.attached_aim();
                     self.detach_retaining_buffer(Duration::ZERO);
                 }
             }
@@ -525,7 +579,12 @@ impl Engine {
             _ => AudioSource::DefaultDevice,
         };
 
-        let mut plan = match self.config.audio_source {
+        let choice = if pid == 0 {
+            AudioSourceChoice::System
+        } else {
+            self.config.audio_source
+        };
+        let mut plan = match choice {
             AudioSourceChoice::System => {
                 AudioPlan::single(self.system_source(device), gain(self.config.other_volume))
             }
@@ -564,11 +623,31 @@ impl Engine {
         plan
     }
 
-    fn attached_pid(&self) -> Option<u32> {
+    fn attached_aim(&self) -> Option<Aim> {
         self.active
             .as_ref()
-            .map(|p| p.source.window_pid())
-            .or_else(|| self.pending_attach.as_ref().map(|s| s.pid()))
+            .map(|pipeline| pipeline.target.aim())
+            .or_else(|| self.pending_attach.as_ref().map(|search| Aim::Process(search.pid())))
+    }
+
+    fn aim_at(&mut self, aim: Aim) {
+        match aim {
+            Aim::Process(pid) => self.begin_attach(pid),
+            Aim::Screen(device) => self.attach_screen(&device),
+        }
+    }
+
+    fn attach_screen(&mut self, device: &str) {
+        let Some(screen) = crate::capture::screen::find(device) else {
+            let message = format!("screen {device} is not connected");
+            log::warn!("{message}");
+            self.emit_error(ErrorCode::WindowNotFound, message, true);
+            return;
+        };
+        if let Err(e) = self.attach(Target::Screen(screen)) {
+            log::error!("Could not start recording screen {device}: {e:#}");
+            self.troubled(0, ErrorCode::Internal, format!("{e:#}"));
+        }
     }
 
     fn begin_attach(&mut self, pid: u32) {
@@ -589,7 +668,7 @@ impl Engine {
                     return;
                 }
                 self.pending_attach = None;
-                if let Err(e) = self.attach(target) {
+                if let Err(e) = self.attach(Target::Window(target)) {
                     log::error!("Could not start capturing process {pid}: {e:#}");
                     self.troubled(pid, ErrorCode::Internal, format!("{e:#}"));
                 }
@@ -639,16 +718,17 @@ impl Engine {
             return;
         };
 
-        let pid = pipeline.target.pid;
+        let aim = pipeline.target.aim();
+        let key = pipeline.target.pid();
         log::warn!("Recording broke because {why}; rebuilding it");
         let again = self.troubled(
-            pid,
+            key,
             ErrorCode::GraphicsDevice,
             format!("recording broke because {why}; it is starting again"),
         );
         self.detach_retaining_buffer(Duration::ZERO);
         if again {
-            self.begin_attach(pid);
+            self.aim_at(aim);
         }
     }
 
@@ -684,7 +764,7 @@ impl Engine {
             return;
         };
 
-        let source = window::client_size(pipeline.target.hwnd);
+        let source = pipeline.target.size();
         pipeline.hidden.store(source.is_none(), Ordering::Relaxed);
         let Some(source) = source else {
             self.resize_settling = None;
@@ -707,7 +787,7 @@ impl Engine {
                 if since.elapsed() < SETTLE {
                     return;
                 }
-                let pid = pipeline.target.pid;
+                let aim = pipeline.target.aim();
                 let was = (pipeline.settings.width, pipeline.settings.height);
                 log::info!(
                     "Window settled at {}x{}; rebuilding the pipeline to record {}x{} instead of {}x{}",
@@ -720,7 +800,7 @@ impl Engine {
                 );
                 self.resize_settling = None;
                 self.detach_retaining_buffer(began.elapsed() + STATUS_INTERVAL);
-                self.pending_attach = Some(window::WindowSearch::new(pid, ATTACH_TIMEOUT));
+                self.aim_at(aim);
             }
             Some((_, _, began)) => self.resize_settling = Some((wanted, Instant::now(), began)),
             None => self.resize_settling = Some((wanted, Instant::now(), Instant::now())),
@@ -752,24 +832,24 @@ impl Engine {
         Ok((codec, encoder))
     }
 
-    fn attach(&mut self, target: window::GameWindow) -> Result<()> {
-        log::info!("Attaching to '{}' (pid {})", target.title, target.pid);
+    fn attach(&mut self, target: Target) -> Result<()> {
+        log::info!("Attaching to {}", target.label());
         self.keyframe_warned.set(false);
         self.empty_warned.set(false);
 
         let (codec, chosen) = self.choose_encoder()?;
 
-        let Some(source) = window::client_size(target.hwnd) else {
+        let Some(source) = target.size() else {
             anyhow::bail!(
-                "'{}' is minimised or has no drawable area, so there is nothing to record yet",
-                target.title,
+                "{} is minimised or has no drawable area, so there is nothing to record yet",
+                target.label(),
             );
         };
 
         if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
             anyhow::bail!(
-                "'{}' is only {}x{} on screen, too small to record — it is probably minimised",
-                target.title,
+                "{} is only {}x{} on screen, too small to record — it is probably minimised",
+                target.label(),
                 source.0,
                 source.1,
             );
@@ -795,14 +875,20 @@ impl Engine {
             codec,
         };
 
-        let (device, hooked) = match hook_handshake(&target, settings.fps) {
-            Ok((session, texture)) => {
-                match CaptureDevice::new_for_shared_texture(target.hwnd, texture.handle) {
-                    Ok(device) => (device, Ok((session, texture))),
-                    Err(e) => (CaptureDevice::new_for_window(target.hwnd)?, Err(e)),
+        let (device, hooked) = match &target {
+            Target::Window(window) => match hook_handshake(window, settings.fps) {
+                Ok((session, texture)) => {
+                    match CaptureDevice::new_for_shared_texture(window.hwnd, texture.handle) {
+                        Ok(device) => (device, Ok((session, texture))),
+                        Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
+                    }
                 }
-            }
-            Err(e) => (CaptureDevice::new_for_window(target.hwnd)?, Err(e)),
+                Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
+            },
+            Target::Screen(screen) => (
+                CaptureDevice::new_for_monitor(screen.monitor)?,
+                Err(anyhow::anyhow!("a screen is recorded as it is shown")),
+            ),
         };
 
         let pool = HwFramePool::new(&device, settings.width, settings.height)?;
@@ -823,7 +909,10 @@ impl Engine {
                 &device,
                 (settings.width, settings.height),
                 settings.fps,
-                Some(target.hwnd),
+                match &target {
+                    Target::Window(window) => Some(window.hwnd),
+                    Target::Screen(_) => None,
+                },
             )?
         };
 
@@ -918,20 +1007,21 @@ impl Engine {
                 )?))
             }
             Err(e) => {
-                log::warn!("Graphics hook unavailable, falling back to window capture: {e:#}");
-                FrameSource::Window(CaptureSession::start(
-                    device,
-                    target.hwnd,
-                    settings.fps,
-                    sink,
-                )?)
+                let capture = match &target {
+                    Target::Window(window) => {
+                        log::warn!("Graphics hook unavailable, falling back to window capture: {e:#}");
+                        crate::capture::wgc::Source::Window(window.hwnd)
+                    }
+                    Target::Screen(screen) => crate::capture::wgc::Source::Screen(screen.monitor),
+                };
+                FrameSource::Window(CaptureSession::start(device, capture, settings.fps, sink)?)
             }
         };
 
         let audio = if self.config.capture_audio {
             match start_audio(
                 self.config.buffer_seconds as f32,
-                self.audio_plan(target.pid),
+                self.audio_plan(target.pid()),
                 Arc::clone(&epoch_for_audio),
                 self.config.microphone_denoise,
             ) {
@@ -950,13 +1040,7 @@ impl Engine {
             None
         };
 
-        log::info!(
-            "Attached to '{}' ({}x{}) via {}",
-            target.title,
-            target.width,
-            target.height,
-            source.describe()
-        );
+        log::info!("Attached to {} via {}", target.label(), source.describe());
 
         self.active = Some(Pipeline {
             device: health_device,
