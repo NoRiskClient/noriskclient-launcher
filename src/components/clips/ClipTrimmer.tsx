@@ -26,7 +26,6 @@ import { useTrimPreview } from "./useTrimPreview";
 import { useEditHistory } from "./useEditHistory";
 import {
   MIN_LENGTH,
-  NUDGE,
   MIN_BOX,
   TICK_STEPS,
   MAX_TICKS,
@@ -43,8 +42,6 @@ import {
   type Translate,
   overlayTint,
   clamp,
-  merged,
-  hollowed,
   tidy,
   laneWindow,
   formatTime,
@@ -52,6 +49,7 @@ import {
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
+import { useCuts, type PartLane } from "./editor/useCuts";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { Lane, TrackLink, AudioLane, OverlayLane, Readout, Handle } from "./editor/Timeline";
 import { PanelTitle, PropSlider, ShadeChoice, CornerChoice } from "./editor/Inspector";
@@ -79,8 +77,6 @@ interface LaneTrim {
   stream: number;
   edge: "start" | "end";
 }
-
-type PartLane = "all" | "video" | number;
 
 interface RenderProgress {
   done: number;
@@ -140,11 +136,6 @@ export function ClipTrimmer({
   const [boxDrag, setBoxDrag] = useState<BoxDrag | null>(null);
   const [barDrag, setBarDrag] = useState<BarDrag | null>(null);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
-  const [removed, setRemoved] = useState<Span[]>([]);
-  const [splits, setSplits] = useState<number[]>([]);
-  const [blanked, setBlanked] = useState<Span[]>([]);
-  const [muted, setMuted] = useState<Record<number, Span[]>>({});
-  const [pick, setPick] = useState<{ lane: PartLane; at: number } | null>(null);
   const [rendering, setRendering] = useState<RenderProgress | null>(null);
   const renderingRef = useRef(false);
   const leave = useRef(onCancel);
@@ -165,6 +156,28 @@ export function ClipTrimmer({
   const [volumes, setVolumes] = useState<Record<number, number>>({});
   const [windows, setWindows] = useState<Record<number, LaneWindow>>({});
 
+  const shot = laneWindow(picture, start, end);
+  const cuts = useCuts({ playhead, separate, start, end, shot, windows });
+  const {
+    removed,
+    splits,
+    blanked,
+    muted,
+    pick,
+    setPick,
+    part,
+    kept,
+    canSplit,
+    split,
+    cuttable,
+    cutPart,
+    hushed,
+    unsplit,
+    unremove,
+    unblank,
+    unmute,
+  } = cuts;
+
   const doc = useMemo(
     () => ({
       overlays,
@@ -175,32 +188,13 @@ export function ClipTrimmer({
       volumes,
       shape,
       separate,
-      removed,
-      splits,
-      blanked,
-      muted,
+      cuts: cuts.snapshot,
     }),
-    [
-      blanked,
-      end,
-      muted,
-      overlays,
-      picture,
-      removed,
-      separate,
-      shape,
-      splits,
-      start,
-      volumes,
-      windows,
-    ],
+    [cuts.snapshot, end, overlays, picture, separate, shape, start, volumes, windows],
   );
   const restore = useCallback((saved: typeof doc) => {
     setOverlays(saved.overlays);
-    setRemoved(saved.removed);
-    setSplits(saved.splits);
-    setBlanked(saved.blanked);
-    setMuted(saved.muted);
+    cuts.restore(saved.cuts);
     setStart(saved.start);
     setEnd(saved.end);
     setPicture(saved.picture);
@@ -208,7 +202,7 @@ export function ClipTrimmer({
     setVolumes(saved.volumes);
     setShape(saved.shape);
     setSeparate(saved.separate);
-  }, []);
+  }, [cuts.restore]);
   const history = useEditHistory(doc, restore, !busy);
   const { rebase } = history;
 
@@ -217,8 +211,6 @@ export function ClipTrimmer({
     setWindows(Object.fromEntries(movable.map((track) => [track.stream, NO_WINDOW])));
     rebase();
   }, [adjustable, movable, rebase]);
-
-  const shot = laneWindow(picture, start, end);
 
   const levels: TrackLevel[] = useMemo(
     () =>
@@ -452,62 +444,6 @@ export function ClipTrimmer({
     laneTrim,
     (event, laneTrim) => trimTrack(laneTrim.stream, laneTrim.edge, secondsAt(event.clientX)),
     () => setLaneTrim(null),
-  );
-
-  const inside = useCallback(
-    (at: number) => removed.some((span) => at >= span.startSeconds && at < span.endSeconds),
-    [removed],
-  );
-
-  const kept = Math.max(0, shot.to - shot.from - hollowed(removed, shot.from, shot.to));
-
-  const canSplit =
-    playhead > shot.from + NUDGE &&
-    playhead < shot.to - NUDGE &&
-    !inside(playhead) &&
-    splits.every((at) => Math.abs(at - playhead) >= NUDGE);
-
-  const split = useCallback(() => {
-    if (!canSplit) return;
-    setSplits((current) => [...current, tidy(playhead)].sort((a, b) => a - b));
-  }, [canSplit, playhead]);
-
-  const part = useMemo((): { lane: PartLane; span: Span } | null => {
-    if (!pick) return null;
-    const lane: PartLane = separate ? pick.lane : "all";
-    const range =
-      typeof lane === "number" ? laneWindow(windows[lane], start, end) : { from: shot.from, to: shot.to };
-    const own = lane === "video" ? blanked : typeof lane === "number" ? (muted[lane] ?? []) : [];
-    if (inside(pick.at) || own.some((span) => pick.at >= span.startSeconds && pick.at < span.endSeconds)) {
-      return null;
-    }
-    const edges = [range.from, ...splits.filter((at) => at > range.from && at < range.to), range.to];
-    for (let i = 1; i < edges.length; i++) {
-      if (pick.at >= edges[i - 1] && pick.at < edges[i]) {
-        return { lane, span: { startSeconds: edges[i - 1], endSeconds: edges[i] } };
-      }
-    }
-    return null;
-  }, [blanked, end, inside, muted, pick, separate, shot.from, shot.to, splits, start, windows]);
-
-  const cuttable =
-    part !== null &&
-    (part.lane !== "all" || kept - (part.span.endSeconds - part.span.startSeconds) >= MIN_LENGTH);
-
-  const cutPart = useCallback(() => {
-    if (!part || !cuttable) return;
-    const { lane, span } = part;
-    if (lane === "all") setRemoved((current) => merged([...current, span]));
-    else if (lane === "video") setBlanked((current) => merged([...current, span]));
-    else setMuted((current) => ({ ...current, [lane]: merged([...(current[lane] ?? []), span]) }));
-  }, [cuttable, part]);
-
-  const hushed = useMemo(
-    () =>
-      Object.entries(muted).flatMap(([stream, spans]) =>
-        spans.map((span) => ({ stream: Number(stream), ...span })),
-      ),
-    [muted],
   );
 
   useEffect(() => {
@@ -1304,9 +1240,7 @@ export function ClipTrimmer({
               </div>
             )}
 
-            {laneMarks("video", blanked, (index) =>
-              setBlanked((current) => current.filter((_, at) => at !== index)),
-            )}
+            {laneMarks("video", blanked, unblank)}
 
             {separate && (
               <div className="pointer-events-none absolute inset-0 z-10">
@@ -1346,10 +1280,7 @@ export function ClipTrimmer({
                   setPick({ lane: track.stream, at: secondsAt(clientX) });
                 }}
                 marks={laneMarks(track.stream, muted[track.stream] ?? [], (index) =>
-                  setMuted((current) => ({
-                    ...current,
-                    [track.stream]: (current[track.stream] ?? []).filter((_, at) => at !== index),
-                  })),
+                  unmute(track.stream, index),
                 )}
                 onTrim={(edge) => setLaneTrim({ stream: track.stream, edge })}
                 onTrimNudge={(edge, by) =>
@@ -1388,11 +1319,7 @@ export function ClipTrimmer({
           <div className="pointer-events-none absolute inset-y-0 left-44 right-0">
             {!separate && clipMasks(start, end)}
             {part?.lane === "all" && highlight(part.span)}
-            {removed.map((span, index) =>
-              gapBlock(span, index, () =>
-                setRemoved((current) => current.filter((_, at) => at !== index)),
-              ),
-            )}
+            {removed.map((span, index) => gapBlock(span, index, () => unremove(index)))}
             {splits.map((at) => (
               <div
                 key={at}
@@ -1405,7 +1332,7 @@ export function ClipTrimmer({
                   title={t("clips.editor.split.remove")}
                   disabled={busy}
                   onPointerDown={(event) => event.stopPropagation()}
-                  onClick={() => setSplits((current) => current.filter((other) => other !== at))}
+                  onClick={() => unsplit(at)}
                   className="group pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white/70 transition-colors hover:text-white"
                 >
                   <Icon icon="solar:scissors-bold" className="h-2.5 w-2.5 group-hover:hidden" />
