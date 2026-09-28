@@ -51,6 +51,7 @@ import {
   formatTick,
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
+import { useWindowDrag } from "./editor/useWindowDrag";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { Lane, TrackLink, AudioLane, OverlayLane, Readout, Handle } from "./editor/Timeline";
 import { PanelTitle, PropSlider, ShadeChoice, CornerChoice } from "./editor/Inspector";
@@ -314,17 +315,11 @@ export function ClipTrimmer({
     [secondsAt, seek],
   );
 
-  useEffect(() => {
-    if (!scrubbing) return;
-    const move = (event: PointerEvent) => scrubTo(event.clientX);
-    const up = () => setScrubbing(false);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [scrubbing, scrubTo]);
+  useWindowDrag(
+    scrubbing,
+    (event) => scrubTo(event.clientX),
+    () => setScrubbing(false),
+  );
 
   const moveHandle = useCallback(
     (which: "start" | "end", seconds: number) => {
@@ -354,17 +349,11 @@ export function ClipTrimmer({
     [duration, end, seek, separate, shot.end, shot.from, shot.start, shot.to, start],
   );
 
-  useEffect(() => {
-    if (!dragging) return;
-    const move = (event: PointerEvent) => moveHandle(dragging, secondsAt(event.clientX));
-    const up = () => setDragging(null);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [dragging, moveHandle, secondsAt]);
+  useWindowDrag(
+    dragging,
+    (event, dragging) => moveHandle(dragging, secondsAt(event.clientX)),
+    () => setDragging(null),
+  );
 
   const editOverlay = useCallback((index: number, patch: Partial<ClipOverlay>) => {
     setOverlays((current) =>
@@ -398,9 +387,9 @@ export function ClipTrimmer({
     setChosen(null);
   }, []);
 
-  useEffect(() => {
-    if (!boxDrag) return;
-    const move = (event: PointerEvent) => {
+  useWindowDrag(
+    boxDrag,
+    (event, boxDrag) => {
       const rect = frameRef.current?.getBoundingClientRect();
       if (!rect || rect.width === 0 || rect.height === 0) return;
       const byX = (event.clientX - boxDrag.fromX) / rect.width;
@@ -416,19 +405,13 @@ export function ClipTrimmer({
           height: clamp(boxDrag.height + byY, MIN_BOX, 1 - boxDrag.top),
         });
       }
-    };
-    const up = () => setBoxDrag(null);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [boxDrag, editOverlay]);
+    },
+    () => setBoxDrag(null),
+  );
 
-  useEffect(() => {
-    if (!barDrag) return;
-    const move = (event: PointerEvent) => {
+  useWindowDrag(
+    barDrag,
+    (event, barDrag) => {
       const rect = scaleRef.current?.getBoundingClientRect();
       if (!rect || rect.width === 0 || duration <= 0) return;
       const by = ((event.clientX - barDrag.fromX) / rect.width) * duration;
@@ -445,15 +428,9 @@ export function ClipTrimmer({
           endSeconds: clamp(barDrag.endSeconds + by, barDrag.startSeconds + MIN_LENGTH, duration),
         });
       }
-    };
-    const up = () => setBarDrag(null);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [barDrag, duration, editOverlay]);
+    },
+    () => setBarDrag(null),
+  );
 
   const trimTrack = useCallback(
     (stream: number, edge: "start" | "end", seconds: number) => {
@@ -471,18 +448,11 @@ export function ClipTrimmer({
     [end, start],
   );
 
-  useEffect(() => {
-    if (!laneTrim) return;
-    const move = (event: PointerEvent) =>
-      trimTrack(laneTrim.stream, laneTrim.edge, secondsAt(event.clientX));
-    const up = () => setLaneTrim(null);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-  }, [laneTrim, secondsAt, trimTrack]);
+  useWindowDrag(
+    laneTrim,
+    (event, laneTrim) => trimTrack(laneTrim.stream, laneTrim.edge, secondsAt(event.clientX)),
+    () => setLaneTrim(null),
+  );
 
   const inside = useCallback(
     (at: number) => removed.some((span) => at >= span.startSeconds && at < span.endSeconds),
