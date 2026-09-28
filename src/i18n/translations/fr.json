@@ -2161,7 +2161,7 @@
   "settings.clips.games.screens": "Écrans",
   "settings.clips.games.screen": "Écran {{number}}",
   "settings.clips.games.screen.primary": "écran principal",
-  "settings.clips.games.screen.hint": "Tout ce qui est sur cet écran se retrouve dans le clip, y compris les messages et les autres fenêtres. Dès que Minecraft est au premier plan, c'est Minecraft qui est enregistré.",
+  "settings.clips.games.screen.hint": "C'est tout l'écran qui est enregistré, messages et autres fenêtres compris, au lieu de Minecraft seul. Minecraft en plein écran exclusif (F11) reste noir ; utilise le mode fenêtré ou sans bordure.",
   "settings.clips.enabled.short": "Ajoute Clips à la barre latérale et enregistre en arrière-plan.",
   "settings.clips.applied": "Prêt. Appuie sur {{keys}} pour enregistrer un clip.",
   "settings.clips.apply_failed": "Impossible d'appliquer les paramètres : {{error}}",

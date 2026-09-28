@@ -2191,7 +2191,7 @@
   "settings.clips.games.screens": "Screens",
   "settings.clips.games.screen": "Screen {{number}}",
   "settings.clips.games.screen.primary": "main screen",
-  "settings.clips.games.screen.hint": "Everything on this screen ends up in the clip, including messages and other windows. As soon as Minecraft is in front, Minecraft is recorded instead.",
+  "settings.clips.games.screen.hint": "The whole screen is recorded, including messages and other windows, instead of Minecraft alone. Minecraft in exclusive fullscreen (F11) stays black here; use windowed or borderless mode.",
   "settings.clips.enabled.short": "Puts Clips in the sidebar and records in the background.",
   "settings.clips.applied": "Ready. Press {{keys}} to save a clip.",
   "settings.clips.apply_failed": "Settings could not be applied: {{error}}",

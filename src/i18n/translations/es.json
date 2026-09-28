@@ -2161,7 +2161,7 @@
   "settings.clips.games.screens": "Pantallas",
   "settings.clips.games.screen": "Pantalla {{number}}",
   "settings.clips.games.screen.primary": "pantalla principal",
-  "settings.clips.games.screen.hint": "Todo lo que haya en esta pantalla acaba en el clip, incluidos mensajes y otras ventanas. En cuanto Minecraft esté en primer plano, se graba Minecraft en su lugar.",
+  "settings.clips.games.screen.hint": "Se graba toda la pantalla, incluidos mensajes y otras ventanas, en lugar de solo Minecraft. Minecraft en pantalla completa exclusiva (F11) queda en negro; usa el modo ventana o sin bordes.",
   "settings.clips.enabled.short": "Añade Clips a la barra lateral y graba en segundo plano.",
   "settings.clips.applied": "Listo. Pulsa {{keys}} para guardar un clip.",
   "settings.clips.apply_failed": "No se pudo aplicar la configuración: {{error}}",

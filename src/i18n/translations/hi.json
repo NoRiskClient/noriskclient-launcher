@@ -2176,7 +2176,7 @@
   "settings.clips.games.screens": "स्क्रीन",
   "settings.clips.games.screen": "स्क्रीन {{number}}",
   "settings.clips.games.screen.primary": "मुख्य स्क्रीन",
-  "settings.clips.games.screen.hint": "इस स्क्रीन पर जो कुछ भी है वह क्लिप में आएगा, संदेश और दूसरी विंडो भी। जैसे ही Minecraft सामने हो, उसकी जगह Minecraft रिकॉर्ड होगा।",
+  "settings.clips.games.screen.hint": "सिर्फ़ Minecraft की जगह पूरी स्क्रीन रिकॉर्ड होगी, संदेश और दूसरी विंडो भी। एक्सक्लूसिव फ़ुलस्क्रीन (F11) में Minecraft यहाँ काला रहेगा; विंडो या बॉर्डरलेस मोड इस्तेमाल करें।",
   "settings.clips.enabled.short": "साइडबार में क्लिप्स जोड़ता है और बैकग्राउंड में रिकॉर्ड करता है।",
   "settings.clips.applied": "तैयार है। क्लिप सेव करने के लिए {{keys}} दबाएं।",
   "settings.clips.apply_failed": "सेटिंग्स लागू नहीं हो सकीं: {{error}}",

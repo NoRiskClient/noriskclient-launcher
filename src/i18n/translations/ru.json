@@ -2163,7 +2163,7 @@
   "settings.clips.games.screens": "Экраны",
   "settings.clips.games.screen": "Экран {{number}}",
   "settings.clips.games.screen.primary": "основной экран",
-  "settings.clips.games.screen.hint": "В клип попадёт всё, что есть на этом экране, включая сообщения и другие окна. Как только Minecraft окажется на переднем плане, будет записываться Minecraft.",
+  "settings.clips.games.screen.hint": "Записывается весь экран, включая сообщения и другие окна, а не только Minecraft. Minecraft в эксклюзивном полноэкранном режиме (F11) здесь останется чёрным; используй оконный режим или режим без рамки.",
   "settings.clips.enabled.short": "Добавляет Клипы в боковую панель и записывает в фоне.",
   "settings.clips.applied": "Готово. Нажми {{keys}}, чтобы сохранить клип.",
   "settings.clips.apply_failed": "Не удалось применить настройки: {{error}}",

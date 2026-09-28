@@ -2171,7 +2171,7 @@
   "settings.clips.games.screens": "Bildschirme",
   "settings.clips.games.screen": "Bildschirm {{number}}",
   "settings.clips.games.screen.primary": "Hauptbildschirm",
-  "settings.clips.games.screen.hint": "Aufgenommen wird alles auf diesem Bildschirm, auch Nachrichten und andere Fenster. Sobald Minecraft im Vordergrund ist, wird stattdessen Minecraft aufgenommen.",
+  "settings.clips.games.screen.hint": "Aufgenommen wird der ganze Bildschirm, auch Nachrichten und andere Fenster, statt nur Minecraft. Minecraft im echten Vollbild (F11) bleibt dabei schwarz – nutze den Fenstermodus oder randloses Vollbild.",
   "settings.clips.enabled.short": "Zeigt „Clips“ in der Seitenleiste und nimmt im Hintergrund mit.",
   "settings.clips.applied": "Bereit. Drücke {{keys}}, um einen Clip zu speichern.",
   "settings.clips.apply_failed": "Einstellungen konnten nicht übernommen werden: {{error}}",
