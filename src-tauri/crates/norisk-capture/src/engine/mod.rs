@@ -18,8 +18,10 @@ use crate::encoder::{
 };
 use crate::writer::{write_mp4, TrackInfo};
 
+mod target;
 mod trouble;
 
+use target::{Aim, Target};
 use trouble::{Trouble, Verdict, TROUBLE_LIMIT, TROUBLE_WINDOW};
 
 const STATUS_INTERVAL: Duration = Duration::from_secs(1);
@@ -99,52 +101,6 @@ impl FrameSource {
             Self::Window(session) if session.is_screen() => "screen capture",
             Self::Window(_) => "window capture",
             Self::Hook(_) => "graphics hook",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Aim {
-    Process(u32),
-    Screen(String),
-}
-
-#[derive(Clone)]
-enum Target {
-    Window(window::GameWindow),
-    Screen(crate::capture::screen::Screen),
-}
-
-impl Target {
-    fn aim(&self) -> Aim {
-        match self {
-            Self::Window(window) => Aim::Process(window.pid),
-            Self::Screen(screen) => Aim::Screen(screen.device.clone()),
-        }
-    }
-
-    fn pid(&self) -> u32 {
-        match self {
-            Self::Window(window) => window.pid,
-            Self::Screen(_) => 0,
-        }
-    }
-
-    fn size(&self) -> Option<(u32, u32)> {
-        match self {
-            Self::Window(window) => window::client_size(window.hwnd),
-            Self::Screen(screen) => {
-                crate::capture::screen::find(&screen.device).map(|found| (found.width, found.height))
-            }
-        }
-    }
-
-    fn label(&self) -> String {
-        match self {
-            Self::Window(window) => format!("'{}' (pid {})", window.title, window.pid),
-            Self::Screen(screen) => {
-                format!("screen {} ({}x{})", screen.device, screen.width, screen.height)
-            }
         }
     }
 }
