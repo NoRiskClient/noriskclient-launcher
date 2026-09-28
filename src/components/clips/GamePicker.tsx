@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
-import { GroupTabs } from "../ui/GroupTabs";
 import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, listScreens, type OpenApp, type ScreenInfo } from "../../services/clip-service";
 import type { OtherGame, OtherScreen } from "../../types/launcherConfig";
@@ -35,6 +34,7 @@ export function GamePicker({
   const [apps, setApps] = useState<OpenApp[] | null>(null);
   const [screens, setScreens] = useState<ScreenInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const accentColor = useThemeStore((state) => state.accentColor);
   const offerScreens = Boolean(onScreen) && !isMacOS();
   const [view, setView] = useState<"apps" | "screens">(screen ? "screens" : "apps");
   const showing = offerScreens ? view : "apps";
@@ -69,30 +69,39 @@ export function GamePicker({
 
   return (
     <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
         {offerScreens ? (
-          <GroupTabs
-            className="!mb-0"
-            showAddButton={false}
-            activeGroup={showing}
-            onGroupChange={(id) => setView(id === "screens" ? "screens" : "apps")}
-            groups={[
-              {
-                id: "apps",
-                name: t("settings.clips.games.apps"),
-                count: apps?.length ?? 0,
-                icon: "solar:widget-bold",
-              },
-              {
-                id: "screens",
-                name: t("settings.clips.games.screens"),
-                count: screens.length,
-                icon: "solar:monitor-bold",
-              },
-            ]}
-          />
+          <div className="grid flex-1 grid-cols-2 gap-1 rounded-lg bg-black/30 p-1">
+            {(
+              [
+                { id: "apps", icon: "solar:widget-bold", label: t("settings.clips.games.apps"), count: apps?.length ?? 0 },
+                { id: "screens", icon: "solar:monitor-bold", label: t("settings.clips.games.screens"), count: screens.length },
+              ] as const
+            ).map((tab) => {
+              const active = showing === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setView(tab.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-md px-3 py-1.5 font-minecraft text-sm transition-colors",
+                    active ? "text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80",
+                  )}
+                  style={active ? { backgroundColor: `${accentColor.value}35` } : undefined}
+                >
+                  <Icon icon={tab.icon} className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{tab.label}</span>
+                  <span className="rounded bg-black/30 px-1.5 text-xs tabular-nums text-white/60">
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         ) : (
-          <p className="font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
+          <p className="flex-1 font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
         )}
         <Button
           variant="ghost"
@@ -145,30 +154,61 @@ export function GamePicker({
         )}
 
         {showing === "screens" && (
-          <>
+          <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-3">
             {screens.map((shown, index) => {
               const name = t("settings.clips.games.screen", { number: index + 1 });
+              const selected = screen?.device === shown.device;
               return (
-                <Row
+                <button
                   key={shown.device}
-                  icon="solar:monitor-bold"
-                  name={name}
-                  detail={`${shown.width} × ${shown.height}${
-                    shown.primary ? ` · ${t("settings.clips.games.screen.primary")}` : ""
-                  }`}
-                  selected={screen?.device === shown.device}
+                  type="button"
+                  onClick={() => onScreen?.({ device: shown.device, name })}
                   disabled={disabled}
-                  onSelect={() => onScreen?.({ device: shown.device, name })}
-                />
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-lg border px-3 pb-2.5 pt-3 transition-all duration-200",
+                    selected
+                      ? "text-white"
+                      : "border-white/10 bg-black/20 hover:border-white/25 hover:bg-black/30",
+                    disabled && "cursor-not-allowed",
+                  )}
+                  style={
+                    selected
+                      ? { backgroundColor: `${accentColor.value}20`, borderColor: accentColor.value }
+                      : undefined
+                  }
+                >
+                  <span
+                    className="relative flex w-full max-w-[9rem] items-center justify-center rounded-md border-2 bg-black/40"
+                    style={{
+                      aspectRatio: `${Math.max(shown.width, 1)} / ${Math.max(shown.height, 1)}`,
+                      borderColor: selected ? accentColor.value : "rgba(255,255,255,0.25)",
+                    }}
+                  >
+                    <span className="font-minecraft text-2xl text-white/80">{index + 1}</span>
+                    {shown.primary && (
+                      <Icon
+                        icon="solar:star-bold"
+                        className="absolute right-1 top-1 h-3 w-3 text-yellow-400"
+                      />
+                    )}
+                  </span>
+                  <span className="h-1 w-8 rounded-b bg-white/20" />
+                  <span className="font-minecraft text-sm text-white/90">{name}</span>
+                  <span className="font-minecraft text-xs text-white/40">
+                    {shown.width} × {shown.height}
+                    {shown.primary ? ` · ${t("settings.clips.games.screen.primary")}` : ""}
+                  </span>
+                </button>
               );
             })}
-          </>
+          </div>
         )}
       </div>
 
       {offerScreens && screen && (
-        <p className="flex items-start gap-2 px-1 font-minecraft text-xs leading-relaxed text-amber-300">
-          <Icon icon="solar:danger-triangle-bold" className="mt-0.5 h-4 w-4 shrink-0" />
+        <p className="flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 font-minecraft text-xs leading-relaxed text-amber-200">
+          <Icon icon="solar:danger-triangle-bold" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           {t("settings.clips.games.screen.hint")}
         </p>
       )}

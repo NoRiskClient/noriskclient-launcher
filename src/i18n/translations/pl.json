@@ -2151,7 +2151,7 @@
   "settings.clips.enabled": "Nagrywaj klipy",
   "settings.clips.enabled.description": "Uruchamia się razem z grą i nagrywa cicho w tle.",
   "settings.clips.games.other": "Nagrywaj też",
-  "settings.clips.games.other.description": "Oprócz Minecrafta nagrywany jest jeszcze jeden program, gdy jest na pierwszym planie.",
+  "settings.clips.games.other.description": "Oprócz Minecrafta nagrywaj inny program, gdy jest na pierwszym planie, albo wybierz zamiast tego cały ekran.",
   "settings.clips.games.open": "Aktualnie otwarte",
   "settings.clips.games.refresh": "Odśwież",
   "settings.clips.games.none": "Brak",

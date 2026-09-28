@@ -2161,7 +2161,7 @@
   "settings.clips.enabled": "Clips aufnehmen",
   "settings.clips.enabled.description": "Startet mit dem Spiel und nimmt unauffällig im Hintergrund auf.",
   "settings.clips.games.other": "Zusätzlich aufnehmen",
-  "settings.clips.games.other.description": "Neben Minecraft wird ein weiteres Programm mitgeschnitten, sobald es im Vordergrund ist.",
+  "settings.clips.games.other.description": "Neben Minecraft ein weiteres Programm aufnehmen, sobald es im Vordergrund ist – oder stattdessen einen ganzen Bildschirm.",
   "settings.clips.games.open": "Gerade geöffnet",
   "settings.clips.games.refresh": "Neu laden",
   "settings.clips.games.none": "Keins",

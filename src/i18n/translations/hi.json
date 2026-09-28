@@ -2166,7 +2166,7 @@
   "settings.clips.enabled": "क्लिप्स रिकॉर्ड करें",
   "settings.clips.enabled.description": "गेम के साथ शुरू होता है और बैकग्राउंड में चुपचाप रिकॉर्ड करता रहता है।",
   "settings.clips.games.other": "साथ में रिकॉर्ड करें",
-  "settings.clips.games.other.description": "Minecraft के अलावा एक और प्रोग्राम रिकॉर्ड होता है, जब वह सामने हो।",
+  "settings.clips.games.other.description": "Minecraft के अलावा कोई और प्रोग्राम सामने होने पर रिकॉर्ड करें, या उसकी जगह पूरी स्क्रीन चुनें।",
   "settings.clips.games.open": "अभी खुले हुए",
   "settings.clips.games.refresh": "रीलोड करें",
   "settings.clips.games.none": "कोई नहीं",

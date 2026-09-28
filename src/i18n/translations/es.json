@@ -2151,7 +2151,7 @@
   "settings.clips.enabled": "Grabar clips",
   "settings.clips.enabled.description": "Se inicia con el juego y sigue grabando en segundo plano sin interrupciones.",
   "settings.clips.games.other": "Grabar además",
-  "settings.clips.games.other.description": "Además de Minecraft se graba un programa más cuando está en primer plano.",
+  "settings.clips.games.other.description": "Además de Minecraft, graba otro programa cuando esté en primer plano, o elige una pantalla completa para grabarla en su lugar.",
   "settings.clips.games.open": "Abierto ahora mismo",
   "settings.clips.games.refresh": "Actualizar",
   "settings.clips.games.none": "Ninguno",

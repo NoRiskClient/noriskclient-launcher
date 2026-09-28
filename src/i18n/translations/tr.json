@@ -2151,7 +2151,7 @@
   "settings.clips.enabled": "Klip kaydet",
   "settings.clips.enabled.description": "Oyunla birlikte başlar ve arka planda sessizce kayıt yapar.",
   "settings.clips.games.other": "Ayrıca kaydet",
-  "settings.clips.games.other.description": "Minecraft dışında bir program daha ön plandayken kaydedilir.",
+  "settings.clips.games.other.description": "Minecraft'ın yanında öne geldiğinde başka bir programı kaydet ya da onun yerine tüm bir ekranı seç.",
   "settings.clips.games.open": "Şu an açık",
   "settings.clips.games.refresh": "Yenile",
   "settings.clips.games.none": "Yok",

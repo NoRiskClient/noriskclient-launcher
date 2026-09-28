@@ -2181,7 +2181,7 @@
   "settings.clips.enabled": "Record clips",
   "settings.clips.enabled.description": "Starts with the game and keeps recording quietly in the background.",
   "settings.clips.games.other": "Also record",
-  "settings.clips.games.other.description": "Besides Minecraft, one more program is recorded whenever it is in front.",
+  "settings.clips.games.other.description": "Besides Minecraft, record another program whenever it is in front, or pick a whole screen to record instead.",
   "settings.clips.games.open": "Open right now",
   "settings.clips.games.refresh": "Reload",
   "settings.clips.games.none": "None",

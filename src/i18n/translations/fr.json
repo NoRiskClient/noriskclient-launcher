@@ -2151,7 +2151,7 @@
   "settings.clips.enabled": "Enregistrer des clips",
   "settings.clips.enabled.description": "Démarre avec le jeu et continue d'enregistrer discrètement en arrière-plan.",
   "settings.clips.games.other": "Enregistrer aussi",
-  "settings.clips.games.other.description": "En plus de Minecraft, un autre programme est enregistré quand il est au premier plan.",
+  "settings.clips.games.other.description": "En plus de Minecraft, enregistre un autre programme dès qu'il est au premier plan, ou choisis plutôt un écran entier.",
   "settings.clips.games.open": "Ouvert en ce moment",
   "settings.clips.games.refresh": "Actualiser",
   "settings.clips.games.none": "Aucun",
