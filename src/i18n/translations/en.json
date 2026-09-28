@@ -2188,6 +2188,7 @@
   "settings.clips.games.none.description": "Record Minecraft only.",
   "settings.clips.games.closed": "{{executable}} — not open right now",
   "settings.clips.games.empty": "No open programs found.",
+  "settings.clips.games.apps": "Programs",
   "settings.clips.games.screens": "Screens",
   "settings.clips.games.screen": "Screen {{number}}",
   "settings.clips.games.screen.primary": "main screen",

@@ -2173,6 +2173,7 @@
   "settings.clips.games.none.description": "सिर्फ़ Minecraft रिकॉर्ड करें।",
   "settings.clips.games.closed": "{{executable}} अभी खुला नहीं है",
   "settings.clips.games.empty": "कोई खुला हुआ प्रोग्राम नहीं मिला।",
+  "settings.clips.games.apps": "ऐप्लिकेशन",
   "settings.clips.games.screens": "स्क्रीन",
   "settings.clips.games.screen": "स्क्रीन {{number}}",
   "settings.clips.games.screen.primary": "मुख्य स्क्रीन",

@@ -2158,6 +2158,7 @@
   "settings.clips.games.none.description": "Sadece Minecraft'ı kaydet.",
   "settings.clips.games.closed": "{{executable}}, şu an açık değil",
   "settings.clips.games.empty": "Açık program bulunamadı.",
+  "settings.clips.games.apps": "Uygulamalar",
   "settings.clips.games.screens": "Ekranlar",
   "settings.clips.games.screen": "Ekran {{number}}",
   "settings.clips.games.screen.primary": "ana ekran",

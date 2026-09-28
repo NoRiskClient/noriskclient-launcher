@@ -2168,6 +2168,7 @@
   "settings.clips.games.none.description": "Nur Minecraft aufnehmen.",
   "settings.clips.games.closed": "{{executable}} — gerade nicht geöffnet",
   "settings.clips.games.empty": "Keine offenen Programme gefunden.",
+  "settings.clips.games.apps": "Anwendungen",
   "settings.clips.games.screens": "Bildschirme",
   "settings.clips.games.screen": "Bildschirm {{number}}",
   "settings.clips.games.screen.primary": "Hauptbildschirm",

@@ -2158,6 +2158,7 @@
   "settings.clips.games.none.description": "Registra solo Minecraft.",
   "settings.clips.games.closed": "{{executable}} non è aperto al momento",
   "settings.clips.games.empty": "Nessun programma aperto trovato.",
+  "settings.clips.games.apps": "Applicazioni",
   "settings.clips.games.screens": "Schermi",
   "settings.clips.games.screen": "Schermo {{number}}",
   "settings.clips.games.screen.primary": "schermo principale",

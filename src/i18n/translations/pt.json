@@ -2158,6 +2158,7 @@
   "settings.clips.games.none.description": "Gravar apenas Minecraft.",
   "settings.clips.games.closed": "{{executable}}, não está aberto agora",
   "settings.clips.games.empty": "Nenhum programa aberto encontrado.",
+  "settings.clips.games.apps": "Aplicativos",
   "settings.clips.games.screens": "Telas",
   "settings.clips.games.screen": "Tela {{number}}",
   "settings.clips.games.screen.primary": "tela principal",

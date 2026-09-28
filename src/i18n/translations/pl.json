@@ -2158,6 +2158,7 @@
   "settings.clips.games.none.description": "Nagrywaj tylko Minecrafta.",
   "settings.clips.games.closed": "{{executable}}, obecnie nie otwarty",
   "settings.clips.games.empty": "Nie znaleziono otwartych programów.",
+  "settings.clips.games.apps": "Aplikacje",
   "settings.clips.games.screens": "Ekrany",
   "settings.clips.games.screen": "Ekran {{number}}",
   "settings.clips.games.screen.primary": "ekran główny",

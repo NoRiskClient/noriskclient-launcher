@@ -2158,6 +2158,7 @@
   "settings.clips.games.none.description": "Graba solo Minecraft.",
   "settings.clips.games.closed": "{{executable}}: no está abierto ahora mismo",
   "settings.clips.games.empty": "No se encontraron programas abiertos.",
+  "settings.clips.games.apps": "Programas",
   "settings.clips.games.screens": "Pantallas",
   "settings.clips.games.screen": "Pantalla {{number}}",
   "settings.clips.games.screen.primary": "pantalla principal",

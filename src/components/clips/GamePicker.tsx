@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
+import { GroupTabs } from "../ui/GroupTabs";
 import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, listScreens, type OpenApp, type ScreenInfo } from "../../services/clip-service";
 import type { OtherGame, OtherScreen } from "../../types/launcherConfig";
@@ -35,6 +36,8 @@ export function GamePicker({
   const [screens, setScreens] = useState<ScreenInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const offerScreens = Boolean(onScreen) && !isMacOS();
+  const [view, setView] = useState<"apps" | "screens">(screen ? "screens" : "apps");
+  const showing = offerScreens ? view : "apps";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,7 +70,30 @@ export function GamePicker({
   return (
     <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
       <div className="flex items-center justify-between gap-3">
-        <p className="font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
+        {offerScreens ? (
+          <GroupTabs
+            className="!mb-0"
+            showAddButton={false}
+            activeGroup={showing}
+            onGroupChange={(id) => setView(id === "screens" ? "screens" : "apps")}
+            groups={[
+              {
+                id: "apps",
+                name: t("settings.clips.games.apps"),
+                count: apps?.length ?? 0,
+                icon: "solar:widget-bold",
+              },
+              {
+                id: "screens",
+                name: t("settings.clips.games.screens"),
+                count: screens.length,
+                icon: "solar:monitor-bold",
+              },
+            ]}
+          />
+        ) : (
+          <p className="font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
+        )}
         <Button
           variant="ghost"
           size="xs"
@@ -94,7 +120,7 @@ export function GamePicker({
           onSelect={() => onChange(null)}
         />
 
-        {rows.map((app) => (
+        {showing === "apps" && rows.map((app) => (
           <Row
             key={app.executable}
             icon={icon}
@@ -112,17 +138,14 @@ export function GamePicker({
           />
         ))}
 
-        {apps !== null && apps.length === 0 && (
+        {showing === "apps" && apps !== null && apps.length === 0 && (
           <p className="px-2 py-3 text-center font-minecraft text-xs text-white/40">
             {t("settings.clips.games.empty")}
           </p>
         )}
 
-        {offerScreens && screens.length > 0 && (
+        {showing === "screens" && (
           <>
-            <p className="px-2 pt-2 font-minecraft text-xs text-white/50">
-              {t("settings.clips.games.screens")}
-            </p>
             {screens.map((shown, index) => {
               const name = t("settings.clips.games.screen", { number: index + 1 });
               return (

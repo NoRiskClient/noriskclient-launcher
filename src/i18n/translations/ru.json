@@ -2160,6 +2160,7 @@
   "settings.clips.games.none.description": "Записывать только Minecraft.",
   "settings.clips.games.closed": "{{executable}}: сейчас не открыто",
   "settings.clips.games.empty": "Открытых программ не найдено.",
+  "settings.clips.games.apps": "Приложения",
   "settings.clips.games.screens": "Экраны",
   "settings.clips.games.screen": "Экран {{number}}",
   "settings.clips.games.screen.primary": "основной экран",
