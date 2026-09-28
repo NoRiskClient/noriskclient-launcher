@@ -273,7 +273,7 @@ impl CaptureSupervisor {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
         let kind = game_kind(session.attached_game.as_deref());
-        let method = status.capture_method.clone();
+        let method = status.capture_method;
 
         if to == Buffering && session.buffering_since.is_none() {
             session.buffering_since = Some(std::time::Instant::now());
@@ -706,7 +706,7 @@ impl CaptureSupervisor {
                             "audio_tracks": manifest.audio_tracks.len(),
                             "codec": active.map(|(codec, _)| codec),
                             "encoder": active.map(|(_, encoder)| encoder),
-                            "capture_method": status.as_ref().and_then(|s| s.capture_method.clone()),
+                            "capture_method": status.as_ref().and_then(|s| s.capture_method),
                             "capture_fps": status.as_ref().map(|s| s.capture_fps.round()),
                             "encode_fps": status.as_ref().map(|s| s.encode_fps.round()),
                             "dropped_frames": status.as_ref().map(|s| s.dropped_frames),
@@ -885,7 +885,7 @@ impl CaptureSupervisor {
                         "code": error.code,
                         "recoverable": error.recoverable,
                         "game": game_kind(self.attached_game().as_deref()),
-                        "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method.clone()),
+                        "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method),
                     }),
                 );
                 if attaching_failed(error.code) {

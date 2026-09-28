@@ -275,6 +275,18 @@ impl CaptureState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CaptureMethod {
+    #[serde(rename = "graphics hook")]
+    GraphicsHook,
+    #[serde(rename = "window capture")]
+    WindowCapture,
+    #[serde(rename = "screen capture")]
+    ScreenCapture,
+    #[serde(rename = "screencapturekit")]
+    ScreenCaptureKit,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StatusReport {
     pub state: CaptureState,
@@ -287,7 +299,7 @@ pub struct StatusReport {
     pub dropped_before_keyframe: u64,
     pub encode_latency_ms_p99: f32,
     #[serde(default)]
-    pub capture_method: Option<String>,
+    pub capture_method: Option<CaptureMethod>,
     #[serde(default)]
     pub retry_in_seconds: Option<u32>,
     #[serde(default)]
@@ -573,7 +585,7 @@ mod tests {
             dropped_frames: 0,
             dropped_before_keyframe: 0,
             encode_latency_ms_p99: 0.0,
-            capture_method: Some("graphics hook".to_string()),
+            capture_method: Some(CaptureMethod::GraphicsHook),
             retry_in_seconds: Some(60),
             active_codec: Some(ClipCodec::Av1),
             active_encoder: Some(EncoderPreference::Nvenc),
@@ -581,6 +593,15 @@ mod tests {
 
         let back: CaptureToLauncher = decode_line(&encode_line(&msg).unwrap()).unwrap();
         assert_eq!(back, msg);
+    }
+
+    #[test]
+    fn capture_methods_keep_the_text_older_launchers_and_analytics_know() {
+        let text = |method| serde_json::to_string(&method).unwrap();
+        assert_eq!(text(CaptureMethod::GraphicsHook), r#""graphics hook""#);
+        assert_eq!(text(CaptureMethod::WindowCapture), r#""window capture""#);
+        assert_eq!(text(CaptureMethod::ScreenCapture), r#""screen capture""#);
+        assert_eq!(text(CaptureMethod::ScreenCaptureKit), r#""screencapturekit""#);
     }
 
     #[test]

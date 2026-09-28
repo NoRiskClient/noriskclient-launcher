@@ -644,7 +644,7 @@ impl Engine {
             dropped_frames: pipeline.dropped.load(Ordering::Relaxed),
             dropped_before_keyframe,
             encode_latency_ms_p99: latency_p99_ms(&pipeline.encode_latency),
-            capture_method: Some(pipeline.source.describe().to_string()),
+            capture_method: Some(pipeline.source.method()),
             retry_in_seconds: None,
             active_codec: Some(pipeline.settings.codec),
             active_encoder: Some(pipeline.encoder),

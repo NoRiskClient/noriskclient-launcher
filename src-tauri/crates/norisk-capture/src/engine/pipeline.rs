@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use norisk_ipc::{CaptureState, ErrorCode};
+use norisk_ipc::{CaptureMethod, CaptureState, ErrorCode};
 
 use super::audio::{start_audio, AudioPipeline};
 use super::target::Target;
@@ -58,11 +58,11 @@ impl FrameSource {
         }
     }
 
-    pub(super) fn describe(&self) -> &'static str {
+    pub(super) fn method(&self) -> CaptureMethod {
         match self {
-            Self::Window(session) if session.is_screen() => "screen capture",
-            Self::Window(_) => "window capture",
-            Self::Hook(_) => "graphics hook",
+            Self::Window(session) if session.is_screen() => CaptureMethod::ScreenCapture,
+            Self::Window(_) => CaptureMethod::WindowCapture,
+            Self::Hook(_) => CaptureMethod::GraphicsHook,
         }
     }
 }
@@ -257,7 +257,7 @@ impl Engine {
             None
         };
 
-        log::info!("Attached to {} via {}", target.label(), source.describe());
+        log::info!("Attached to {} via {:?}", target.label(), source.method());
 
         self.active = Some(Pipeline {
             device: health_device,
