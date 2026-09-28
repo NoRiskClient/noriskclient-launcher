@@ -11,7 +11,7 @@ use super::audio::{start_audio, AudioPipeline};
 use super::target::Target;
 use super::{Engine, MIN_CAPTURE_SIDE};
 use crate::buffer::RingBuffer;
-use crate::capture::{fit_output, window, BgraFrame, CaptureDevice, CaptureSession, Converter};
+use crate::capture::{fit_output, window, BgraFrame, CaptureDevice, CaptureSession, Converter, FrameSink};
 use crate::encoder::{
     video::TIME_BASE_DEN, EncoderSettings, HwFramePool, PoolFrame, VideoEncoder,
 };
@@ -121,33 +121,7 @@ impl Engine {
         self.empty_warned.set(false);
 
         let (codec, chosen) = self.choose_encoder()?;
-
-        let Some(source) = target.size() else {
-            anyhow::bail!(
-                "{} is minimised or has no drawable area, so there is nothing to record yet",
-                target.label(),
-            );
-        };
-
-        if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
-            anyhow::bail!(
-                "{} is only {}x{} on screen, too small to record — it is probably minimised",
-                target.label(),
-                source.0,
-                source.1,
-            );
-        }
-
-        let (width, height) = fit_output(source, (self.config.width, self.config.height));
-        if (width, height) != (self.config.width, self.config.height) {
-            log::info!(
-                "Recording at {width}x{height}: the game renders {}x{} and the preset caps at {}x{}",
-                source.0,
-                source.1,
-                self.config.width,
-                self.config.height
-            );
-        }
+        let (width, height) = self.output_size(&target)?;
 
         let settings = EncoderSettings {
             width,
@@ -158,21 +132,7 @@ impl Engine {
             codec,
         };
 
-        let (device, hooked) = match &target {
-            Target::Window(window) => match hook_handshake(window, settings.fps) {
-                Ok((session, texture)) => {
-                    match CaptureDevice::new_for_shared_texture(window.hwnd, texture.handle) {
-                        Ok(device) => (device, Ok((session, texture))),
-                        Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
-                    }
-                }
-                Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
-            },
-            Target::Screen(screen) => (
-                CaptureDevice::new_for_monitor(screen.monitor)?,
-                Err(anyhow::anyhow!("a screen is recorded as it is shown")),
-            ),
-        };
+        let (device, hooked) = pick_device_and_hook(&target, settings.fps)?;
 
         let pool = HwFramePool::new(&device, settings.width, settings.height)?;
         let (encoder, settings, chosen) = open_encoder(&pool, settings, chosen, &device.adapter_name)?;
@@ -273,33 +233,7 @@ impl Engine {
         };
 
         let health_device = device.clone();
-        let source = match hooked {
-            Ok((session, texture)) => {
-                log::info!(
-                    "Recording through the graphics hook: {}x{}{}",
-                    texture.width,
-                    texture.height,
-                    if texture.flip { ", flipped" } else { "" }
-                );
-                FrameSource::Hook(Box::new(crate::capture::hook::HookCapture::start(
-                    device,
-                    session,
-                    texture,
-                    settings.fps,
-                    sink,
-                )?))
-            }
-            Err(e) => {
-                let capture = match &target {
-                    Target::Window(window) => {
-                        log::warn!("Graphics hook unavailable, falling back to window capture: {e:#}");
-                        crate::capture::wgc::Source::Window(window.hwnd)
-                    }
-                    Target::Screen(screen) => crate::capture::wgc::Source::Screen(screen.monitor),
-                };
-                FrameSource::Window(CaptureSession::start(device, capture, settings.fps, sink)?)
-            }
-        };
+        let source = start_source(device, hooked, &target, settings.fps, sink)?;
 
         let audio = if self.config.capture_audio {
             match start_audio(
@@ -344,6 +278,92 @@ impl Engine {
         });
         Ok(())
     }
+
+    fn output_size(&self, target: &Target) -> Result<(u32, u32)> {
+        let Some(source) = target.size() else {
+            anyhow::bail!(
+                "{} is minimised or has no drawable area, so there is nothing to record yet",
+                target.label(),
+            );
+        };
+
+        if source.0 < MIN_CAPTURE_SIDE || source.1 < MIN_CAPTURE_SIDE {
+            anyhow::bail!(
+                "{} is only {}x{} on screen, too small to record — it is probably minimised",
+                target.label(),
+                source.0,
+                source.1,
+            );
+        }
+
+        let (width, height) = fit_output(source, (self.config.width, self.config.height));
+        if (width, height) != (self.config.width, self.config.height) {
+            log::info!(
+                "Recording at {width}x{height}: the game renders {}x{} and the preset caps at {}x{}",
+                source.0,
+                source.1,
+                self.config.width,
+                self.config.height
+            );
+        }
+        Ok((width, height))
+    }
+}
+
+type Hooked = Result<(crate::capture::hook::HookSession, crate::capture::hook::HookTexture)>;
+
+fn pick_device_and_hook(target: &Target, fps: u32) -> Result<(CaptureDevice, Hooked)> {
+    Ok(match target {
+        Target::Window(window) => match hook_handshake(window, fps) {
+            Ok((session, texture)) => {
+                match CaptureDevice::new_for_shared_texture(window.hwnd, texture.handle) {
+                    Ok(device) => (device, Ok((session, texture))),
+                    Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
+                }
+            }
+            Err(e) => (CaptureDevice::new_for_window(window.hwnd)?, Err(e)),
+        },
+        Target::Screen(screen) => (
+            CaptureDevice::new_for_monitor(screen.monitor)?,
+            Err(anyhow::anyhow!("a screen is recorded as it is shown")),
+        ),
+    })
+}
+
+fn start_source(
+    device: CaptureDevice,
+    hooked: Hooked,
+    target: &Target,
+    fps: u32,
+    sink: impl FrameSink,
+) -> Result<FrameSource> {
+    Ok(match hooked {
+        Ok((session, texture)) => {
+            log::info!(
+                "Recording through the graphics hook: {}x{}{}",
+                texture.width,
+                texture.height,
+                if texture.flip { ", flipped" } else { "" }
+            );
+            FrameSource::Hook(Box::new(crate::capture::hook::HookCapture::start(
+                device,
+                session,
+                texture,
+                fps,
+                sink,
+            )?))
+        }
+        Err(e) => {
+            let capture = match target {
+                Target::Window(window) => {
+                    log::warn!("Graphics hook unavailable, falling back to window capture: {e:#}");
+                    crate::capture::wgc::Source::Window(window.hwnd)
+                }
+                Target::Screen(screen) => crate::capture::wgc::Source::Screen(screen.monitor),
+            };
+            FrameSource::Window(CaptureSession::start(device, capture, fps, sink)?)
+        }
+    })
 }
 
 const REPEAT_AFTER_FRAMES: u32 = 2;
@@ -557,10 +577,7 @@ fn open_encoder(
 fn hook_handshake(
     target: &window::GameWindow,
     fps: u32,
-) -> Result<(
-    crate::capture::hook::HookSession,
-    crate::capture::hook::HookTexture,
-)> {
+) -> Hooked {
     use crate::capture::hook::{self, HookStep};
     const BUDGET: Duration = Duration::from_millis(6_000);
 
