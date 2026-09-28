@@ -11,7 +11,6 @@ import {
   exportVertical,
   samePath,
   type ClipDetails,
-  type ClipOverlay,
   type ClipShape,
   type ExportProgress,
   type ExportedClip,
@@ -26,10 +25,8 @@ import { useTrimPreview } from "./useTrimPreview";
 import { useEditHistory } from "./useEditHistory";
 import {
   MIN_LENGTH,
-  MIN_BOX,
   TICK_STEPS,
   MAX_TICKS,
-  type NewOverlay,
   TOOLS,
   OVERLAY_NAME,
   OVERLAY_ICON,
@@ -50,28 +47,10 @@ import {
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
 import { useCuts, type PartLane } from "./editor/useCuts";
+import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { Lane, TrackLink, AudioLane, OverlayLane, Readout, Handle } from "./editor/Timeline";
 import { PanelTitle, PropSlider, ShadeChoice, CornerChoice } from "./editor/Inspector";
-
-interface BoxDrag {
-  index: number;
-  mode: "move" | "resize";
-  fromX: number;
-  fromY: number;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
-interface BarDrag {
-  index: number;
-  mode: "move" | "start" | "end";
-  fromX: number;
-  startSeconds: number;
-  endSeconds: number;
-}
 
 interface LaneTrim {
   stream: number;
@@ -127,14 +106,22 @@ export function ClipTrimmer({
   const [scrubbing, setScrubbing] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const overlayEdit = useOverlays({ start, end, duration, frameRef, scaleRef });
+  const {
+    overlays,
+    chosen,
+    setChosen,
+    picked,
+    editOverlay,
+    addOverlay,
+    dropOverlay,
+    grabBox,
+    grabBar,
+  } = overlayEdit;
 
   const [ratio, setRatio] = useState(16 / 9);
-  const [overlays, setOverlays] = useState<ClipOverlay[]>([]);
-  const [chosen, setChosen] = useState<number | null>(null);
   const [shape, setShape] = useState<ClipShape>("original");
   const [panel, setPanel] = useState<Panel>(OFFERED_PANELS[0].id);
-  const [boxDrag, setBoxDrag] = useState<BoxDrag | null>(null);
-  const [barDrag, setBarDrag] = useState<BarDrag | null>(null);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
   const [rendering, setRendering] = useState<RenderProgress | null>(null);
   const renderingRef = useRef(false);
@@ -193,7 +180,7 @@ export function ClipTrimmer({
     [cuts.snapshot, end, overlays, picture, separate, shape, start, volumes, windows],
   );
   const restore = useCallback((saved: typeof doc) => {
-    setOverlays(saved.overlays);
+    overlayEdit.restore(saved.overlays);
     cuts.restore(saved.cuts);
     setStart(saved.start);
     setEnd(saved.end);
@@ -202,7 +189,7 @@ export function ClipTrimmer({
     setVolumes(saved.volumes);
     setShape(saved.shape);
     setSeparate(saved.separate);
-  }, [cuts.restore]);
+  }, [cuts.restore, overlayEdit.restore]);
   const history = useEditHistory(doc, restore, !busy);
   const { rebase } = history;
 
@@ -347,83 +334,6 @@ export function ClipTrimmer({
     () => setDragging(null),
   );
 
-  const editOverlay = useCallback((index: number, patch: Partial<ClipOverlay>) => {
-    setOverlays((current) =>
-      current.map((overlay, at) =>
-        at === index ? ({ ...overlay, ...patch } as ClipOverlay) : overlay,
-      ),
-    );
-  }, []);
-
-  const addOverlay = useCallback(
-    (seed: NewOverlay) => {
-      setOverlays((current) => [
-        ...current,
-        {
-          ...seed,
-          left: 0.25,
-          top: 0.25,
-          width: 0.5,
-          height: 0.5,
-          startSeconds: start,
-          endSeconds: end,
-        },
-      ]);
-      setChosen(overlays.length);
-    },
-    [end, overlays.length, start],
-  );
-
-  const dropOverlay = useCallback((index: number) => {
-    setOverlays((current) => current.filter((_, at) => at !== index));
-    setChosen(null);
-  }, []);
-
-  useWindowDrag(
-    boxDrag,
-    (event, boxDrag) => {
-      const rect = frameRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0 || rect.height === 0) return;
-      const byX = (event.clientX - boxDrag.fromX) / rect.width;
-      const byY = (event.clientY - boxDrag.fromY) / rect.height;
-      if (boxDrag.mode === "move") {
-        editOverlay(boxDrag.index, {
-          left: clamp(boxDrag.left + byX, 0, 1 - boxDrag.width),
-          top: clamp(boxDrag.top + byY, 0, 1 - boxDrag.height),
-        });
-      } else {
-        editOverlay(boxDrag.index, {
-          width: clamp(boxDrag.width + byX, MIN_BOX, 1 - boxDrag.left),
-          height: clamp(boxDrag.height + byY, MIN_BOX, 1 - boxDrag.top),
-        });
-      }
-    },
-    () => setBoxDrag(null),
-  );
-
-  useWindowDrag(
-    barDrag,
-    (event, barDrag) => {
-      const rect = scaleRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0 || duration <= 0) return;
-      const by = ((event.clientX - barDrag.fromX) / rect.width) * duration;
-      if (barDrag.mode === "move") {
-        const span = barDrag.endSeconds - barDrag.startSeconds;
-        const from = clamp(barDrag.startSeconds + by, 0, duration - span);
-        editOverlay(barDrag.index, { startSeconds: from, endSeconds: from + span });
-      } else if (barDrag.mode === "start") {
-        editOverlay(barDrag.index, {
-          startSeconds: clamp(barDrag.startSeconds + by, 0, barDrag.endSeconds - MIN_LENGTH),
-        });
-      } else {
-        editOverlay(barDrag.index, {
-          endSeconds: clamp(barDrag.endSeconds + by, barDrag.startSeconds + MIN_LENGTH, duration),
-        });
-      }
-    },
-    () => setBarDrag(null),
-  );
-
   const trimTrack = useCallback(
     (stream: number, edge: "start" | "end", seconds: number) => {
       setWindows((current) => {
@@ -564,8 +474,6 @@ export function ClipTrimmer({
       ? { width: target / ratio, height: 1 }
       : { width: 1, height: ratio / target };
   }, [ratio, shape]);
-
-  const picked = chosen === null ? null : (overlays[chosen] ?? null);
 
   const exportPercent =
     rendering && rendering.total > 0
@@ -956,19 +864,7 @@ export function ClipTrimmer({
                 color={accentColor.value}
                 label={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
                 onPick={() => setChosen(index)}
-                onGrab={(mode, event) => {
-                  setChosen(index);
-                  setBoxDrag({
-                    index,
-                    mode,
-                    fromX: event.clientX,
-                    fromY: event.clientY,
-                    left: overlay.left,
-                    top: overlay.top,
-                    width: overlay.width,
-                    height: overlay.height,
-                  });
-                }}
+                onGrab={(mode, event) => grabBox(index, mode, event)}
               />
             ))}
           </div>
@@ -1303,16 +1199,7 @@ export function ClipTrimmer({
               accent={accentColor.value}
               name={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
               onPick={() => setChosen(index)}
-              onGrab={(mode, event) => {
-                setChosen(index);
-                setBarDrag({
-                  index,
-                  mode,
-                  fromX: event.clientX,
-                  startSeconds: overlay.startSeconds,
-                  endSeconds: overlay.endSeconds,
-                });
-              }}
+              onGrab={(mode, event) => grabBar(index, mode, event)}
             />
           ))}
 
