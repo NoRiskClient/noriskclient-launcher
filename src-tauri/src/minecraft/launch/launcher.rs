@@ -455,12 +455,9 @@ impl MinecraftLauncher {
             }
         }
 
-        match Natives::installed_ffmpeg_dir() {
-            Some(dir) => {
-                info!("[NRC Natives] Passing ffmpeg natives directory to the game");
-                command.arg(format!("-Dnrc.ffmpeg.natives={}", dir.display()));
-            }
-            None => info!("[NRC Natives] ffmpeg natives not installed, stream player stays disabled"),
+        if let Some(dir) = Natives::ffmpeg_dir() {
+            info!("[NRC Natives] Passing ffmpeg natives directory to the game: {}", dir.display());
+            command.arg(format!("-Dnrc.ffmpeg.natives={}", dir.display()));
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the

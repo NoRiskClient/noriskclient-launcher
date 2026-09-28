@@ -459,15 +459,7 @@ pub async fn install_minecraft_version(
             .await?
     });
 
-    if NoriskNativesDownloadService::installed_ffmpeg_dir().is_none() {
-        let natives_download = NoriskNativesDownloadService::new();
-        timed_step(&state, &summary, EventType::DownloadingNoRiskClientAssets, profile.id, "ffmpeg natives", || async {
-            if let Err(e) = natives_download.install(&FFMPEG).await {
-                log::error!("[NRC Natives] Continuing without ffmpeg natives: {}", e);
-            }
-            Ok::<(), AppError>(())
-        }).await?;
-    }
+    NoriskNativesDownloadService::install_in_background(&FFMPEG);
 
     // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());
