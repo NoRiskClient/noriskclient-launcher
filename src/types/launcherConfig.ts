@@ -116,6 +116,8 @@ export type CaptureRuntimeState =
   | { state: "downloading"; downloaded: number; total: number | null }
   | { state: "failed"; message: string };
 
+export type CaptureMethod = "graphics hook" | "window capture" | "screen capture" | "screencapturekit";
+
 export interface CaptureStatus {
   running: boolean;
   runtime: CaptureRuntimeState;
@@ -133,7 +135,7 @@ export interface CaptureStatus {
   capabilities: EncoderCapability[];
   active_codec: ClipCodec | null;
   active_encoder: ClipEncoder | null;
-  capture_method: string | null;
+  capture_method: CaptureMethod | null;
   capture_fps: number;
   dropped_frames: number;
   retry_in_seconds: number | null;

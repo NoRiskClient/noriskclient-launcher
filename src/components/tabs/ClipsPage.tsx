@@ -15,7 +15,7 @@ import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
 import { errorKey, getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
-import type { CaptureStatus, ClipEncoder } from "../../types/launcherConfig";
+import type { CaptureMethod, CaptureStatus, ClipEncoder } from "../../types/launcherConfig";
 import { BetaNotice } from "../ui/BetaNotice";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
@@ -29,9 +29,9 @@ import { cn } from "../../lib/utils";
 
 const STATUS_POLL_MS = 2000;
 const DROP_SHARE = 0.05;
-const HOOK = "graphics hook";
-const WINDOW = "window capture";
-const SCREEN = "screen capture";
+const HOOK: CaptureMethod = "graphics hook";
+const WINDOW: CaptureMethod = "window capture";
+const SCREEN: CaptureMethod = "screen capture";
 
 const ENCODER_NAME: Partial<Record<ClipEncoder, string>> = {
   nvenc: "NVENC",
