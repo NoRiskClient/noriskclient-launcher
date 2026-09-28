@@ -147,24 +147,24 @@ impl Gaps {
     }
 }
 
-pub fn to_vertical(
+pub fn render(
     request: &norisk_ipc::ExportVerticalRequest,
     progress: impl Fn(u32, u32),
 ) -> Result<VerticalResult> {
     let mut used = None;
-    match render(request, &progress, &RENDER_ENCODERS, &mut used) {
+    match render_with(request, &progress, &RENDER_ENCODERS, &mut used) {
         Err(e) if used.is_some_and(|name| name != CPU_ENCODER) => {
             log::warn!(
                 "Rendering with {} failed ({e:#}); rendering again on the processor",
                 used.map(|name| name.to_string_lossy()).unwrap_or_default()
             );
-            render(request, &progress, &[CPU_ENCODER], &mut used)
+            render_with(request, &progress, &[CPU_ENCODER], &mut used)
         }
         done => done,
     }
 }
 
-fn render(
+fn render_with(
     request: &norisk_ipc::ExportVerticalRequest,
     progress: &impl Fn(u32, u32),
     encoders: &[&'static std::ffi::CStr],
@@ -1199,7 +1199,7 @@ mod probe {
             shape: norisk_ipc::ClipShape::Vertical,
             ..Default::default()
         };
-        match super::to_vertical(&request, |_, _| {}) {
+        match super::render(&request, |_, _| {}) {
             Ok(result) => println!(
                 "OK  {}x{}  {:.1}s  {:.1} MB  in {} ms  -> {}",
                 result.width,
@@ -1262,7 +1262,7 @@ mod render_tests {
             };
             let _ = std::fs::remove_file(&request.destination);
             let started = std::time::Instant::now();
-            let result = super::to_vertical(&request, |_, _| {}).unwrap();
+            let result = super::render(&request, |_, _| {}).unwrap();
             println!(
                 "{label}: {:.2}s for {:.1}s of clip",
                 started.elapsed().as_secs_f64(),
@@ -1322,7 +1322,7 @@ mod render_tests {
             overlays,
             ..Default::default()
         };
-        let result = super::to_vertical(&request, |_, _| {}).unwrap();
+        let result = super::render(&request, |_, _| {}).unwrap();
 
         assert_eq!(result.width, result.height, "a square export was not square");
         println!(
@@ -1356,7 +1356,7 @@ mod render_tests {
             end_seconds: Some(end),
             ..Default::default()
         };
-        super::to_vertical(&request, |_, _| {}).unwrap();
+        super::render(&request, |_, _| {}).unwrap();
 
         let written = crate::trim::read(&destination).unwrap();
         let first = written.video.iter().map(|p| p.pts).min().unwrap();
@@ -1410,7 +1410,7 @@ mod render_tests {
             removed: vec![norisk_ipc::Span { start_seconds: gone_from, end_seconds: gone_to }],
             ..Default::default()
         };
-        super::to_vertical(&request, |_, _| {}).unwrap();
+        super::render(&request, |_, _| {}).unwrap();
 
         let written = crate::trim::read(&destination).unwrap();
         let seconds = |ticks: i64| ticks as f64 / TIME_BASE_DEN as f64;

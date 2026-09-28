@@ -62,7 +62,7 @@ impl Engine {
                     ));
                 };
 
-                match crate::vertical::to_vertical(&request, report) {
+                match crate::render::render(&request, report) {
                     Ok(result) => {
                         log::info!(
                             "Exported {} as {}x{} in {} ms",

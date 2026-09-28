@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use ffmpeg_next::ffi as ff;
 
-use crate::vertical::{Decoder, Frame};
+use crate::render::{Decoder, Frame};
 
 const MAX_WIDTH: u32 = 400;
 const TARGET_FPS: u32 = 12;

@@ -20,7 +20,7 @@ pub mod trim;
 #[cfg(windows)]
 pub mod preview;
 #[cfg(windows)]
-pub mod vertical;
+pub mod render;
 pub mod watchdog;
 #[cfg(windows)]
 pub mod writer;
