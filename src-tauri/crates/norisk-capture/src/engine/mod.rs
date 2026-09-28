@@ -18,68 +18,18 @@ use crate::encoder::{
 };
 use crate::writer::{write_mp4, TrackInfo};
 
+mod trouble;
+
+use trouble::{Trouble, Verdict, TROUBLE_LIMIT, TROUBLE_WINDOW};
+
 const STATUS_INTERVAL: Duration = Duration::from_secs(1);
 const HEALTH_GRACE: Duration = Duration::from_secs(3);
 const FAILURE_LOG_EVERY: u64 = 600;
 const FRESH_ENOUGH_SECONDS: f64 = 5.0;
-const TROUBLE_WINDOW: Duration = Duration::from_secs(120);
-const TROUBLE_LIMIT: usize = 3;
-const FIRST_REST: Duration = Duration::from_secs(60);
 const HEALTHY_AFTER: Duration = Duration::from_secs(120);
 const SPARE_BYTES: u64 = 32 * 1024 * 1024;
 const PLAYBACK_CHECK_PACKETS: usize = 120;
 
-#[derive(Debug, PartialEq, Eq)]
-enum Verdict {
-    Report,
-    Quiet,
-    Rest(Duration),
-}
-
-#[derive(Default)]
-struct Trouble {
-    pid: u32,
-    recent: VecDeque<Instant>,
-    rests: u32,
-    resting_until: Option<Instant>,
-}
-
-impl Trouble {
-    fn note(&mut self, pid: u32, now: Instant) -> Verdict {
-        if self.pid != pid {
-            *self = Trouble { pid, ..Default::default() };
-        }
-        self.recent.retain(|at| now.saturating_duration_since(*at) < TROUBLE_WINDOW);
-        self.recent.push_back(now);
-
-        if self.recent.len() >= TROUBLE_LIMIT {
-            let rest = FIRST_REST * 2u32.pow(self.rests.min(3));
-            self.rests += 1;
-            self.recent.clear();
-            self.resting_until = Some(now + rest);
-            return Verdict::Rest(rest);
-        }
-        if self.recent.len() == 1 {
-            Verdict::Report
-        } else {
-            Verdict::Quiet
-        }
-    }
-
-    fn resting(&self, pid: u32, now: Instant) -> bool {
-        self.pid == pid && self.resting_until.is_some_and(|until| now < until)
-    }
-
-    fn resting_at_all(&self, now: Instant) -> bool {
-        self.resting_until.is_some_and(|until| now < until)
-    }
-
-    fn retry_in(&self, now: Instant) -> Option<u32> {
-        self.resting_until
-            .filter(|until| now < *until)
-            .map(|until| until.saturating_duration_since(now).as_secs_f64().ceil() as u32)
-    }
-}
 const ENCODE_QUEUE_DEPTH: usize = 4;
 
 const PROGRESS_EVERY: Duration = Duration::from_millis(150);
@@ -690,7 +640,7 @@ impl Engine {
         if pipeline.started.elapsed() < HEALTH_GRACE {
             return;
         }
-        if pipeline.started.elapsed() >= HEALTHY_AFTER && self.trouble.rests + self.trouble.recent.len() as u32 > 0 {
+        if pipeline.started.elapsed() >= HEALTHY_AFTER && self.trouble.has_history() {
             log::debug!("Recording has run cleanly for {HEALTHY_AFTER:?}; forgetting earlier failures");
             self.trouble = Trouble::default();
         }
@@ -2381,69 +2331,6 @@ fn hook_handshake(
                 std::thread::sleep(Duration::from_millis(25));
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod trouble_tests {
-    use super::*;
-
-    #[test]
-    fn a_single_failure_is_reported_and_the_next_ones_stay_quiet() {
-        let mut trouble = Trouble::default();
-        let now = Instant::now();
-
-        assert_eq!(trouble.note(7, now), Verdict::Report);
-        assert_eq!(trouble.note(7, now + Duration::from_secs(5)), Verdict::Quiet);
-        assert!(!trouble.resting(7, now + Duration::from_secs(5)));
-    }
-
-    #[test]
-    fn repeated_failures_rest_longer_each_time_up_to_a_ceiling() {
-        let mut trouble = Trouble::default();
-        let mut now = Instant::now();
-        let mut rests = Vec::new();
-
-        for _ in 0..5 {
-            let mut verdict = Verdict::Quiet;
-            for _ in 0..TROUBLE_LIMIT {
-                now += Duration::from_secs(1);
-                verdict = trouble.note(7, now);
-            }
-            let Verdict::Rest(rest) = verdict else {
-                panic!("{TROUBLE_LIMIT} quick failures did not lead to a rest");
-            };
-            assert!(trouble.resting(7, now));
-            assert_eq!(trouble.retry_in(now), Some(rest.as_secs() as u32));
-            assert!(!trouble.resting(8, now), "another game should not wait");
-            rests.push(rest.as_secs());
-            now += rest;
-            assert!(!trouble.resting(7, now), "the rest never ended");
-            assert_eq!(trouble.retry_in(now), None);
-        }
-
-        assert_eq!(rests, vec![60, 120, 240, 480, 480]);
-    }
-
-    #[test]
-    fn failures_spread_far_apart_never_add_up_to_a_rest() {
-        let mut trouble = Trouble::default();
-        let mut now = Instant::now();
-
-        for _ in 0..10 {
-            now += TROUBLE_WINDOW;
-            assert_eq!(trouble.note(7, now), Verdict::Report);
-        }
-    }
-
-    #[test]
-    fn another_game_starts_with_a_clean_slate() {
-        let mut trouble = Trouble::default();
-        let now = Instant::now();
-
-        trouble.note(7, now);
-        trouble.note(7, now);
-        assert_eq!(trouble.note(8, now), Verdict::Report);
     }
 }
 
