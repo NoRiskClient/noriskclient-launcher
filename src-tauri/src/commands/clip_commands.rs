@@ -446,6 +446,11 @@ pub async fn clip_save_thumbnail(
 }
 
 #[tauri::command]
+pub fn clip_list_screens() -> Vec<crate::utils::screens::ScreenInfo> {
+    crate::utils::screens::list()
+}
+
+#[tauri::command]
 pub async fn clip_open_apps() -> Result<Vec<crate::utils::game_detect::OpenApp>, CommandError> {
     Ok(tokio::task::spawn_blocking(crate::utils::game_detect::open_apps)
         .await

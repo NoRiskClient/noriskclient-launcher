@@ -37,6 +37,7 @@ const BACKOFF: &[Duration] = &[
 struct Session {
     config: Option<norisk_ipc::CaptureConfig>,
     attached_pid: Option<u32>,
+    attached_screen: Option<String>,
     attached_game: Option<String>,
     buffering_enabled: Option<bool>,
     attached_at: Option<std::time::Instant>,
@@ -170,9 +171,17 @@ impl CaptureSupervisor {
                 .unwrap_or_else(|poison| poison.into_inner());
             match &command {
                 LauncherToCapture::Configure(config) => session.config = Some(config.clone()),
-                LauncherToCapture::AttachWindow { pid } => session.attached_pid = Some(*pid),
+                LauncherToCapture::AttachWindow { pid } => {
+                    session.attached_pid = Some(*pid);
+                    session.attached_screen = None;
+                }
+                LauncherToCapture::AttachScreen { device } => {
+                    session.attached_screen = Some(device.clone());
+                    session.attached_pid = None;
+                }
                 LauncherToCapture::DetachWindow => {
                     session.attached_pid = None;
+                    session.attached_screen = None;
                     session.attached_game = None;
                 }
                 LauncherToCapture::SetBufferEnabled { enabled } => {
@@ -202,6 +211,14 @@ impl CaptureSupervisor {
             .attached_pid
     }
 
+    pub fn attached_screen(&self) -> Option<String> {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .attached_screen
+            .clone()
+    }
+
     pub fn attached_game(&self) -> Option<String> {
         self.session
             .lock()
@@ -216,8 +233,20 @@ impl CaptureSupervisor {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
         session.attached_pid = None;
+        session.attached_screen = None;
         session.attached_game = None;
         session.attached_at = None;
+    }
+
+    pub fn attach_screen(&self, device: String, name: String) -> Result<()> {
+        self.send(LauncherToCapture::AttachScreen { device })?;
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        session.attached_game = Some(name);
+        session.attached_at = Some(std::time::Instant::now());
+        Ok(())
     }
 
     pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
@@ -479,6 +508,9 @@ impl CaptureSupervisor {
         }
         if let Some(pid) = session.attached_pid {
             replay.push(LauncherToCapture::AttachWindow { pid });
+        }
+        if let Some(device) = session.attached_screen {
+            replay.push(LauncherToCapture::AttachScreen { device });
         }
         if !replay.is_empty() {
             log::info!("Restoring {} session command(s) on the capture engine", replay.len());

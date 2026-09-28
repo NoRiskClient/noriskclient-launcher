@@ -153,11 +153,19 @@ pub struct ClipConfig {
     pub hotkey_toggle: String,
     #[serde(default)]
     pub other_game: Option<OtherGame>,
+    #[serde(default)]
+    pub other_screen: Option<OtherScreen>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct OtherGame {
     pub executable: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct OtherScreen {
+    pub device: String,
     pub name: String,
 }
 
@@ -189,6 +197,7 @@ impl Default for ClipConfig {
             hotkey_save: default_clip_hotkey_save(),
             hotkey_toggle: default_clip_hotkey_toggle(),
             other_game: None,
+            other_screen: None,
         }
     }
 }
