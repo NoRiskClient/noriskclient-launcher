@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -598,9 +599,9 @@ export function ClipTrimmer({
   const darkened = blanked.some((span) => playhead >= span.startSeconds && playhead < span.endSeconds);
 
   return (
-    <div className="fixed inset-0 z-[1000] flex bg-black/70 p-4 backdrop-blur-md-anyos">
+    <div className="flex h-screen bg-black">
       <div
-        className="relative flex min-h-0 w-full flex-col overflow-hidden rounded-lg border border-b-2"
+        className="relative flex min-h-0 w-full flex-col overflow-hidden border border-b-2"
         style={{
           backgroundColor: `${accentColor.value}20`,
           borderColor: `${accentColor.value}80`,
@@ -608,6 +609,7 @@ export function ClipTrimmer({
         }}
       >
       <header
+        data-tauri-drag-region
         className="relative flex shrink-0 items-center gap-3 border-b-2 px-5 py-3.5"
         style={{
           borderColor: `${accentColor.value}60`,
@@ -654,6 +656,16 @@ export function ClipTrimmer({
           >
             {t("clips.trim.save")}
           </Button>
+          <ClipIconButton
+            icon="mdi:minus"
+            label={t("window.minimize")}
+            onClick={() => void getCurrentWindow().minimize()}
+          />
+          <ClipIconButton
+            icon="mdi:checkbox-blank-outline"
+            label={t("window.maximize")}
+            onClick={() => void getCurrentWindow().toggleMaximize()}
+          />
         </div>
 
         {rendering && (

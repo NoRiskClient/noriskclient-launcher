@@ -59,6 +59,10 @@ export async function openClipFolder(): Promise<void> {
   return invoke("clip_open_folder");
 }
 
+export async function openClipEditor(path: string, name: string): Promise<void> {
+  return invoke("clip_open_editor", { path, name });
+}
+
 export interface OpenApp {
   pid: number;
   executable: string;

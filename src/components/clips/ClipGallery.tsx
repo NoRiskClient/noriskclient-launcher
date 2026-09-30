@@ -15,23 +15,19 @@ import { useThemeStore } from "../../store/useThemeStore";
 import {
   deleteClip,
   exportGif,
-  getClipDetails,
   renameClip,
   setClipFavourite,
   getClipStorageUsage,
   listClips,
+  openClipEditor,
   revealClip,
   samePath,
-  trimClip,
-  type ClipDetails,
   type ClipEntry,
   type ClipStorageUsage,
   type ExportedClip,
   type ExportedGif,
-  type TrackLevel,
   type TrimmedClip,
 } from "../../services/clip-service";
-import { ClipTrimmer } from "./ClipTrimmer";
 import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
@@ -517,65 +513,15 @@ function ClipPlayer({
 }) {
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
 
-  const [trimming, setTrimming] = useState(false);
   const [duration, setDuration] = useState(0);
   const [ratio, setRatio] = useState(16 / 9);
-  const [saving, setSaving] = useState(false);
-  const [details, setDetails] = useState<ClipDetails | null>(null);
 
-  useEffect(() => {
-    let current = true;
-    setDetails(null);
-    void getClipDetails(clip.path)
-      .then((loaded) => {
-        if (current) setDetails(loaded);
-      })
-      .catch((e) => {
-        console.warn("Could not read the clip's details", e);
-      });
-    return () => {
-      current = false;
-    };
-  }, [clip.path]);
-
-  const save = useCallback(
-    async (
-      startSeconds: number,
-      endSeconds: number,
-      levels: TrackLevel[],
-      videoStartSeconds: number | null,
-      videoEndSeconds: number | null,
-    ) => {
-      setSaving(true);
-      try {
-        await trimClip(clip.path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
-        toast.success(t("clips.trim.saved"));
-        setTrimming(false);
-      } catch (e) {
-        console.error("Could not trim the clip", e);
-        toast.error(t("clips.trim.failed"));
-      } finally {
-        setSaving(false);
-      }
-    },
-    [clip.path, t],
-  );
-
-  if (trimming) {
-    return (
-      <ClipTrimmer
-        src={src}
-        path={clip.path}
-        name={clip.name}
-        duration={duration}
-        busy={saving}
-        details={details}
-        onCancel={() => setTrimming(false)}
-        onSave={save}
-        t={t}
-      />
-    );
-  }
+  const edit = useCallback(() => {
+    openClipEditor(clip.path, clip.name).catch((e) => {
+      console.error("Could not open the clip editor", e);
+      toast.error(parseErrorMessage(e));
+    });
+  }, [clip.name, clip.path]);
 
   const footer = (
     <div className="flex items-center justify-end gap-3">
@@ -591,7 +537,7 @@ function ClipPlayer({
         variant="default"
         size="sm"
         icon={<Icon icon="solar:scissors-bold" className="w-4 h-4" />}
-        onClick={() => setTrimming(true)}
+        onClick={edit}
         disabled={duration <= 0}
       >
         {t("clips.trim.open")}
