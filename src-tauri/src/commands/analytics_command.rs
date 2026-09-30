@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use log::{debug, warn};
 use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::command;
 use crate::state::state_manager;
 
@@ -30,6 +31,17 @@ pub struct TrackEventResponse {
 }
 
 const ANALYTICS_URL: &str = "https://analytics-api-staging.norisk.gg/api/track";
+
+fn analytics_url() -> String {
+    if cfg!(debug_assertions) {
+        if let Ok(url) = std::env::var("NRC_ANALYTICS_URL") {
+            return url;
+        }
+    }
+    ANALYTICS_URL.to_string()
+}
+
+static FRONTEND_IDENTITY: Mutex<Option<(String, String)>> = Mutex::new(None);
 
 pub fn tenths(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
@@ -66,17 +78,36 @@ pub fn track_event(event_type: impl Into<String>, properties: HashMap<String, Va
     });
 }
 
-async fn send_event(event: AnalyticsEvent) -> Result<(), String> {
+pub async fn track_with_frontend_identity(event_type: &str, properties: Value) -> Result<bool, String> {
+    let identity = FRONTEND_IDENTITY.lock().ok().and_then(|known| known.clone());
+    let Some((session_id, user_id)) = identity else {
+        return Ok(false);
+    };
+    let properties = match properties {
+        Value::Object(map) => map.into_iter().collect(),
+        _ => HashMap::new(),
+    };
+    send_event(AnalyticsEvent {
+        event_type: event_type.to_string(),
+        timestamp: Utc::now(),
+        session_id,
+        user_id,
+        properties: Some(properties),
+    })
+    .await
+}
+
+async fn send_event(event: AnalyticsEvent) -> Result<bool, String> {
     match state_manager::State::get().await {
         Ok(state) => {
             if !state.config_manager.get_config().await.enable_analytics {
                 debug!("[Analytics] Disabled - skipping {}", event.event_type);
-                return Ok(());
+                return Ok(false);
             }
         }
         Err(e) => {
             debug!("[Analytics] State unavailable - skipping {}: {}", event.event_type, e);
-            return Ok(());
+            return Ok(false);
         }
     }
 
@@ -88,7 +119,7 @@ async fn send_event(event: AnalyticsEvent) -> Result<(), String> {
         .map_err(|e| format!("client build: {}", e))?;
 
     let response = client
-        .post(ANALYTICS_URL)
+        .post(analytics_url())
         .json(&request_body)
         .send()
         .await
@@ -97,10 +128,15 @@ async fn send_event(event: AnalyticsEvent) -> Result<(), String> {
     let status = response.status();
     if status.is_success() {
         debug!("[Analytics] Tracked (status {})", status);
-        Ok(())
+        Ok(true)
     } else {
         Err(format!("status {}", status))
     }
+}
+
+#[command]
+pub fn set_screen_time_tab(tab: String) {
+    crate::utils::screen_time::set_tab(&tab);
 }
 
 #[derive(Debug, Serialize)]
@@ -129,6 +165,9 @@ pub async fn track_analytics_event(event: AnalyticsEvent) -> Result<TrackEventRe
         "[Analytics] Frontend event: type={} session={} user={}",
         event.event_type, event.session_id, event.user_id
     );
+    if let Ok(mut known) = FRONTEND_IDENTITY.lock() {
+        *known = Some((event.session_id.clone(), event.user_id.clone()));
+    }
     let event_type = event.event_type.clone();
     // Spawn so the frontend invoke returns immediately (no UI block on slow analytics server).
     tokio::spawn(async move {

@@ -42,7 +42,7 @@ import {
 import * as ConfigService from "./services/launcher-config-service";
 import { useGlobalDragAndDrop } from './hooks/useGlobalDragAndDrop';
 import { loadIcons } from '@iconify/react';
-import { trackEvent } from "./services/analytics-service";
+import { setScreenTimeTab, trackEvent } from "./services/analytics-service";
 
 let launcherStartTracked = false;
 
@@ -111,6 +111,11 @@ export function App() {
 
   const activeTab = location.pathname.substring(1) || "play";
 
+  const settingsOpen = useSettingsModalStore((s) => s.isOpen);
+  const screenTimeTab = settingsOpen ? "settings" : activeTab.split("/")[0];
+  useEffect(() => {
+    setScreenTimeTab(screenTimeTab);
+  }, [screenTimeTab]);
 
   const [currentGroupingCriterion, setCurrentGroupingCriterion] =
       useState<string>("none");
