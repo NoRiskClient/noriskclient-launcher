@@ -427,18 +427,12 @@ async fn resolve_profile_mod(
         return ModOutcome::skipped(ModResolutionStatus::UserDisabled);
     }
 
-    if let Some(mod_gv_list) = &mod_info.game_versions {
-        let mc_ver = minecraft_version.to_string();
-        if !mod_gv_list.is_empty()
-            && !mod_gv_list.contains(&mc_ver)
-            && !mod_info.force_include_versions.contains(&mc_ver)
-        {
-            debug!(
-                "Skipping profile mod '{}' (intended for MC {:?}, force={:?}) because target version is {}",
-                mod_name, mod_gv_list, mod_info.force_include_versions, minecraft_version
-            );
-            return ModOutcome::skipped(ModResolutionStatus::GameVersionMismatch);
-        }
+    if !mod_info.targets_game_version(minecraft_version) {
+        debug!(
+            "Skipping profile mod '{}' (intended for MC {:?}, force={:?}) because target version is {}",
+            mod_name, mod_info.game_versions, mod_info.force_include_versions, minecraft_version
+        );
+        return ModOutcome::skipped(ModResolutionStatus::GameVersionMismatch);
     }
 
     let profile_loader = profile.loader;

@@ -5,6 +5,7 @@ import type {
   CreateSyncPackParams,
   DroppedSyncResult,
   DetachMode,
+  ProfileSyncPackMod,
   SeedCandidate,
   SyncPreviewEntry,
   SyncConflict,
@@ -158,6 +159,20 @@ export async function getProfileSyncConflicts(
   profileId: string,
 ): Promise<SyncConflict[]> {
   return invoke<SyncConflict[]>("get_profile_sync_conflicts", { profileId });
+}
+
+export async function getProfileSyncPackMods(
+  profileId: string,
+): Promise<ProfileSyncPackMod[]> {
+  return invoke<ProfileSyncPackMod[]>("get_profile_sync_pack_mods", { profileId });
+}
+
+export async function setProfileSyncModsExcluded(
+  profileId: string,
+  mods: { pack_id: string; mod_key: string }[],
+  excluded: boolean,
+): Promise<void> {
+  return invoke<void>("set_profile_sync_mods_excluded", { profileId, mods, excluded });
 }
 
 export async function openSyncPackFolder(

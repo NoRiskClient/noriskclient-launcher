@@ -24,6 +24,10 @@ use crate::commands::process_command::{
 use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
 };
+use commands::twitch_command::{
+    twitch_available_scopes, twitch_begin_device_login, twitch_cancel_login, twitch_is_linked,
+    twitch_unlink,
+};
 use commands::minecraft_command::{
     add_skin,
     apply_skin_from_base64,
@@ -608,6 +612,11 @@ async fn main() {
             get_active_account,
             set_active_account,
             get_accounts,
+            twitch_available_scopes,
+            twitch_begin_device_login,
+            twitch_cancel_login,
+            twitch_unlink,
+            twitch_is_linked,
             search_modrinth_mods,
             search_modrinth_projects,
             search_mods_unified_command,
@@ -836,6 +845,8 @@ async fn main() {
             commands::sync_pack_command::delete_sync_pack,
             commands::sync_pack_command::set_profile_sync_packs,
             commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::get_profile_sync_pack_mods,
+            commands::sync_pack_command::set_profile_sync_mods_excluded,
             commands::sync_pack_command::sync_profile_now,
             commands::sync_pack_command::set_sync_pack_mod_enabled,
             commands::sync_pack_command::remove_sync_pack_entries,

@@ -102,19 +102,24 @@ pub fn show(app: &AppHandle) {
     log::debug!("Showing the clip overlay");
 
     position(&window);
+
+    #[cfg(not(windows))]
     let _ = window.show();
 
     #[cfg(windows)]
     {
         use windows::Win32::Foundation::HWND;
         use windows::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+            SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+            SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
         };
 
-        if let Ok(handle) = window.hwnd() {
-            unsafe {
+        match window.hwnd() {
+            Ok(handle) => unsafe {
+                let hwnd = HWND(handle.0);
+                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                 let _ = SetWindowPos(
-                    HWND(handle.0),
+                    hwnd,
                     HWND_TOPMOST,
                     0,
                     0,
@@ -122,13 +127,30 @@ pub fn show(app: &AppHandle) {
                     0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
                 );
+            },
+            Err(e) => {
+                log::warn!("The clip overlay has no window handle, showing it may steal focus: {e}");
+                let _ = window.show();
             }
         }
     }
 }
 
 pub fn hide(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
-        let _ = window.hide();
+    let Some(window) = app.get_webview_window(OVERLAY_LABEL) else {
+        return;
+    };
+
+    #[cfg(windows)]
+    if let Ok(handle) = window.hwnd() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+
+        unsafe {
+            let _ = ShowWindow(HWND(handle.0), SW_HIDE);
+        }
+        return;
     }
+
+    let _ = window.hide();
 }

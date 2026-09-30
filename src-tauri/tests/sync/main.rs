@@ -6,4 +6,5 @@ mod pack_file_copy;
 mod pack_options_merge;
 mod pack_paths;
 mod pack_planning;
+mod profile_mods;
 mod subscribers;

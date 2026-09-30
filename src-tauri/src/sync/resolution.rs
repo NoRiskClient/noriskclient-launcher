@@ -386,7 +386,7 @@ fn plan_entry(
     }
 }
 
-fn label_of(entry: &SyncPackModEntry) -> String {
+pub(crate) fn label_of(entry: &SyncPackModEntry) -> String {
     entry
         .info
         .display_name
@@ -678,3 +678,4 @@ pub async fn refresh_resolutions(
     let cache = manager.get_mod_resolutions(pack_id).await?;
     Ok(matrix_rows(entry, Some(project_key), contexts, &cache))
 }
+

@@ -9,6 +9,7 @@ use crate::minecraft::downloads::mc_assets_download::MinecraftAssetsDownloadServ
 use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
+use crate::minecraft::downloads::norisk_natives_download::{NoriskNativesDownloadService, FFMPEG};
 use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
@@ -457,6 +458,8 @@ pub async fn install_minecraft_version(
             .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
             .await?
     });
+
+    NoriskNativesDownloadService::install_in_background(&FFMPEG);
 
     // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());
