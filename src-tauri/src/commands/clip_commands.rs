@@ -502,3 +502,55 @@ pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError>
         .map_err(|e| crate::error::AppError::Other(format!("could not open the clip folder: {e}")))?;
     Ok(())
 }
+
+const EDITOR_LABEL: &str = "clip_editor";
+
+#[derive(Serialize, Clone)]
+struct EditorClip {
+    path: String,
+    name: String,
+}
+
+#[tauri::command]
+pub async fn clip_open_editor(
+    app: tauri::AppHandle,
+    path: std::path::PathBuf,
+    name: String,
+) -> Result<(), CommandError> {
+    use tauri::{Emitter, Manager};
+
+    let dir = clip_dir().await?;
+    crate::utils::clip_library::guard_inside(&dir, &path)?;
+    let clip = EditorClip {
+        path: path.to_string_lossy().into_owned(),
+        name,
+    };
+
+    if let Some(window) = app.get_webview_window(EDITOR_LABEL) {
+        app.emit_to(EDITOR_LABEL, "clip_editor_open", &clip).map_err(|e| {
+            crate::error::AppError::Other(format!("could not hand the clip to the editor: {e}"))
+        })?;
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_always_on_top(false);
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let url = format!(
+        "clip-editor-window.html?path={}&name={}",
+        urlencoding::encode(&clip.path),
+        urlencoding::encode(&clip.name)
+    );
+    tauri::WebviewWindowBuilder::new(&app, EDITOR_LABEL, tauri::WebviewUrl::App(url.into()))
+        .title("Clip Editor")
+        .inner_size(1400.0, 860.0)
+        .min_inner_size(1024.0, 640.0)
+        .decorations(false)
+        .center()
+        .visible(false)
+        .build()
+        .map_err(|e| crate::error::AppError::Other(format!("could not open the clip editor: {e}")))?;
+    Ok(())
+}

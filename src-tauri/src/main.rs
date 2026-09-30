@@ -900,6 +900,7 @@ async fn main() {
             commands::clip_commands::clip_prepare_preview,
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
+            commands::clip_commands::clip_open_editor,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
