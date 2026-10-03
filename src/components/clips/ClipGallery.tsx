@@ -120,6 +120,7 @@ export function ClipGallery({
           );
         }),
         listen("clip_error", () => setBusy(null)),
+        listen("clip_engine_stopped", () => setBusy(null)),
       ]);
       unlisten = () => stops.forEach((stop) => stop());
     })();

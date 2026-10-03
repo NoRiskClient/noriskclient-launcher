@@ -399,6 +399,12 @@ export function ClipTrimmer({
           toast.success(t("clips.trim.saved"));
           leave.current();
         }),
+        listen("clip_engine_stopped", () => {
+          if (!renderingRef.current) return;
+          renderingRef.current = false;
+          setRendering(null);
+          toast.error(t("clips.trim.failed"));
+        }),
         listen<CaptureError>("clip_error", (event) => {
           if (!renderingRef.current) return;
           if (event.payload.code !== "clip_write" && event.payload.code !== "protocol") return;

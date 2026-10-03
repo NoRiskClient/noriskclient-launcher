@@ -409,7 +409,12 @@ impl CaptureSupervisor {
         let mut attempt = 0usize;
 
         loop {
-            match self.run_once(&exe, &mut commands).await {
+            let outcome = self.run_once(&exe, &mut commands).await;
+            if let Some(app) = self.app.read().await.as_ref() {
+                use tauri::Emitter;
+                let _ = app.emit("clip_engine_stopped", ());
+            }
+            match outcome {
                 Outcome::Shutdown => {
                     log::info!("Capture engine shut down as requested");
                     return commands;
