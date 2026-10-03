@@ -56,7 +56,7 @@ export const OVERLAY_ICON: Record<ClipOverlay["kind"], string> = {
   text: "solar:text-bold",
 };
 
-export function grey(colour: number): string {
+export function toHex(colour: number): string {
   return `#${colour.toString(16).padStart(6, "0")}`;
 }
 
@@ -88,7 +88,7 @@ export const NO_WINDOW: LaneWindow = { start: null, end: null };
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 export function overlayTint(overlay: ClipOverlay, fallback: string): string {
-  return overlay.kind === "blur" ? fallback : grey(overlay.colour);
+  return overlay.kind === "blur" ? fallback : toHex(overlay.colour);
 }
 
 export function clamp(value: number, low: number, high: number): number {

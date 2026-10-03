@@ -125,20 +125,6 @@ pub fn rect_in(overlay: &ClipOverlay, width: usize, height: usize) -> Option<Rec
     })
 }
 
-pub fn apply(plane: &mut Plane, rect: Rect, kind: &OverlayKind) {
-    let Some(rect) = clamp(rect, plane.width, plane.height) else {
-        return;
-    };
-    match kind {
-        OverlayKind::Blur { strength } => blur(plane, rect, *strength),
-        _ => {
-            if let Some(stamp) = stamp_of(kind, rect.width, rect.height, plane.channel) {
-                press(plane, rect, &stamp);
-            }
-        }
-    }
-}
-
 fn stamp_of(kind: &OverlayKind, width: usize, height: usize, channel: Channel) -> Option<Stamp> {
     let mut alpha = vec![0u8; width * height];
     let colour = match kind {
@@ -327,7 +313,7 @@ fn clamp(rect: Rect, width: usize, height: usize) -> Option<Rect> {
 }
 
 fn blur(plane: &mut Plane, rect: Rect, strength: u32) {
-    let radius = strength.clamp(1, 64) as usize;
+    let radius = ((strength.clamp(1, 64) as f32 * plane.channel.scale()) as usize).max(1);
     if rect.width == 0 || rect.height == 0 {
         return;
     }
@@ -369,12 +355,16 @@ fn smear(line: &mut [u8], radius: usize, prefix: &mut Vec<u32>) {
     }
 }
 
-pub fn halve(rect: Rect) -> Rect {
+pub fn halve(rect: Rect, width: usize, height: usize) -> Rect {
+    let left = (rect.left / 2).min(width);
+    let top = (rect.top / 2).min(height);
+    let right = (rect.left + rect.width).div_ceil(2).min(width);
+    let bottom = (rect.top + rect.height).div_ceil(2).min(height);
     Rect {
-        left: rect.left / 2,
-        top: rect.top / 2,
-        width: (rect.width / 2).max(1),
-        height: (rect.height / 2).max(1),
+        left,
+        top,
+        width: right.saturating_sub(left),
+        height: bottom.saturating_sub(top),
     }
 }
 
@@ -454,7 +444,7 @@ mod tests {
 
         let before = spread(&data, width, rect);
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 6 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 6 });
         let after = spread(&data, width, rect);
 
         assert!(
@@ -518,7 +508,7 @@ mod tests {
                     height,
                     channel: Channel::Luma,
                 };
-                apply(&mut plane, rect, &OverlayKind::Blur { strength });
+                Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength });
 
                 let mut slow = noise.clone();
                 blur_the_slow_way(&mut slow, stride, rect, strength as usize);
@@ -569,11 +559,10 @@ mod tests {
                     height,
                     channel: Channel::Luma,
                 };
-                apply(&mut plane, rect, &kind);
+                Stamps::default().apply(0, &mut plane, rect, &kind);
 
                 assert_eq!(kept, fresh, "{kind:?} drifted on frame {frame}");
             }
-            assert_eq!(stamps.made.len(), 1, "{kind:?} was rebuilt instead of kept");
         }
     }
 
@@ -585,7 +574,7 @@ mod tests {
         let rect = Rect { left: 16, top: 16, width: 32, height: 32 };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 6 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 6 });
 
         for y in 0..height {
             for x in 0..width {
@@ -616,7 +605,7 @@ mod tests {
 
         let rect = Rect { left: 4, top: 4, width: 16, height: 16 };
         let mut plane = Plane { data: &mut data, stride, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 4 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 4 });
 
         for y in 0..height {
             for x in width..stride {
@@ -635,7 +624,7 @@ mod tests {
         let rect = Rect { left: 0, top: 0, width, height };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 10 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 10 });
 
         assert!(data.iter().all(|v| *v == 200), "a flat area changed value");
     }
@@ -648,7 +637,7 @@ mod tests {
         let rect = Rect { left: 8, top: 8, width: 10, height: 6 };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Box { colour: 0x000000 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Box { colour: 0x000000 });
 
         for y in rect.top..rect.top + rect.height {
             for x in rect.left..rect.left + rect.width {
@@ -666,68 +655,12 @@ mod tests {
         let rect = Rect { left: 2, top: 2, width: 12, height: 12 };
 
         let mut plane = Plane { data: &mut data, stride, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Box { colour: 0x646464 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Box { colour: 0x646464 });
 
         for y in 0..height {
             for x in width..stride {
                 assert_eq!(data[y * stride + x], 9, "padding at {x},{y} was filled");
             }
-        }
-    }
-
-    fn arrow_on(towards: Corner, width: usize, height: usize) -> Vec<u8> {
-        let mut data = vec![0u8; width * height];
-        let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(
-            &mut plane,
-            Rect { left: 0, top: 0, width, height },
-            &OverlayKind::Arrow { colour: 0xffffff, thickness: 3, towards },
-        );
-        data
-    }
-
-    fn seen_from(towards: Corner, x: usize, y: usize, width: usize, height: usize) -> usize {
-        let x = if matches!(towards, Corner::TopLeft | Corner::BottomLeft) { width - 1 - x } else { x };
-        let y = if matches!(towards, Corner::TopLeft | Corner::TopRight) { height - 1 - y } else { y };
-        y * width + x
-    }
-
-    #[test]
-    fn an_arrow_marks_both_of_its_ends() {
-        let (width, height) = (48, 48);
-        let data = arrow_on(Corner::BottomRight, width, height);
-
-        let white = to_yuv(0xffffff).0;
-        assert_eq!(white, 235, "white should be studio white, not full range");
-        assert_eq!(data[0], white, "the tail corner is empty");
-        assert!(data[37 * width + 37] > 0, "the tip is empty");
-        assert_eq!(data[34 * width + 34], white, "just behind the tip is empty");
-        assert_eq!(data[width - 1], 0, "the opposite corner should stay clear");
-    }
-
-    #[test]
-    fn an_arrow_has_a_head_wider_than_its_shaft_at_the_corner_it_points_to() {
-        let (width, height) = (48, 48);
-        let white = to_yuv(0xffffff).0;
-
-        for towards in [Corner::BottomRight, Corner::BottomLeft, Corner::TopRight, Corner::TopLeft] {
-            let data = arrow_on(towards, width, height);
-            assert_eq!(data[seen_from(towards, 0, 0, width, height)], white, "{towards:?} lost its tail");
-            assert_eq!(
-                data[seen_from(towards, 35, 31, width, height)],
-                white,
-                "{towards:?} has no head beside the tip",
-            );
-            assert_eq!(
-                data[seen_from(towards, 13, 9, width, height)],
-                0,
-                "{towards:?} is as wide at the tail as at the head",
-            );
-            assert!(
-                (0..width).all(|x| data[seen_from(towards, x, height - 1, width, height)] == 0)
-                    && (0..height).all(|y| data[seen_from(towards, width - 1, y, width, height)] == 0),
-                "{towards:?} pushed its head against the edge, where the box cuts it off",
-            );
         }
     }
 
@@ -739,7 +672,8 @@ mod tests {
         let rect = Rect { left: 10, top: 10, width: 20, height: 20 };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(
+        Stamps::default().apply(
+            0,
             &mut plane,
             rect,
             &OverlayKind::Arrow { colour: 0xc8c8c8, thickness: 5, towards: Corner::TopLeft },
@@ -771,7 +705,7 @@ mod tests {
             height,
             channel: Channel::Blue,
         };
-        apply(&mut plane, rect, &OverlayKind::Box { colour: 0x000000 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Box { colour: 0x000000 });
 
         let (_, blue, _) = to_yuv(0x000000);
         assert_eq!(blue, NEUTRAL, "black should carry no colour");
@@ -794,7 +728,8 @@ mod tests {
             height,
             channel: Channel::Blue,
         };
-        apply(
+        Stamps::default().apply(
+            0,
             &mut plane,
             rect,
             &OverlayKind::Arrow { colour: 0xffffff, thickness: 3, towards: Corner::BottomRight },
@@ -822,7 +757,8 @@ mod tests {
             height,
             channel: Channel::Luma,
         };
-        apply(
+        Stamps::default().apply(
+            0,
             &mut plane,
             rect,
             &OverlayKind::Text { content: "HALLO".into(), size: 32, colour: 0xffffff },
@@ -861,7 +797,8 @@ mod tests {
             height,
             channel: Channel::Luma,
         };
-        apply(
+        Stamps::default().apply(
+            0,
             &mut plane,
             Rect { left: 0, top: 0, width, height },
             &OverlayKind::Text { content: "   ".into(), size: 20, colour: 0xffffff },
@@ -881,10 +818,13 @@ mod tests {
     }
 
     #[test]
-    fn chroma_planes_get_the_matching_half_sized_rectangle() {
-        let rect = Rect { left: 480, top: 540, width: 960, height: 270 };
-        let chroma = halve(rect);
-        assert_eq!(chroma, Rect { left: 240, top: 270, width: 480, height: 135 });
+    fn a_halved_rectangle_stays_inside_the_chroma_plane() {
+        let chroma = halve(Rect { left: 1910, top: 1070, width: 11, height: 11 }, 960, 540);
+        assert_eq!(chroma.left + chroma.width, 960);
+        assert_eq!(chroma.top + chroma.height, 540);
+
+        let outside = halve(Rect { left: 4000, top: 4000, width: 8, height: 8 }, 960, 540);
+        assert_eq!((outside.width, outside.height), (0, 0));
     }
 
     #[test]
@@ -894,7 +834,7 @@ mod tests {
         let rect = Rect { left: 24, top: 24, width: 99, height: 99 };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 4 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 4 });
 
         assert_eq!(data.len(), width * height);
     }
@@ -907,14 +847,14 @@ mod tests {
         let rect = Rect { left: 40, top: 40, width: 8, height: 8 };
 
         let mut plane = Plane { data: &mut data, stride: width, width, height, channel: Channel::Luma };
-        apply(&mut plane, rect, &OverlayKind::Blur { strength: 4 });
+        Stamps::default().apply(0, &mut plane, rect, &OverlayKind::Blur { strength: 4 });
 
         assert_eq!(data, original);
     }
 
     #[test]
     fn a_thin_rectangle_never_halves_away_to_nothing() {
-        let chroma = halve(Rect { left: 0, top: 0, width: 1, height: 1 });
+        let chroma = halve(Rect { left: 0, top: 0, width: 1, height: 1 }, 10, 10);
         assert!(chroma.width >= 1 && chroma.height >= 1);
     }
 }

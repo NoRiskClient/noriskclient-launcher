@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use super::{Engine, RetiredAudio};
+use super::Engine;
 use crate::buffer::{AudioRing, PeakRing};
 use crate::encoder::video::TIME_BASE_DEN;
 
@@ -277,6 +277,7 @@ fn open_stem(
     Ok((stem, sink))
 }
 
+#[derive(Clone)]
 pub(super) struct AudioSelection {
     master: AudioStem,
     stems: Vec<AudioStem>,
@@ -291,17 +292,6 @@ impl From<&AudioPipeline> for AudioSelection {
             stems: pipeline.stems.clone(),
             sample_rate: pipeline.sample_rate,
             channels: pipeline.channels,
-        }
-    }
-}
-
-impl From<&RetiredAudio> for AudioSelection {
-    fn from(retired: &RetiredAudio) -> Self {
-        Self {
-            master: retired.master.clone(),
-            stems: retired.stems.clone(),
-            sample_rate: retired.sample_rate,
-            channels: retired.channels,
         }
     }
 }

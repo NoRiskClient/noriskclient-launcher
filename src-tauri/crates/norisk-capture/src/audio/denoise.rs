@@ -19,7 +19,7 @@ impl Denoiser {
             channels,
             states: (0..channels).map(|_| DenoiseState::new()).collect(),
             waiting: vec![VecDeque::new(); channels],
-            cleaned: vec![VecDeque::new(); channels],
+            cleaned: vec![VecDeque::from(vec![0.0; FRAME]); channels],
         }
     }
 
@@ -41,14 +41,6 @@ impl Denoiser {
                 }
                 self.states[channel].process_frame(&mut output, &input);
                 self.cleaned[channel].extend(output.iter().copied());
-            }
-        }
-
-        let frames = samples.len() / self.channels;
-        for channel in 0..self.channels {
-            let short = frames.saturating_sub(self.cleaned[channel].len());
-            for _ in 0..short {
-                self.cleaned[channel].push_front(0.0);
             }
         }
 
@@ -108,20 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn a_block_that_lands_on_the_frame_size_is_not_delayed_at_all() {
-        let mut denoiser = Denoiser::new(1);
-        let mut block = tone(FRAME, 1, 0.5);
-        denoiser.process(&mut block);
-
-        assert_eq!(block.len(), FRAME);
-        assert!(
-            block.iter().any(|s| s.abs() > 1e-6),
-            "a whole frame came back empty",
-        );
-    }
-
-    #[test]
-    fn a_ragged_block_is_padded_at_the_front_rather_than_shortened() {
+    fn the_sound_comes_out_exactly_one_frame_late() {
         let mut denoiser = Denoiser::new(1);
         let spare = 20;
         let mut block = tone(FRAME + spare, 1, 0.5);
@@ -129,33 +108,13 @@ mod tests {
 
         assert_eq!(block.len(), FRAME + spare);
         assert!(
-            block[..spare].iter().all(|s| *s == 0.0),
-            "expected {spare} samples of lead-in silence",
+            block[..FRAME].iter().all(|s| *s == 0.0),
+            "expected one frame of lead-in silence",
         );
         assert!(
-            block[spare..].iter().any(|s| s.abs() > 1e-6),
-            "everything after the padding was silent",
+            block[FRAME..].iter().any(|s| s.abs() > 1e-6),
+            "everything after the lead-in was silent",
         );
-    }
-
-    #[test]
-    fn the_delay_never_grows_past_one_frame() {
-        let mut denoiser = Denoiser::new(1);
-        let mut lead_in = 0;
-        for round in 0..50 {
-            let mut block = tone(500, 1, 0.5);
-            denoiser.process(&mut block);
-            let silent = block.iter().take_while(|s| **s == 0.0).count();
-            if round == 0 {
-                lead_in = silent;
-            } else {
-                assert!(
-                    silent < FRAME,
-                    "round {round} padded {silent} samples, the delay is growing",
-                );
-            }
-        }
-        assert!(lead_in < FRAME, "the first block was padded by {lead_in}");
     }
 
     #[test]

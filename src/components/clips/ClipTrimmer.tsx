@@ -2,27 +2,28 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import { toast } from "react-hot-toast";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { toast } from "react-hot-toast";
 
 import { Button } from "../ui/buttons/Button";
+import { Tooltip } from "../ui/Tooltip";
+import { WindowFrame } from "../ui/WindowFrame";
 import { useThemeStore } from "../../store/useThemeStore";
 import {
-  exportVertical,
-  samePath,
   type ClipDetails,
   type ClipShape,
-  type ExportProgress,
-  type ExportedClip,
   type Span,
   type TrackLevel,
+  revealClip,
 } from "../../services/clip-service";
 import { TrackLevelControl, trackName } from "./ClipTimeline";
 import { ClipIconButton } from "./ClipIconButton";
 import { cn } from "../../lib/utils";
-import { parseErrorMessage } from "../../utils/error-utils";
 import { useTrimPreview } from "./useTrimPreview";
-import { useEditHistory } from "./useEditHistory";
+import { typing, useEditHistory } from "./useEditHistory";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { useGlobalModalStore } from "../../hooks/useGlobalModal";
+import { useClipRender } from "./useClipRender";
 import {
   MIN_LENGTH,
   TICK_STEPS,
@@ -43,25 +44,28 @@ import {
   formatTick,
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
-import { useWindowDrag } from "./editor/useWindowDrag";
+import { holdPointer, useWindowDrag } from "./editor/useWindowDrag";
 import { useCuts, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
-import { Lane, TrackLink, AudioLane, OverlayLane, Readout, Handle } from "./editor/Timeline";
+import { EditorHelpModal, EditorMenuBar, shortcutText, type MenuDef } from "./editor/EditorMenuBar";
+import {
+  Lane,
+  TrackLink,
+  AudioLane,
+  OverlayLane,
+  Readout,
+  ClipMasks,
+  ClipHandles,
+  SpanHighlight,
+  GapBlock,
+  SplitMark,
+} from "./editor/Timeline";
 import { PanelTitle, OverlayInspector } from "./editor/Inspector";
 
 interface LaneTrim {
   stream: number;
   edge: "start" | "end";
-}
-
-interface RenderProgress {
-  done: number;
-  total: number;
-}
-
-interface CaptureError {
-  code: string;
 }
 
 interface Props {
@@ -70,8 +74,10 @@ interface Props {
   name: string;
   duration: number;
   busy: boolean;
+  paused?: boolean;
   details: ClipDetails | null;
   onCancel: () => void;
+  onDone: () => void;
   onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
   onSave: (
     startSeconds: number,
@@ -89,8 +95,10 @@ export function ClipTrimmer({
   name,
   duration,
   busy: saving,
+  paused = false,
   details,
   onCancel,
+  onDone,
   onStateChange,
   onSave,
   t,
@@ -122,14 +130,11 @@ export function ClipTrimmer({
   const [ratio, setRatio] = useState(16 / 9);
   const [shape, setShape] = useState<ClipShape>("original");
   const [panel, setPanel] = useState<Panel>(OFFERED_PANELS[0].id);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
-  const [rendering, setRendering] = useState<RenderProgress | null>(null);
-  const renderingRef = useRef(false);
-  const leave = useRef(onCancel);
-  useEffect(() => {
-    leave.current = onCancel;
-  }, [onCancel]);
-  const busy = saving || rendering !== null;
+  const render = useClipRender({ path, onDone, onTrim: onSave, t });
+  const busy = saving || render.rendering;
 
   const lanes = useMemo(() => details?.audioTracks ?? [], [details]);
   const adjustable = useMemo(() => lanes.filter((track) => track.adjustable), [lanes]);
@@ -190,18 +195,13 @@ export function ClipTrimmer({
     setShape(saved.shape);
     setSeparate(saved.separate);
   }, [cuts.restore, overlayEdit.restore]);
-  const history = useEditHistory(doc, restore, !busy);
+  const held = paused || helpOpen;
+  const history = useEditHistory(doc, restore, !busy, held);
   const { rebase } = history;
 
   useEffect(() => {
     onStateChange?.({ dirty: history.canUndo, busy });
   }, [busy, history.canUndo, onStateChange]);
-
-  useEffect(() => {
-    setVolumes(Object.fromEntries(adjustable.map((track) => [track.stream, 100])));
-    setWindows(Object.fromEntries(movable.map((track) => [track.stream, NO_WINDOW])));
-    rebase();
-  }, [adjustable, movable, rebase]);
 
   const levels: TrackLevel[] = useMemo(
     () =>
@@ -387,95 +387,139 @@ export function ClipTrimmer({
     };
   }, [hushed, previewState, removed]);
 
-  useEffect(() => {
-    let stop: (() => void) | undefined;
-    let alive = true;
-
-    void (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      const stops = await Promise.all([
-        listen<ExportProgress>("clip_export_progress", (event) => {
-          if (!renderingRef.current || !samePath(event.payload.source, path)) return;
-          setRendering({ done: event.payload.done, total: event.payload.total });
-        }),
-        listen<ExportedClip>("clip_exported", (event) => {
-          if (!renderingRef.current || !samePath(event.payload.source, path)) return;
-          renderingRef.current = false;
-          setRendering(null);
-          toast.success(t("clips.trim.saved"));
-          leave.current();
-        }),
-        listen("clip_engine_stopped", () => {
-          if (!renderingRef.current) return;
-          renderingRef.current = false;
-          setRendering(null);
-          toast.error(t("clips.trim.failed"));
-        }),
-        listen<CaptureError>("clip_error", (event) => {
-          if (!renderingRef.current) return;
-          if (event.payload.code !== "clip_write" && event.payload.code !== "protocol") return;
-          renderingRef.current = false;
-          setRendering(null);
-          toast.error(t("clips.trim.failed"));
-        }),
-      ]);
-      if (!alive) {
-        stops.forEach((off) => off());
-        return;
-      }
-      stop = () => stops.forEach((off) => off());
-    })();
-
-    return () => {
-      alive = false;
-      stop?.();
-    };
-  }, [path, t]);
-
-  const save = useCallback(async () => {
-    if (
-      overlays.length === 0 &&
-      shape === "original" &&
-      removed.length === 0 &&
-      blanked.length === 0 &&
-      hushed.length === 0
-    ) {
-      onSave(start, end, levels, shot.start, shot.end);
-      return;
-    }
-    renderingRef.current = true;
-    setRendering({ done: 0, total: 0 });
-    try {
-      await exportVertical(path, shape, overlays, {
-        startSeconds: start,
-        endSeconds: end,
+  const save = useCallback(
+    () =>
+      render.save({
+        overlays,
+        shape,
+        start,
+        end,
         levels,
-        videoStartSeconds: shot.start,
-        videoEndSeconds: shot.end,
+        videoStart: shot.start,
+        videoEnd: shot.end,
         removed,
         blanked,
-        muted: hushed,
-      });
-    } catch (e) {
-      console.error("Could not render the clip", e);
-      renderingRef.current = false;
-      setRendering(null);
-      toast.error(parseErrorMessage(e));
-    }
-  }, [
-    blanked,
-    end,
-    hushed,
-    levels,
-    onSave,
-    overlays,
-    path,
-    removed,
-    shape,
-    shot.end,
-    shot.start,
-    start,
-  ]);
+        hushed,
+      }),
+    [blanked, end, hushed, levels, overlays, removed, render.save, shape, shot.end, shot.start, start],
+  );
+
+  const canSave = !busy && kept >= MIN_LENGTH;
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "s") return;
+      event.preventDefault();
+      if (!canSave || held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
+      void save();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [canSave, held, save]);
+
+  const menus: MenuDef[] = [
+    {
+      id: "file",
+      label: t("clips.editor.menu.file"),
+      sections: [
+        [
+          {
+            id: "save",
+            label: t("clips.trim.save"),
+            icon: "solar:check-circle-bold",
+            shortcut: shortcutText("S", t),
+            disabled: !canSave,
+            onSelect: () => void save(),
+          },
+          {
+            id: "reveal",
+            label: t("clips.gallery.reveal"),
+            icon: "solar:folder-with-files-bold",
+            onSelect: () =>
+              void revealClip(path).catch((e) => toast.error(parseErrorMessage(e))),
+          },
+        ],
+        [
+          {
+            id: "close",
+            label: t("common.close"),
+            icon: "solar:close-circle-bold",
+            disabled: busy,
+            onSelect: onCancel,
+          },
+        ],
+      ],
+    },
+    {
+      id: "edit",
+      label: t("clips.editor.menu.edit"),
+      sections: [
+        [
+          {
+            id: "undo",
+            label: t("clips.editor.transport.undo"),
+            icon: "solar:undo-left-bold",
+            shortcut: shortcutText("Z", t),
+            disabled: !history.canUndo,
+            onSelect: history.undo,
+          },
+          {
+            id: "redo",
+            label: t("clips.editor.transport.redo"),
+            icon: "solar:undo-right-bold",
+            shortcut: shortcutText("Y", t),
+            disabled: !history.canRedo,
+            onSelect: history.redo,
+          },
+        ],
+        FULL_EDITOR
+          ? [
+              {
+                id: "split",
+                label: t("clips.editor.transport.split"),
+                icon: "solar:scissors-square-bold",
+                disabled: busy || !canSplit,
+                onSelect: split,
+              },
+              {
+                id: "remove",
+                label: t("clips.editor.transport.remove"),
+                icon: "solar:trash-bin-trash-bold",
+                disabled: busy || !cuttable,
+                onSelect: cutPart,
+              },
+            ]
+          : [],
+      ],
+    },
+    {
+      id: "view",
+      label: t("clips.editor.menu.view"),
+      sections: [
+        OFFERED_PANELS.map((entry) => ({
+          id: entry.id,
+          label: t(entry.label),
+          checked: panel === entry.id,
+          onSelect: () => setPanel(entry.id),
+        })),
+      ],
+    },
+    {
+      id: "help",
+      label: t("clips.editor.menu.help"),
+      sections: [
+        [
+          {
+            id: "how",
+            label: t("clips.editor.menu.how"),
+            icon: "solar:question-circle-bold",
+            onSelect: () => setHelpOpen(true),
+          },
+        ],
+      ],
+    },
+  ];
 
   const guide = useMemo(() => {
     const target = SHAPES.find((entry) => entry.choice === shape)?.ratio;
@@ -485,10 +529,7 @@ export function ClipTrimmer({
       : { width: 1, height: ratio / target };
   }, [ratio, shape]);
 
-  const exportPercent =
-    rendering && rendering.total > 0
-      ? Math.round((rendering.done / rendering.total) * 100)
-      : null;
+  const exportPercent = render.percent;
 
   const preview = useCallback(() => {
     const video = videoRef.current;
@@ -520,85 +561,38 @@ export function ClipTrimmer({
     };
   }, [end]);
 
-  const shapeLabel = SHAPES.find((entry) => entry.choice === shape)?.label ?? SHAPES[0].label;
 
   const clipMasks = (from: number, to: number) => (
-    <>
-      <div
-        className="absolute inset-y-0 left-0 bg-black/70"
-        style={{ width: `${percent(from)}%` }}
-      />
-      <div
-        className="absolute inset-y-0 right-0 bg-black/70"
-        style={{ width: `${100 - percent(to)}%` }}
-      />
-      <div
-        className="absolute inset-y-0 border-x-2"
-        style={{
-          left: `${percent(from)}%`,
-          width: `${percent(Math.max(0, to - from))}%`,
-          borderColor: accentColor.value,
-        }}
-      />
-    </>
+    <ClipMasks from={from} to={to} color={accentColor.value} percent={percent} />
   );
 
   const clipHandles = (from: number, to: number) => (
-    <>
-      <Handle
-        left={percent(from)}
-        active={dragging === "start"}
-        time={formatTime(from)}
-        label={t("clips.trim.handle_start")}
-        color={accentColor.value}
-        onGrab={() => setDragging("start")}
-        onNudge={(by) => moveHandle("start", from + by)}
-      />
-      <Handle
-        left={percent(to)}
-        active={dragging === "end"}
-        time={formatTime(to)}
-        label={t("clips.trim.handle_end")}
-        color={accentColor.value}
-        onGrab={() => setDragging("end")}
-        onNudge={(by) => moveHandle("end", to + by)}
-      />
-    </>
-  );
-
-  const highlight = (span: Span) => (
-    <div
-      className="absolute inset-y-0 rounded-md border-2"
-      style={{
-        left: `${percent(span.startSeconds)}%`,
-        width: `${percent(span.endSeconds - span.startSeconds)}%`,
-        borderColor: accentColor.value,
-        backgroundColor: `${accentColor.value}1f`,
-      }}
+    <ClipHandles
+      from={from}
+      to={to}
+      dragging={dragging}
+      color={accentColor.value}
+      disabled={busy}
+      percent={percent}
+      onGrab={setDragging}
+      onMove={moveHandle}
+      t={t}
     />
   );
 
+  const highlight = (span: Span) => (
+    <SpanHighlight span={span} color={accentColor.value} percent={percent} />
+  );
+
   const gapBlock = (span: Span, key: number, onRestore: () => void) => (
-    <div
+    <GapBlock
       key={key}
-      className="absolute inset-y-0 border-x border-dashed border-white/30 bg-[#08080b]/90"
-      style={{
-        left: `${percent(span.startSeconds)}%`,
-        width: `${percent(span.endSeconds - span.startSeconds)}%`,
-      }}
-    >
-      <button
-        type="button"
-        aria-label={t("clips.editor.remove.restore")}
-        title={t("clips.editor.remove.restore")}
-        disabled={busy}
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={onRestore}
-        className="pointer-events-auto absolute left-1/2 top-0.5 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full text-white/40 transition-colors hover:text-white"
-      >
-        <Icon icon="solar:restart-bold" className="h-3 w-3" />
-      </button>
-    </div>
+      span={span}
+      disabled={busy}
+      percent={percent}
+      onRestore={onRestore}
+      t={t}
+    />
   );
 
   const laneMarks = (lane: PartLane, gaps: Span[], restore: (index: number) => void) => (
@@ -611,76 +605,52 @@ export function ClipTrimmer({
   const darkened = blanked.some((span) => playhead >= span.startSeconds && playhead < span.endSeconds);
 
   return (
-    <div className="flex h-screen bg-black">
-      <div
-        className="relative flex min-h-0 w-full flex-col overflow-hidden border border-b-2"
-        style={{
-          backgroundColor: `${accentColor.value}20`,
-          borderColor: `${accentColor.value}80`,
-          borderBottomColor: accentColor.value,
-        }}
-      >
+    <WindowFrame className="select-none [&_input]:select-text [&_textarea]:select-text">
       <header
         data-tauri-drag-region
-        className="relative flex shrink-0 items-center gap-3 border-b-2 px-5 py-3.5"
-        style={{
-          borderColor: `${accentColor.value}60`,
-          backgroundColor: `${accentColor.value}30`,
-        }}
+        className="relative flex h-11 shrink-0 select-none items-center gap-3 border-b border-white/5 bg-black/40 pl-4 pr-2"
       >
         <Icon
           icon="solar:videocamera-record-bold"
-          className="h-6 w-6 shrink-0"
+          className="pointer-events-none h-4 w-4 shrink-0"
           style={{ color: accentColor.value }}
         />
-        <span
-          title={name}
-          className="max-w-[20rem] truncate font-minecraft text-lg normal-case text-white"
+        <EditorMenuBar menus={menus} open={menuOpen} onOpenChange={setMenuOpen} />
+        <div
+          data-tauri-drag-region
+          className="pointer-events-none flex h-full min-w-0 flex-1 items-center"
         >
-          {name}
-        </span>
-
-        <span className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 font-smallcaps text-xs uppercase tracking-wider text-white/50">
-          {t("clips.editor.shape.label")}: {t(shapeLabel)}
-        </span>
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onCancel}
-            disabled={busy}
-            icon={<Icon icon="solar:close-circle-bold" className="w-4 h-4" />}
+          <span
+            className="truncate font-minecraft text-xs normal-case tracking-wider"
+            style={{ color: accentColor.value }}
           >
-            {t("clips.editor.exit")}
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => void save()}
-            disabled={busy || kept < MIN_LENGTH}
-            icon={
-              <Icon
-                icon={busy ? "svg-spinners:ring-resize" : "solar:scissors-bold"}
-                className="w-4 h-4"
-              />
-            }
-          >
-            {t("clips.trim.save")}
-          </Button>
-          <ClipIconButton
+            {name}
+          </span>
+        </div>
+
+
+        <div className="flex items-center gap-1">
+          <WindowButton
             icon="mdi:minus"
             label={t("window.minimize")}
             onClick={() => void getCurrentWindow().minimize()}
           />
-          <ClipIconButton
+          <WindowButton
             icon="mdi:checkbox-blank-outline"
+            iconClassName="h-3.5 w-3.5"
             label={t("window.maximize")}
             onClick={() => void getCurrentWindow().toggleMaximize()}
           />
+          <WindowButton
+            icon="mdi:close"
+            label={t("window.close")}
+            danger
+            disabled={busy}
+            onClick={onCancel}
+          />
         </div>
 
-        {rendering && (
+        {render.rendering && (
           <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-white/10">
             <span
               className={cn(
@@ -696,8 +666,10 @@ export function ClipTrimmer({
         )}
       </header>
 
+      {helpOpen && <EditorHelpModal onClose={() => setHelpOpen(false)} t={t} />}
+
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-[5rem] shrink-0 flex-col gap-2 border-r border-white/10 bg-black/20 p-3">
+        <nav className="flex w-[5.5rem] shrink-0 flex-col gap-1 border-r border-white/10 bg-black/30 p-2">
           {OFFERED_PANELS.map((entry) => (
             <button
               key={entry.id}
@@ -705,19 +677,18 @@ export function ClipTrimmer({
               onClick={() => setPanel(entry.id)}
               aria-pressed={panel === entry.id}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2.5 transition-colors",
+                "flex w-full flex-col items-center gap-1.5 rounded border px-0.5 py-2.5 transition-colors",
                 panel === entry.id
-                  ? "text-white"
-                  : "border-white/10 bg-black/20 text-white/50 hover:border-white/20 hover:text-white",
+                  ? "border-white/20 bg-white/10 text-white"
+                  : "border-transparent text-white/60 hover:bg-white/5 hover:text-white",
               )}
-              style={
-                panel === entry.id
-                  ? { borderColor: accentColor.value, backgroundColor: `${accentColor.value}25` }
-                  : undefined
-              }
             >
-              <Icon icon={entry.icon} className="h-5 w-5" />
-              <span className="font-smallcaps text-[0.6rem] uppercase tracking-wider">
+              <Icon
+                icon={entry.icon}
+                className="h-5 w-5"
+                style={panel === entry.id ? { color: accentColor.value } : undefined}
+              />
+              <span className="w-full truncate text-center font-minecraft text-[10px] leading-tight">
                 {t(entry.label)}
               </span>
             </button>
@@ -726,10 +697,7 @@ export function ClipTrimmer({
 
         <aside className="custom-scrollbar flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r border-white/10 bg-black/20 p-4">
           {!FULL_EDITOR && (
-            <div
-              className="flex items-start gap-2.5 rounded-lg border px-3 py-2.5"
-              style={{ borderColor: `${accentColor.value}60`, backgroundColor: `${accentColor.value}1a` }}
-            >
+            <div className="flex items-start gap-2.5 rounded border border-white/10 bg-black/30 px-3 py-2.5">
               <Icon
                 icon="solar:info-circle-bold"
                 className="mt-0.5 h-4 w-4 shrink-0"
@@ -754,13 +722,16 @@ export function ClipTrimmer({
                     onClick={() => addOverlay(tool.seed)}
                     disabled={busy}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-left font-minecraft text-sm text-white/80 transition-colors hover:border-white/20 hover:text-white",
-                      busy && "cursor-not-allowed opacity-40",
+                      "group flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-2 text-left font-minecraft text-xs leading-tight text-white/80 transition-colors",
+                      busy ? "cursor-not-allowed opacity-40" : "hover:border-white/20 hover:bg-white/5 hover:text-white",
                     )}
                   >
-                    <Icon icon={tool.icon} className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{t(tool.label)}</span>
-                    <Icon icon="solar:add-circle-bold" className="h-4 w-4 shrink-0 text-white/30" />
+                    <Icon icon={tool.icon} className="h-4 w-4 shrink-0 text-white/60" />
+                    <span className="min-w-0 flex-1 break-words">{t(tool.label)}</span>
+                    <Icon
+                      icon="solar:add-circle-bold"
+                      className={cn("h-4 w-4 shrink-0 text-white/30", !busy && "group-hover:text-white/70")}
+                    />
                   </button>
                 ))}
               </div>
@@ -820,17 +791,14 @@ export function ClipTrimmer({
                     onClick={() => setShape(entry.choice)}
                     disabled={busy}
                     className={cn(
-                      "rounded-lg border px-2 py-2.5 font-minecraft text-xs transition-colors",
+                      "rounded border px-2 py-2.5 font-minecraft text-xs leading-tight transition-colors",
                       shape === entry.choice
-                        ? "text-white"
-                        : "border-white/10 bg-black/20 text-white/60 hover:border-white/20 hover:text-white",
-                      busy && "cursor-not-allowed opacity-40",
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-white/10 bg-black/30 text-white/60",
+                      busy
+                        ? "cursor-not-allowed opacity-40"
+                        : shape !== entry.choice && "hover:border-white/20 hover:bg-white/5 hover:text-white",
                     )}
-                    style={
-                      shape === entry.choice
-                        ? { borderColor: accentColor.value, backgroundColor: `${accentColor.value}30` }
-                        : undefined
-                    }
                   >
                     {t(entry.label)}
                   </button>
@@ -843,7 +811,7 @@ export function ClipTrimmer({
         <main className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
           <div
             ref={frameRef}
-            className="relative w-full overflow-hidden rounded-lg border border-white/10 bg-black shadow-2xl"
+            className="relative w-full overflow-hidden rounded border border-white/10 bg-black shadow-2xl"
             style={{
               aspectRatio: `${ratio}`,
               maxWidth: `calc(48vh * ${ratio})`,
@@ -870,11 +838,8 @@ export function ClipTrimmer({
                 aria-label={t("clips.trim.preview")}
                 className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-colors hover:bg-black/40"
               >
-                <span
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20"
-                  style={{ backgroundColor: `${accentColor.value}40` }}
-                >
-                  <Icon icon="solar:play-bold" className="h-7 w-7 text-white" />
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/50">
+                  <Icon icon="solar:play-bold" className="h-7 w-7" style={{ color: accentColor.value }} />
                 </span>
               </button>
             )}
@@ -902,6 +867,7 @@ export function ClipTrimmer({
                 visible={playhead >= overlay.startSeconds && playhead <= overlay.endSeconds}
                 color={accentColor.value}
                 label={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
+                disabled={busy}
                 onPick={() => setChosen(index)}
                 onGrab={(mode, event) => grabBox(index, mode, event)}
               />
@@ -920,7 +886,7 @@ export function ClipTrimmer({
         />
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-white/10 bg-black/20 px-5 py-3">
+      <div className="flex shrink-0 items-center gap-1.5 border-t border-white/10 bg-black/30 px-5 py-2.5">
         <ClipIconButton
           icon="solar:restart-bold"
           label={t("clips.editor.transport.to_start")}
@@ -969,7 +935,7 @@ export function ClipTrimmer({
           </>
         )}
 
-        <span className="ml-2 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1 font-minecraft text-sm tabular-nums text-white/90">
+        <span className="ml-2 flex h-8 items-center rounded border border-white/10 bg-black/30 px-2.5 font-minecraft text-sm tabular-nums text-white/90">
           {formatTime(playhead)}
           <span className="text-white/40"> / {formatTime(duration)}</span>
         </span>
@@ -982,6 +948,20 @@ export function ClipTrimmer({
             strong
           />
           <Readout label={t("clips.trim.to")} value={formatTime(shot.to)} />
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => void save()}
+            disabled={!canSave}
+            icon={
+              <Icon
+                icon={busy ? "svg-spinners:ring-resize" : "solar:check-circle-bold"}
+                className="h-4 w-4"
+              />
+            }
+          >
+            {t("clips.trim.save")}
+          </Button>
         </div>
       </div>
 
@@ -1010,6 +990,7 @@ export function ClipTrimmer({
               ref={scaleRef}
               role="presentation"
               onPointerDown={(event) => {
+                holdPointer(event);
                 scrubTo(event.clientX);
                 setScrubbing(true);
               }}
@@ -1018,7 +999,7 @@ export function ClipTrimmer({
               {ticks.map((at) => (
                 <span
                   key={at}
-                  className="absolute bottom-0 top-0 border-l border-white/20 pl-1 font-minecraft text-[0.6rem] leading-5 text-white/40"
+                  className="absolute bottom-0 top-0 border-l border-white/20 pl-1 font-minecraft text-[10px] leading-5 text-white/50"
                   style={{ left: `${percent(at)}%` }}
                 >
                   {formatTick(at)}
@@ -1115,6 +1096,7 @@ export function ClipTrimmer({
               active={chosen === index}
               accent={accentColor.value}
               name={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
+              disabled={busy}
               onPick={() => setChosen(index)}
               onGrab={(mode, event) => grabBar(index, mode, event)}
             />
@@ -1125,24 +1107,14 @@ export function ClipTrimmer({
             {part?.lane === "all" && highlight(part.span)}
             {removed.map((span, index) => gapBlock(span, index, () => unremove(index)))}
             {splits.map((at) => (
-              <div
+              <SplitMark
                 key={at}
-                className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white/70"
-                style={{ left: `${percent(at)}%` }}
-              >
-                <button
-                  type="button"
-                  aria-label={t("clips.editor.split.remove")}
-                  title={t("clips.editor.split.remove")}
-                  disabled={busy}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={() => unsplit(at)}
-                  className="group pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white/70 transition-colors hover:text-white"
-                >
-                  <Icon icon="solar:scissors-bold" className="h-2.5 w-2.5 group-hover:hidden" />
-                  <Icon icon="solar:close-circle-bold" className="hidden h-3.5 w-3.5 group-hover:block" />
-                </button>
-              </div>
+                at={at}
+                disabled={busy}
+                percent={percent}
+                onRemove={() => unsplit(at)}
+                t={t}
+              />
             ))}
             <div
               className="absolute inset-y-0 w-px bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
@@ -1161,7 +1133,39 @@ export function ClipTrimmer({
               : t("clips.trim.hint")}
         </p>
       </div>
-      </div>
-    </div>
+    </WindowFrame>
+  );
+}
+
+function WindowButton({
+  icon,
+  label,
+  onClick,
+  danger = false,
+  disabled = false,
+  iconClassName = "h-4 w-4",
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  iconClassName?: string;
+}) {
+  return (
+    <Tooltip content={label} position="bottom">
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+          danger ? "enabled:hover:bg-red-500/80" : "enabled:hover:bg-white/10",
+        )}
+      >
+        <Icon icon={icon} className={cn(iconClassName, "text-white/70")} />
+      </button>
+    </Tooltip>
   );
 }

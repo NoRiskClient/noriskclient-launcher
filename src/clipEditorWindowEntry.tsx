@@ -9,12 +9,10 @@ import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import i18n from "./i18n/i18n";
 import "./styles/globals.css";
 
-const params = new URLSearchParams(window.location.search);
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <I18nextProvider i18n={i18n}>
-      <ClipEditorWindow initial={{ path: params.get("path") ?? "", name: params.get("name") ?? "" }} />
+      <ClipEditorWindow />
       <GlobalToaster />
       <GlobalModalPortal />
     </I18nextProvider>

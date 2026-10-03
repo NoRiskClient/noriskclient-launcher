@@ -1,10 +1,13 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use ffmpeg_next::ffi as ff;
 
+use norisk_ipc::ticks_at;
+
 use crate::buffer::{Clip, Packet};
+use crate::codec::{planar_420, shown_at, Decoder, Frame};
 use crate::encoder::hw::av_error;
 use crate::encoder::video::TIME_BASE_DEN;
 use crate::writer::{write_mp4, TrackInfo};
@@ -55,10 +58,7 @@ fn crop_ratio(shape: norisk_ipc::ClipShape, width: u32, height: u32) -> Ratio {
 }
 
 fn to_decode(packets: &[Packet], start: i64, end: i64) -> &[Packet] {
-    let first = packets
-        .iter()
-        .rposition(|p| p.keyframe && p.pts <= start)
-        .unwrap_or(0);
+    let first = crate::trim::keyframe_index_at_or_before(packets, start).unwrap_or(0);
     let rest = &packets[first..];
     &rest[..rest.iter().take_while(|p| p.dts <= end).count()]
 }
@@ -95,7 +95,7 @@ struct Gaps(Vec<(i64, i64)>);
 
 impl Gaps {
     fn new(removed: &[norisk_ipc::Span], origin: i64, start: i64, end: i64) -> Self {
-        let at = |seconds: f64| origin.saturating_add((seconds * TIME_BASE_DEN as f64) as i64);
+        let at = |seconds: f64| ticks_at(origin, seconds, TIME_BASE_DEN as i64);
         let mut spans: Vec<(i64, i64)> = removed
             .iter()
             .filter(|span| span.start_seconds.is_finite() && span.end_seconds.is_finite())
@@ -153,7 +153,10 @@ pub fn render(
 ) -> Result<VerticalResult> {
     let mut used = None;
     match render_with(request, &progress, &RENDER_ENCODERS, &mut used) {
-        Err(e) if used.is_some_and(|name| name != CPU_ENCODER) => {
+        Err(e)
+            if e.downcast_ref::<EncoderFault>().is_some()
+                && used.is_some_and(|name| HARDWARE_ENCODERS.contains(&name)) =>
+        {
             log::warn!(
                 "Rendering with {} failed ({e:#}); rendering again on the processor",
                 used.map(|name| name.to_string_lossy()).unwrap_or_default()
@@ -207,8 +210,8 @@ fn render_with(
         request.end_seconds.unwrap_or(duration),
         duration,
     )?;
-    let want_start = clip.first_pts + (start_seconds * TIME_BASE_DEN as f64) as i64;
-    let want_end = clip.first_pts + (end_seconds * TIME_BASE_DEN as f64) as i64;
+    let want_start = ticks_at(clip.first_pts, start_seconds, TIME_BASE_DEN as i64);
+    let want_end = ticks_at(clip.first_pts, end_seconds, TIME_BASE_DEN as i64);
     let (picture_start, picture_end) = crate::trim::picture_window(
         request.video_start_seconds,
         request.video_end_seconds,
@@ -241,26 +244,22 @@ fn render_with(
     let total = feed.len() as u32;
     let mut packets: Vec<Packet> = Vec::with_capacity(feed.len());
     let mut last = None;
+    let mut sent = 0usize;
     let mut stamps = crate::overlay::Stamps::default();
     let mut take = |frame: Frame| -> Result<()> {
-        let pts = unsafe {
-            if (*frame.0).pts == ff::AV_NOPTS_VALUE {
-                (*frame.0).best_effort_timestamp
-            } else {
-                (*frame.0).pts
-            }
-        };
-        let Some(pts) = place(pts, picture_start, picture_end, last) else {
+        let Some(pts) = place(shown_at(&frame), picture_start, picture_end, last) else {
             return Ok(());
         };
         last = Some(pts);
         let Some(shown) = gaps.shift(pts) else {
             return Ok(());
         };
+        planar_420(&frame, "rendering")?;
         unsafe { (*frame.0).pts = pts };
         paint(&frame, clip.first_pts, &overlays, &mut stamps)?;
         unsafe { (*frame.0).pts = shown };
-        packets.extend(encoder.push(frame, crop)?);
+        packets.extend(encoder.push(frame, crop).context(EncoderFault)?);
+        sent += 1;
         Ok(())
     };
 
@@ -273,11 +272,16 @@ fn render_with(
     for frame in decoder.finish()? {
         take(frame)?;
     }
-    packets.extend(encoder.finish()?);
+    packets.extend(encoder.finish().context(EncoderFault)?);
     progress(total, total);
 
-    if packets.is_empty() {
+    if sent == 0 {
         bail!("no frames fall inside {start_seconds:.1}s to {end_seconds:.1}s");
+    }
+    let extradata = encoder.extradata();
+    if packets.is_empty() || extradata.is_empty() {
+        return Err(anyhow!("the encoder took {sent} frames but gave back no usable picture")
+            .context(EncoderFault));
     }
 
     let audio: Vec<_> = crate::trim::windowed_audio(
@@ -296,19 +300,8 @@ fn render_with(
     })
     .collect();
     let audio = crate::trim::build_audio(&audio, &request.levels)?;
-    let audio_packets = || audio.iter().flat_map(|track| track.packets.iter());
-
-    let bytes = packets
-        .iter()
-        .chain(audio_packets())
-        .map(|p| p.len() as u64)
-        .sum::<u64>();
-    let end_pts = packets
-        .iter()
-        .chain(audio_packets())
-        .map(|p| p.pts)
-        .max()
-        .unwrap_or(want_end);
+    let bytes = crate::trim::total_bytes(&packets, &audio);
+    let end_pts = crate::trim::furthest_pts(&packets, &audio, want_end);
 
     let cut = Clip {
         start_pts: want_start,
@@ -324,7 +317,7 @@ fn render_with(
         fps: clip.track.fps,
         time_base_den: TIME_BASE_DEN as i64,
         codec: norisk_ipc::ClipCodec::H264,
-        extradata: encoder.extradata(),
+        extradata,
     };
 
     let written = write_mp4(&cut, destination, &track, &audio)
@@ -340,7 +333,7 @@ fn render_with(
 }
 
 fn hushed(muted: &[norisk_ipc::TrackCut], stream: u32, origin: i64, gaps: &Gaps) -> Vec<(i64, i64)> {
-    let at = |seconds: f64| origin.saturating_add((seconds * TIME_BASE_DEN as f64) as i64);
+    let at = |seconds: f64| ticks_at(origin, seconds, TIME_BASE_DEN as i64);
     muted
         .iter()
         .filter(|cut| cut.stream == stream)
@@ -401,7 +394,7 @@ fn paint(
             };
             stamps.apply(number, &mut luma, rect, &overlay.kind);
 
-            let chroma = halve(rect);
+            let chroma = halve(rect, chroma_width, chroma_height);
             for index in 1..3 {
                 let stride = (*frame.0).linesize[index].max(0) as usize;
                 if (*frame.0).data[index].is_null() || stride < chroma_width {
@@ -429,151 +422,24 @@ fn paint(
     Ok(())
 }
 
-pub(crate) struct Decoder {
-    context: *mut ff::AVCodecContext,
-    packet: *mut ff::AVPacket,
-}
-
-impl Decoder {
-    pub(crate) fn open(track: &TrackInfo) -> Result<Self> {
-        unsafe {
-            let id = match track.codec {
-                norisk_ipc::ClipCodec::H264 => ff::AVCodecID::AV_CODEC_ID_H264,
-                norisk_ipc::ClipCodec::H265 => ff::AVCodecID::AV_CODEC_ID_HEVC,
-                norisk_ipc::ClipCodec::Av1 => ff::AVCodecID::AV_CODEC_ID_AV1,
-            };
-
-            let codec = ff::avcodec_find_decoder(id);
-            if codec.is_null() {
-                bail!("no decoder for {:?} in this FFmpeg build", track.codec);
-            }
-
-            let context = ff::avcodec_alloc_context3(codec);
-            if context.is_null() {
-                bail!("avcodec_alloc_context3 failed for the video decoder");
-            }
-
-            let mut guard = Self {
-                context,
-                packet: std::ptr::null_mut(),
-            };
-
-            (*context).width = track.width as i32;
-            (*context).height = track.height as i32;
-
-            if !track.extradata.is_empty() {
-                let size = track.extradata.len();
-                let buffer =
-                    ff::av_mallocz(size + ff::AV_INPUT_BUFFER_PADDING_SIZE as usize) as *mut u8;
-                if buffer.is_null() {
-                    bail!("could not allocate room for the stream header");
-                }
-                std::ptr::copy_nonoverlapping(track.extradata.as_ptr(), buffer, size);
-                (*context).extradata = buffer;
-                (*context).extradata_size = size as i32;
-            }
-
-            let rc = ff::avcodec_open2(context, codec, std::ptr::null_mut());
-            if rc < 0 {
-                bail!("opening the video decoder failed: {}", av_error(rc));
-            }
-
-            guard.packet = ff::av_packet_alloc();
-            if guard.packet.is_null() {
-                bail!("av_packet_alloc failed");
-            }
-
-            Ok(guard)
-        }
-    }
-
-    pub(crate) fn push(&mut self, packet: &Packet) -> Result<Vec<Frame>> {
-        unsafe {
-            ff::av_packet_unref(self.packet);
-            let rc = ff::av_new_packet(self.packet, packet.len() as i32);
-            if rc < 0 {
-                bail!("av_new_packet failed: {}", av_error(rc));
-            }
-            std::ptr::copy_nonoverlapping(
-                packet.data.as_ptr(),
-                (*self.packet).data,
-                packet.len(),
-            );
-            (*self.packet).pts = packet.pts;
-            (*self.packet).dts = packet.dts;
-            if packet.keyframe {
-                (*self.packet).flags |= ff::AV_PKT_FLAG_KEY as i32;
-            }
-
-            let rc = ff::avcodec_send_packet(self.context, self.packet);
-            if rc < 0 && rc != ff::AVERROR(ff::EAGAIN) {
-                bail!("avcodec_send_packet failed: {}", av_error(rc));
-            }
-        }
-        self.drain()
-    }
-
-    pub(crate) fn finish(&mut self) -> Result<Vec<Frame>> {
-        unsafe {
-            let rc = ff::avcodec_send_packet(self.context, std::ptr::null());
-            if rc < 0 && rc != ff::AVERROR_EOF {
-                bail!("flushing the video decoder failed: {}", av_error(rc));
-            }
-        }
-        self.drain()
-    }
-
-    fn drain(&mut self) -> Result<Vec<Frame>> {
-        let mut out = Vec::new();
-        loop {
-            let frame = Frame::alloc()?;
-            let rc = unsafe { ff::avcodec_receive_frame(self.context, frame.0) };
-            if rc == ff::AVERROR(ff::EAGAIN) || rc == ff::AVERROR_EOF {
-                break;
-            }
-            if rc < 0 {
-                bail!("avcodec_receive_frame failed: {}", av_error(rc));
-            }
-            out.push(frame);
-        }
-        Ok(out)
-    }
-}
-
-impl Drop for Decoder {
-    fn drop(&mut self) {
-        unsafe {
-            ff::av_packet_free(&mut self.packet);
-            ff::avcodec_free_context(&mut self.context);
-        }
-    }
-}
-
-pub(crate) struct Frame(pub(crate) *mut ff::AVFrame);
-
-impl Frame {
-    fn alloc() -> Result<Self> {
-        let frame = unsafe { ff::av_frame_alloc() };
-        if frame.is_null() {
-            bail!("av_frame_alloc failed");
-        }
-        Ok(Self(frame))
-    }
-}
-
-impl Drop for Frame {
-    fn drop(&mut self) {
-        unsafe { ff::av_frame_free(&mut self.0) };
-    }
-}
-
 struct Encoder {
     context: *mut ff::AVCodecContext,
     packet: *mut ff::AVPacket,
 }
 
 const CPU_ENCODER: &std::ffi::CStr = c"libx264";
-const RENDER_ENCODERS: [&std::ffi::CStr; 3] = [c"h264_nvenc", c"h264_amf", CPU_ENCODER];
+const HARDWARE_ENCODERS: [&std::ffi::CStr; 2] = [c"h264_nvenc", c"h264_amf"];
+const RENDER_ENCODERS: [&std::ffi::CStr; 3] =
+    [HARDWARE_ENCODERS[0], HARDWARE_ENCODERS[1], CPU_ENCODER];
+
+#[derive(Debug)]
+struct EncoderFault;
+
+impl std::fmt::Display for EncoderFault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the video encoder failed")
+    }
+}
 
 impl Encoder {
     fn open(
@@ -584,14 +450,16 @@ impl Encoder {
     ) -> Result<(Self, &'static std::ffi::CStr)> {
         for &name in encoders {
             match Self::open_with(Some(name), width, height, fps) {
-                Ok(encoder) => {
+                Ok(opened) => {
                     log::info!("Rendering with {}", name.to_string_lossy());
-                    return Ok((encoder, name));
+                    return Ok(opened);
                 }
                 Err(e) => log::debug!("{} cannot render here: {e:#}", name.to_string_lossy()),
             }
         }
-        Ok((Self::open_with(None, width, height, fps)?, CPU_ENCODER))
+        let (encoder, name) = Self::open_with(None, width, height, fps)?;
+        log::info!("Rendering with FFmpeg's default H.264 encoder, {}", name.to_string_lossy());
+        Ok((encoder, name))
     }
 
     fn open_with(
@@ -599,7 +467,7 @@ impl Encoder {
         width: u32,
         height: u32,
         fps: u32,
-    ) -> Result<Self> {
+    ) -> Result<(Self, &'static std::ffi::CStr)> {
         unsafe {
             let codec = match name {
                 Some(name) => ff::avcodec_find_encoder_by_name(name.as_ptr()),
@@ -608,7 +476,12 @@ impl Encoder {
             if codec.is_null() {
                 bail!("not in this FFmpeg build");
             }
-            let hardware = matches!(name, Some(name) if name != c"libx264");
+            let opened: &'static std::ffi::CStr = if (*codec).name.is_null() {
+                c"h264"
+            } else {
+                std::ffi::CStr::from_ptr((*codec).name)
+            };
+            let hardware = matches!(name, Some(name) if name != CPU_ENCODER);
 
             let context = ff::avcodec_alloc_context3(codec);
             if context.is_null() {
@@ -663,7 +536,7 @@ impl Encoder {
                 bail!("av_packet_alloc failed");
             }
 
-            Ok(guard)
+            Ok((guard, opened))
         }
     }
 
@@ -753,7 +626,6 @@ impl Drop for Encoder {
     }
 }
 
-unsafe impl Send for Decoder {}
 unsafe impl Send for Encoder {}
 
 #[cfg(test)]
@@ -1121,15 +993,11 @@ mod tests {
             origin + 8 * second,
         );
 
-        assert_eq!(
-            gaps.0,
-            vec![
-                (origin, origin + second / 2),
-                (origin + second, origin + 2 * second),
-                (origin + 6 * second, origin + 7 * second),
-            ],
-        );
+        assert_eq!(gaps.shift(origin + second / 4), None);
+        assert_eq!(gaps.shift(origin + 7 * second / 4), None);
+        assert_eq!(gaps.shift(origin + 13 * second / 2), None);
         assert_eq!(gaps.shift(origin + 3 * second), Some(origin + 3 * second / 2));
+        assert_eq!(gaps.shift(origin + 15 * second / 2), Some(origin + 5 * second));
     }
 
     #[test]
@@ -1141,8 +1009,9 @@ mod tests {
             10 * TIME_BASE_DEN as i64,
         );
 
-        assert!(gaps.0.is_empty());
-        assert_eq!(gaps.shift(12_345), Some(12_345));
+        for pts in [12_345, 3 * TIME_BASE_DEN as i64 / 2, 7 * TIME_BASE_DEN as i64 / 2] {
+            assert_eq!(gaps.shift(pts), Some(pts));
+        }
     }
 
     #[test]
@@ -1181,96 +1050,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod probe {
-    #[test]
-    #[ignore = "needs a real clip; run it by hand"]
-    fn probe_export() {
-        let Ok(source) = std::env::var("NRC_CLIP") else {
-            println!("set NRC_CLIP to a clip to try this");
-            return;
-        };
-        let destination = std::env::temp_dir().join("nrc-vertical-probe.mp4");
-        let _ = std::fs::remove_file(&destination);
-
-        let started = std::time::Instant::now();
-        let request = norisk_ipc::ExportVerticalRequest {
-            source: source.into(),
-            destination: destination.clone(),
-            shape: norisk_ipc::ClipShape::Vertical,
-            ..Default::default()
-        };
-        match super::render(&request, |_, _| {}) {
-            Ok(result) => println!(
-                "OK  {}x{}  {:.1}s  {:.1} MB  in {} ms  -> {}",
-                result.width,
-                result.height,
-                result.duration_seconds,
-                result.size_bytes as f64 / 1e6,
-                started.elapsed().as_millis(),
-                result.path.display(),
-            ),
-            Err(e) => println!("FAILED after {} ms: {e:#}", started.elapsed().as_millis()),
-        }
-    }
-}
-
-#[cfg(test)]
 mod render_tests {
-    #[test]
-    #[ignore = "measures time on a real clip in NRC_TEST_CLIP"]
-    fn what_overlays_cost_on_top_of_a_plain_render() {
-        let source = std::path::PathBuf::from(std::env::var("NRC_TEST_CLIP").unwrap());
-        let overlay = |kind: norisk_ipc::OverlayKind, left: f32, top: f32| norisk_ipc::ClipOverlay {
-            kind,
-            left,
-            top,
-            width: 0.3,
-            height: 0.2,
-            start_seconds: 0.0,
-            end_seconds: 999.0,
-        };
-        let four = vec![
-            overlay(norisk_ipc::OverlayKind::Blur { strength: 12 }, 0.05, 0.05),
-            overlay(norisk_ipc::OverlayKind::Box { colour: 0x000000 }, 0.6, 0.05),
-            overlay(
-                norisk_ipc::OverlayKind::Arrow {
-                    colour: 0xff3b30,
-                    thickness: 6,
-                    towards: norisk_ipc::Corner::BottomRight,
-                },
-                0.05,
-                0.6,
-            ),
-            overlay(
-                norisk_ipc::OverlayKind::Text {
-                    content: "NORISK".into(),
-                    size: 48,
-                    colour: 0xffffff,
-                },
-                0.6,
-                0.6,
-            ),
-        ];
-
-        for (label, overlays) in [("plain", Vec::new()), ("four overlays", four)] {
-            let request = norisk_ipc::ExportVerticalRequest {
-                source: source.clone(),
-                destination: std::env::temp_dir().join(format!("nrc-cost-{}.mp4", overlays.len())),
-                shape: norisk_ipc::ClipShape::Original,
-                overlays,
-                ..Default::default()
-            };
-            let _ = std::fs::remove_file(&request.destination);
-            let started = std::time::Instant::now();
-            let result = super::render(&request, |_, _| {}).unwrap();
-            println!(
-                "{label}: {:.2}s for {:.1}s of clip",
-                started.elapsed().as_secs_f64(),
-                result.duration_seconds,
-            );
-        }
-    }
-
     #[test]
     #[ignore = "needs a real clip in NRC_TEST_CLIP"]
     fn a_real_clip_takes_a_blur_an_arrow_and_some_text() {

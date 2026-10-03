@@ -110,12 +110,8 @@ fn run(
     let mut next = Instant::now();
     let mut size = texture_size(&staging);
     let mut unopenable_since: Option<Instant> = None;
-    let started = Instant::now();
 
     while !stop.load(Ordering::Relaxed) {
-        if crate::fault::due("hook", started) {
-            break;
-        }
         let now = Instant::now();
         if now < next {
             std::thread::sleep(next - now);

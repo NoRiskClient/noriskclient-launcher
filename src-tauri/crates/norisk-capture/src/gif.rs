@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use ffmpeg_next::ffi as ff;
 
-use crate::render::{Decoder, Frame};
+use crate::codec::{planar_420, shown_at, Decoder, Frame};
+use crate::encoder::video::TIME_BASE_DEN;
 
 const MAX_WIDTH: u32 = 400;
 const TARGET_FPS: u32 = 12;
@@ -36,19 +37,19 @@ pub fn to_gif(
 ) -> Result<GifResult> {
     let clip = crate::trim::read(source)?;
 
-    let source_fps = clip.track.fps.max(1);
-    let keep_every = (source_fps as f64 / TARGET_FPS as f64).round().max(1.0) as usize;
-    let fps = source_fps as f64 / keep_every as f64;
-    let delay = ((100.0 / fps).round() as u16).max(2);
-    let budget = (fps * MAX_SECONDS as f64).ceil() as u32;
+    let delay = ((100.0 / TARGET_FPS as f64).round() as u16).max(2);
+    let budget = MAX_SECONDS * 100 / delay as u32;
+    let mut pacer = Pacer::new(delay);
 
     let (width, height) = fit(clip.track.width, clip.track.height);
 
     log::info!(
-        "Turning {} ({}x{} at {source_fps} fps) into a {width}x{height} GIF, every {keep_every}. frame",
+        "Turning {} ({}x{} at {} fps) into a {width}x{height} GIF, one frame every {} ms",
         source.display(),
         clip.track.width,
         clip.track.height,
+        clip.track.fps,
+        delay as u32 * 10,
     );
 
     let file = std::fs::File::create(destination)
@@ -62,38 +63,53 @@ pub fn to_gif(
 
     let mut decoder = Decoder::open(&clip.track)?;
     let total = clip.video.len() as u32;
-    let mut seen = 0usize;
     let mut written = 0u32;
+    let mut filled = 0u32;
     let mut truncated = false;
     let mut planes = Planes::default();
+    let mut held: Option<Frame> = None;
+
+    let mut take = |next: Option<Frame>| -> Result<bool> {
+        let slots = match &next {
+            Some(frame) => pacer.slots(shown_at(frame)),
+            None => 1,
+        };
+        if slots == 0 {
+            return Ok(true);
+        }
+        if filled >= budget {
+            return Ok(false);
+        }
+        if let Some(previous) = std::mem::replace(&mut held, next) {
+            let slots = slots.min(budget - filled);
+            let shown_for = (delay as u32 * slots).min(u16::MAX as u32) as u16;
+            write_frame(&mut encoder, &previous, width, height, shown_for, &mut planes)?;
+            filled += slots;
+            written += 1;
+        }
+        Ok(true)
+    };
 
     'outer: for (index, packet) in clip.video.iter().enumerate() {
         for frame in decoder.push(packet)? {
-            if written >= budget {
+            if !take(Some(frame))? {
                 truncated = true;
                 break 'outer;
             }
-            if seen % keep_every == 0 {
-                write_frame(&mut encoder, &frame, width, height, delay, &mut planes)?;
-                written += 1;
-            }
-            seen += 1;
         }
         progress(index as u32 + 1, total);
     }
 
     if !truncated {
         for frame in decoder.finish()? {
-            if written >= budget {
+            if !take(Some(frame))? {
                 truncated = true;
                 break;
             }
-            if seen % keep_every == 0 {
-                write_frame(&mut encoder, &frame, width, height, delay, &mut planes)?;
-                written += 1;
-            }
-            seen += 1;
         }
+    }
+    if !truncated && !take(None)? {
+        truncated = true;
     }
     progress(total, total);
 
@@ -110,7 +126,7 @@ pub fn to_gif(
     let size_bytes = std::fs::metadata(destination)
         .map(|meta| meta.len())
         .unwrap_or(0);
-    let duration_seconds = written as f64 * delay as f64 / 100.0;
+    let duration_seconds = filled as f64 * delay as f64 / 100.0;
 
     if truncated {
         log::info!("The clip is longer than {MAX_SECONDS}s; the GIF holds its first {written} frames");
@@ -132,6 +148,33 @@ pub fn to_gif(
     })
 }
 
+struct Pacer {
+    interval: i64,
+    next_due: Option<i64>,
+}
+
+impl Pacer {
+    fn new(delay_centiseconds: u16) -> Self {
+        Self {
+            interval: (TIME_BASE_DEN as i64 * delay_centiseconds as i64 / 100).max(1),
+            next_due: None,
+        }
+    }
+
+    fn slots(&mut self, pts: i64) -> u32 {
+        if pts == ff::AV_NOPTS_VALUE {
+            return 0;
+        }
+        let due = *self.next_due.get_or_insert(pts);
+        if pts < due {
+            return 0;
+        }
+        let slots = (pts - due) / self.interval + 1;
+        self.next_due = Some(due.saturating_add(slots.saturating_mul(self.interval)));
+        slots.min(u32::MAX as i64) as u32
+    }
+}
+
 #[derive(Default)]
 struct Planes {
     luma: Vec<u8>,
@@ -148,10 +191,8 @@ fn write_frame<W: std::io::Write>(
     delay: u16,
     planes: &mut Planes,
 ) -> Result<()> {
+    let full_range = planar_420(frame, "GIF export")?;
     read_planes(frame, width, height, planes)?;
-
-    let full_range = unsafe { (*frame.0).format }
-        == ff::AVPixelFormat::AV_PIX_FMT_YUVJ420P as i32;
     to_rgb(planes, full_range);
 
     let mut out = gif::Frame::from_rgb_speed(
@@ -169,14 +210,8 @@ fn write_frame<W: std::io::Write>(
 
 fn read_planes(frame: &Frame, width: u32, height: u32, planes: &mut Planes) -> Result<()> {
     let raw = frame.0;
-    let (format, source_width, source_height) =
-        unsafe { ((*raw).format, (*raw).width, (*raw).height) };
+    let (source_width, source_height) = unsafe { ((*raw).width, (*raw).height) };
 
-    if format != ff::AVPixelFormat::AV_PIX_FMT_YUV420P as i32
-        && format != ff::AVPixelFormat::AV_PIX_FMT_YUVJ420P as i32
-    {
-        bail!("GIF export needs planar 4:2:0 video, but this clip decoded to format {format}");
-    }
     if source_width <= 0 || source_height <= 0 {
         bail!("the decoder returned a {source_width}x{source_height} frame");
     }
@@ -324,6 +359,80 @@ mod tests {
     fn a_clip_never_collapses_to_nothing() {
         let (width, height) = fit(4000, 1);
         assert!(width >= 1 && height >= 1, "got {width}x{height}");
+    }
+
+    fn picked(times: &[i64]) -> (Vec<i64>, u32) {
+        let mut pacer = Pacer::new(8);
+        let mut kept = Vec::new();
+        let mut slots = 0;
+        for &pts in times {
+            let taken = pacer.slots(pts);
+            if taken > 0 {
+                kept.push(pts);
+                slots += taken;
+            }
+        }
+        (kept, slots)
+    }
+
+    #[test]
+    fn frames_are_picked_by_their_time_so_uneven_spacing_keeps_the_real_speed() {
+        let gaps = [1_200i64, 1_700, 1_400, 2_300, 1_500, 900, 1_600, 1_800];
+        let times: Vec<i64> = (0..600)
+            .scan(0i64, |at, i| {
+                let now = *at;
+                *at += gaps[i % gaps.len()];
+                Some(now)
+            })
+            .collect();
+        let interval = TIME_BASE_DEN as i64 * 8 / 100;
+
+        let (kept, slots) = picked(&times);
+
+        let span = times.last().unwrap() - times.first().unwrap();
+        let played = slots as i64 * interval;
+        assert!(
+            (played - span).abs() <= interval,
+            "the GIF plays {played} ticks for {span} ticks of clip",
+        );
+        assert_eq!(slots as usize, kept.len(), "a clip faster than the GIF never stretches a frame");
+    }
+
+    #[test]
+    fn a_steady_sixty_fps_clip_keeps_one_frame_per_gif_interval() {
+        let step = TIME_BASE_DEN as i64 / 60;
+        let times: Vec<i64> = (0..600).map(|i| 1_000 + i * step).collect();
+        let interval = TIME_BASE_DEN as i64 * 8 / 100;
+
+        let (kept, slots) = picked(&times);
+
+        assert_eq!(kept[0], 1_000, "the first frame is always kept");
+        assert_eq!(slots as usize, kept.len(), "a fast clip never stretches a frame");
+        let expected = (times.last().unwrap() - times[0]) / interval + 1;
+        assert_eq!(kept.len() as i64, expected);
+    }
+
+    #[test]
+    fn a_clip_slower_than_the_gif_holds_its_frames_longer_instead_of_speeding_up() {
+        let step = TIME_BASE_DEN as i64 / 5;
+        let times: Vec<i64> = (0..50).map(|i| i * step).collect();
+        let interval = TIME_BASE_DEN as i64 * 8 / 100;
+
+        let (kept, slots) = picked(&times);
+
+        assert_eq!(kept.len(), times.len(), "every slow frame is kept");
+        let played = slots as i64 * interval;
+        let span = times.last().unwrap() - times[0];
+        assert!((played - span).abs() <= interval, "{played} vs {span}");
+    }
+
+    #[test]
+    fn frames_without_a_time_or_going_backwards_are_skipped() {
+        let mut pacer = Pacer::new(8);
+        assert_eq!(pacer.slots(ff::AV_NOPTS_VALUE), 0);
+        assert_eq!(pacer.slots(10_000), 1);
+        assert_eq!(pacer.slots(9_000), 0);
+        assert_eq!(pacer.slots(i64::MAX), u32::MAX);
     }
 
     #[test]

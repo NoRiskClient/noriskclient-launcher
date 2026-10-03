@@ -97,7 +97,7 @@ export interface ClipConfig {
   hotkey_save: string;
   hotkey_toggle: string;
   other_game: OtherGame | null;
-  other_screen?: OtherScreen | null;
+  other_screen: OtherScreen | null;
 }
 
 export interface OtherGame {
@@ -116,7 +116,7 @@ export type CaptureRuntimeState =
   | { state: "downloading"; downloaded: number; total: number | null }
   | { state: "failed"; message: string };
 
-export type CaptureMethod = "graphics hook" | "window capture" | "screen capture" | "screencapturekit";
+export type CaptureMethod = "graphics hook" | "window capture" | "screen capture" | "screencapturekit" | "unknown";
 
 export interface CaptureStatus {
   running: boolean;

@@ -3,11 +3,13 @@
 import type { ReactNode } from "react";
 import { Icon } from "@iconify/react";
 
-import type { ClipAudioTrack, ClipOverlay } from "../../../services/clip-service";
+import type { ClipAudioTrack, ClipOverlay, Span } from "../../../services/clip-service";
 import { Waveform } from "../ClipTimeline";
 import { ClipIconButton } from "../ClipIconButton";
+import { Tooltip } from "../../ui/Tooltip";
 import { cn } from "../../../lib/utils";
 import { NUDGE, OVERLAY_ICON, type Translate, overlayTint, formatTime } from "./shared";
+import { holdPointer } from "./useWindowDrag";
 
 const LINK_MODES: { separate: boolean; icon: string; label: string }[] = [
   { separate: false, icon: "solar:link-bold", label: "clips.editor.link.linked" },
@@ -40,8 +42,13 @@ export function Lane({
   const head = (
     <>
       <span className="h-4 w-1 shrink-0 rounded-full" style={{ backgroundColor: tint }} />
-      <Icon icon={icon} className="h-3.5 w-3.5 shrink-0 text-white/50" />
-      <span className="min-w-0 flex-1 truncate text-left font-minecraft text-xs text-white/70">
+      <Icon icon={icon} className={cn("h-3.5 w-3.5 shrink-0", active ? "text-white" : "text-white/50")} />
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-left font-minecraft text-xs uppercase tracking-wide",
+          active ? "text-white" : "text-white/60",
+        )}
+      >
         {name}
       </span>
     </>
@@ -51,10 +58,10 @@ export function Lane({
     <div className="flex">
       <div
         className={cn(
-          "flex w-44 shrink-0 items-center gap-2 rounded-l-lg border-y border-l border-white/10 bg-black/20 px-2.5",
+          "flex w-44 shrink-0 items-center gap-2 rounded-l border-y border-l px-2.5 transition-colors",
+          active ? "border-white/20 bg-white/10" : "border-white/10 bg-black/30",
           height,
         )}
-        style={active ? { backgroundColor: `${tint}25`, borderColor: `${tint}80` } : undefined}
       >
         {onPick ? (
           <button
@@ -72,9 +79,16 @@ export function Lane({
       </div>
       <div
         role="presentation"
-        onPointerDown={onScrub ? (event) => onScrub(event.clientX) : undefined}
+        onPointerDown={
+          onScrub
+            ? (event) => {
+                holdPointer(event);
+                onScrub(event.clientX);
+              }
+            : undefined
+        }
         className={cn(
-          "relative min-w-0 flex-1 overflow-hidden rounded-r-lg border border-white/10 bg-black/20",
+          "relative min-w-0 flex-1 overflow-hidden rounded-r border border-white/10 bg-black/30",
           height,
           onScrub && "cursor-ew-resize",
         )}
@@ -103,7 +117,7 @@ export function TrackLink({
   t: Translate;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+    <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/30 p-1">
       {LINK_MODES.map((mode) => {
         const on = separate === mode.separate;
         return (
@@ -112,16 +126,20 @@ export function TrackLink({
             type="button"
             disabled={disabled}
             aria-pressed={on}
-            title={t(mode.label)}
             onClick={() => onChange(mode.separate)}
             className={cn(
-              "flex items-center gap-1.5 rounded border border-transparent px-2 py-1 font-minecraft text-xs transition-colors",
-              on ? "text-white" : "text-white/50 hover:text-white",
-              disabled && "cursor-not-allowed opacity-40",
+              "flex items-center gap-1.5 rounded border px-2 py-1 font-minecraft text-xs transition-colors",
+              on ? "border-white/20 bg-white/10 text-white" : "border-transparent text-white/60",
+              disabled
+                ? "cursor-not-allowed opacity-40"
+                : !on && "hover:bg-white/5 hover:text-white",
             )}
-            style={on ? { borderColor: color, backgroundColor: `${color}30` } : undefined}
           >
-            <Icon icon={mode.icon} className="h-3.5 w-3.5 shrink-0" />
+            <Icon
+              icon={mode.icon}
+              className="h-3.5 w-3.5 shrink-0"
+              style={on ? { color } : undefined}
+            />
             {t(mode.label)}
           </button>
         );
@@ -197,8 +215,8 @@ export function AudioLane({
           <div className="flex shrink-0 items-center gap-1">
             <span
               className={cn(
-                "w-9 text-right font-minecraft text-[0.7rem] tabular-nums",
-                volume === 100 ? "text-white/40" : "text-white",
+                "w-9 text-right font-minecraft text-[11px] tabular-nums",
+                volume === 100 ? "text-white/50" : "text-white",
               )}
             >
               {volume}%
@@ -210,7 +228,7 @@ export function AudioLane({
               aria-pressed={muted}
               disabled={disabled}
               onClick={() => onChange(muted ? 100 : 0)}
-              className={cn("h-7 w-7", muted && "text-white/40 hover:text-white/70")}
+              className={cn("h-7 w-7", muted && "text-white/40 enabled:hover:text-white/70")}
             />
           </div>
         ) : undefined
@@ -257,16 +275,21 @@ export function AudioLane({
       )}
 
       {trimmable && trimmed && (
-        <button
-          type="button"
-          title={t("clips.editor.audio.trim_reset")}
-          aria-label={t("clips.editor.audio.trim_reset")}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onTrimReset}
-          className="absolute left-1/2 top-1 z-20 -translate-x-1/2 rounded border border-white/20 bg-black/70 px-1.5 py-0.5 font-minecraft text-[0.7rem] tabular-nums text-white transition-colors hover:border-white/60"
+        <Tooltip
+          content={t("clips.editor.audio.trim_reset")}
+          position="top"
+          wrapperClassName="absolute left-1/2 top-1 z-20 -translate-x-1/2"
         >
-          {`${(to - from).toFixed(1)} s`}
-        </button>
+          <button
+            type="button"
+            aria-label={t("clips.editor.audio.trim_reset")}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onTrimReset}
+            className="rounded border border-white/20 bg-black/80 px-1.5 py-0.5 font-minecraft text-[11px] tabular-nums text-white transition-colors hover:border-white/60"
+          >
+            {`${(to - from).toFixed(1)} s`}
+          </button>
+        </Tooltip>
       )}
     </Lane>
   );
@@ -278,6 +301,7 @@ export function OverlayLane({
   active,
   accent,
   name,
+  disabled,
   onPick,
   onGrab,
 }: {
@@ -286,6 +310,7 @@ export function OverlayLane({
   active: boolean;
   accent: string;
   name: string;
+  disabled: boolean;
   onPick: () => void;
   onGrab: (mode: "move" | "start" | "end", event: { clientX: number }) => void;
 }) {
@@ -310,6 +335,8 @@ export function OverlayLane({
         aria-pressed={active}
         onPointerDown={(event) => {
           event.preventDefault();
+          if (disabled) return;
+          holdPointer(event);
           onGrab("move", event);
         }}
         onKeyDown={(event) => {
@@ -317,7 +344,10 @@ export function OverlayLane({
           event.preventDefault();
           onPick();
         }}
-        className="absolute inset-y-1 flex cursor-grab items-center justify-center rounded border focus:outline-none"
+        className={cn(
+          "absolute inset-y-1 flex items-center justify-center rounded border focus:outline-none",
+          disabled ? "cursor-not-allowed" : "cursor-grab",
+        )}
         style={{
           left: `${left}%`,
           width: `${width}%`,
@@ -334,18 +364,22 @@ export function OverlayLane({
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (disabled) return;
+            holdPointer(event);
             onGrab("start", event);
           }}
-          className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l bg-white/30 hover:bg-white/60"
+          className={cn("absolute inset-y-0 left-0 w-2 rounded-l bg-white/30", !disabled && "cursor-ew-resize hover:bg-white/60")}
         />
         <span
           role="presentation"
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (disabled) return;
+            holdPointer(event);
             onGrab("end", event);
           }}
-          className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r bg-white/30 hover:bg-white/60"
+          className={cn("absolute inset-y-0 right-0 w-2 rounded-r bg-white/30", !disabled && "cursor-ew-resize hover:bg-white/60")}
         />
       </div>
     </Lane>
@@ -363,7 +397,7 @@ export function Readout({ label, value, strong }: { label: string; value: string
       >
         {value}
       </span>
-      <span className="font-smallcaps text-[0.65rem] uppercase tracking-wider text-white/50">
+      <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/60">
         {label}
       </span>
     </div>
@@ -376,6 +410,7 @@ export function Handle({
   time,
   label,
   color,
+  disabled = false,
   onGrab,
   onNudge,
 }: {
@@ -384,6 +419,7 @@ export function Handle({
   time: string;
   label: string;
   color: string;
+  disabled?: boolean;
   onGrab: () => void;
   onNudge: (by: number) => void;
 }) {
@@ -391,17 +427,24 @@ export function Handle({
     <button
       type="button"
       aria-label={label}
+      aria-disabled={disabled}
       onPointerDown={(event) => {
         event.stopPropagation();
+        if (disabled) return;
+        holdPointer(event);
         onGrab();
       }}
       onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         event.preventDefault();
+        if (disabled) return;
         const step = event.shiftKey ? NUDGE * 10 : NUDGE;
         onNudge(event.key === "ArrowLeft" ? -step : step);
       }}
-      className="group pointer-events-auto absolute inset-y-0 w-6 -translate-x-1/2 cursor-ew-resize focus:outline-none"
+      className={cn(
+        "group pointer-events-auto absolute inset-y-0 w-6 -translate-x-1/2 focus:outline-none",
+        disabled ? "cursor-not-allowed" : "cursor-ew-resize",
+      )}
       style={{ left: `${left}%` }}
     >
       <span
@@ -413,12 +456,194 @@ export function Handle({
       />
       <span
         className={cn(
-          "pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-lg bg-black/70 border border-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white transition-opacity",
+          "pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded border border-white/10 bg-black/80 px-1.5 py-0.5 font-minecraft text-xs text-white transition-opacity",
           active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
         )}
       >
         {time}
       </span>
     </button>
+  );
+}
+
+export function ClipMasks({
+  from,
+  to,
+  color,
+  percent,
+}: {
+  from: number;
+  to: number;
+  color: string;
+  percent: (seconds: number) => number;
+}) {
+  return (
+    <>
+      <div
+        className="absolute inset-y-0 left-0 bg-black/70"
+        style={{ width: `${percent(from)}%` }}
+      />
+      <div
+        className="absolute inset-y-0 right-0 bg-black/70"
+        style={{ width: `${100 - percent(to)}%` }}
+      />
+      <div
+        className="absolute inset-y-0 border-x-2"
+        style={{
+          left: `${percent(from)}%`,
+          width: `${percent(Math.max(0, to - from))}%`,
+          borderColor: color,
+        }}
+      />
+    </>
+  );
+}
+
+export function ClipHandles({
+  from,
+  to,
+  dragging,
+  color,
+  disabled,
+  percent,
+  onGrab,
+  onMove,
+  t,
+}: {
+  from: number;
+  to: number;
+  dragging: "start" | "end" | null;
+  color: string;
+  disabled: boolean;
+  percent: (seconds: number) => number;
+  onGrab: (which: "start" | "end") => void;
+  onMove: (which: "start" | "end", seconds: number) => void;
+  t: Translate;
+}) {
+  return (
+    <>
+      <Handle
+        left={percent(from)}
+        active={dragging === "start"}
+        time={formatTime(from)}
+        label={t("clips.trim.handle_start")}
+        color={color}
+        disabled={disabled}
+        onGrab={() => onGrab("start")}
+        onNudge={(by) => onMove("start", from + by)}
+      />
+      <Handle
+        left={percent(to)}
+        active={dragging === "end"}
+        time={formatTime(to)}
+        label={t("clips.trim.handle_end")}
+        color={color}
+        disabled={disabled}
+        onGrab={() => onGrab("end")}
+        onNudge={(by) => onMove("end", to + by)}
+      />
+    </>
+  );
+}
+
+export function SpanHighlight({
+  span,
+  color,
+  percent,
+}: {
+  span: Span;
+  color: string;
+  percent: (seconds: number) => number;
+}) {
+  return (
+    <div
+      className="absolute inset-y-0 rounded border-2"
+      style={{
+        left: `${percent(span.startSeconds)}%`,
+        width: `${percent(span.endSeconds - span.startSeconds)}%`,
+        borderColor: color,
+        backgroundColor: `${color}1f`,
+      }}
+    />
+  );
+}
+
+export function GapBlock({
+  span,
+  disabled,
+  percent,
+  onRestore,
+  t,
+}: {
+  span: Span;
+  disabled: boolean;
+  percent: (seconds: number) => number;
+  onRestore: () => void;
+  t: Translate;
+}) {
+  return (
+    <div
+      className="absolute inset-y-0 border-x border-dashed border-white/30 bg-[#08080b]/90"
+      style={{
+        left: `${percent(span.startSeconds)}%`,
+        width: `${percent(span.endSeconds - span.startSeconds)}%`,
+      }}
+    >
+      <Tooltip
+        content={t("clips.editor.remove.restore")}
+        position="top"
+        wrapperClassName="pointer-events-auto absolute left-1/2 top-0.5 -translate-x-1/2"
+      >
+        <button
+          type="button"
+          aria-label={t("clips.editor.remove.restore")}
+          disabled={disabled}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onRestore}
+          className="flex h-4 w-4 items-center justify-center rounded-full text-white/40 transition-colors hover:text-white"
+        >
+          <Icon icon="solar:restart-bold" className="h-3 w-3" />
+        </button>
+      </Tooltip>
+    </div>
+  );
+}
+
+export function SplitMark({
+  at,
+  disabled,
+  percent,
+  onRemove,
+  t,
+}: {
+  at: number;
+  disabled: boolean;
+  percent: (seconds: number) => number;
+  onRemove: () => void;
+  t: Translate;
+}) {
+  return (
+    <div
+      className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white/70"
+      style={{ left: `${percent(at)}%` }}
+    >
+      <Tooltip
+        content={t("clips.editor.split.remove")}
+        position="top"
+        wrapperClassName="pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2"
+      >
+        <button
+          type="button"
+          aria-label={t("clips.editor.split.remove")}
+          disabled={disabled}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onRemove}
+          className="group flex h-4 w-4 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white/70 transition-colors hover:text-white"
+        >
+          <Icon icon="solar:scissors-bold" className="h-2.5 w-2.5 group-hover:hidden" />
+          <Icon icon="solar:close-circle-bold" className="hidden h-3.5 w-3.5 group-hover:block" />
+        </button>
+      </Tooltip>
+    </div>
   );
 }

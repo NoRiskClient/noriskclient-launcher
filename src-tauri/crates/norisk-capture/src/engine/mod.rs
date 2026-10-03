@@ -21,7 +21,7 @@ mod save;
 mod target;
 mod trouble;
 
-use audio::{AudioSelection, AudioStem};
+use audio::AudioSelection;
 use pipeline::{LatencyWindow, Pipeline};
 use target::{Aim, Target};
 use trouble::{Trouble, Verdict, TROUBLE_LIMIT, TROUBLE_WINDOW};
@@ -34,37 +34,44 @@ const MIN_CAPTURE_SIDE: u32 = 128;
 const ENCODE_DRAIN_BUDGET: Duration = Duration::from_millis(2_000);
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(60);
 const EMPTY_RING_GRACE: Duration = Duration::from_secs(8);
+const RETRY_AFTER: Duration = Duration::from_secs(2);
 
 pub struct Engine {
     config: CaptureConfig,
     events: UnboundedSender<CaptureToLauncher>,
     active: Option<Pipeline>,
     pending_attach: Option<window::WindowSearch>,
-    resize_settling: Option<((u32, u32), Instant, Instant)>,
+    resize_settling: Option<ResizeSettling>,
     retired: Option<Retired>,
     buffering_enabled: bool,
     paused: Option<Aim>,
     trouble: Trouble,
+    retry: Option<Retry>,
     last_status: Instant,
-    rate_sample: std::cell::Cell<(u64, u64, Instant)>,
-    keyframe_warned: std::cell::Cell<bool>,
-    empty_warned: std::cell::Cell<bool>,
+    rate_sample: (u64, u64, Instant),
+    keyframe_warned: bool,
+    empty_warned: bool,
+}
+
+#[derive(Clone, Copy)]
+struct ResizeSettling {
+    wanted: (u32, u32),
+    since: Instant,
+    began: Instant,
+}
+
+struct Retry {
+    aim: Aim,
+    at: Instant,
 }
 
 struct Retired {
     ring: Arc<Mutex<RingBuffer>>,
     extradata: Vec<u8>,
     settings: EncoderSettings,
-    audio: Option<RetiredAudio>,
+    audio: Option<AudioSelection>,
     at: Instant,
     spoiled: Duration,
-}
-
-struct RetiredAudio {
-    master: AudioStem,
-    stems: Vec<AudioStem>,
-    sample_rate: u32,
-    channels: u32,
 }
 
 const RETAIN_FOR: Duration = Duration::from_secs(MAX_CLIP_SECONDS_RETAINED);
@@ -97,10 +104,11 @@ impl Engine {
             buffering_enabled: true,
             paused: None,
             trouble: Trouble::default(),
+            retry: None,
             last_status: Instant::now(),
-            rate_sample: std::cell::Cell::new((0, 0, Instant::now())),
-            keyframe_warned: std::cell::Cell::new(false),
-            empty_warned: std::cell::Cell::new(false),
+            rate_sample: (0, 0, Instant::now()),
+            keyframe_warned: false,
+            empty_warned: false,
         }
     }
 
@@ -121,6 +129,7 @@ impl Engine {
             }
 
             self.step_pending_attach();
+            self.step_retry();
             self.step_health();
             self.step_resize_watch();
 
@@ -213,13 +222,16 @@ impl Engine {
                 }
             }
             LauncherToCapture::AttachWindow { pid } => {
+                let aim = Aim::Process(pid);
+                self.retry = None;
                 if !self.buffering_enabled {
                     log::info!("Buffering is paused; process {pid} waits for the resume");
-                    self.paused = Some(Aim::Process(pid));
-                } else if self.attached_aim() == Some(Aim::Process(pid)) {
+                    self.paused = Some(aim);
+                } else if self.attached_aim() == Some(aim.clone()) {
                     log::debug!("Already recording process {pid}; leaving the pipeline alone");
-                } else if self.trouble.resting(pid, Instant::now()) {
+                } else if let Some(at) = self.trouble.rest_ends(&aim, Instant::now()) {
                     log::debug!("Recording process {pid} kept failing; waiting before trying again");
+                    self.retry = Some(Retry { aim, at });
                 } else {
                     self.detach();
                     self.begin_attach(pid);
@@ -227,13 +239,15 @@ impl Engine {
             }
             LauncherToCapture::AttachScreen { device } => {
                 let aim = Aim::Screen(device.clone());
+                self.retry = None;
                 if !self.buffering_enabled {
                     log::info!("Buffering is paused; screen {device} waits for the resume");
                     self.paused = Some(aim);
                 } else if self.attached_aim() == Some(aim.clone()) {
                     log::debug!("Already recording screen {device}; leaving the pipeline alone");
-                } else if self.trouble.resting(0, Instant::now()) {
+                } else if let Some(at) = self.trouble.rest_ends(&aim, Instant::now()) {
                     log::debug!("Recording screen {device} kept failing; waiting before trying again");
+                    self.retry = Some(Retry { aim, at });
                 } else {
                     self.detach();
                     self.aim_at(aim);
@@ -241,6 +255,7 @@ impl Engine {
             }
             LauncherToCapture::DetachWindow => {
                 self.paused = None;
+                self.retry = None;
                 self.trouble = Trouble::default();
                 self.detach();
             }
@@ -250,6 +265,7 @@ impl Engine {
                 }
                 self.buffering_enabled = enabled;
                 self.trouble = Trouble::default();
+                self.retry = None;
 
                 if enabled {
                     log::info!("Buffering resumed");
@@ -298,7 +314,7 @@ impl Engine {
         };
         if let Err(e) = self.attach(Target::Screen(screen)) {
             log::error!("Could not start recording screen {device}: {e:#}");
-            self.troubled(0, ErrorCode::Internal, format!("{e:#}"));
+            self.troubled(Aim::Screen(device.to_string()), ErrorCode::Internal, format!("{e:#}"));
         }
     }
 
@@ -322,7 +338,7 @@ impl Engine {
                 self.pending_attach = None;
                 if let Err(e) = self.attach(Target::Window(target)) {
                     log::error!("Could not start capturing process {pid}: {e:#}");
-                    self.troubled(pid, ErrorCode::Internal, format!("{e:#}"));
+                    self.troubled(Aim::Process(pid), ErrorCode::Internal, format!("{e:#}"));
                 }
             }
             window::SearchStep::TimedOut => {
@@ -347,13 +363,7 @@ impl Engine {
             self.trouble = Trouble::default();
         }
 
-        if crate::fault::due("crash", pipeline.started) {
-            panic!("simulated crash because NRC_FAULT=crash is set");
-        }
-
-        let broken = if crate::fault::due("device", pipeline.started) {
-            Some("the graphics driver reset (simulated)".to_string())
-        } else if let Err(e) = unsafe { pipeline.device.device.GetDeviceRemovedReason() } {
+        let broken = if let Err(e) = unsafe { pipeline.device.device.GetDeviceRemovedReason() } {
             Some(format!("the graphics driver reset or the card went away ({e})"))
         } else if matches!(
             pipeline.encode_done.try_recv(),
@@ -371,10 +381,9 @@ impl Engine {
         };
 
         let aim = pipeline.target.aim();
-        let key = pipeline.target.pid();
         log::warn!("Recording broke because {why}; rebuilding it");
         let again = self.troubled(
-            key,
+            aim.clone(),
             ErrorCode::GraphicsDevice,
             format!("recording broke because {why}; it is starting again"),
         );
@@ -384,14 +393,22 @@ impl Engine {
         }
     }
 
-    fn troubled(&mut self, pid: u32, code: ErrorCode, message: String) -> bool {
-        match self.trouble.note(pid, Instant::now()) {
+    fn troubled(&mut self, aim: Aim, code: ErrorCode, message: String) -> bool {
+        let now = Instant::now();
+        match self.trouble.note(&aim, now) {
             Verdict::Report => {
                 self.emit_error(code, message, true);
                 true
             }
-            Verdict::Quiet => true,
+            Verdict::Quiet => {
+                self.retry = Some(Retry {
+                    aim,
+                    at: now + RETRY_AFTER,
+                });
+                true
+            }
             Verdict::Rest(rest) => {
+                self.retry = Some(Retry { aim, at: now + rest });
                 log::warn!(
                     "Recording failed {TROUBLE_LIMIT} times within {TROUBLE_WINDOW:?}; waiting {rest:?} before trying again"
                 );
@@ -406,6 +423,18 @@ impl Engine {
                 false
             }
         }
+    }
+
+    fn step_retry(&mut self) {
+        let now = Instant::now();
+        let Some(retry) = self.retry.take_if(|retry| now >= retry.at) else {
+            return;
+        };
+        if !self.buffering_enabled || self.active.is_some() || self.pending_attach.is_some() {
+            return;
+        }
+        log::info!("Trying to record {:?} again after it failed", retry.aim);
+        self.aim_at(retry.aim);
     }
 
     fn step_resize_watch(&mut self) {
@@ -435,7 +464,11 @@ impl Engine {
         }
 
         match self.resize_settling {
-            Some((pending, since, began)) if pending == wanted => {
+            Some(ResizeSettling {
+                wanted: pending,
+                since,
+                began,
+            }) if pending == wanted => {
                 if since.elapsed() < SETTLE {
                     return;
                 }
@@ -454,8 +487,21 @@ impl Engine {
                 self.detach_retaining_buffer(began.elapsed() + STATUS_INTERVAL);
                 self.aim_at(aim);
             }
-            Some((_, _, began)) => self.resize_settling = Some((wanted, Instant::now(), began)),
-            None => self.resize_settling = Some((wanted, Instant::now(), Instant::now())),
+            Some(ResizeSettling { began, .. }) => {
+                self.resize_settling = Some(ResizeSettling {
+                    wanted,
+                    since: Instant::now(),
+                    began,
+                })
+            }
+            None => {
+                let now = Instant::now();
+                self.resize_settling = Some(ResizeSettling {
+                    wanted,
+                    since: now,
+                    began: now,
+                })
+            }
         }
     }
 
@@ -468,12 +514,7 @@ impl Engine {
             ring: Arc::clone(&pipeline.ring),
             extradata: pipeline.extradata.clone(),
             settings: pipeline.settings,
-            audio: pipeline.audio.as_ref().map(|audio| RetiredAudio {
-                master: audio.master.clone(),
-                stems: audio.stems.clone(),
-                sample_rate: audio.sample_rate,
-                channels: audio.channels,
-            }),
+            audio: pipeline.audio.as_ref().map(AudioSelection::from),
             at: Instant::now(),
             spoiled,
         });
@@ -553,7 +594,7 @@ impl Engine {
         }
     }
 
-    fn emit_status(&self) {
+    fn emit_status(&mut self) {
         let Some(pipeline) = self.active.as_ref() else {
             let _ = self.events.send(CaptureToLauncher::Status(StatusReport {
                 state: if !self.buffering_enabled {
@@ -594,9 +635,9 @@ impl Engine {
             && dropped_before_keyframe == 0
             && stats.delivered > 0
             && pipeline.started.elapsed() >= EMPTY_RING_GRACE
-            && !self.empty_warned.get()
+            && !self.empty_warned
         {
-            self.empty_warned.set(true);
+            self.empty_warned = true;
             log::error!(
                 "Nothing has reached the replay buffer in {:?} of recording: the source handed on \
                  {} frame(s), {} never reached the encoder, and {} packet(s) were thrown away \
@@ -608,9 +649,8 @@ impl Engine {
             );
         }
 
-        if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned.get()
-        {
-            self.keyframe_warned.set(true);
+        if dropped_before_keyframe > 0 && buffer_fill_seconds <= 0.0 && !self.keyframe_warned {
+            self.keyframe_warned = true;
             log::warn!(
                 "{} has produced {dropped_before_keyframe} packet(s) and not one keyframe, so the \
                  replay buffer is throwing all of them away and every clip will fail. The encoder \
@@ -621,11 +661,10 @@ impl Engine {
         }
 
         let now = Instant::now();
-        let (received_before, delivered_before, sampled_at) = self.rate_sample.replace((
-            stats.received,
-            stats.delivered,
-            now,
-        ));
+        let (received_before, delivered_before, sampled_at) = std::mem::replace(
+            &mut self.rate_sample,
+            (stats.received, stats.delivered, now),
+        );
         let elapsed = now.duration_since(sampled_at).as_secs_f32().max(1e-3);
         let rate = |after: u64, before: u64| after.saturating_sub(before) as f32 / elapsed;
 
@@ -762,5 +801,4 @@ mod tests {
         next.buffer_seconds = 60;
         assert!(!needs_restart(&base(), &next));
     }
-
 }

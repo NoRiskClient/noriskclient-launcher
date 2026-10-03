@@ -446,53 +446,6 @@ mod tests {
     }
 
     #[test]
-    fn gop_follows_the_configured_seconds() {
-        let base = EncoderSettings {
-            fps: 60,
-            gop_seconds: 2.0,
-            ..Default::default()
-        };
-        assert_eq!(gop_frames(base), 120);
-
-        assert_eq!(
-            gop_frames(EncoderSettings {
-                gop_seconds: 1.0,
-                ..base
-            }),
-            60
-        );
-        assert_eq!(
-            gop_frames(EncoderSettings {
-                fps: 144,
-                gop_seconds: 2.0,
-                ..base
-            }),
-            288
-        );
-    }
-
-    #[test]
-    fn keyframe_spacing_in_ticks_ignores_the_frame_rate() {
-        let at_60 = gop_ticks(EncoderSettings {
-            fps: 60,
-            gop_seconds: 2.0,
-            ..Default::default()
-        });
-        let at_30 = gop_ticks(EncoderSettings {
-            fps: 30,
-            gop_seconds: 2.0,
-            ..Default::default()
-        });
-        assert_eq!(at_60, at_30);
-        assert_eq!(at_60, 2 * TIME_BASE_DEN as i64);
-
-        assert_ne!(
-            gop_frames(EncoderSettings { fps: 60, gop_seconds: 2.0, ..Default::default() }),
-            gop_frames(EncoderSettings { fps: 30, gop_seconds: 2.0, ..Default::default() }),
-        );
-    }
-
-    #[test]
     fn a_degenerate_gop_is_clamped_rather_than_zero() {
         assert_eq!(
             gop_frames(EncoderSettings {

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use windows::core::Interface;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LUID};
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
 };
@@ -11,7 +11,8 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_SDK_VERSION,
 };
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIAdapter, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
+    CreateDXGIFactory1, IDXGIAdapter, IDXGIAdapter1, IDXGIDevice, IDXGIFactory1,
+    DXGI_ADAPTER_DESC1, DXGI_ADAPTER_FLAG_SOFTWARE,
 };
 use windows::Win32::Graphics::Gdi::{MonitorFromWindow, HMONITOR, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice;
@@ -40,11 +41,11 @@ impl CaptureDevice {
     }
 
     pub fn new_default() -> Result<Self> {
-        let (adapter, adapter_name) = hardware_adapters()?
+        let (adapter, desc) = hardware_adapters()?
             .into_iter()
             .next()
             .ok_or_else(|| anyhow!("no hardware graphics adapter found"))?;
-        Self::create(adapter, adapter_name)
+        Self::create(adapter.cast()?, super::utf16_to_string(&desc.Description))
     }
 
     pub fn new_for_shared_texture(hwnd: HWND, handle: u32) -> Result<Self> {
@@ -54,8 +55,15 @@ impl CaptureDevice {
             Err(e) => e,
         };
 
-        for (adapter, name) in hardware_adapters()? {
-            let Ok(device) = Self::create(adapter, name) else {
+        let tried = adapter_luid(&first.device);
+        for (adapter, desc) in hardware_adapters()? {
+            if tried == Some(desc.AdapterLuid) {
+                continue;
+            }
+            let Ok(adapter) = adapter.cast() else {
+                continue;
+            };
+            let Ok(device) = Self::create(adapter, super::utf16_to_string(&desc.Description)) else {
                 continue;
             };
             if super::shared::open_shared_texture(&device.device, handle).is_ok() {
@@ -161,7 +169,7 @@ fn refusal(adapter: &IDXGIAdapter, name: &str) -> String {
     }
 }
 
-fn hardware_adapters() -> Result<Vec<(IDXGIAdapter, String)>> {
+pub(super) fn hardware_adapters() -> Result<Vec<(IDXGIAdapter1, DXGI_ADAPTER_DESC1)>> {
     let factory: IDXGIFactory1 =
         unsafe { CreateDXGIFactory1().context("CreateDXGIFactory1 failed")? };
 
@@ -170,36 +178,28 @@ fn hardware_adapters() -> Result<Vec<(IDXGIAdapter, String)>> {
         let Ok(adapter) = (unsafe { factory.EnumAdapters1(i) }) else {
             break;
         };
-        let desc = unsafe { adapter.GetDesc1() }.context("IDXGIAdapter1::GetDesc1 failed")?;
-        if is_software(desc.Flags) {
+        let Ok(desc) = (unsafe { adapter.GetDesc1() }) else {
+            continue;
+        };
+        if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
             continue;
         }
-        found.push((adapter.cast()?, utf16_to_string(&desc.Description)));
+        found.push((adapter, desc));
     }
     Ok(found)
 }
 
-fn is_software(flags: u32) -> bool {
-    flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0
+fn adapter_luid(device: &ID3D11Device) -> Option<LUID> {
+    let dxgi_device: IDXGIDevice = device.cast().ok()?;
+    let adapter = unsafe { dxgi_device.GetAdapter() }.ok()?;
+    Some(unsafe { adapter.GetDesc() }.ok()?.AdapterLuid)
 }
 
 fn adapter_for_monitor(monitor: HMONITOR) -> Result<(IDXGIAdapter, String)> {
-    let factory: IDXGIFactory1 =
-        unsafe { CreateDXGIFactory1().context("CreateDXGIFactory1 failed")? };
-
     let mut first_hardware: Option<(IDXGIAdapter, String)> = None;
 
-    for i in 0.. {
-        let Ok(adapter) = (unsafe { factory.EnumAdapters1(i) }) else {
-            break;
-        };
-
-        let desc = unsafe { adapter.GetDesc1() }.context("IDXGIAdapter1::GetDesc1 failed")?;
-        if is_software(desc.Flags) {
-            continue;
-        }
-
-        let name = utf16_to_string(&desc.Description);
+    for (adapter, desc) in hardware_adapters()? {
+        let name = super::utf16_to_string(&desc.Description);
         let generic: IDXGIAdapter = adapter.cast().context("adapter cast failed")?;
 
         if first_hardware.is_none() {
@@ -226,9 +226,4 @@ fn adapter_for_monitor(monitor: HMONITOR) -> Result<(IDXGIAdapter, String)> {
             (adapter, format!("{name} (no monitor match)"))
         })
         .ok_or_else(|| anyhow!("no hardware graphics adapter found"))
-}
-
-fn utf16_to_string(buffer: &[u16]) -> String {
-    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-    String::from_utf16_lossy(&buffer[..end])
 }

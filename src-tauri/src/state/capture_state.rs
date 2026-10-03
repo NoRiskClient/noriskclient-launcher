@@ -423,6 +423,8 @@ impl CaptureSupervisor {
                     log::warn!("Capture engine went away: {reason}");
                     *self.state.write().await = CaptureState::Attaching;
                     *self.ready.write().await = None;
+                    *self.active.write().await = None;
+                    *self.last_status.write().await = None;
                 }
             }
 
@@ -632,9 +634,14 @@ impl CaptureSupervisor {
                             info.protocol_version,
                             norisk_ipc::PROTOCOL_VERSION
                         ),
-                        recoverable: true,
+                        recoverable: false,
                     })))
                     .await;
+                } else {
+                    let mut last_error = self.last_error.write().await;
+                    if last_error.as_ref().is_some_and(|e| e.code == norisk_ipc::ErrorCode::Protocol) {
+                        *last_error = None;
+                    }
                 }
                 log::info!(
                     "Capture engine {} ready on {} with {:?}",
@@ -650,8 +657,6 @@ impl CaptureSupervisor {
                         json!({
                             "engine_version": info.engine_version,
                             "gpu_vendor": gpu_vendor(&info.adapter),
-                            "gpu": info.adapter,
-                            "gpu_driver": info.gpu_driver,
                             "driver_too_old": info.capabilities.iter().any(|c| c.driver_too_old),
                             "encoders": info.available_encoders,
                             "hardware_encoders": info
@@ -669,7 +674,10 @@ impl CaptureSupervisor {
             }
             CaptureToLauncher::Status(status) => {
                 if status.state == CaptureState::Buffering {
-                    *self.last_error.write().await = None;
+                    let mut last_error = self.last_error.write().await;
+                    if last_error.as_ref().is_some_and(|e| e.code != norisk_ipc::ErrorCode::Protocol) {
+                        *last_error = None;
+                    }
                 }
                 {
                     let mut current = self.state.write().await;

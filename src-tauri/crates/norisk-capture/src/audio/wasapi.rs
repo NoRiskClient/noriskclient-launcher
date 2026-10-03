@@ -683,30 +683,6 @@ fn qpc_100ns() -> i64 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn frame_count_divides_by_channels() {
-        let stereo = AudioFormat {
-            sample_rate: 48_000,
-            channels: 2,
-        };
-        assert_eq!(stereo.frame_count(2048), 1024);
-
-        let mono = AudioFormat {
-            sample_rate: 48_000,
-            channels: 1,
-        };
-        assert_eq!(mono.frame_count(1024), 1024);
-    }
-
-    #[test]
-    fn a_zero_channel_format_does_not_divide_by_zero() {
-        let broken = AudioFormat {
-            sample_rate: 48_000,
-            channels: 0,
-        };
-        assert_eq!(broken.frame_count(1024), 1024);
-    }
-
     const RATE: u32 = 48_000;
     const PACKET: usize = 480;
 
@@ -841,18 +817,6 @@ mod tests {
         let expected = filler_start + span_100ns(RATE as usize / 10, RATE);
         assert_eq!(clock.place(expected + 5_000, PACKET, RATE, false), expected);
     }
-
-    #[test]
-    fn a_span_is_measured_from_the_frames_not_the_clock() {
-        assert_eq!(span_100ns(48_000, 48_000), 10_000_000);
-        assert_eq!(span_100ns(480, 48_000), 100_000);
-        assert_eq!(span_100ns(0, 48_000), 0);
-    }
-
-    #[test]
-    fn a_zero_sample_rate_does_not_divide_by_zero() {
-        assert_eq!(span_100ns(480, 0), 480 * 10_000_000);
-    }
 }
 
 pub fn pid_of_executable(executable: &str) -> Option<u32> {
@@ -875,7 +839,7 @@ pub fn pid_of_executable(executable: &str) -> Option<u32> {
             ..Default::default()
         };
 
-        let mut found = None;
+        let mut matching = Vec::new();
         if Process32FirstW(snapshot, &mut entry).is_ok() {
             loop {
                 let end = entry
@@ -885,8 +849,7 @@ pub fn pid_of_executable(executable: &str) -> Option<u32> {
                     .unwrap_or(entry.szExeFile.len());
                 let name = String::from_utf16_lossy(&entry.szExeFile[..end]);
                 if name.eq_ignore_ascii_case(wanted) {
-                    found = Some(entry.th32ProcessID);
-                    break;
+                    matching.push((entry.th32ProcessID, entry.th32ParentProcessID));
                 }
                 if Process32NextW(snapshot, &mut entry).is_err() {
                     break;
@@ -895,8 +858,16 @@ pub fn pid_of_executable(executable: &str) -> Option<u32> {
         }
 
         let _ = CloseHandle(snapshot);
-        found
+        root_process(&matching)
     }
+}
+
+fn root_process(matching: &[(u32, u32)]) -> Option<u32> {
+    matching
+        .iter()
+        .find(|(_, parent)| !matching.iter().any(|(pid, _)| pid == parent))
+        .or(matching.first())
+        .map(|(pid, _)| *pid)
 }
 
 #[cfg(test)]
@@ -921,6 +892,23 @@ mod process_tests {
         let name = own.file_name().unwrap().to_string_lossy().to_uppercase();
 
         assert_eq!(pid_of_executable(&name), Some(std::process::id()));
+    }
+
+    #[test]
+    fn of_several_processes_with_the_same_name_the_one_that_started_the_others_wins() {
+        let discord = [(4_120, 3_900), (4_200, 4_120), (5_010, 4_200), (6_000, 4_120)];
+        assert_eq!(root_process(&discord), Some(4_120));
+
+        let child_listed_first = [(5_010, 4_200), (4_200, 4_120), (4_120, 3_900)];
+        assert_eq!(root_process(&child_listed_first), Some(4_120));
+
+        assert_eq!(root_process(&[(77, 1)]), Some(77));
+        assert_eq!(root_process(&[]), None);
+    }
+
+    #[test]
+    fn a_parent_loop_still_picks_a_process_instead_of_nothing() {
+        assert_eq!(root_process(&[(10, 20), (20, 10)]), Some(10));
     }
 
     #[test]

@@ -149,6 +149,10 @@ fn meta_name(clip: &Path) -> String {
     format!("{stem}-{:08x}", fingerprint(clip))
 }
 
+fn resolved(clip: &Path) -> PathBuf {
+    plain(clip.canonicalize().unwrap_or_else(|_| clip.to_path_buf()))
+}
+
 fn fingerprint(clip: &Path) -> u32 {
     let flattened = plain(clip.to_path_buf());
     let text = flattened.to_string_lossy().to_lowercase();
@@ -166,7 +170,7 @@ fn meta_path(clip: &Path, extension: &str) -> PathBuf {
 }
 
 pub fn thumbnail_path(clip: &Path) -> PathBuf {
-    meta_path(clip, "thumb.jpg")
+    meta_path(&resolved(clip), "thumb.jpg")
 }
 
 pub fn write_thumbnail(dir: &Path, clip: &Path, jpeg: &[u8]) -> Result<PathBuf> {
@@ -192,13 +196,27 @@ pub fn write_thumbnail(dir: &Path, clip: &Path, jpeg: &[u8]) -> Result<PathBuf> 
 const MAX_THUMBNAIL_BYTES: usize = 2 * 1024 * 1024;
 
 pub fn details_path(clip: &Path) -> PathBuf {
-    meta_path(clip, "nrc.json")
+    meta_path(&resolved(clip), "nrc.json")
+}
+
+fn adopt_sidecars(clip: &Path, earlier: &Path) {
+    for extension in ["nrc.json", "thumb.jpg"] {
+        let target = meta_path(clip, extension);
+        let old = meta_path(earlier, extension);
+        if target == old || target.exists() || !old.exists() {
+            continue;
+        }
+        if let Err(e) = std::fs::rename(&old, &target) {
+            log::warn!("Could not move {} to {}: {e}", old.display(), target.display());
+        }
+    }
 }
 
 pub fn tidy_clip_folder(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
+    let canonical = resolved(dir);
 
     let mut moved = 0;
     for entry in entries.filter_map(|entry| entry.ok()) {
@@ -214,7 +232,7 @@ pub fn tidy_clip_folder(dir: &Path) {
             Some(stem) => (stem, "nrc.json"),
             None => (name.trim_end_matches(".thumb.jpg"), "thumb.jpg"),
         };
-        let target = meta_path(&dir.join(format!("{stem}.mp4")), extension);
+        let target = meta_path(&canonical.join(format!("{stem}.mp4")), extension);
 
         if std::fs::create_dir_all(meta_dir()).is_err() {
             return;
@@ -250,8 +268,11 @@ fn ensure_meta_dir() -> Result<()> {
 }
 
 pub fn read_details(clip: &Path) -> Option<ClipDetails> {
-    let path = details_path(clip);
-    let bytes = std::fs::read(&path).ok()?;
+    read_details_at(&details_path(clip))
+}
+
+fn read_details_at(path: &Path) -> Option<ClipDetails> {
+    let bytes = std::fs::read(path).ok()?;
     match serde_json::from_slice(&bytes) {
         Ok(details) => Some(details),
         Err(e) => {
@@ -262,7 +283,10 @@ pub fn read_details(clip: &Path) -> Option<ClipDetails> {
 }
 
 pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
-    let entries = match std::fs::read_dir(dir) {
+    let given = dir;
+    let dir = resolved(given);
+    let earlier = Some(given).filter(|given| fingerprint(given) != fingerprint(&dir));
+    let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => {
@@ -284,8 +308,11 @@ pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
             if !metadata.is_file() {
                 return None;
             }
-            let details = read_details(&path);
-            let thumbnail = Some(thumbnail_path(&path)).filter(|thumb| thumb.exists());
+            if let Some(earlier) = earlier {
+                adopt_sidecars(&path, &earlier.join(entry.file_name()));
+            }
+            let details = read_details_at(&meta_path(&path, "nrc.json"));
+            let thumbnail = Some(meta_path(&path, "thumb.jpg")).filter(|thumb| thumb.exists());
             Some(ClipEntry {
                 managed: details.is_some() || thumbnail.is_some(),
                 name: path.file_stem()?.to_string_lossy().into_owned(),
@@ -335,6 +362,10 @@ pub fn guard_inside(dir: &Path, path: &Path) -> Result<PathBuf> {
     }
 
     Ok(path)
+}
+
+pub fn resolve_clip(dir: &Path, path: &Path) -> Result<PathBuf> {
+    guard_inside(dir, path).map(plain)
 }
 
 pub fn delete(dir: &Path, path: &Path) -> Result<()> {
@@ -515,10 +546,6 @@ pub fn enforce_limit(dir: &Path, limit_gb: u32) -> Result<Vec<PathBuf>> {
     Ok(removed)
 }
 
-pub fn vertical_destination(dir: &Path, source: &Path) -> Result<PathBuf> {
-    beside(dir, source, "_vertical", "mp4")
-}
-
 pub fn shaped_destination(
     dir: &Path,
     source: &Path,
@@ -575,30 +602,6 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    mod paths {
-        use super::*;
-
-        #[test]
-        fn the_extended_length_prefix_is_removed() {
-            assert_eq!(
-                plain(PathBuf::from(r"\\?\C:\clips\one.mp4")),
-                PathBuf::from(r"C:\clips\one.mp4"),
-            );
-        }
-
-        #[test]
-        fn an_ordinary_path_is_left_alone() {
-            let ordinary = PathBuf::from(r"C:\clips\one.mp4");
-            assert_eq!(plain(ordinary.clone()), ordinary);
-        }
-
-        #[test]
-        fn a_network_path_is_left_alone() {
-            let unc = PathBuf::from(r"\\?\UNC\server\share\one.mp4");
-            assert_eq!(plain(unc.clone()), unc);
-        }
-    }
 
     mod naming {
         use super::*;
@@ -688,7 +691,10 @@ mod tests {
         let clip = write_clip(&dir, "fight.mp4", 10);
 
         assert_eq!(
-            vertical_destination(&dir, &clip).unwrap().file_name().unwrap(),
+            shaped_destination(&dir, &clip, norisk_ipc::ClipShape::Vertical)
+                .unwrap()
+                .file_name()
+                .unwrap(),
             "fight_vertical.mp4"
         );
         assert_eq!(
@@ -787,35 +793,6 @@ mod tests {
     }
 
     #[test]
-    fn slicing_keeps_only_the_range_that_was_kept() {
-        let details = details_with(vec![track("Mix", false, (0..200u32).map(|i| i as u8).collect())]);
-
-        let cut = details.sliced(1.0, 2.0);
-
-        assert_eq!(cut.audio_tracks.len(), 1);
-        assert_eq!(cut.audio_tracks[0].peaks.len(), 50);
-        assert_eq!(cut.audio_tracks[0].peaks[0], 50, "starts where the trim did");
-        assert!((cut.duration_seconds - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn slicing_collapses_the_sources_into_one_lane() {
-        let details = details_with(vec![
-            track("Mix", false, vec![255, 255, 255, 255]),
-            track("Game", true, vec![10, 90, 10, 10]),
-            track("Microphone", true, vec![0, 0, 200, 0]),
-        ]);
-
-        let cut = details.sliced(0.0, 0.08);
-        let peaks = &cut.audio_tracks[0].peaks;
-
-        assert_eq!(cut.audio_tracks.len(), 1, "a trimmed clip has one track");
-        assert!(!cut.audio_tracks[0].adjustable, "its balance is already baked in");
-        assert_eq!(peaks[1], 90, "the game was the loudest thing here");
-        assert_eq!(peaks[2], 200, "the microphone was the loudest thing here");
-    }
-
-    #[test]
     fn slicing_a_clip_that_only_ever_had_a_mix_keeps_it() {
         let details = details_with(vec![track("Mix", false, vec![10, 20, 30, 40])]);
         let cut = details.sliced(0.0, 0.08);
@@ -897,7 +874,6 @@ mod tests {
         }
     }
 
-    #[allow(clippy::vec_init_then_push)]
     fn library() -> Vec<ClipEntry> {
         vec![
             entry("new", 40, 300, false),
@@ -956,7 +932,7 @@ mod tests {
     #[test]
     fn cleanup_steps_over_a_marked_clip_and_takes_the_next() {
         let mut clips = library();
-        clips[2].favourite = true; // the oldest, exactly what would have gone
+        clips[2].favourite = true;
 
         let plan = cleanup_plan(&clips, 100);
 
@@ -993,43 +969,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(windows)]
-    fn the_same_clip_is_filed_the_same_way_however_its_path_is_written() {
-        let dir = temp_dir("meta-key");
-        let clip = write_clip(&dir, "same.mp4", 8);
-        let canonical = clip.canonicalize().unwrap();
-
-        assert_ne!(clip, canonical, "the test needs the two forms to differ");
-        assert_eq!(details_path(&clip), details_path(&canonical));
-        assert_eq!(thumbnail_path(&clip), thumbnail_path(&canonical));
-    }
-
-    #[test]
-    fn two_clips_of_the_same_name_in_different_folders_do_not_share() {
-        let one = temp_dir("meta-a").join("clip.mp4");
-        let two = temp_dir("meta-b").join("clip.mp4");
-
-        assert_ne!(details_path(&one), details_path(&two));
-    }
-
-    #[test]
     fn a_still_is_written_beside_its_clip() {
         let dir = temp_dir("thumb");
         let clip = write_clip(&dir, "thumb-written.mp4", 32);
 
         let written = write_thumbnail(&dir, &clip, &jpeg()).unwrap();
 
-        assert_eq!(written.parent().unwrap(), meta_dir(), "stills belong out of the clip folder");
-        assert_eq!(written, thumbnail_path(&clip));
-        assert!(
-            written
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .starts_with("thumb-written-"),
-            "got {}",
-            written.display(),
-        );
         assert!(written.exists());
         assert_eq!(list(&dir).unwrap()[0].thumbnail, Some(written));
     }

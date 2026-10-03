@@ -457,7 +457,7 @@ export function ProfileDetailViewV3({
           </Tooltip>
 
           <SettingsContextMenu
-            profile={currentProfile}
+            target={currentProfile}
             isOpen={isContextMenuOpen}
             position={contextMenuPosition}
             items={contextMenuItems}

@@ -38,86 +38,89 @@ impl Engine {
     }
 
     pub(super) fn export_vertical(&self, request: norisk_ipc::ExportVerticalRequest) {
-        let events = self.events.clone();
-
-        let spawned = std::thread::Builder::new()
-            .name("nrc-export".into())
-            .spawn(move || {
+        self.spawn_export(
+            "nrc-export",
+            "Vertical export failed",
+            "could not start the export",
+            request.source.clone(),
+            move |report| {
                 let started = Instant::now();
-
-                let source = request.source.clone();
-                let last = std::cell::Cell::new(Instant::now() - PROGRESS_EVERY);
-                let report = |done: u32, total: u32| {
-                    let finished = done >= total;
-                    if !finished && last.get().elapsed() < PROGRESS_EVERY {
-                        return;
-                    }
-                    last.set(Instant::now());
-                    let _ = events.send(CaptureToLauncher::ExportProgress(
-                        norisk_ipc::ExportProgress {
-                            source: source.clone(),
-                            done,
-                            total,
-                        },
-                    ));
-                };
-
-                match crate::render::render(&request, report) {
-                    Ok(result) => {
-                        log::info!(
-                            "Exported {} as {}x{} in {} ms",
-                            request.source.display(),
-                            result.width,
-                            result.height,
-                            started.elapsed().as_millis()
-                        );
-                        let _ = events.send(CaptureToLauncher::ClipExported(
-                            norisk_ipc::ExportedClip {
-                                path: result.path,
-                                source: request.source,
-                                width: result.width,
-                                height: result.height,
-                                duration_seconds: result.duration_seconds,
-                                size_bytes: result.size_bytes,
-                            },
-                        ));
-                    }
-                    Err(e) => {
-                        log::error!("Vertical export failed: {e:#}");
-                        let _ = events.send(CaptureToLauncher::Error(CaptureError {
-                            code: ErrorCode::ClipWrite,
-                            message: format!("{e:#}"),
-                            recoverable: true,
-                        }));
-                    }
-                }
-            });
-
-        if let Err(e) = spawned {
-            self.emit_error(
-                ErrorCode::ClipWrite,
-                format!("could not start the export: {e}"),
-                true,
-            );
-        }
+                let result = crate::render::render(&request, report)?;
+                log::info!(
+                    "Exported {} as {}x{} in {} ms",
+                    request.source.display(),
+                    result.width,
+                    result.height,
+                    started.elapsed().as_millis()
+                );
+                Ok(CaptureToLauncher::ClipExported(norisk_ipc::ExportedClip {
+                    path: result.path,
+                    source: request.source,
+                    width: result.width,
+                    height: result.height,
+                    duration_seconds: result.duration_seconds,
+                    size_bytes: result.size_bytes,
+                }))
+            },
+        );
     }
 
     pub(super) fn export_gif(&self, request: norisk_ipc::ExportGifRequest) {
+        self.spawn_export(
+            "nrc-gif",
+            "GIF export failed",
+            "could not start the GIF export",
+            request.source.clone(),
+            move |report| {
+                let started = Instant::now();
+                let existed = request.destination.exists();
+                let result = crate::gif::to_gif(&request.source, &request.destination, report)
+                    .inspect_err(|_| {
+                        if !existed {
+                            let _ = std::fs::remove_file(&request.destination);
+                        }
+                    })?;
+                log::info!(
+                    "Turned {} into a GIF in {} ms",
+                    request.source.display(),
+                    started.elapsed().as_millis()
+                );
+                Ok(CaptureToLauncher::GifExported(norisk_ipc::ExportedGif {
+                    path: result.path,
+                    source: request.source,
+                    width: result.width,
+                    height: result.height,
+                    frames: result.frames,
+                    duration_seconds: result.duration_seconds,
+                    size_bytes: result.size_bytes,
+                    truncated: result.truncated,
+                }))
+            },
+        );
+    }
+
+    fn spawn_export<F>(
+        &self,
+        thread: &str,
+        failed: &'static str,
+        unstarted: &str,
+        source: std::path::PathBuf,
+        work: F,
+    ) where
+        F: FnOnce(&dyn Fn(u32, u32)) -> anyhow::Result<CaptureToLauncher> + Send + 'static,
+    {
         let events = self.events.clone();
 
         let spawned = std::thread::Builder::new()
-            .name("nrc-gif".into())
+            .name(thread.into())
             .spawn(move || {
-                let started = Instant::now();
-
-                let source = request.source.clone();
-                let last = std::cell::Cell::new(Instant::now() - PROGRESS_EVERY);
+                let last = std::cell::Cell::new(None::<Instant>);
                 let report = |done: u32, total: u32| {
                     let finished = done >= total;
-                    if !finished && last.get().elapsed() < PROGRESS_EVERY {
+                    if !finished && last.get().is_some_and(|at| at.elapsed() < PROGRESS_EVERY) {
                         return;
                     }
-                    last.set(Instant::now());
+                    last.set(Some(Instant::now()));
                     let _ = events.send(CaptureToLauncher::ExportProgress(
                         norisk_ipc::ExportProgress {
                             source: source.clone(),
@@ -127,29 +130,12 @@ impl Engine {
                     ));
                 };
 
-                match crate::gif::to_gif(&request.source, &request.destination, report) {
-                    Ok(result) => {
-                        log::info!(
-                            "Turned {} into a GIF in {} ms",
-                            request.source.display(),
-                            started.elapsed().as_millis()
-                        );
-                        let _ = events.send(CaptureToLauncher::GifExported(
-                            norisk_ipc::ExportedGif {
-                                path: result.path,
-                                source: request.source,
-                                width: result.width,
-                                height: result.height,
-                                frames: result.frames,
-                                duration_seconds: result.duration_seconds,
-                                size_bytes: result.size_bytes,
-                                truncated: result.truncated,
-                            },
-                        ));
+                match work(&report) {
+                    Ok(exported) => {
+                        let _ = events.send(exported);
                     }
                     Err(e) => {
-                        log::error!("GIF export failed: {e:#}");
-                        let _ = std::fs::remove_file(&request.destination);
+                        log::error!("{failed}: {e:#}");
                         let _ = events.send(CaptureToLauncher::Error(CaptureError {
                             code: ErrorCode::ClipWrite,
                             message: format!("{e:#}"),
@@ -160,11 +146,7 @@ impl Engine {
             });
 
         if let Err(e) = spawned {
-            self.emit_error(
-                ErrorCode::ClipWrite,
-                format!("could not start the GIF export: {e}"),
-                true,
-            );
+            self.emit_error(ErrorCode::ClipWrite, format!("{unstarted}: {e}"), true);
         }
     }
 

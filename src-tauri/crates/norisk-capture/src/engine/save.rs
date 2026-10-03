@@ -67,7 +67,7 @@ impl Engine {
                         older,
                         retired.extradata.clone(),
                         retired.settings,
-                        retired.audio.as_ref().map(AudioSelection::from),
+                        retired.audio.clone(),
                     ));
                 }
             }

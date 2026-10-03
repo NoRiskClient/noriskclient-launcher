@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import {
@@ -26,7 +26,8 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
   const context = useRef<AudioContext | null>(null);
   const buffers = useRef<Map<number, AudioBuffer>>(new Map());
   const gains = useRef<Map<number, GainNode>>(new Map());
-  const playing = useRef<AudioBufferSourceNode[]>([]);
+  const playing = useRef<Voice[]>([]);
+  const restart = useRef<(() => void) | null>(null);
 
   const wanted = useRef(levels);
   wanted.current = levels;
@@ -102,7 +103,7 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
     return () => {
       alive = false;
       stopListening?.();
-      playing.current.forEach((source) => stopQuietly(source));
+      playing.current.forEach(silence);
       playing.current = [];
       gains.current.clear();
       buffers.current.clear();
@@ -118,6 +119,19 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
     }
   }, [levels]);
 
+  const timing = useMemo(
+    () =>
+      JSON.stringify([
+        levels.map((level) => [level.stream, level.offsetSeconds, level.startSeconds, level.endSeconds]),
+        muted,
+      ]),
+    [levels, muted],
+  );
+
+  useEffect(() => {
+    restart.current?.();
+  }, [timing]);
+
   useEffect(() => {
     const element = video.current;
     if (!element || state !== "live") return;
@@ -125,7 +139,7 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
     element.muted = true;
 
     const stopAll = () => {
-      playing.current.forEach((source) => stopQuietly(source));
+      playing.current.forEach(silence);
       playing.current = [];
     };
 
@@ -166,9 +180,14 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
         const source = audio.createBufferSource();
         source.buffer = buffer;
         source.connect(hush);
+        source.onended = () => hush.disconnect();
         source.start(now + (enter - at), head, span);
-        playing.current.push(source);
+        playing.current.push({ source, hush });
       }
+    };
+
+    restart.current = () => {
+      if (!element.paused && !element.seeking) startAll();
     };
 
     const onSeek = () => {
@@ -191,6 +210,7 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
       element.removeEventListener("ended", stopAll);
       element.removeEventListener("seeked", onSeek);
       element.removeEventListener("seeking", stopAll);
+      restart.current = null;
       stopAll();
       element.muted = false;
     };
@@ -203,10 +223,16 @@ function levelOf(levels: TrackLevel[], stream: number): number {
   return (levels.find((level) => level.stream === stream)?.volume ?? 100) / 100;
 }
 
-function stopQuietly(source: AudioBufferSourceNode) {
+interface Voice {
+  source: AudioBufferSourceNode;
+  hush: GainNode;
+}
+
+function silence({ source, hush }: Voice) {
   try {
     source.stop();
   } catch {
   }
   source.disconnect();
+  hush.disconnect();
 }

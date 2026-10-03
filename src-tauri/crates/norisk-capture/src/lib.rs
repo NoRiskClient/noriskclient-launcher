@@ -4,9 +4,10 @@ pub mod audio;
 #[cfg(windows)]
 pub mod capture;
 #[cfg(windows)]
+pub(crate) mod codec;
+#[cfg(windows)]
 pub mod encoder;
 #[cfg(windows)]
-pub mod fault;
 #[cfg(windows)]
 pub mod engine;
 #[cfg(windows)]

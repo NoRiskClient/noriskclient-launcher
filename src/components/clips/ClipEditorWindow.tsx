@@ -5,36 +5,38 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ClipTrimmer } from "./ClipTrimmer";
 import {
+  closeClipEditor,
   getClipDetails,
-  samePath,
+  getEditorClip,
   trimClip,
   type ClipDetails,
+  type EditorClip,
   type TrackLevel,
 } from "../../services/clip-service";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
+import { WindowFrame } from "../ui/WindowFrame";
 
-export interface EditorClip {
-  path: string;
-  name: string;
-}
-
-export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
+export function ClipEditorWindow() {
   const { t } = useTranslation();
-  const [clip, setClip] = useState(initial);
+  const accent = useThemeStore((state) => state.accentColor.value);
+  const [clip, setClip] = useState<EditorClip | null>(null);
   const [duration, setDuration] = useState(0);
   const [details, setDetails] = useState<ClipDetails | null>(null);
   const [saving, setSaving] = useState(false);
-  const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
-  const { confirm, confirmDialog } = useConfirmDialog();
+  const path = clip?.path ?? null;
+  const src = useMemo(() => (path ? convertFileSrc(path) : null), [path]);
+  const { confirm, confirmDialog, isOpen: dialogOpen } = useConfirmDialog();
   const editor = useRef({ dirty: false, busy: false });
   const switchTo = useRef<(next: EditorClip) => void>(() => {});
+  const leave = useRef<() => void>(() => {});
+  const asking = useRef(false);
 
   useEffect(() => {
     const theme = useThemeStore.getState();
@@ -43,9 +45,13 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
     useFontStore.getState().applyFontToDOM();
   }, []);
 
+  const closeNow = useCallback(() => {
+    closeClipEditor().catch((e) => console.error("Could not close the clip editor", e));
+  }, []);
+
   useEffect(() => {
     switchTo.current = async (next: EditorClip) => {
-      if (samePath(next.path, clip.path)) return;
+      if (next.path === path) return;
       if (saving || editor.current.busy) {
         toast.error(t("clips.editor.switch.busy"));
         return;
@@ -55,13 +61,33 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
           title: t("clips.editor.switch.title"),
           message: t("clips.editor.switch.message", { name: next.name }),
           confirmText: t("clips.editor.switch.confirm"),
-          cancelText: t("clips.gallery.cancel"),
-          type: "warning",
+          cancelText: t("clips.editor.keep_editing"),
+          type: "danger",
+          icon: "solar:videocamera-record-bold",
         });
         if (!sure) return;
       }
       editor.current = { dirty: false, busy: false };
       setClip(next);
+    };
+
+    leave.current = async () => {
+      if (asking.current) return;
+      if (editor.current.dirty) {
+        asking.current = true;
+        const sure = await confirm({
+          title: t("clips.editor.close.title"),
+          message: t("clips.editor.close.message"),
+          confirmText: t("clips.editor.close.discard"),
+          cancelText: t("clips.editor.keep_editing"),
+          type: "danger",
+          icon: "solar:close-circle-bold",
+        }).finally(() => {
+          asking.current = false;
+        });
+        if (!sure) return;
+      }
+      closeNow();
     };
   });
 
@@ -71,11 +97,22 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
 
   useEffect(() => {
     const opened = listen<EditorClip>("clip_editor_open", (event) => switchTo.current(event.payload));
+    void getEditorClip()
+      .then((current) => {
+        if (current) setClip((shown) => shown ?? current);
+      })
+      .catch((e) => console.error("Could not read which clip to edit", e));
     return () => void opened.then((stop) => stop());
   }, []);
 
   useEffect(() => {
+    const requested = getCurrentWindow().listen(TauriEvent.WINDOW_CLOSE_REQUESTED, () => leave.current());
+    return () => void requested.then((stop) => stop());
+  }, []);
+
+  useEffect(() => {
     setDuration(0);
+    if (!src) return;
     const probe = document.createElement("video");
     probe.preload = "metadata";
     probe.onloadedmetadata = () => setDuration(probe.duration);
@@ -88,9 +125,10 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
   }, [src]);
 
   useEffect(() => {
-    let current = true;
     setDetails(null);
-    void getClipDetails(clip.path)
+    if (!path) return;
+    let current = true;
+    void getClipDetails(path)
       .then((loaded) => {
         if (current) setDetails(loaded);
       })
@@ -100,9 +138,9 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
     return () => {
       current = false;
     };
-  }, [clip.path]);
+  }, [path]);
 
-  const close = useCallback(() => void getCurrentWindow().close(), []);
+  const close = useCallback(() => leave.current(), []);
 
   const save = useCallback(
     async (
@@ -112,11 +150,12 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
       videoStartSeconds: number | null,
       videoEndSeconds: number | null,
     ) => {
+      if (!path) return;
       setSaving(true);
       try {
-        await trimClip(clip.path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
+        await trimClip(path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
         toast.success(t("clips.trim.saved"));
-        close();
+        closeNow();
       } catch (e) {
         console.error("Could not trim the clip", e);
         toast.error(t("clips.trim.failed"));
@@ -124,14 +163,24 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
         setSaving(false);
       }
     },
-    [clip.path, close, t],
+    [path, closeNow, t],
   );
 
-  if (duration <= 0) {
+  if (!clip || !src || duration <= 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black" data-tauri-drag-region>
-        <Icon icon="svg-spinners:ring-resize" className="h-8 w-8 text-white/40" />
-      </div>
+      <>
+        <WindowFrame className="select-none items-center justify-center" data-tauri-drag-region>
+          <Icon
+            icon="svg-spinners:ring-resize"
+            className="pointer-events-none mb-3 h-7 w-7"
+            style={{ color: accent }}
+          />
+          <span className="pointer-events-none font-minecraft text-xs tracking-wider text-white/50">
+            {t("common.loading")}
+          </span>
+        </WindowFrame>
+        {confirmDialog}
+      </>
     );
   }
 
@@ -144,8 +193,10 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
         name={clip.name}
         duration={duration}
         busy={saving}
+        paused={dialogOpen}
         details={details}
         onCancel={close}
+        onDone={closeNow}
         onStateChange={track}
         onSave={save}
         t={t}

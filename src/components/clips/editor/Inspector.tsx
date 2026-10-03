@@ -5,12 +5,13 @@ import { Icon } from "@iconify/react";
 
 import { Input } from "../../ui/Input";
 import { RangeSlider } from "../../ui/RangeSlider";
+import { Tooltip } from "../../ui/Tooltip";
 import type { ClipCorner, ClipOverlay } from "../../../services/clip-service";
 import { ClipIconButton } from "../ClipIconButton";
 import { cn } from "../../../lib/utils";
 import { ColorPickerModal } from "../../modals/ColorPickerModal";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
-import { OVERLAY_ICON, OVERLAY_NAME, formatTime, grey, overlayTint, type Translate } from "./shared";
+import { OVERLAY_ICON, OVERLAY_NAME, formatTime, toHex, overlayTint, type Translate } from "./shared";
 
 const OVERLAY_COLOUR_MODAL = "clip-overlay-colour";
 
@@ -25,10 +26,8 @@ const CORNERS: { value: ClipCorner; label: string; turn: number }[] = [
 
 export function PanelTitle({ children, color }: { children: ReactNode; color: string }) {
   return (
-    <h3
-      className="border-b border-white/10 pb-2 font-smallcaps text-lg leading-none tracking-wide"
-      style={{ color }}
-    >
+    <h3 className="flex items-center gap-2 border-b border-white/10 pb-2 font-minecraft text-xs uppercase leading-none tracking-wider text-white/60">
+      <span className="h-3 w-1 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {children}
     </h3>
   );
@@ -84,10 +83,10 @@ function ShadeChoice({
   t: Translate;
 }) {
   const { showModal, hideModal } = useGlobalModal();
-  const [typed, setTyped] = useState(grey(value));
+  const [typed, setTyped] = useState(toHex(value));
 
   useEffect(() => {
-    setTyped(grey(value));
+    setTyped(toHex(value));
   }, [value]);
 
   const accept = (text: string) => {
@@ -101,62 +100,59 @@ function ShadeChoice({
       <span className="font-minecraft text-sm text-white/80">{label}</span>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label={t("clips.editor.overlay.colour.pick")}
-          title={t("clips.editor.overlay.colour.pick")}
-          onClick={() =>
-            showModal(
-              OVERLAY_COLOUR_MODAL,
-              <ColorPickerModal
-                initialColor={grey(value)}
-                applyToTheme={false}
-                onColorSelected={(picked) => accept(picked)}
-                onClose={() => hideModal(OVERLAY_COLOUR_MODAL)}
-              />,
-              1200,
-            )
-          }
-          className={cn(
-            "h-7 w-7 shrink-0 rounded border border-white/20 transition-colors",
-            disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:border-white/60",
-          )}
-          style={{ backgroundColor: grey(value) }}
-        />
+        <Tooltip content={t("clips.editor.overlay.colour.pick")} position="top" wrapperClassName="shrink-0">
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={t("clips.editor.overlay.colour.pick")}
+            onClick={() =>
+              showModal(
+                OVERLAY_COLOUR_MODAL,
+                <ColorPickerModal
+                  initialColor={toHex(value)}
+                  applyToTheme={false}
+                  onColorSelected={(picked) => accept(picked)}
+                  onClose={() => hideModal(OVERLAY_COLOUR_MODAL)}
+                />,
+                1200,
+              )
+            }
+            className={cn(
+              "h-7 w-7 shrink-0 rounded border border-white/20 transition-colors",
+              disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:border-white/60",
+            )}
+            style={{ backgroundColor: toHex(value) }}
+          />
+        </Tooltip>
 
-        <input
-          type="text"
-          value={typed}
-          disabled={disabled}
-          spellCheck={false}
-          maxLength={7}
-          aria-label={t("clips.editor.overlay.colour.hex")}
-          onChange={(event) => accept(event.target.value)}
-          onBlur={() => setTyped(grey(value))}
-          className={cn(
-            "min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-minecraft text-sm uppercase text-white/90 outline-none transition-colors",
-            disabled ? "cursor-not-allowed opacity-40" : "hover:border-white/40 focus:border-white/60",
-          )}
-        />
+        <div className="min-w-0 flex-1" onBlur={() => setTyped(toHex(value))}>
+          <Input
+            size="sm"
+            value={typed}
+            disabled={disabled}
+            maxLength={7}
+            aria-label={t("clips.editor.overlay.colour.hex")}
+            onChange={(event) => accept(event.target.value)}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {SWATCHES.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            disabled={disabled}
-            aria-label={grey(preset)}
-            title={grey(preset)}
-            onClick={() => onChange(preset)}
-            className={cn(
-              "h-5 w-5 shrink-0 rounded border transition-colors",
-              value === preset ? "border-white" : "border-white/20 hover:border-white/60",
-              disabled && "cursor-not-allowed opacity-40",
-            )}
-            style={{ backgroundColor: grey(preset) }}
-          />
+          <Tooltip key={preset} content={toHex(preset)} position="top">
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={toHex(preset)}
+              onClick={() => onChange(preset)}
+              className={cn(
+                "h-5 w-5 shrink-0 rounded border transition-colors",
+                value === preset ? "border-white" : "border-white/20 hover:border-white/60",
+                disabled && "cursor-not-allowed opacity-40",
+              )}
+              style={{ backgroundColor: toHex(preset) }}
+            />
+          </Tooltip>
         ))}
       </div>
     </div>
@@ -183,33 +179,33 @@ function CornerChoice({
       <span className="font-minecraft text-sm text-white/80">{label}</span>
       <div className="grid w-fit grid-cols-2 gap-1">
         {CORNERS.map((corner) => (
-          <button
-            key={corner.value}
-            type="button"
-            disabled={disabled}
-            aria-label={t(corner.label)}
-            aria-pressed={value === corner.value}
-            title={t(corner.label)}
-            onClick={() => onChange(corner.value)}
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-lg border transition-colors",
-              value === corner.value
-                ? "text-white"
-                : "border-white/10 bg-black/20 text-white/50 hover:border-white/20 hover:text-white",
-              disabled && "cursor-not-allowed opacity-40",
-            )}
-            style={
-              value === corner.value
-                ? { borderColor: color, backgroundColor: `${color}30` }
-                : undefined
-            }
-          >
-            <Icon
-              icon="solar:arrow-right-up-bold"
-              className="h-3.5 w-3.5"
-              style={{ transform: `rotate(${corner.turn}deg)` }}
-            />
-          </button>
+          <Tooltip key={corner.value} content={t(corner.label)} position="top">
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={t(corner.label)}
+              aria-pressed={value === corner.value}
+              onClick={() => onChange(corner.value)}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded border transition-colors",
+                value === corner.value
+                  ? "border-white/20 bg-white/10 text-white"
+                  : "border-white/10 bg-black/30 text-white/60",
+                disabled
+                  ? "cursor-not-allowed opacity-40"
+                  : value !== corner.value && "hover:border-white/20 hover:bg-white/5 hover:text-white",
+              )}
+            >
+              <Icon
+                icon="solar:arrow-right-up-bold"
+                className="h-3.5 w-3.5"
+                style={{
+                  transform: `rotate(${corner.turn}deg)`,
+                  color: value === corner.value ? color : undefined,
+                }}
+              />
+            </button>
+          </Tooltip>
         ))}
       </div>
     </div>
@@ -243,13 +239,7 @@ export function OverlayInspector({
         </p>
       ) : (
         <>
-          <div
-            className="flex items-center gap-2 rounded-lg border px-3 py-2.5"
-            style={{
-              borderColor: `${accent}80`,
-              backgroundColor: `${accent}20`,
-            }}
-          >
+          <div className="flex items-center gap-2 rounded border border-white/20 bg-white/10 px-3 py-2">
             <Icon
               icon={OVERLAY_ICON[picked.kind]}
               className="h-4 w-4 shrink-0"

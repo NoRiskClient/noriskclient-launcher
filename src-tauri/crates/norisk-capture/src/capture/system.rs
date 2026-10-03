@@ -1,7 +1,5 @@
 use windows::core::{Interface, HSTRING};
-use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
-};
+use windows::Win32::Graphics::Dxgi::IDXGIDevice;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
 
 const NVIDIA: u32 = 0x10DE;
@@ -15,33 +13,19 @@ pub struct Gpu {
 }
 
 pub fn gpus() -> Vec<Gpu> {
-    let Ok(factory) = (unsafe { CreateDXGIFactory1::<IDXGIFactory1>() }) else {
-        return Vec::new();
-    };
-
-    let mut found = Vec::new();
-    for i in 0.. {
-        let Ok(adapter) = (unsafe { factory.EnumAdapters1(i) }) else {
-            break;
-        };
-        let Ok(desc) = (unsafe { adapter.GetDesc1() }) else {
-            continue;
-        };
-        if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
-            continue;
-        }
-
-        let end = desc.Description.iter().position(|&c| c == 0).unwrap_or(desc.Description.len());
-        let umd = unsafe { adapter.CheckInterfaceSupport(&IDXGIDevice::IID) }.ok();
-
-        found.push(Gpu {
-            name: String::from_utf16_lossy(&desc.Description[..end]),
-            vendor: desc.VendorId,
-            driver: umd.map(|umd| driver_version(umd as u64, desc.VendorId)),
-            memory_mb: desc.DedicatedVideoMemory as u64 / (1024 * 1024),
-        });
-    }
-    found
+    super::device::hardware_adapters()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(adapter, desc)| {
+            let umd = unsafe { adapter.CheckInterfaceSupport(&IDXGIDevice::IID) }.ok();
+            Gpu {
+                name: super::utf16_to_string(&desc.Description),
+                vendor: desc.VendorId,
+                driver: umd.map(|umd| driver_version(umd as u64, desc.VendorId)),
+                memory_mb: desc.DedicatedVideoMemory as u64 / (1024 * 1024),
+            }
+        })
+        .collect()
 }
 
 fn driver_version(umd: u64, vendor: u32) -> String {
@@ -73,8 +57,7 @@ fn windows_version() -> String {
         }
         .ok()
         .ok()?;
-        let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-        Some(String::from_utf16_lossy(&buffer[..end]))
+        Some(super::utf16_to_string(&buffer))
     };
     let number = |value: &str| -> Option<u32> {
         let mut data = 0u32;

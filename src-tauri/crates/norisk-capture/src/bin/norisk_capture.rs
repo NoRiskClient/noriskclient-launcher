@@ -50,8 +50,7 @@ fn main() -> anyhow::Result<()> {
 
     std::panic::set_hook(Box::new(|info| {
         let trace = std::backtrace::Backtrace::force_capture();
-        log::error!("The capture engine crashed: {info}
-{trace}");
+        log::error!("The capture engine crashed: {info}\n{trace}");
         log::logger().flush();
     }));
 

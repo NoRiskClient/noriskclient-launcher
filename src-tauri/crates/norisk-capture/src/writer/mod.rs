@@ -487,7 +487,7 @@ mod tests {
             .output()
             .expect("ffprobe");
         let text = String::from_utf8_lossy(&probe.stdout).to_string();
-        println!("{text}");
+        eprintln!("{text}");
 
         for wanted in [
             "color_space=bt709",

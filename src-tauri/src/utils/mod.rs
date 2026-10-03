@@ -24,6 +24,7 @@ pub mod clip_overlay;
 #[cfg(windows)]
 pub mod hotkey_hook;
 pub mod window_finder;
+pub mod window_focus;
 pub mod screens;
 pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-only
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it

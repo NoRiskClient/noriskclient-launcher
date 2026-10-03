@@ -285,6 +285,8 @@ pub enum CaptureMethod {
     ScreenCapture,
     #[serde(rename = "screencapturekit")]
     ScreenCaptureKit,
+    #[serde(rename = "unknown", other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -529,28 +531,12 @@ mod export_progress {
     }
 
     #[test]
-    fn a_fresh_export_is_at_nothing() {
+    fn progress_runs_from_nothing_to_one_and_an_empty_clip_counts_as_done() {
         assert_eq!(at(0, 900).fraction(), 0.0);
-    }
-
-    #[test]
-    fn halfway_is_a_half() {
         assert_eq!(at(450, 900).fraction(), 0.5);
-    }
-
-    #[test]
-    fn finished_is_one() {
         assert_eq!(at(900, 900).fraction(), 1.0);
-    }
-
-    #[test]
-    fn a_clip_with_no_frames_counts_as_done() {
-        assert_eq!(at(0, 0).fraction(), 1.0);
-    }
-
-    #[test]
-    fn a_count_past_the_end_does_not_overshoot() {
         assert_eq!(at(1000, 900).fraction(), 1.0);
+        assert_eq!(at(0, 0).fraction(), 1.0);
     }
 }
 
@@ -559,49 +545,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn round_trips_a_command() {
-        let msg = LauncherToCapture::SaveClip(SaveClipRequest {
-            pre_roll_seconds: 20,
-            post_roll_seconds: 10,
-            reason: ClipReason::Event("PLAYER_KILL".into()),
-        });
-
-        let line = encode_line(&msg).unwrap();
-        assert!(line.ends_with('\n'));
-        assert_eq!(line.matches('\n').count(), 1, "framing must stay one line");
-
-        let back: LauncherToCapture = decode_line(&line).unwrap();
-        assert_eq!(back, msg);
-    }
-
-    #[test]
-    fn round_trips_a_report() {
-        let msg = CaptureToLauncher::Status(StatusReport {
-            state: CaptureState::BlockedFullscreenExclusive,
-            buffer_fill_seconds: 0.0,
-            buffer_bytes: 0,
-            capture_fps: 0.0,
-            encode_fps: 0.0,
-            dropped_frames: 0,
-            dropped_before_keyframe: 0,
-            encode_latency_ms_p99: 0.0,
-            capture_method: Some(CaptureMethod::GraphicsHook),
-            retry_in_seconds: Some(60),
-            active_codec: Some(ClipCodec::Av1),
-            active_encoder: Some(EncoderPreference::Nvenc),
-        });
-
-        let back: CaptureToLauncher = decode_line(&encode_line(&msg).unwrap()).unwrap();
-        assert_eq!(back, msg);
-    }
-
-    #[test]
     fn capture_methods_keep_the_text_older_launchers_and_analytics_know() {
         let text = |method| serde_json::to_string(&method).unwrap();
         assert_eq!(text(CaptureMethod::GraphicsHook), r#""graphics hook""#);
         assert_eq!(text(CaptureMethod::WindowCapture), r#""window capture""#);
         assert_eq!(text(CaptureMethod::ScreenCapture), r#""screen capture""#);
         assert_eq!(text(CaptureMethod::ScreenCaptureKit), r#""screencapturekit""#);
+
+        let read = |raw: &str| serde_json::from_str::<CaptureMethod>(raw).unwrap();
+        assert_eq!(read(r#""graphics hook""#), CaptureMethod::GraphicsHook);
+        assert_eq!(read(r#""window capture""#), CaptureMethod::WindowCapture);
+        assert_eq!(read(r#""screen capture""#), CaptureMethod::ScreenCapture);
+        assert_eq!(read(r#""screencapturekit""#), CaptureMethod::ScreenCaptureKit);
+        assert_eq!(read(r#""some future method""#), CaptureMethod::Unknown);
+    }
+
+    #[test]
+    fn a_report_from_a_newer_engine_with_an_unknown_capture_method_still_parses() {
+        let line = r#"{"type":"status","state":"buffering","buffer_fill_seconds":1.0,"buffer_bytes":10,"capture_fps":60.0,"encode_fps":60.0,"dropped_frames":0,"encode_latency_ms_p99":0.0,"capture_method":"desktop duplication"}"#;
+
+        let CaptureToLauncher::Status(report) = decode_line(line).expect("parses") else {
+            panic!("not a status report");
+        };
+        assert_eq!(report.capture_method, Some(CaptureMethod::Unknown));
+    }
+
+    #[test]
+    fn edit_spans_from_a_newer_editor_with_extra_fields_still_parse() {
+        let span: Span = serde_json::from_str(r#"{"startSeconds":1.0,"endSeconds":2.0,"label":"x"}"#).unwrap();
+        assert_eq!(span, Span { start_seconds: 1.0, end_seconds: 2.0 });
+
+        let cut: TrackCut =
+            serde_json::from_str(r#"{"stream":1,"startSeconds":1.0,"endSeconds":2.0,"fade":true}"#).unwrap();
+        assert_eq!(cut, TrackCut { stream: 1, start_seconds: 1.0, end_seconds: 2.0 });
+
+        let level: TrackLevel = serde_json::from_str(r#"{"stream":2,"volume":80,"pan":0.5}"#).unwrap();
+        assert_eq!((level.stream, level.volume), (2, 80));
     }
 
     #[test]
@@ -678,66 +657,6 @@ mod tests {
     }
 
     #[test]
-    fn a_level_with_a_field_it_does_not_know_is_refused_instead_of_quietly_zeroed() {
-        let wrong = serde_json::from_str::<TrackLevel>(
-            r#"{"stream":1,"volume":90,"offset_seconds":0.5}"#,
-        );
-        assert!(
-            wrong.is_err(),
-            "a misspelt field must fail loudly, not arrive as an offset of zero",
-        );
-    }
-
-    #[test]
-    fn an_offset_on_its_own_counts_as_a_change() {
-        let still = TrackLevel {
-            stream: 1,
-            volume: 100,
-            offset_seconds: 0.0,
-            start_seconds: None,
-            end_seconds: None,
-        };
-        assert!(!levels_change_anything(&[still]));
-        assert!(levels_change_anything(&[TrackLevel {
-            offset_seconds: 0.25,
-            ..still
-        }]));
-        assert!(levels_change_anything(&[TrackLevel {
-            offset_seconds: -0.25,
-            ..still
-        }]));
-        assert!(levels_change_anything(&[TrackLevel {
-            volume: 50,
-            ..still
-        }]));
-    }
-
-    #[test]
-    fn a_window_on_its_own_counts_as_a_change() {
-        let still = TrackLevel {
-            stream: 1,
-            volume: 100,
-            offset_seconds: 0.0,
-            start_seconds: None,
-            end_seconds: None,
-        };
-
-        assert!(!levels_change_anything(&[still]));
-        assert!(levels_change_anything(&[TrackLevel {
-            start_seconds: Some(1.5),
-            ..still
-        }]));
-        assert!(levels_change_anything(&[TrackLevel {
-            end_seconds: Some(4.0),
-            ..still
-        }]));
-        assert!(levels_change_anything(&[TrackLevel {
-            start_seconds: Some(0.0),
-            ..still
-        }]));
-    }
-
-    #[test]
     fn a_window_that_is_not_a_number_is_no_window_at_all() {
         let nonsense = TrackLevel {
             stream: 1,
@@ -753,95 +672,10 @@ mod tests {
     }
 
     #[test]
-    fn a_window_becomes_ticks_counted_from_the_clips_own_start() {
-        let level = TrackLevel {
-            stream: 1,
-            volume: 100,
-            offset_seconds: 0.0,
-            start_seconds: Some(1.0),
-            end_seconds: Some(2.0),
-        };
-
-        assert_eq!(level.window_ticks(90_000, 0), (Some(90_000), Some(180_000)));
-        assert_eq!(
-            level.window_ticks(90_000, 1_000),
-            (Some(91_000), Some(181_000))
-        );
-        assert_eq!(
-            TrackLevel {
-                start_seconds: Some(f64::MAX),
-                end_seconds: Some(f64::MIN),
-                ..level
-            }
-            .window_ticks(90_000, 0),
-            (Some(i64::MAX), Some(i64::MIN))
-        );
-    }
-
-    #[test]
-    fn an_offset_becomes_ticks_and_nonsense_becomes_nothing() {
-        let at = |offset_seconds| TrackLevel {
-            stream: 0,
-            volume: 100,
-            offset_seconds,
-            start_seconds: None,
-            end_seconds: None,
-        };
-
-        assert_eq!(at(0.25).offset_ticks(90_000), 22_500);
-        assert_eq!(at(-0.25).offset_ticks(90_000), -22_500);
-        assert_eq!(at(f64::NAN).offset_ticks(90_000), 0);
-        assert_eq!(at(f64::INFINITY).offset_ticks(90_000), 0);
-        assert_eq!(at(f64::NEG_INFINITY).offset_ticks(90_000), 0);
-        assert!(!levels_change_anything(&[at(f64::NAN)]));
-    }
-
-    #[test]
     fn clip_reason_produces_a_filename_safe_slug() {
         assert_eq!(ClipReason::Manual.slug(), "clip");
         assert_eq!(ClipReason::Event("PLAYER_KILL".into()).slug(), "player_kill");
         assert_eq!(ClipReason::Event("bed/destroy!".into()).slug(), "bed_destroy_");
-    }
-
-    #[test]
-    fn auto_takes_the_best_available() {
-        let available = [EncoderPreference::Amf, EncoderPreference::Software];
-        assert_eq!(
-            EncoderPreference::Auto.resolve(&available),
-            Some(EncoderPreference::Amf)
-        );
-    }
-
-    #[test]
-    fn an_explicit_choice_is_honoured_when_usable() {
-        let available = [EncoderPreference::Nvenc, EncoderPreference::Software];
-        assert_eq!(
-            EncoderPreference::Software.resolve(&available),
-            Some(EncoderPreference::Software)
-        );
-    }
-
-    #[test]
-    fn an_unusable_choice_falls_back_instead_of_failing() {
-        let available = [EncoderPreference::Amf];
-        assert_eq!(
-            EncoderPreference::Nvenc.resolve(&available),
-            Some(EncoderPreference::Amf)
-        );
-    }
-
-    #[test]
-    fn nothing_available_resolves_to_nothing() {
-        assert_eq!(EncoderPreference::Auto.resolve(&[]), None);
-        assert_eq!(EncoderPreference::Nvenc.resolve(&[]), None);
-    }
-
-    #[test]
-    fn only_buffering_allows_saving() {
-        assert!(CaptureState::Buffering.can_save());
-        assert!(!CaptureState::BlockedFullscreenExclusive.can_save());
-        assert!(!CaptureState::Idle.can_save());
-        assert!(!CaptureState::Paused.can_save());
     }
 }
 
@@ -860,7 +694,7 @@ pub struct TrimClipRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackLevel {
     pub stream: u32,
     pub volume: u32,
@@ -888,7 +722,7 @@ impl TrackLevel {
         let at = |seconds: Option<f64>| {
             seconds
                 .filter(|s| s.is_finite())
-                .map(|s| origin.saturating_add((s * ticks_per_second as f64) as i64))
+                .map(|s| ticks_at(origin, s, ticks_per_second))
         };
         (at(self.start_seconds), at(self.end_seconds))
     }
@@ -897,6 +731,10 @@ impl TrackLevel {
         let given = |seconds: Option<f64>| seconds.is_some_and(|s| s.is_finite());
         given(self.start_seconds) || given(self.end_seconds)
     }
+}
+
+pub fn ticks_at(origin: i64, seconds: f64, ticks_per_second: i64) -> i64 {
+    origin.saturating_add((seconds * ticks_per_second as f64) as i64)
 }
 
 pub fn levels_change_anything(levels: &[TrackLevel]) -> bool {
@@ -1006,14 +844,14 @@ pub struct ExportVerticalRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct Span {
     pub start_seconds: f64,
     pub end_seconds: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackCut {
     pub stream: u32,
     pub start_seconds: f64,

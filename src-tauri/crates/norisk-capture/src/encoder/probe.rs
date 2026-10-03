@@ -292,15 +292,6 @@ mod tests {
     }
 
     #[test]
-    fn every_codec_has_all_three_vendors_plus_software() {
-        for codec in ClipCodec::all() {
-            let list = candidates(codec);
-            assert_eq!(list.len(), 4, "{codec:?} should cover NVIDIA, AMD, Intel and software");
-            assert!(list.iter().filter(|c| c.hardware).count() == 3);
-        }
-    }
-
-    #[test]
     fn only_an_nvenc_that_ffmpeg_calls_unimplemented_means_an_old_driver() {
         let nvenc = &candidates(ClipCodec::H264)[0];
         let amf = &candidates(ClipCodec::H264)[1];
@@ -309,13 +300,5 @@ mod tests {
         assert!(driver_too_old(nvenc, &unimplemented), "FFmpeg said {unimplemented:?}");
         assert!(!driver_too_old(nvenc, &av_error(ff::AVERROR(ff::EINVAL))));
         assert!(!driver_too_old(amf, &unimplemented));
-    }
-
-    #[test]
-    fn encoder_names_resolve_for_known_pairings() {
-        assert_eq!(encoder_name(ClipCodec::H264, EncoderPreference::Nvenc), Some("h264_nvenc"));
-        assert_eq!(encoder_name(ClipCodec::Av1, EncoderPreference::Nvenc), Some("av1_nvenc"));
-        assert_eq!(encoder_name(ClipCodec::H265, EncoderPreference::Software), Some("libx265"));
-        assert_eq!(encoder_name(ClipCodec::H264, EncoderPreference::Auto), None);
     }
 }

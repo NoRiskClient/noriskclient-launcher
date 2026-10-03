@@ -27,13 +27,12 @@ pub fn screens() -> Vec<Screen> {
             return true.into();
         }
         let area = info.monitorInfo.rcMonitor;
-        let end = info.szDevice.iter().position(|&c| c == 0).unwrap_or(info.szDevice.len());
         let (mut dpi, mut unused) = (96u32, 96u32);
         let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi, &mut unused);
 
         found.push(Screen {
             monitor,
-            device: String::from_utf16_lossy(&info.szDevice[..end]),
+            device: super::utf16_to_string(&info.szDevice),
             width: (area.right - area.left).max(0) as u32,
             height: (area.bottom - area.top).max(0) as u32,
             scale_percent: dpi * 100 / 96,

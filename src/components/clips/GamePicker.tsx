@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
+import { GroupTabs } from "../ui/GroupTabs";
 import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, listScreens, type OpenApp, type ScreenInfo } from "../../services/clip-service";
 import type { OtherGame, OtherScreen } from "../../types/launcherConfig";
@@ -71,35 +72,26 @@ export function GamePicker({
     <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
       <div className="flex items-center gap-2">
         {offerScreens ? (
-          <div className="grid flex-1 grid-cols-2 gap-1 rounded-lg bg-black/30 p-1">
-            {(
-              [
-                { id: "apps", icon: "solar:widget-bold", label: t("settings.clips.games.apps"), count: apps?.length ?? 0 },
-                { id: "screens", icon: "solar:monitor-bold", label: t("settings.clips.games.screens"), count: screens.length },
-              ] as const
-            ).map((tab) => {
-              const active = showing === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setView(tab.id)}
-                  aria-pressed={active}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-md px-3 py-1.5 font-minecraft text-sm transition-colors",
-                    active ? "text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80",
-                  )}
-                  style={active ? { backgroundColor: `${accentColor.value}35` } : undefined}
-                >
-                  <Icon icon={tab.icon} className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{tab.label}</span>
-                  <span className="rounded bg-black/30 px-1.5 text-xs tabular-nums text-white/60">
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <GroupTabs
+            groups={[
+              {
+                id: "apps",
+                icon: "solar:widget-bold",
+                name: `${t("settings.clips.games.apps")} (${apps?.length ?? 0})`,
+                count: apps?.length ?? 0,
+              },
+              {
+                id: "screens",
+                icon: "solar:monitor-bold",
+                name: `${t("settings.clips.games.screens")} (${screens.length})`,
+                count: screens.length,
+              },
+            ]}
+            activeGroup={showing}
+            onGroupChange={(id) => setView(id === "screens" ? "screens" : "apps")}
+            showAddButton={false}
+            className="!mb-0 flex-1"
+          />
         ) : (
           <p className="flex-1 font-minecraft text-xs text-white/50">{t("settings.clips.games.open")}</p>
         )}

@@ -106,10 +106,11 @@ export function ColorPickerModal({
 
   // Update HSV when accent color changes
   useEffect(() => {
+    if (initialColor !== undefined) return;
     const rgb = hexToRgb(accentColor.value);
     setHsv(rgbToHsv(rgb.r, rgb.g, rgb.b));
     setHex(accentColor.value);
-  }, [accentColor.value]);
+  }, [accentColor.value, initialColor]);
 
   // Update hex when HSV changes
   useEffect(() => {
@@ -161,9 +162,11 @@ export function ColorPickerModal({
 
   const handleApply = () => {
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      if (applyToTheme) setCustomAccentColor(hex);
       onColorSelected?.(hex);
-      toast.success(t('color_picker.toast.applied'));
+      if (applyToTheme) {
+        setCustomAccentColor(hex);
+        toast.success(t('color_picker.toast.applied'));
+      }
       onClose();
     } else {
       toast.error(t('color_picker.toast.invalid_hex'));

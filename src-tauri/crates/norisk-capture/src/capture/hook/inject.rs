@@ -263,12 +263,7 @@ fn process_executable(pid: u32) -> Option<String> {
 
     unsafe { Module32FirstW(snapshot.0, &mut entry) }.ok()?;
 
-    let end = entry
-        .szModule
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(entry.szModule.len());
-    Some(String::from_utf16_lossy(&entry.szModule[..end]))
+    Some(crate::capture::utf16_to_string(&entry.szModule))
 }
 
 fn inject_through_remote_thread(pid: u32, dll: &Path) -> Result<()> {
@@ -369,13 +364,7 @@ pub fn is_module_loaded(pid: u32, file_name: &str) -> Result<bool> {
     }
 
     loop {
-        let name = String::from_utf16_lossy(
-            &entry.szModule[..entry
-                .szModule
-                .iter()
-                .position(|&c| c == 0)
-                .unwrap_or(entry.szModule.len())],
-        );
+        let name = crate::capture::utf16_to_string(&entry.szModule);
         if name.eq_ignore_ascii_case(file_name) {
             return Ok(true);
         }

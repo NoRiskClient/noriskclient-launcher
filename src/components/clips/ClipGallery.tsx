@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
@@ -10,6 +11,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
+import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
 import {
@@ -24,14 +26,12 @@ import {
   samePath,
   type ClipEntry,
   type ClipStorageUsage,
-  type ExportedClip,
-  type ExportedGif,
-  type TrimmedClip,
 } from "../../services/clip-service";
 import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
+import { useClipEngineEvents } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { trackEvent } from "../../services/analytics-service";
 import { isMacOS } from "../../utils/platform";
@@ -64,6 +64,7 @@ export function ClipGallery({
   const [vertical, setVertical] = useState<ClipEntry | null>(null);
   const [renaming, setRenaming] = useState<ClipEntry | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const gifFor = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -103,36 +104,40 @@ export function ClipGallery({
     onGamesChange?.(games);
   }, [games, onGamesChange]);
 
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      const stops = await Promise.all([
-        listen("clip_saved", () => void refresh()),
-        listen<TrimmedClip>("clip_trimmed", (event) => void follow(event.payload)),
-        listen<ExportedClip>("clip_exported", (event) => void follow(event.payload)),
-        listen<ExportedGif>("clip_gif_exported", (event) => {
-          setBusy(null);
-          toast.success(
-            event.payload.truncated
-              ? t("clips.gallery.gif_done_shortened")
-              : t("clips.gallery.gif_done"),
-          );
-        }),
-        listen("clip_error", () => setBusy(null)),
-        listen("clip_engine_stopped", () => setBusy(null)),
-      ]);
-      unlisten = () => stops.forEach((stop) => stop());
-    })();
-    return () => unlisten?.();
-  }, [follow, refresh, t]);
+  const gifDone = useCallback(() => {
+    const source = gifFor.current;
+    gifFor.current = null;
+    if (source !== null) {
+      setBusy((current) => (current !== null && samePath(current, source) ? null : current));
+    }
+  }, []);
+
+  useClipEngineEvents({
+    clip_saved: () => void refresh(),
+    clip_trimmed: (clip) => void follow(clip),
+    clip_exported: (clip) => void follow(clip),
+    clip_gif_exported: (gif) => {
+      if (gifFor.current === null || !samePath(gif.source, gifFor.current)) return;
+      gifDone();
+      toast.success(
+        gif.truncated ? t("clips.gallery.gif_done_shortened") : t("clips.gallery.gif_done"),
+      );
+    },
+    clip_error: (error) => {
+      if (error.code !== "clip_write" && error.code !== "protocol") return;
+      gifDone();
+    },
+    clip_engine_stopped: gifDone,
+  });
 
   const makeGif = useCallback(
     async (clip: ClipEntry) => {
       setBusy(clip.path);
+      gifFor.current = clip.path;
       try {
         await exportGif(clip.path);
       } catch (e) {
+        gifFor.current = null;
         setBusy(null);
         console.error("Could not start the GIF export", e);
         toast.error(parseErrorMessage(e));
@@ -176,6 +181,13 @@ export function ClipGallery({
     },
     [refresh],
   );
+
+  const edit = useCallback((clip: ClipEntry) => {
+    openClipEditor(clip.path, clip.name).catch((e) => {
+      console.error("Could not open the clip editor", e);
+      toast.error(parseErrorMessage(e));
+    });
+  }, []);
 
   const remove = useCallback(
     async (clip: ClipEntry) => {
@@ -320,6 +332,7 @@ export function ClipGallery({
                 onReveal={() =>
                   void revealClip(clip.path).catch((e) => toast.error(parseErrorMessage(e)))
                 }
+                onEdit={() => edit(clip)}
                 onDelete={() => void remove(clip)}
                 onFavourite={(favourite) => void setFavourite(clip, favourite)}
                 onRename={() => setRenaming(clip)}
@@ -376,6 +389,7 @@ function ClipCard({
   busy,
   onPlay,
   onReveal,
+  onEdit,
   onDelete,
   onFavourite,
   onRename,
@@ -389,6 +403,7 @@ function ClipCard({
   busy: boolean;
   onPlay: () => void;
   onReveal: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onFavourite: (favourite: boolean) => void;
   onRename: () => void;
@@ -400,6 +415,32 @@ function ClipCard({
   const accentColor = useThemeStore((state) => state.accentColor);
   const animated = useThemeStore((state) => state.isBackgroundAnimationEnabled);
   const [hovered, setHovered] = useState(false);
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  const openMenu = (x: number, y: number) =>
+    setMenuAt({
+      x: Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH - 8)),
+      y: Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT - 8)),
+    });
+
+  const menuItems: ContextMenuItem<ClipEntry>[] = [
+    { id: "edit", label: t("clips.gallery.edit"), icon: "solar:scissors-bold", onClick: onEdit },
+    { id: "rename", label: t("clips.gallery.rename"), icon: "solar:pen-bold", onClick: onRename },
+    { id: "vertical", label: t("clips.gallery.vertical"), icon: "solar:smartphone-bold", onClick: onVertical },
+    ...(isMacOS()
+      ? []
+      : [{ id: "gif", label: t("clips.gallery.gif"), icon: "solar:gallery-bold", onClick: onGif }]),
+    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: onReveal },
+    {
+      id: "delete",
+      label: t("clips.gallery.delete"),
+      icon: "solar:trash-bin-trash-bold",
+      destructive: true,
+      separator: true,
+      onClick: onDelete,
+    },
+  ];
 
   const favouriteLabel = clip.favourite
     ? t("clips.gallery.unfavourite")
@@ -419,6 +460,10 @@ function ClipCard({
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        openMenu(event.clientX, event.clientY);
+      }}
     >
       <button
         type="button"
@@ -460,20 +505,41 @@ function ClipCard({
         />
       </div>
 
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
-        <ClipIconButton icon="solar:pen-bold" label={t("clips.gallery.rename")} onClick={onRename} />
-        <ClipIconButton icon="solar:smartphone-bold" label={t("clips.gallery.vertical")} onClick={onVertical} />
-        {!isMacOS() && (
-          <ClipIconButton icon="solar:gallery-bold" label={t("clips.gallery.gif")} onClick={onGif} />
+      <div
+        ref={moreRef}
+        className={cn(
+          "absolute top-2 right-2 z-20 transition-opacity duration-200",
+          menuAt ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
         )}
-        <ClipIconButton icon="solar:folder-with-files-bold" label={t("clips.gallery.reveal")} onClick={onReveal} />
+      >
         <ClipIconButton
-          icon="solar:trash-bin-trash-bold"
-          label={t("clips.gallery.delete")}
-          tone="danger"
-          onClick={onDelete}
+          icon="solar:menu-dots-bold"
+          label={t("content.actions.more")}
+          withTooltip={false}
+          onClick={() => {
+            if (menuAt) {
+              setMenuAt(null);
+              return;
+            }
+            const box = moreRef.current?.getBoundingClientRect();
+            if (box) openMenu(box.right - MENU_WIDTH, box.bottom + 4);
+          }}
         />
       </div>
+
+      {menuAt &&
+        createPortal(
+          <SettingsContextMenu
+            target={clip}
+            isOpen
+            position={menuAt}
+            items={menuItems}
+            onClose={() => setMenuAt(null)}
+            triggerButtonRef={moreRef}
+            compact
+          />,
+          document.body,
+        )}
 
       <div className="flex flex-col gap-1 px-3 py-2.5 min-w-0">
         <span className="font-minecraft text-base text-white whitespace-nowrap overflow-hidden text-ellipsis normal-case">
@@ -494,6 +560,9 @@ function ClipCard({
     </div>
   );
 }
+
+const MENU_WIDTH = 176;
+const MENU_HEIGHT = 220;
 
 function formatLength(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));

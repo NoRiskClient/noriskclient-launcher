@@ -1,4 +1,4 @@
-import { useCallback, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 
 import type { ClipOverlay } from "../../../services/clip-service";
 import { MIN_BOX, MIN_LENGTH, clamp, type NewOverlay } from "./shared";
@@ -33,22 +33,31 @@ interface Stage {
 
 export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage) {
   const [overlays, setOverlays] = useState<ClipOverlay[]>([]);
+  const latest = useRef<ClipOverlay[]>([]);
   const [chosen, setChosen] = useState<number | null>(null);
   const [boxDrag, setBoxDrag] = useState<BoxDrag | null>(null);
   const [barDrag, setBarDrag] = useState<BarDrag | null>(null);
 
-  const editOverlay = useCallback((index: number, patch: Partial<ClipOverlay>) => {
-    setOverlays((current) =>
-      current.map((overlay, at) =>
-        at === index ? ({ ...overlay, ...patch } as ClipOverlay) : overlay,
-      ),
-    );
+  const commit = useCallback((next: ClipOverlay[]) => {
+    latest.current = next;
+    setOverlays(next);
   }, []);
+
+  const editOverlay = useCallback(
+    (index: number, patch: Partial<ClipOverlay>) => {
+      commit(
+        latest.current.map((overlay, at) =>
+          at === index ? ({ ...overlay, ...patch } as ClipOverlay) : overlay,
+        ),
+      );
+    },
+    [commit],
+  );
 
   const addOverlay = useCallback(
     (seed: NewOverlay) => {
-      setOverlays((current) => [
-        ...current,
+      const next = [
+        ...latest.current,
         {
           ...seed,
           left: 0.25,
@@ -58,19 +67,34 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
           startSeconds: start,
           endSeconds: end,
         },
-      ]);
-      setChosen(overlays.length);
+      ];
+      commit(next);
+      setChosen(next.length - 1);
     },
-    [end, overlays.length, start],
+    [commit, end, start],
   );
 
-  const dropOverlay = useCallback((index: number) => {
-    setOverlays((current) => current.filter((_, at) => at !== index));
-    setChosen(null);
-  }, []);
+  const dropOverlay = useCallback(
+    (index: number) => {
+      commit(latest.current.filter((_, at) => at !== index));
+      setChosen(null);
+    },
+    [commit],
+  );
+
+  const restore = useCallback(
+    (saved: ClipOverlay[]) => {
+      commit(saved);
+      setChosen((current) =>
+        current === null || saved.length === 0 ? null : Math.min(current, saved.length - 1),
+      );
+    },
+    [commit],
+  );
 
   const grabBox = (index: number, mode: BoxDrag["mode"], event: { clientX: number; clientY: number }) => {
     const overlay = overlays[index];
+    if (!overlay) return;
     setChosen(index);
     setBoxDrag({
       index,
@@ -86,6 +110,7 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
 
   const grabBar = (index: number, mode: BarDrag["mode"], event: { clientX: number }) => {
     const overlay = overlays[index];
+    if (!overlay) return;
     setChosen(index);
     setBarDrag({
       index,
@@ -153,6 +178,6 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
     dropOverlay,
     grabBox,
     grabBar,
-    restore: setOverlays,
+    restore,
   };
 }

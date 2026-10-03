@@ -117,8 +117,8 @@ impl Engine {
 
     pub(super) fn attach(&mut self, target: Target) -> Result<()> {
         log::info!("Attaching to {}", target.label());
-        self.keyframe_warned.set(false);
-        self.empty_warned.set(false);
+        self.keyframe_warned = false;
+        self.empty_warned = false;
 
         let (codec, chosen) = self.choose_encoder()?;
         let (width, height) = self.output_size(&target)?;
@@ -386,7 +386,6 @@ fn encode_loop(
 
     let report_after = (fps / REPEAT_AFTER_FRAMES as i64).max(1) as u64;
 
-    let started = Instant::now();
     let mut last: Option<PoolFrame> = None;
     let mut last_pts = i64::MIN;
     let mut repeats: u64 = 0;
@@ -418,10 +417,6 @@ fn encode_loop(
     };
 
     loop {
-        if crate::fault::due("encoder", started) {
-            log::error!("Encoding failed: simulated because NRC_FAULT=encoder is set");
-            return;
-        }
         match frames.recv_timeout(wait) {
             Ok(mut frame) => {
                 if reported {
@@ -532,21 +527,8 @@ fn open_encoder(
     preferred: norisk_ipc::EncoderPreference,
     adapter: &str,
 ) -> Result<(VideoEncoder, EncoderSettings, norisk_ipc::EncoderPreference)> {
-    use norisk_ipc::{ClipCodec, EncoderPreference};
-
-    let matrix = crate::encoder::capabilities();
     let first = (settings.codec, preferred);
-    let mut tries = vec![first];
-    for other in matrix
-        .iter()
-        .filter(|c| c.codec == settings.codec && c.available && c.hardware)
-        .map(|c| (c.codec, c.encoder))
-        .chain([(settings.codec, EncoderPreference::Software), (ClipCodec::H264, EncoderPreference::Software)])
-    {
-        if !tries.contains(&other) {
-            tries.push(other);
-        }
-    }
+    let tries = encoders_to_try(&crate::encoder::capabilities(), first);
 
     let mut last = None;
     for (codec, encoder) in tries {
@@ -572,6 +554,32 @@ fn open_encoder(
     }
 
     Err(last.unwrap_or_else(|| anyhow::anyhow!("no encoder could be opened")))
+}
+
+fn encoders_to_try(
+    matrix: &[norisk_ipc::EncoderCapability],
+    first: (norisk_ipc::ClipCodec, norisk_ipc::EncoderPreference),
+) -> Vec<(norisk_ipc::ClipCodec, norisk_ipc::EncoderPreference)> {
+    use norisk_ipc::{ClipCodec, EncoderPreference};
+
+    let hardware_for = |codec: ClipCodec| {
+        matrix
+            .iter()
+            .filter(move |c| c.codec == codec && c.available && c.hardware)
+            .map(|c| (c.codec, c.encoder))
+    };
+
+    let mut tries = vec![first];
+    for other in hardware_for(first.0)
+        .chain([(first.0, EncoderPreference::Software)])
+        .chain(hardware_for(ClipCodec::H264))
+        .chain([(ClipCodec::H264, EncoderPreference::Software)])
+    {
+        if !tries.contains(&other) {
+            tries.push(other);
+        }
+    }
+    tries
 }
 
 fn hook_handshake(
@@ -624,14 +632,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn timestamps_rebase_onto_the_first_frame() {
-        let epoch = 1_000_000i64;
-        assert_eq!(rebase_pts(epoch, epoch), 0);
-        assert_eq!(rebase_pts(epoch + 10_000_000, epoch), TIME_BASE_DEN as i64);
-    }
+    fn a_failing_newer_codec_falls_back_to_h264_hardware_before_h264_software() {
+        use norisk_ipc::{ClipCodec, EncoderCapability, EncoderPreference};
 
-    #[test]
-    fn a_timestamp_before_the_epoch_does_not_wrap() {
-        assert_eq!(rebase_pts(0, 1_000_000), -9_000);
+        let capability = |codec, encoder, hardware| EncoderCapability {
+            codec,
+            encoder,
+            available: true,
+            hardware,
+            detail: None,
+            driver_too_old: false,
+        };
+        let matrix = [
+            capability(ClipCodec::H264, EncoderPreference::Nvenc, true),
+            capability(ClipCodec::H264, EncoderPreference::Software, false),
+            capability(ClipCodec::H265, EncoderPreference::Nvenc, true),
+            capability(ClipCodec::H265, EncoderPreference::Amf, true),
+        ];
+
+        assert_eq!(
+            encoders_to_try(&matrix, (ClipCodec::H265, EncoderPreference::Nvenc)),
+            vec![
+                (ClipCodec::H265, EncoderPreference::Nvenc),
+                (ClipCodec::H265, EncoderPreference::Amf),
+                (ClipCodec::H265, EncoderPreference::Software),
+                (ClipCodec::H264, EncoderPreference::Nvenc),
+                (ClipCodec::H264, EncoderPreference::Software),
+            ]
+        );
+        assert_eq!(
+            encoders_to_try(&matrix, (ClipCodec::H264, EncoderPreference::Software)),
+            vec![
+                (ClipCodec::H264, EncoderPreference::Software),
+                (ClipCodec::H264, EncoderPreference::Nvenc),
+            ]
+        );
     }
 }

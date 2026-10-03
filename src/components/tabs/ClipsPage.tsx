@@ -33,12 +33,6 @@ const HOOK: CaptureMethod = "graphics hook";
 const WINDOW: CaptureMethod = "window capture";
 const SCREEN: CaptureMethod = "screen capture";
 
-const ENCODER_NAME: Partial<Record<ClipEncoder, string>> = {
-  nvenc: "NVENC",
-  amf: "AMF",
-  quick_sync: "Quick Sync",
-  video_toolbox: "VideoToolbox",
-};
 const ALL_GAMES = "__all__";
 const FEEDBACK_URL = "https://discord.norisk.gg";
 
@@ -111,10 +105,11 @@ function liveDetail(
           ? t("clips.page.status.via_screen")
           : null;
   const encoder = status.active_encoder
-    ? (ENCODER_NAME[status.active_encoder] ?? t("settings.clips.quality.encoder.software"))
+    ? status.active_encoder === "software"
+      ? t("clips.page.status.by_cpu")
+      : t("clips.page.status.by_gpu")
     : null;
-  const codec = status.active_codec ? t(`settings.clips.quality.codec.${status.active_codec}`) : null;
-  const parts = [method, encoder, codec].filter(Boolean);
+  const parts = [method, encoder].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
