@@ -72,6 +72,7 @@ interface Props {
   busy: boolean;
   details: ClipDetails | null;
   onCancel: () => void;
+  onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
   onSave: (
     startSeconds: number,
     endSeconds: number,
@@ -90,6 +91,7 @@ export function ClipTrimmer({
   busy: saving,
   details,
   onCancel,
+  onStateChange,
   onSave,
   t,
 }: Props) {
@@ -190,6 +192,10 @@ export function ClipTrimmer({
   }, [cuts.restore, overlayEdit.restore]);
   const history = useEditHistory(doc, restore, !busy);
   const { rebase } = history;
+
+  useEffect(() => {
+    onStateChange?.({ dirty: history.canUndo, busy });
+  }, [busy, history.canUndo, onStateChange]);
 
   useEffect(() => {
     setVolumes(Object.fromEntries(adjustable.map((track) => [track.stream, 100])));

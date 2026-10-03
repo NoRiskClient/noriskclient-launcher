@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
@@ -9,7 +9,14 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ClipTrimmer } from "./ClipTrimmer";
-import { getClipDetails, trimClip, type ClipDetails, type TrackLevel } from "../../services/clip-service";
+import {
+  getClipDetails,
+  samePath,
+  trimClip,
+  type ClipDetails,
+  type TrackLevel,
+} from "../../services/clip-service";
+import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 
@@ -25,6 +32,9 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
   const [details, setDetails] = useState<ClipDetails | null>(null);
   const [saving, setSaving] = useState(false);
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const editor = useRef({ dirty: false, busy: false });
+  const switchTo = useRef<(next: EditorClip) => void>(() => {});
 
   useEffect(() => {
     const theme = useThemeStore.getState();
@@ -34,7 +44,33 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
   }, []);
 
   useEffect(() => {
-    const opened = listen<EditorClip>("clip_editor_open", (event) => setClip(event.payload));
+    switchTo.current = async (next: EditorClip) => {
+      if (samePath(next.path, clip.path)) return;
+      if (saving || editor.current.busy) {
+        toast.error(t("clips.editor.switch.busy"));
+        return;
+      }
+      if (editor.current.dirty) {
+        const sure = await confirm({
+          title: t("clips.editor.switch.title"),
+          message: t("clips.editor.switch.message", { name: next.name }),
+          confirmText: t("clips.editor.switch.confirm"),
+          cancelText: t("clips.gallery.cancel"),
+          type: "warning",
+        });
+        if (!sure) return;
+      }
+      editor.current = { dirty: false, busy: false };
+      setClip(next);
+    };
+  });
+
+  const track = useCallback((state: { dirty: boolean; busy: boolean }) => {
+    editor.current = state;
+  }, []);
+
+  useEffect(() => {
+    const opened = listen<EditorClip>("clip_editor_open", (event) => switchTo.current(event.payload));
     return () => void opened.then((stop) => stop());
   }, []);
 
@@ -100,17 +136,21 @@ export function ClipEditorWindow({ initial }: { initial: EditorClip }) {
   }
 
   return (
-    <ClipTrimmer
-      key={clip.path}
-      src={src}
-      path={clip.path}
-      name={clip.name}
-      duration={duration}
-      busy={saving}
-      details={details}
-      onCancel={close}
-      onSave={save}
-      t={t}
-    />
+    <>
+      <ClipTrimmer
+        key={clip.path}
+        src={src}
+        path={clip.path}
+        name={clip.name}
+        duration={duration}
+        busy={saving}
+        details={details}
+        onCancel={close}
+        onStateChange={track}
+        onSave={save}
+        t={t}
+      />
+      {confirmDialog}
+    </>
   );
 }
