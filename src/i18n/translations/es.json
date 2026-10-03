@@ -2692,6 +2692,8 @@
   "clips.trim.levels.live": "La vista previa sigue los controles: lo que oyes es lo que se guarda.",
   "clips.trim.levels.preparing": "Preparando la vista previa, hasta entonces reproduce la mezcla original.",
   "clips.editor.exit": "Salir",
+  "clips.editor.mac_notice.title": "Pronto también en Mac",
+  "clips.editor.mac_notice.message": "Las superposiciones, los cortes en medio y las pistas separadas llegarán a macOS con la próxima actualización. Recortar y el volumen ya funcionan.",
   "clips.editor.switch.title": "¿Cambiar a otro clip?",
   "clips.editor.switch.message": "Tus cambios en este clip se perderán si abres {{name}}.",
   "clips.editor.switch.confirm": "Cambiar",

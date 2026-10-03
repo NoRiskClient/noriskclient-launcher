@@ -2704,6 +2704,8 @@
   "clips.trim.levels.live": "Предпросмотр следует за ползунками: что слышишь, то и сохранится.",
   "clips.trim.levels.preparing": "Подготовка предпросмотра: пока что играет оригинальный микс.",
   "clips.editor.exit": "Выйти",
+  "clips.editor.mac_notice.title": "Скоро и на Mac",
+  "clips.editor.mac_notice.message": "Наложения, вырезание из середины и раздельные дорожки появятся на macOS в следующем обновлении. Обрезка и громкость уже работают.",
   "clips.editor.switch.title": "Перейти к другому клипу?",
   "clips.editor.switch.message": "Твои изменения в этом клипе будут потеряны, если ты откроешь {{name}}.",
   "clips.editor.switch.confirm": "Перейти",

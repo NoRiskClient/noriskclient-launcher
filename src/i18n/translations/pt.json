@@ -2692,6 +2692,8 @@
   "clips.trim.levels.live": "A pré-visualização acompanha os controles: o que você ouve é o que será salvo.",
   "clips.trim.levels.preparing": "Preparando a pré-visualização, até lá ela reproduz a mixagem original.",
   "clips.editor.exit": "Sair",
+  "clips.editor.mac_notice.title": "Em breve também no Mac",
+  "clips.editor.mac_notice.message": "Sobreposições, cortes no meio e faixas separadas chegam ao macOS na próxima atualização. Cortar e o volume já funcionam.",
   "clips.editor.switch.title": "Mudar para outro clipe?",
   "clips.editor.switch.message": "As tuas alterações a este clipe serão perdidas se abrires {{name}}.",
   "clips.editor.switch.confirm": "Mudar",

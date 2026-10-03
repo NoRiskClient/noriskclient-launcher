@@ -2441,6 +2441,8 @@
   "clips.trim.levels.live": "The preview follows the sliders — what you hear is what gets saved.",
   "clips.trim.levels.preparing": "Preparing the preview — until then it plays the original mix.",
   "clips.editor.exit": "Exit",
+  "clips.editor.mac_notice.title": "Coming soon on Mac",
+  "clips.editor.mac_notice.message": "Overlays, cuts in the middle and separate tracks are coming to macOS with the next update. Trimming and volume already work.",
   "clips.editor.switch.title": "Switch to another clip?",
   "clips.editor.switch.message": "Your changes to this clip will be lost if you open {{name}}.",
   "clips.editor.switch.confirm": "Switch",

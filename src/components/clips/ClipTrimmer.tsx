@@ -725,6 +725,24 @@ export function ClipTrimmer({
         </nav>
 
         <aside className="custom-scrollbar flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r border-white/10 bg-black/20 p-4">
+          {!FULL_EDITOR && (
+            <div
+              className="flex items-start gap-2.5 rounded-lg border px-3 py-2.5"
+              style={{ borderColor: `${accentColor.value}60`, backgroundColor: `${accentColor.value}1a` }}
+            >
+              <Icon
+                icon="solar:info-circle-bold"
+                className="mt-0.5 h-4 w-4 shrink-0"
+                style={{ color: accentColor.value }}
+              />
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="font-minecraft text-sm text-white">{t("clips.editor.mac_notice.title")}</span>
+                <span className="font-minecraft text-xs leading-relaxed text-white/60">
+                  {t("clips.editor.mac_notice.message")}
+                </span>
+              </div>
+            </div>
+          )}
           {panel === "tools" && (
             <>
               <PanelTitle color={accentColor.value}>{t("clips.editor.tools")}</PanelTitle>

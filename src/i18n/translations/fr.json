@@ -2692,6 +2692,8 @@
   "clips.trim.levels.live": "L'aperçu suit les curseurs, ce que tu entends est ce qui sera enregistré.",
   "clips.trim.levels.preparing": "Préparation de l'aperçu, en attendant il lit le mixage original.",
   "clips.editor.exit": "Quitter",
+  "clips.editor.mac_notice.title": "Bientôt aussi sur Mac",
+  "clips.editor.mac_notice.message": "Les incrustations, les coupes au milieu et les pistes séparées arrivent sur macOS avec la prochaine mise à jour. Le découpage et le volume fonctionnent déjà.",
   "clips.editor.switch.title": "Passer à un autre clip ?",
   "clips.editor.switch.message": "Tes modifications de ce clip seront perdues si tu ouvres {{name}}.",
   "clips.editor.switch.confirm": "Changer",

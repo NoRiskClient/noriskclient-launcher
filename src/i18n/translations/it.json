@@ -2692,6 +2692,8 @@
   "clips.trim.levels.live": "L'anteprima segue i cursori: quello che senti è quello che viene salvato.",
   "clips.trim.levels.preparing": "Preparazione dell'anteprima: fino ad allora riproduce il mix originale.",
   "clips.editor.exit": "Esci",
+  "clips.editor.mac_notice.title": "Presto anche su Mac",
+  "clips.editor.mac_notice.message": "Sovrapposizioni, tagli nel mezzo e tracce separate arriveranno su macOS con il prossimo aggiornamento. Taglio e volume funzionano già.",
   "clips.editor.switch.title": "Passare a un'altra clip?",
   "clips.editor.switch.message": "Le modifiche a questa clip andranno perse se apri {{name}}.",
   "clips.editor.switch.confirm": "Cambia",

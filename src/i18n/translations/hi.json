@@ -2707,6 +2707,8 @@
   "clips.trim.levels.live": "प्रीव्यू स्लाइडर्स को फ़ॉलो करता है, जो आप सुनते हैं वही सेव होता है।",
   "clips.trim.levels.preparing": "प्रीव्यू तैयार किया जा रहा है, तब तक यह असली मिक्स चलाता है।",
   "clips.editor.exit": "बाहर निकलें",
+  "clips.editor.mac_notice.title": "जल्द ही Mac पर भी",
+  "clips.editor.mac_notice.message": "ओवरले, बीच में कट और अलग ट्रैक अगले अपडेट के साथ macOS पर भी आएँगे। ट्रिम और वॉल्यूम अभी से काम करते हैं।",
   "clips.editor.switch.title": "दूसरी क्लिप पर जाएँ?",
   "clips.editor.switch.message": "{{name}} खोलने पर इस क्लिप में किए गए आपके बदलाव खो जाएँगे।",
   "clips.editor.switch.confirm": "बदलें",

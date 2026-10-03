@@ -2692,6 +2692,8 @@
   "clips.trim.levels.live": "Önizleme kaydırıcıları takip eder, duyduğun şey kaydedilecek olandır.",
   "clips.trim.levels.preparing": "Önizleme hazırlanıyor, o zamana kadar orijinal karışımı çalar.",
   "clips.editor.exit": "Çık",
+  "clips.editor.mac_notice.title": "Yakında Mac'te de",
+  "clips.editor.mac_notice.message": "Katmanlar, ortadan kesme ve ayrı parçalar bir sonraki güncellemeyle macOS'a da geliyor. Kırpma ve ses seviyesi şimdiden çalışıyor.",
   "clips.editor.switch.title": "Başka bir klibe geçilsin mi?",
   "clips.editor.switch.message": "{{name}} açarsan bu klipteki değişikliklerin kaybolacak.",
   "clips.editor.switch.confirm": "Geç",

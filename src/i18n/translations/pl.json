@@ -2702,6 +2702,8 @@
   "clips.trim.levels.live": "Podgląd podąża za suwakami, to, co słyszysz, jest tym, co zostanie zapisane.",
   "clips.trim.levels.preparing": "Przygotowywanie podglądu, do tego czasu odtwarzany jest oryginalny miks.",
   "clips.editor.exit": "Zakończ",
+  "clips.editor.mac_notice.title": "Wkrótce także na Macu",
+  "clips.editor.mac_notice.message": "Nakładki, cięcia w środku i osobne ścieżki pojawią się na macOS w następnej aktualizacji. Przycinanie i głośność działają już teraz.",
   "clips.editor.switch.title": "Przełączyć na inny klip?",
   "clips.editor.switch.message": "Twoje zmiany w tym klipie zostaną utracone, jeśli otworzysz {{name}}.",
   "clips.editor.switch.confirm": "Przełącz",
