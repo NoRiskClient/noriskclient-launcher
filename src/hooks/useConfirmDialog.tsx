@@ -3,11 +3,11 @@
 import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/buttons/Button";
 import { Input } from "../components/ui/Input";
-import { Label } from "../components/ui/Label";
 import { StatusMessage } from "../components/ui/StatusMessage";
 
 interface ConfirmOptions {
@@ -20,6 +20,7 @@ interface ConfirmOptions {
   inputInitialValue?: string;
   inputRequired?: boolean;
   type?: "confirm" | "input" | "warning" | "danger";
+  icon?: string;
   fullscreen?: boolean;
 }
 
@@ -134,7 +135,10 @@ export function useConfirmDialog() {
   };
 
   const renderContent = () => (
-    <div className="p-6 space-y-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={options.type === "input" ? "p-6 space-y-6" : "px-6 pt-6"}
+      onClick={(e) => e.stopPropagation()}
+    >
       {options.message && (
         <StatusMessage
           type={getStatusMessageType()}
@@ -165,6 +169,7 @@ export function useConfirmDialog() {
       ? createPortal(
           <Modal
             title={options.title}
+            titleIcon={options.icon ? <Icon icon={options.icon} className="w-5 h-5" /> : undefined}
             onClose={handleClose}
             width="md"
             footer={renderFooter()}
@@ -178,5 +183,6 @@ export function useConfirmDialog() {
   return {
     confirm,
     confirmDialog,
+    isOpen,
   };
 }

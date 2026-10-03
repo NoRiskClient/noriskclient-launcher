@@ -657,7 +657,7 @@ export function ProfileCardV2({
 
         {/* Settings Context Menu */}
                  <SettingsContextMenu
-           profile={profile}
+           target={profile}
            isOpen={isContextMenuOpen}
            position={contextMenuPosition}
            items={contextMenuItems}
@@ -827,7 +827,7 @@ export function ProfileCardV2({
 
              {/* Settings Context Menu */}
        <SettingsContextMenu
-         profile={profile}
+         target={profile}
          isOpen={isContextMenuOpen}
          position={contextMenuPosition}
          items={contextMenuItems}

@@ -95,6 +95,11 @@ pub fn write_mp4(
         (*params).width = track.width as i32;
         (*params).height = track.height as i32;
         (*params).format = ff::AVPixelFormat::AV_PIX_FMT_YUV420P as i32;
+        (*params).color_primaries = crate::encoder::video::COLOR_PRIMARIES;
+        (*params).color_trc = crate::encoder::video::COLOR_TRANSFER;
+        (*params).color_space = crate::encoder::video::COLOR_SPACE;
+        (*params).color_range = crate::encoder::video::COLOR_RANGE;
+        (*params).chroma_location = crate::encoder::video::CHROMA_LOCATION;
 
         let extradata = ff::av_malloc(track.extradata.len() + ff::AV_INPUT_BUFFER_PADDING_SIZE as usize)
             as *mut u8;
@@ -460,5 +465,37 @@ mod tests {
             "90 frames at 60 fps should be 1.5s, got {:.2}s",
             written.duration_seconds
         );
+    }
+
+    #[test]
+    #[ignore = "needs a real clip in NRC_TEST_CLIP"]
+    fn a_written_clip_says_which_colours_it_holds() {
+        let source = std::path::PathBuf::from(std::env::var("NRC_TEST_CLIP").unwrap());
+        let destination = std::env::temp_dir().join("nrc-colour-test.mp4");
+        let _ = std::fs::remove_file(&destination);
+
+        crate::trim::trim(&source, &destination, 0.0, 2.0, None, None, &[]).unwrap();
+
+        let probe = std::process::Command::new("ffprobe")
+            .args([
+                "-hide_banner", "-v", "error", "-select_streams", "v:0",
+                "-show_entries",
+                "stream=color_space,color_primaries,color_transfer,color_range",
+                "-of", "default=noprint_wrappers=1",
+            ])
+            .arg(&destination)
+            .output()
+            .expect("ffprobe");
+        let text = String::from_utf8_lossy(&probe.stdout).to_string();
+        eprintln!("{text}");
+
+        for wanted in [
+            "color_space=bt709",
+            "color_primaries=bt709",
+            "color_transfer=bt709",
+            "color_range=tv",
+        ] {
+            assert!(text.contains(wanted), "missing {wanted} in:\n{text}");
+        }
     }
 }

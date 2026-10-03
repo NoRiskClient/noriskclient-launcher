@@ -48,6 +48,12 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    std::panic::set_hook(Box::new(|info| {
+        let trace = std::backtrace::Backtrace::force_capture();
+        log::error!("The capture engine crashed: {info}\n{trace}");
+        log::logger().flush();
+    }));
+
     log::info!(
         "norisk-capture {} starting on {pipe_name}",
         env!("CARGO_PKG_VERSION")
@@ -61,6 +67,8 @@ fn main() -> anyhow::Result<()> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
     }
+
+    see_real_pixels();
 
     let (commands_tx, commands_rx) = std::sync::mpsc::channel();
     let (events_tx, events_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -92,4 +100,17 @@ fn main() -> anyhow::Result<()> {
 #[cfg(target_os = "macos")]
 fn main() {
     norisk_capture::macos::run();
+}
+
+#[cfg(windows)]
+fn see_real_pixels() {
+    use windows::Win32::UI::HiDpi::{
+        SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    };
+
+    if let Err(e) = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) } {
+        log::warn!(
+            "Could not ask Windows for real pixel sizes, so window sizes on a scaled display will be off: {e}"
+        );
+    }
 }

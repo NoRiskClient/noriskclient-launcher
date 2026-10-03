@@ -168,6 +168,8 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                     defer { pendingMedia.leave() }
                     do { try await editMedia(message) } catch { report(error, code: "clip_write") }
                 }
+            case "export_gif":
+                report(failure("GIF export is not available on macOS yet."), code: "clip_write")
             default: break
             }
         } catch {

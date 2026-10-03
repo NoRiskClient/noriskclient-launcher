@@ -119,8 +119,15 @@ impl Flipper {
 
         let view = self.source_view(source)?;
         let context = &self.device.context;
+        let _alone = Alone::new(&self.device);
 
         unsafe {
+            context.RSSetState(None);
+            context.OMSetBlendState(None, None, u32::MAX);
+            context.OMSetDepthStencilState(None, 0);
+            context.GSSetShader(None, None);
+            context.HSSetShader(None, None);
+            context.DSSetShader(None, None);
             context.OMSetRenderTargets(Some(&[Some(target.view.clone())]), None);
             context.RSSetViewports(Some(&[D3D11_VIEWPORT {
                 TopLeftX: 0.0,
@@ -186,7 +193,7 @@ impl Flipper {
         }
 
         log::info!(
-            "Flipping {}x{} in a shader because the video processor cannot mirror",
+            "Flipping {}x{} the right way up in a shader",
             size.0,
             size.1
         );
@@ -223,6 +230,28 @@ impl Flipper {
 
         sources.insert(key, view.clone());
         Ok(view)
+    }
+}
+
+struct Alone(Option<windows::Win32::Graphics::Direct3D11::ID3D11Multithread>);
+
+impl Alone {
+    fn new(device: &CaptureDevice) -> Self {
+        use windows::core::Interface;
+
+        let lock = device.context.cast::<windows::Win32::Graphics::Direct3D11::ID3D11Multithread>().ok();
+        if let Some(lock) = lock.as_ref() {
+            unsafe { lock.Enter() };
+        }
+        Self(lock)
+    }
+}
+
+impl Drop for Alone {
+    fn drop(&mut self) {
+        if let Some(lock) = self.0.as_ref() {
+            unsafe { lock.Leave() };
+        }
     }
 }
 

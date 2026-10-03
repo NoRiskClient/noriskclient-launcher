@@ -12,7 +12,6 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
     D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0,
     D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0,
-    D3D11_VIDEO_PROCESSOR_CAPS, D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_MIRROR,
     D3D11_VIDEO_PROCESSOR_STREAM, D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
     D3D11_VPIV_DIMENSION_TEXTURE2D, D3D11_VPOV_DIMENSION_TEXTURE2D,
 };
@@ -30,7 +29,6 @@ pub struct Converter {
     output: (u32, u32),
     fps: u32,
     source_window: Option<windows::Win32::Foundation::HWND>,
-    flip_vertical: bool,
     flipper: Option<super::flip::Flipper>,
     inner: Mutex<Option<Processor>>,
 }
@@ -76,49 +74,24 @@ impl Converter {
             output,
             fps,
             source_window,
-            flip_vertical: false,
             flipper: None,
             inner: Mutex::new(None),
         })
     }
 
     pub fn set_flip_vertical(&mut self, flip: bool) {
-        self.flip_vertical = flip;
         self.flipper = None;
 
-        if flip && !self.processor_can_mirror() {
+        if flip {
             match super::flip::Flipper::new(&self._device) {
                 Ok(flipper) => self.flipper = Some(flipper),
                 Err(e) => log::error!(
-                    "This driver cannot mirror and the flip shader would not build, so the \
-                     recording will come out upside down: {e:#}"
+                    "The flip shader would not build, so the recording will come out upside down: {e:#}"
                 ),
             }
         }
 
         *self.inner.lock().unwrap_or_else(|e| e.into_inner()) = None;
-    }
-
-    fn processor_can_mirror(&self) -> bool {
-        let rate = DXGI_RATIONAL {
-            Numerator: self.fps.max(1),
-            Denominator: 1,
-        };
-        let content = D3D11_VIDEO_PROCESSOR_CONTENT_DESC {
-            InputFrameFormat: D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
-            InputFrameRate: rate,
-            InputWidth: self.output.0,
-            InputHeight: self.output.1,
-            OutputFrameRate: rate,
-            OutputWidth: self.output.0,
-            OutputHeight: self.output.1,
-            Usage: D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
-        };
-
-        unsafe { self.video_device.CreateVideoProcessorEnumerator(&content) }
-            .ok()
-            .and_then(|enumerator| can_mirror(&enumerator).ok())
-            .unwrap_or(false)
     }
 
     fn build_processor(
@@ -128,7 +101,6 @@ impl Converter {
         crop: Option<(i32, i32, u32, u32)>,
         output: (u32, u32),
         fps: u32,
-        flip_vertical: bool,
     ) -> Result<Processor> {
         let rate = DXGI_RATIONAL {
             Numerator: fps.max(1),
@@ -159,22 +131,12 @@ impl Converter {
         };
 
         unsafe {
+            video_context.VideoProcessorSetStreamAutoProcessingMode(&processor, 0, false);
             video_context.VideoProcessorSetStreamColorSpace1(
                 &processor,
                 0,
                 DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709,
             );
-            if flip_vertical {
-                if can_mirror(&enumerator)? {
-                    video_context.VideoProcessorSetStreamMirror(&processor, 0, true, false, true);
-                } else {
-                    log::error!(
-                        "The video processor on this driver cannot mirror, so the recording \
-                         will come out upside down"
-                    );
-                }
-            }
-
             video_context.VideoProcessorSetOutputColorSpace1(
                 &processor,
                 DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709,
@@ -265,16 +227,17 @@ impl Converter {
         dst: &ID3D11Texture2D,
         dst_slice: u32,
     ) -> Result<()> {
+        let real = unsafe {
+            let mut desc = std::mem::zeroed::<
+                windows::Win32::Graphics::Direct3D11::D3D11_TEXTURE2D_DESC,
+            >();
+            source.GetDesc(&mut desc);
+            (desc.Width, desc.Height)
+        };
         let source_size = if content.0 > 0 && content.1 > 0 {
-            content
+            (content.0.min(real.0), content.1.min(real.1))
         } else {
-            unsafe {
-                let mut desc = std::mem::zeroed::<
-                    windows::Win32::Graphics::Direct3D11::D3D11_TEXTURE2D_DESC,
-                >();
-                source.GetDesc(&mut desc);
-                (desc.Width, desc.Height)
-            }
+            real
         };
 
         let flipped;
@@ -322,7 +285,6 @@ impl Converter {
                 crop,
                 self.output,
                 self.fps,
-                self.flip_vertical && self.flipper.is_none(),
             )?);
         }
 
@@ -461,13 +423,6 @@ fn fit_preserving_aspect(input: (u32, u32), output: (u32, u32)) -> (i32, i32, i3
     let top = ((output.1 - height) / 2) as i32;
 
     (left, top, left + width as i32, top + height as i32)
-}
-
-fn can_mirror(enumerator: &ID3D11VideoProcessorEnumerator) -> Result<bool> {
-    let mut caps = D3D11_VIDEO_PROCESSOR_CAPS::default();
-    unsafe { enumerator.GetVideoProcessorCaps(&mut caps) }
-        .context("GetVideoProcessorCaps failed")?;
-    Ok(caps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_MIRROR.0 as u32 != 0)
 }
 
 pub fn fit_output(source: (u32, u32), cap: (u32, u32)) -> (u32, u32) {

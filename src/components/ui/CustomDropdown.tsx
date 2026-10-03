@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
 
 export interface DropdownOption {
   value: string;
@@ -111,20 +112,18 @@ export function CustomDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full mt-2 bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden ${
+        <div className={`absolute top-full mt-2 ${MENU_PANEL_CLASSES} ${
           variant === 'search' ? 'left-0 right-0' : label ? 'left-0 right-0' : 'left-0 w-56'
         }`}>
           <div className="py-2">
             {options.map((option, index) => (
               <div key={option.value}>
                 {option.separator && index > 0 && (
-                  <div className={`border-t border-white/10 ${isSm ? 'my-1 mx-2' : 'my-1.5 mx-3'}`} />
+                  <div className={menuSeparatorClasses(isSm)} />
                 )}
                 <button
                   onClick={() => handleOptionClick(option.value)}
-                  className={`w-full flex items-center gap-2.5 text-left font-minecraft transition-colors duration-150 ${
-                    isSm ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-3 text-base'
-                  } ${
+                  className={`${menuItemClasses(isSm)} ${
                     option.value === value
                       ? 'bg-white/10 text-white'
                       : 'text-white/80 hover:bg-white/5 hover:text-white'

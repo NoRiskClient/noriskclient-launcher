@@ -162,24 +162,9 @@ pub async fn open_minecraft_log_window<R: tauri::Runtime>(
     let window_label = "minecraft_log_window";
 
     if let Some(window) = app.get_webview_window(window_label) {
-        window.show().map_err(|e| {
+        crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to show minecraft log window: {}",
-                e
-            )))
-        })?;
-        window.unminimize().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to unminimize minecraft log window: {}",
-                e
-            )))
-        })?;
-        // Trick to bring window to front on Windows: temporarily set always on top
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        window.set_focus().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to focus minecraft log window: {}",
+                "Failed to bring minecraft log window to front: {}",
                 e
             )))
         })?;
@@ -276,24 +261,9 @@ pub async fn focus_main_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
     if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| {
+        crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to show main window: {}",
-                e
-            )))
-        })?;
-        window.unminimize().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to unminimize main window: {}",
-                e
-            )))
-        })?;
-        // Trick to bring window to front on Windows: temporarily set always on top
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        window.set_focus().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to focus main window: {}",
+                "Failed to bring main window to front: {}",
                 e
             )))
         })?;

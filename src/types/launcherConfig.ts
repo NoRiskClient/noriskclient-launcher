@@ -44,6 +44,7 @@ export interface EncoderCapability {
   available: boolean;
   hardware: boolean;
   detail: string | null;
+  driver_too_old?: boolean;
 }
 
 export interface QualitySpec {
@@ -87,6 +88,8 @@ export interface ClipConfig {
   capture_microphone: boolean;
   microphone_device_id: string | null;
   microphone_volume: number;
+  microphone_denoise: boolean;
+  excluded_audio_executable: string | null;
   output_dir: string | null;
   max_storage_gb: number;
   pre_roll_seconds: number;
@@ -94,10 +97,16 @@ export interface ClipConfig {
   hotkey_save: string;
   hotkey_toggle: string;
   other_game: OtherGame | null;
+  other_screen: OtherScreen | null;
 }
 
 export interface OtherGame {
   executable: string;
+  name: string;
+}
+
+export interface OtherScreen {
+  device: string;
   name: string;
 }
 
@@ -106,6 +115,8 @@ export type CaptureRuntimeState =
   | { state: "missing" }
   | { state: "downloading"; downloaded: number; total: number | null }
   | { state: "failed"; message: string };
+
+export type CaptureMethod = "graphics hook" | "window capture" | "screen capture" | "screencapturekit" | "unknown";
 
 export interface CaptureStatus {
   running: boolean;
@@ -124,6 +135,11 @@ export interface CaptureStatus {
   capabilities: EncoderCapability[];
   active_codec: ClipCodec | null;
   active_encoder: ClipEncoder | null;
+  capture_method: CaptureMethod | null;
+  capture_fps: number;
+  dropped_frames: number;
+  retry_in_seconds: number | null;
+  last_error: { code: string; message: string; recoverable: boolean } | null;
   audio_devices: AudioDeviceInfo[];
   microphones: AudioDeviceInfo[];
   supports_game_only_audio: boolean;

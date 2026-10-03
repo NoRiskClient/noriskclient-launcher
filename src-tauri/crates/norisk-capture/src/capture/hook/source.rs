@@ -74,6 +74,10 @@ impl HookCapture {
     pub fn adapter(&self) -> &str {
         &self.adapter
     }
+
+    pub fn has_stopped(&self) -> bool {
+        self.thread.as_ref().is_none_or(|thread| thread.is_finished())
+    }
 }
 
 impl Drop for HookCapture {
@@ -104,6 +108,8 @@ fn run(
     };
 
     let mut next = Instant::now();
+    let mut size = texture_size(&staging);
+    let mut unopenable_since: Option<Instant> = None;
 
     while !stop.load(Ordering::Relaxed) {
         let now = Instant::now();
@@ -131,11 +137,22 @@ fn run(
                         );
                         opened = new_texture;
                         staging = new_staging;
+                        size = texture_size(&staging);
                         texture = fresh;
+                        unopenable_since = None;
                         stats.reopened.fetch_add(1, Ordering::Relaxed);
                     }
                     Err(e) => {
-                        log::warn!("Could not open the hook's new texture: {e:#}");
+                        let since = *unopenable_since.get_or_insert_with(|| {
+                            log::warn!("Could not open the hook's new texture: {e:#}");
+                            Instant::now()
+                        });
+                        if since.elapsed() > GIVE_UP_AFTER {
+                            log::warn!(
+                                "The hook's texture has not opened for {GIVE_UP_AFTER:?}; stopping so the recording can be rebuilt"
+                            );
+                            break;
+                        }
                         continue;
                     }
                 }
@@ -153,8 +170,8 @@ fn run(
 
         sink.on_frame(BgraFrame {
             texture: &staging,
-            width: texture.width,
-            height: texture.height,
+            width: size.0,
+            height: size.1,
             timestamp_100ns: qpc_100ns(),
         });
         stats.delivered.fetch_add(1, Ordering::Relaxed);
@@ -178,6 +195,7 @@ fn create_processor_input(
     unsafe { source.GetDesc(&mut desc) };
 
     let desc = D3D11_TEXTURE2D_DESC {
+        Format: readable(desc.Format),
         BindFlags: (D3D11_BIND_RENDER_TARGET.0 | D3D11_BIND_SHADER_RESOURCE.0) as u32,
         MiscFlags: 0,
         CPUAccessFlags: 0,
@@ -192,6 +210,31 @@ fn create_processor_input(
             .context("CreateTexture2D failed")?;
     }
     texture.context("CreateTexture2D returned nothing")
+}
+
+const GIVE_UP_AFTER: Duration = Duration::from_secs(3);
+
+fn texture_size(texture: &ID3D11Texture2D) -> (u32, u32) {
+    let desc = shared::describe(texture);
+    (desc.Width, desc.Height)
+}
+
+fn readable(
+    format: windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT,
+) -> windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT {
+    use windows::Win32::Graphics::Dxgi::Common::*;
+
+    match format {
+        DXGI_FORMAT_B8G8R8A8_TYPELESS | DXGI_FORMAT_B8G8R8A8_UNORM_SRGB => {
+            DXGI_FORMAT_B8G8R8A8_UNORM
+        }
+        DXGI_FORMAT_R8G8B8A8_TYPELESS | DXGI_FORMAT_R8G8B8A8_UNORM_SRGB => {
+            DXGI_FORMAT_R8G8B8A8_UNORM
+        }
+        DXGI_FORMAT_R10G10B10A2_TYPELESS => DXGI_FORMAT_R10G10B10A2_UNORM,
+        DXGI_FORMAT_R16G16B16A16_TYPELESS => DXGI_FORMAT_R16G16B16A16_FLOAT,
+        other => other,
+    }
 }
 
 fn qpc_100ns() -> i64 {

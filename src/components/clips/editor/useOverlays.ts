@@ -1,0 +1,183 @@
+import { useCallback, useRef, useState, type RefObject } from "react";
+
+import type { ClipOverlay } from "../../../services/clip-service";
+import { MIN_BOX, MIN_LENGTH, clamp, type NewOverlay } from "./shared";
+import { useWindowDrag } from "./useWindowDrag";
+
+interface BoxDrag {
+  index: number;
+  mode: "move" | "resize";
+  fromX: number;
+  fromY: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface BarDrag {
+  index: number;
+  mode: "move" | "start" | "end";
+  fromX: number;
+  startSeconds: number;
+  endSeconds: number;
+}
+
+interface Stage {
+  start: number;
+  end: number;
+  duration: number;
+  frameRef: RefObject<HTMLDivElement | null>;
+  scaleRef: RefObject<HTMLDivElement | null>;
+}
+
+export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage) {
+  const [overlays, setOverlays] = useState<ClipOverlay[]>([]);
+  const latest = useRef<ClipOverlay[]>([]);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [boxDrag, setBoxDrag] = useState<BoxDrag | null>(null);
+  const [barDrag, setBarDrag] = useState<BarDrag | null>(null);
+
+  const commit = useCallback((next: ClipOverlay[]) => {
+    latest.current = next;
+    setOverlays(next);
+  }, []);
+
+  const editOverlay = useCallback(
+    (index: number, patch: Partial<ClipOverlay>) => {
+      commit(
+        latest.current.map((overlay, at) =>
+          at === index ? ({ ...overlay, ...patch } as ClipOverlay) : overlay,
+        ),
+      );
+    },
+    [commit],
+  );
+
+  const addOverlay = useCallback(
+    (seed: NewOverlay) => {
+      const next = [
+        ...latest.current,
+        {
+          ...seed,
+          left: 0.25,
+          top: 0.25,
+          width: 0.5,
+          height: 0.5,
+          startSeconds: start,
+          endSeconds: end,
+        },
+      ];
+      commit(next);
+      setChosen(next.length - 1);
+    },
+    [commit, end, start],
+  );
+
+  const dropOverlay = useCallback(
+    (index: number) => {
+      commit(latest.current.filter((_, at) => at !== index));
+      setChosen(null);
+    },
+    [commit],
+  );
+
+  const restore = useCallback(
+    (saved: ClipOverlay[]) => {
+      commit(saved);
+      setChosen((current) =>
+        current === null || saved.length === 0 ? null : Math.min(current, saved.length - 1),
+      );
+    },
+    [commit],
+  );
+
+  const grabBox = (index: number, mode: BoxDrag["mode"], event: { clientX: number; clientY: number }) => {
+    const overlay = overlays[index];
+    if (!overlay) return;
+    setChosen(index);
+    setBoxDrag({
+      index,
+      mode,
+      fromX: event.clientX,
+      fromY: event.clientY,
+      left: overlay.left,
+      top: overlay.top,
+      width: overlay.width,
+      height: overlay.height,
+    });
+  };
+
+  const grabBar = (index: number, mode: BarDrag["mode"], event: { clientX: number }) => {
+    const overlay = overlays[index];
+    if (!overlay) return;
+    setChosen(index);
+    setBarDrag({
+      index,
+      mode,
+      fromX: event.clientX,
+      startSeconds: overlay.startSeconds,
+      endSeconds: overlay.endSeconds,
+    });
+  };
+
+  useWindowDrag(
+    boxDrag,
+    (event, boxDrag) => {
+      const rect = frameRef.current?.getBoundingClientRect();
+      if (!rect || rect.width === 0 || rect.height === 0) return;
+      const byX = (event.clientX - boxDrag.fromX) / rect.width;
+      const byY = (event.clientY - boxDrag.fromY) / rect.height;
+      if (boxDrag.mode === "move") {
+        editOverlay(boxDrag.index, {
+          left: clamp(boxDrag.left + byX, 0, 1 - boxDrag.width),
+          top: clamp(boxDrag.top + byY, 0, 1 - boxDrag.height),
+        });
+      } else {
+        editOverlay(boxDrag.index, {
+          width: clamp(boxDrag.width + byX, MIN_BOX, 1 - boxDrag.left),
+          height: clamp(boxDrag.height + byY, MIN_BOX, 1 - boxDrag.top),
+        });
+      }
+    },
+    () => setBoxDrag(null),
+  );
+
+  useWindowDrag(
+    barDrag,
+    (event, barDrag) => {
+      const rect = scaleRef.current?.getBoundingClientRect();
+      if (!rect || rect.width === 0 || duration <= 0) return;
+      const by = ((event.clientX - barDrag.fromX) / rect.width) * duration;
+      if (barDrag.mode === "move") {
+        const span = barDrag.endSeconds - barDrag.startSeconds;
+        const from = clamp(barDrag.startSeconds + by, 0, duration - span);
+        editOverlay(barDrag.index, { startSeconds: from, endSeconds: from + span });
+      } else if (barDrag.mode === "start") {
+        editOverlay(barDrag.index, {
+          startSeconds: clamp(barDrag.startSeconds + by, 0, barDrag.endSeconds - MIN_LENGTH),
+        });
+      } else {
+        editOverlay(barDrag.index, {
+          endSeconds: clamp(barDrag.endSeconds + by, barDrag.startSeconds + MIN_LENGTH, duration),
+        });
+      }
+    },
+    () => setBarDrag(null),
+  );
+
+  const picked = chosen === null ? null : (overlays[chosen] ?? null);
+
+  return {
+    overlays,
+    chosen,
+    setChosen,
+    picked,
+    editOverlay,
+    addOverlay,
+    dropOverlay,
+    grabBox,
+    grabBar,
+    restore,
+  };
+}
