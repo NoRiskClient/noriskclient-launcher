@@ -279,8 +279,8 @@ fn remix(stems: &[(u32, &AudioSource)], levels: &[norisk_ipc::TrackLevel]) -> Re
 
         let offset = ((stem.packets[0].pts - start_pts).max(0) as i128
             * OUTPUT_SAMPLE_RATE as i128
-            * OUTPUT_CHANNELS as i128
-            / TIME_BASE_DEN as i128) as usize;
+            / TIME_BASE_DEN as i128) as usize
+            * OUTPUT_CHANNELS as usize;
 
         if mixed.len() < offset + samples.len() {
             mixed.resize(offset + samples.len(), 0.0);
