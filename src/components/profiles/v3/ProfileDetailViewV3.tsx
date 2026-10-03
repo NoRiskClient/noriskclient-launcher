@@ -155,7 +155,10 @@ export function ProfileDetailViewV3({
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const getGenericDisplayFileName = useCallback((item: LocalContentItem) => item.filename, []);
+  const getGenericDisplayFileName = useCallback(
+    (item: LocalContentItem) => item.modrinth_info?.name || item.curseforge_info?.name || item.filename,
+    [],
+  );
 
   // Stub — tabs handle their own refresh; mirrors V2's handleRefresh noop.
   const handleRefresh = useCallback(() => {}, []);

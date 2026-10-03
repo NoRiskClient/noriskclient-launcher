@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::sync::context::SyncContext;
+use crate::sync::model::{jar_exclusion_key, mod_exclusion_key};
 use crate::sync::handlers::SyncHandler;
 use crate::sync::paths;
 use crate::sync::report::HandlerOutcome;
@@ -22,9 +23,29 @@ impl SyncHandler for ModsHandler {
         )
         .await;
 
-        outcome.extra_mods = resolution.mods;
+        let excluded = ctx
+            .manager
+            .get_profile_exclusions(ctx.profile.id)
+            .await
+            .unwrap_or_default()
+            .remove(&ctx.pack.id)
+            .unwrap_or_default();
+
+        outcome.extra_mods = resolution
+            .mods
+            .into_iter()
+            .filter(|m| !excluded.contains(&mod_exclusion_key(m.id)))
+            .collect();
         outcome.warnings.extend(resolution.warnings);
-        outcome.extra_local_jars = paths::list_pack_local_jars(ctx.pack.id).await?;
+        outcome.extra_local_jars = paths::list_pack_local_jars(ctx.pack.id)
+            .await?
+            .into_iter()
+            .filter(|path| {
+                path.file_name()
+                    .map(|name| !excluded.contains(&jar_exclusion_key(&name.to_string_lossy())))
+                    .unwrap_or(true)
+            })
+            .collect();
 
         debug!(
             "Sync pack '{}' contributes {} mod(s) and {} local jar(s)",

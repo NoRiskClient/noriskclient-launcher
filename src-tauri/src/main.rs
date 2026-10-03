@@ -24,6 +24,10 @@ use crate::commands::process_command::{
 use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
 };
+use commands::twitch_command::{
+    twitch_available_scopes, twitch_begin_device_login, twitch_cancel_login, twitch_is_linked,
+    twitch_unlink,
+};
 use commands::minecraft_command::{
     add_skin,
     apply_skin_from_base64,
@@ -543,6 +547,8 @@ async fn main() {
                 //debug_utils::debug_unified_mod_versions().await;
             });
 
+            utils::screen_time::spawn(app_handle.clone());
+
             // --- Register Focus Event Listener for Discord RPC ---
             if let Some(main_window) = app.get_webview_window("main") {
                 let focus_app_handle = app_handle.clone();
@@ -566,6 +572,7 @@ async fn main() {
                 // --- Handle window close request (from taskbar, etc.) ---
                 main_window.listen("tauri://close-requested", move |_event| {
                     info!("Window close requested via system (taskbar, etc.). Exiting application.");
+                    utils::screen_time::report_before_exit();
                     std::process::exit(0);
                 });
             } else {
@@ -608,6 +615,11 @@ async fn main() {
             get_active_account,
             set_active_account,
             get_accounts,
+            twitch_available_scopes,
+            twitch_begin_device_login,
+            twitch_cancel_login,
+            twitch_unlink,
+            twitch_is_linked,
             search_modrinth_mods,
             search_modrinth_projects,
             search_mods_unified_command,
@@ -809,6 +821,7 @@ async fn main() {
             refresh_vanilla_cape_data,
             track_analytics_event,
             commands::analytics_command::get_system_os_info,
+            commands::analytics_command::set_screen_time_tab,
             commands::profile_command::launch_profile_with_overrides,
             commands::profile_command::launch_temp_profile,
             commands::profile_command::add_profile_symlink,
@@ -836,6 +849,8 @@ async fn main() {
             commands::sync_pack_command::delete_sync_pack,
             commands::sync_pack_command::set_profile_sync_packs,
             commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::get_profile_sync_pack_mods,
+            commands::sync_pack_command::set_profile_sync_mods_excluded,
             commands::sync_pack_command::sync_profile_now,
             commands::sync_pack_command::set_sync_pack_mod_enabled,
             commands::sync_pack_command::remove_sync_pack_entries,
@@ -907,6 +922,10 @@ async fn main() {
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {
+                if matches!(event, tauri::RunEvent::Exit) {
+                    utils::screen_time::report_before_exit();
+                }
+
                 #[cfg(target_os = "macos")]
                 if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                     use std::sync::atomic::{AtomicBool, Ordering};
