@@ -55,7 +55,12 @@ async fn tick() -> anyhow::Result<()> {
         }
     }
 
-    if let Some(screen) = clips.other_screen.as_ref() {
+    let chosen_screen = clips.other_screen.as_ref().filter(|screen| {
+        crate::utils::screens::list()
+            .iter()
+            .any(|connected| connected.device == screen.device)
+    });
+    if let Some(screen) = chosen_screen {
         if attached_screen.as_deref() != Some(screen.device.as_str()) {
             log::info!("Recording screen {} ({})", screen.name, screen.device);
             if let Err(e) = supervisor.attach_screen(screen.device.clone(), screen.name.clone()) {
