@@ -25,6 +25,24 @@ export interface ArrowShape {
   wings: [[number, number], [number, number]];
 }
 
+const HEADING: Record<ClipCorner, [number, number]> = {
+  top_left: [-1, -1],
+  top_right: [1, -1],
+  bottom_left: [-1, 1],
+  bottom_right: [1, 1],
+  top: [0, -1],
+  right: [1, 0],
+  bottom: [0, 1],
+  left: [-1, 0],
+};
+
+function ends(size: number, way: number, wing: number): [number, number] {
+  const last = size - 1;
+  if (way > 0) return [0, Math.max(last - wing, 0)];
+  if (way < 0) return [last, Math.min(wing, last)];
+  return [last / 2, last / 2];
+}
+
 export function arrowShape(
   width: number,
   height: number,
@@ -38,26 +56,23 @@ export function arrowShape(
     shorter / 2,
   );
   const wing = fullHead * ARROW_WING_SHARE;
-  const runX = Math.max(width - 1 - wing, 0);
-  const runY = Math.max(height - 1 - wing, 0);
+  const [wayX, wayY] = HEADING[towards];
+  const [tailX, tipX] = ends(width, wayX, wing);
+  const [tailY, tipY] = ends(height, wayY, wing);
+  const [runX, runY] = [tipX - tailX, tipY - tailY];
   const length = Math.max(Math.hypot(runX, runY), 1);
   const head = Math.min(fullHead, length);
-  const right = towards.endsWith("right");
-  const bottom = towards.startsWith("bottom");
-  const at = (alongX: number, alongY: number): [number, number] => [
-    right ? alongX + 0.5 : width - 0.5 - alongX,
-    bottom ? alongY + 0.5 : height - 0.5 - alongY,
-  ];
   const [unitX, unitY] = [runX / length, runY / length];
-  const [baseX, baseY] = [runX - unitX * head, runY - unitY * head];
+  const [neckX, neckY] = [tipX - unitX * head, tipY - unitY * head];
+  const at = (x: number, y: number): [number, number] => [x + 0.5, y + 0.5];
   return {
     thickness: stroke,
-    tail: at(0, 0),
-    neck: at(baseX, baseY),
-    tip: at(runX, runY),
+    tail: at(tailX, tailY),
+    neck: at(neckX, neckY),
+    tip: at(tipX, tipY),
     wings: [
-      at(baseX + unitY * wing, baseY - unitX * wing),
-      at(baseX - unitY * wing, baseY + unitX * wing),
+      at(neckX + unitY * wing, neckY - unitX * wing),
+      at(neckX - unitY * wing, neckY + unitX * wing),
     ],
   };
 }

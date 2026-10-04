@@ -41,7 +41,7 @@ interface Options {
     levels: TrackLevel[],
     videoStartSeconds: number | null,
     videoEndSeconds: number | null,
-  ) => void;
+  ) => Promise<boolean>;
   t: Translate;
 }
 
@@ -87,7 +87,7 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         edit.blanked.length === 0 &&
         edit.hushed.length === 0
       ) {
-        onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd);
+        if (await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd)) onDone();
         return;
       }
       renderingRef.current = true;
@@ -109,7 +109,7 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         toast.error(parseErrorMessage(e));
       }
     },
-    [finish, onTrim, path],
+    [finish, onDone, onTrim, path],
   );
 
   const percent =

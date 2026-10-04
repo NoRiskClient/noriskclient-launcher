@@ -113,7 +113,15 @@ export interface ExportedClip {
 
 export type ClipShape = "original" | "vertical" | "square" | "wide";
 
-export type ClipCorner = "top_left" | "top_right" | "bottom_left" | "bottom_right";
+export type ClipCorner =
+  | "top_left"
+  | "top_right"
+  | "bottom_left"
+  | "bottom_right"
+  | "top"
+  | "right"
+  | "bottom"
+  | "left";
 
 export interface ClipOverlayBounds {
   left: number;
@@ -141,11 +149,17 @@ export interface ClipArrowOverlay extends ClipOverlayBounds {
   towards: ClipCorner;
 }
 
+export type ClipTextAlign = "left" | "center" | "right";
+
+export type ClipTextVertical = "top" | "center" | "bottom";
+
 export interface ClipTextOverlay extends ClipOverlayBounds {
   kind: "text";
   content: string;
   size: number;
   colour: number;
+  align: ClipTextAlign;
+  vertical: ClipTextVertical;
 }
 
 export type ClipOverlay =

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type RefObject } from "react";
 
-import type { ClipOverlay } from "../../../services/clip-service";
+import type { ClipCorner, ClipOverlay } from "../../../services/clip-service";
 import { MIN_BOX, MIN_LENGTH, clamp, type NewOverlay } from "./shared";
 import { useWindowDrag } from "./useWindowDrag";
 
@@ -13,6 +13,7 @@ interface BoxDrag {
   top: number;
   width: number;
   height: number;
+  towards: ClipCorner | null;
 }
 
 interface BarDrag {
@@ -21,6 +22,31 @@ interface BarDrag {
   fromX: number;
   startSeconds: number;
   endSeconds: number;
+}
+
+const MIRRORED: Record<ClipCorner, { x: ClipCorner; y: ClipCorner }> = {
+  top_left: { x: "top_right", y: "bottom_left" },
+  top_right: { x: "top_left", y: "bottom_right" },
+  bottom_left: { x: "bottom_right", y: "top_left" },
+  bottom_right: { x: "bottom_left", y: "top_right" },
+  top: { x: "top", y: "bottom" },
+  right: { x: "left", y: "right" },
+  bottom: { x: "bottom", y: "top" },
+  left: { x: "right", y: "left" },
+};
+
+function mirrored(corner: ClipCorner, flipX: boolean, flipY: boolean): ClipCorner {
+  const across = flipX ? MIRRORED[corner].x : corner;
+  return flipY ? MIRRORED[across].y : across;
+}
+
+function span(from: number, to: number): { start: number; size: number; flipped: boolean } {
+  if (to < from && from >= MIN_BOX) {
+    const start = clamp(to, 0, from - MIN_BOX);
+    return { start, size: from - start, flipped: true };
+  }
+  const reach = clamp(to, from + MIN_BOX, 1);
+  return { start: from, size: Math.max(reach - from, MIN_BOX), flipped: false };
 }
 
 interface Stage {
@@ -105,6 +131,7 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
       top: overlay.top,
       width: overlay.width,
       height: overlay.height,
+      towards: overlay.kind === "arrow" ? overlay.towards : null,
     });
   };
 
@@ -134,9 +161,16 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
           top: clamp(boxDrag.top + byY, 0, 1 - boxDrag.height),
         });
       } else {
+        const across = span(boxDrag.left, boxDrag.left + boxDrag.width + byX);
+        const down = span(boxDrag.top, boxDrag.top + boxDrag.height + byY);
         editOverlay(boxDrag.index, {
-          width: clamp(boxDrag.width + byX, MIN_BOX, 1 - boxDrag.left),
-          height: clamp(boxDrag.height + byY, MIN_BOX, 1 - boxDrag.top),
+          left: across.start,
+          top: down.start,
+          width: across.size,
+          height: down.size,
+          ...(boxDrag.towards && {
+            towards: mirrored(boxDrag.towards, across.flipped, down.flipped),
+          }),
         });
       }
     },

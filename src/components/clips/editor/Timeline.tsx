@@ -58,7 +58,7 @@ export function Lane({
     <div className="flex">
       <div
         className={cn(
-          "flex w-44 shrink-0 items-center gap-2 rounded-l border-y border-l px-2.5 transition-colors",
+          "flex w-[8.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
           active ? "border-white/20 bg-white/10" : "border-white/10 bg-black/30",
           height,
         )}
@@ -68,12 +68,12 @@ export function Lane({
             type="button"
             onClick={onPick}
             aria-pressed={active}
-            className="flex min-w-0 flex-1 items-center gap-2 focus:outline-none"
+            className="flex w-full min-w-0 items-center gap-2 focus:outline-none"
           >
             {head}
           </button>
         ) : (
-          head
+          <div className="flex min-w-0 items-center gap-2">{head}</div>
         )}
         {control}
       </div>
@@ -117,7 +117,7 @@ export function TrackLink({
   t: Translate;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-black/30 p-1">
+    <div className="flex shrink-0 items-center gap-0.5 rounded border border-white/10 bg-black/30 p-0.5">
       {LINK_MODES.map((mode) => {
         const on = separate === mode.separate;
         return (
@@ -128,7 +128,7 @@ export function TrackLink({
             aria-pressed={on}
             onClick={() => onChange(mode.separate)}
             className={cn(
-              "flex items-center gap-1.5 rounded border px-2 py-1 font-minecraft text-xs transition-colors",
+              "flex items-center gap-1.5 rounded border px-2 py-0.5 font-minecraft text-xs transition-colors",
               on ? "border-white/20 bg-white/10 text-white" : "border-transparent text-white/60",
               disabled
                 ? "cursor-not-allowed opacity-40"
@@ -206,13 +206,13 @@ export function AudioLane({
       name={name}
       tint={tone}
       tone={tone}
-      height="h-12"
+      height="h-14"
       active={active}
       onPick={onSelect}
       onScrub={onPick}
       control={
         track.adjustable ? (
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex items-center justify-end gap-1">
             <span
               className={cn(
                 "w-9 text-right font-minecraft text-[11px] tabular-nums",
@@ -388,17 +388,17 @@ export function OverlayLane({
 
 export function Readout({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex flex-col items-center leading-tight">
+    <div className="flex shrink-0 items-baseline gap-1.5 leading-none">
+      <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/50">
+        {label}
+      </span>
       <span
         className={cn(
           "font-minecraft tabular-nums",
-          strong ? "text-base text-white" : "text-sm text-white/80",
+          strong ? "text-sm text-white" : "text-xs text-white/80",
         )}
       >
         {value}
-      </span>
-      <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/60">
-        {label}
       </span>
     </div>
   );

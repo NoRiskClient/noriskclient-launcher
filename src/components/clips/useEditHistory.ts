@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
 
@@ -23,6 +23,7 @@ export function useEditHistory<T>(
   const [epoch, setEpoch] = useState(0);
   const [release, setRelease] = useState(0);
   const [depth, setDepth] = useState({ past: 0, future: 0 });
+  const [savedText, setSavedText] = useState(base.current.text);
 
   const sync = useCallback(
     () => setDepth({ past: stacks.current.past.length, future: stacks.current.future.length }),
@@ -34,19 +35,22 @@ export function useEditHistory<T>(
   useEffect(() => {
     base.current = { doc, text: JSON.stringify(doc) };
     stacks.current = { past: [], future: [] };
+    setSavedText(base.current.text);
     sync();
   }, [epoch, sync]);
 
+  const text = useMemo(() => JSON.stringify(doc), [doc]);
+  const markSaved = useCallback(() => setSavedText(text), [text]);
+
   useEffect(() => {
     if (!enabled || pressed.current || typing()) return;
-    const text = JSON.stringify(doc);
     if (text === base.current.text) return;
     stacks.current.past.push(base.current.doc);
     if (stacks.current.past.length > LIMIT) stacks.current.past.shift();
     stacks.current.future = [];
     base.current = { doc, text };
     sync();
-  }, [doc, enabled, release, sync]);
+  }, [doc, enabled, release, sync, text]);
 
   useEffect(() => {
     const down = () => {
@@ -112,6 +116,8 @@ export function useEditHistory<T>(
     undo,
     redo,
     rebase,
+    markSaved,
+    dirty: text !== savedText,
     canUndo: enabled && depth.past > 0,
     canRedo: enabled && depth.future > 0,
   };

@@ -1,10 +1,16 @@
 "use client";
 
-import type { ClipOverlay } from "../../../services/clip-service";
+import type { ClipOverlay, ClipTextVertical } from "../../../services/clip-service";
 import { cn } from "../../../lib/utils";
 import { toHex } from "./shared";
 import { holdPointer } from "./useWindowDrag";
 import { REFERENCE_HEIGHT, arrowShape, atReference, blurSigma } from "./overlayGeometry";
+
+const JUSTIFY: Record<ClipTextVertical, string> = {
+  top: "justify-start",
+  center: "justify-center",
+  bottom: "justify-end",
+};
 
 function OverlayArt({ overlay, ratio }: { overlay: ClipOverlay; ratio: number }) {
   if (overlay.kind === "box") {
@@ -50,8 +56,12 @@ function OverlayArt({ overlay, ratio }: { overlay: ClipOverlay; ratio: number })
     return (
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-all"
+        className={cn(
+          "pointer-events-none absolute inset-0 flex flex-col overflow-hidden whitespace-pre-wrap break-all",
+          JUSTIFY[overlay.vertical],
+        )}
         style={{
+          textAlign: overlay.align,
           color: toHex(overlay.colour),
           fontFamily: "SmallCaps, monospace",
           fontSize: atReference(overlay.size),

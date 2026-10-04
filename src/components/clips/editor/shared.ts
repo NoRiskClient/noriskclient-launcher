@@ -1,4 +1,4 @@
-import type { ClipCorner, ClipOverlay, ClipShape, Span } from "../../../services/clip-service";
+import type { ClipCorner, ClipOverlay, ClipShape, ClipTextAlign, ClipTextVertical, Span } from "../../../services/clip-service";
 import { isMacOS } from "../../../utils/platform";
 
 export const MIN_LENGTH = 0.5;
@@ -9,15 +9,51 @@ export const MIN_BOX = 0.05;
 
 const DEFAULT_BLUR = 12;
 
-export const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300];
+const TICK_STEPS: { step: number; minor: number }[] = [
+  { step: 0.1, minor: 5 },
+  { step: 0.2, minor: 4 },
+  { step: 0.5, minor: 5 },
+  { step: 1, minor: 4 },
+  { step: 2, minor: 4 },
+  { step: 5, minor: 5 },
+  { step: 10, minor: 5 },
+  { step: 15, minor: 3 },
+  { step: 30, minor: 6 },
+  { step: 60, minor: 4 },
+  { step: 120, minor: 4 },
+  { step: 300, minor: 5 },
+];
 
-export const MAX_TICKS = 12;
+const MAX_TICKS = 12;
+
+interface Ruler {
+  step: number;
+  majors: number[];
+  minors: number[];
+}
+
+export function rulerTicks(duration: number): Ruler {
+  if (duration <= 0) return { step: 1, majors: [], minors: [] };
+  const { step, minor } = TICK_STEPS.find((entry) => duration / entry.step <= MAX_TICKS) ?? {
+    step: Math.ceil(duration / MAX_TICKS / 600) * 600,
+    minor: 6,
+  };
+  const fine = step / minor;
+  const majors: number[] = [];
+  const minors: number[] = [];
+  for (let index = 0; index * fine <= duration + 0.001; index++) {
+    const at = Number((index * fine).toFixed(3));
+    if (index % minor === 0) majors.push(at);
+    else minors.push(at);
+  }
+  return { step, majors, minors };
+}
 
 export type NewOverlay =
   | { kind: "blur"; strength: number }
   | { kind: "box"; colour: number }
   | { kind: "arrow"; colour: number; thickness: number; towards: ClipCorner }
-  | { kind: "text"; content: string; size: number; colour: number };
+  | { kind: "text"; content: string; size: number; colour: number; align: ClipTextAlign; vertical: ClipTextVertical };
 
 export const TOOLS: { icon: string; label: string; seed: NewOverlay }[] = [
   {
@@ -38,7 +74,7 @@ export const TOOLS: { icon: string; label: string; seed: NewOverlay }[] = [
   {
     icon: "solar:text-bold",
     label: "clips.editor.tool.text",
-    seed: { kind: "text", content: "", size: 48, colour: 0xffffff },
+    seed: { kind: "text", content: "", size: 48, colour: 0xffffff, align: "center", vertical: "center" },
   },
 ];
 
@@ -139,7 +175,9 @@ export function formatTime(seconds: number): string {
   return `${minutes}:${String(rest).padStart(2, "0")}.${tenths}`;
 }
 
-export function formatTick(seconds: number): string {
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+export function formatTick(seconds: number, step: number): string {
+  const tenths = Math.round(seconds * 10);
+  const whole = Math.floor(tenths / 10);
+  const clock = `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  return step >= 1 ? clock : `${clock}.${tenths % 10}`;
 }

@@ -150,20 +150,21 @@ export function ClipEditorWindow() {
       videoStartSeconds: number | null,
       videoEndSeconds: number | null,
     ) => {
-      if (!path) return;
+      if (!path) return false;
       setSaving(true);
       try {
         await trimClip(path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
         toast.success(t("clips.trim.saved"));
-        closeNow();
+        return true;
       } catch (e) {
         console.error("Could not trim the clip", e);
         toast.error(t("clips.trim.failed"));
+        return false;
       } finally {
         setSaving(false);
       }
     },
-    [path, closeNow, t],
+    [path, t],
   );
 
   if (!clip || !src || duration <= 0) {
@@ -196,7 +197,6 @@ export function ClipEditorWindow() {
         paused={dialogOpen}
         details={details}
         onCancel={close}
-        onDone={closeNow}
         onStateChange={track}
         onSave={save}
         t={t}
