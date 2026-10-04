@@ -194,8 +194,8 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
       if (!element.paused) startAll();
     };
 
-    element.addEventListener("play", startAll);
     element.addEventListener("playing", startAll);
+    element.addEventListener("waiting", stopAll);
     element.addEventListener("pause", stopAll);
     element.addEventListener("ended", stopAll);
     element.addEventListener("seeked", onSeek);
@@ -204,8 +204,8 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
     if (!element.paused) startAll();
 
     return () => {
-      element.removeEventListener("play", startAll);
       element.removeEventListener("playing", startAll);
+      element.removeEventListener("waiting", stopAll);
       element.removeEventListener("pause", stopAll);
       element.removeEventListener("ended", stopAll);
       element.removeEventListener("seeked", onSeek);

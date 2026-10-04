@@ -105,10 +105,10 @@ export const SHAPES: { choice: ClipShape; ratio: number | null; label: string }[
 
 export type Panel = "tools" | "audio" | "format";
 
-const PANELS: { id: Panel; icon: string; label: string }[] = [
-  { id: "tools", icon: "solar:widget-bold", label: "clips.editor.tools" },
-  { id: "audio", icon: "solar:soundwave-bold", label: "clips.editor.audio" },
-  { id: "format", icon: "solar:smartphone-bold", label: "clips.editor.shape.label" },
+const PANELS: { id: Panel; icon: string; label: string; hint: string }[] = [
+  { id: "tools", icon: "solar:widget-bold", label: "clips.editor.tools", hint: "clips.editor.tools.hint" },
+  { id: "audio", icon: "solar:soundwave-bold", label: "clips.editor.audio", hint: "clips.editor.audio.hint" },
+  { id: "format", icon: "solar:smartphone-bold", label: "clips.editor.shape.label", hint: "clips.editor.shape.hint" },
 ];
 
 export const FULL_EDITOR = !isMacOS();

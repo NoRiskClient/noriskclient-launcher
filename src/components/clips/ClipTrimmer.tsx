@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "react-hot-toast";
@@ -20,6 +20,7 @@ import { TrackLevelControl, trackName } from "./ClipTimeline";
 import { ClipIconButton } from "./ClipIconButton";
 import { cn } from "../../lib/utils";
 import { useTrimPreview } from "./useTrimPreview";
+import { usePlayback } from "./usePlayback";
 import { typing, useEditHistory } from "./useEditHistory";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
@@ -39,16 +40,15 @@ import {
   tidy,
   laneWindow,
   formatTime,
-  formatTick,
-  rulerTicks,
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
-import { holdPointer, useWindowDrag } from "./editor/useWindowDrag";
+import { useWindowDrag } from "./editor/useWindowDrag";
 import { useCuts, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { EditorHelpModal, EditorMenuBar, shortcutText, type MenuDef } from "./editor/EditorMenuBar";
 import {
+  Ruler,
   Lane,
   TrackLink,
   AudioLane,
@@ -128,7 +128,6 @@ export function ClipTrimmer({
   const [dragging, setDragging] = useState<"start" | "end" | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
   const [playhead, setPlayhead] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const overlayEdit = useOverlays({ start, end, duration, frameRef, scaleRef });
   const {
     overlays,
@@ -145,6 +144,7 @@ export function ClipTrimmer({
   const [ratio, setRatio] = useState(16 / 9);
   const [shape, setShape] = useState<ClipShape>("original");
   const [panel, setPanel] = useState<Panel>(OFFERED_PANELS[0].id);
+  const activePanel = OFFERED_PANELS.find((entry) => entry.id === panel) ?? OFFERED_PANELS[0];
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
@@ -253,6 +253,16 @@ export function ClipTrimmer({
     active: adjustable.length > 0,
   });
 
+  const { playing, buffering, toggle: preview } = usePlayback({
+    video: videoRef,
+    start,
+    end,
+    removed,
+    quiet: hushed,
+    ownsSound: previewState !== "live",
+    onTime: setPlayhead,
+  });
+
   const drawn = movable.length > 0 ? movable : lanes;
 
   const link = useCallback(
@@ -283,8 +293,6 @@ export function ClipTrimmer({
     (seconds: number) => (duration > 0 ? (seconds / duration) * 100 : 0),
     [duration],
   );
-
-  const ruler = useMemo(() => rulerTicks(duration), [duration]);
 
   const seek = useCallback(
     (seconds: number) => {
@@ -384,33 +392,6 @@ export function ClipTrimmer({
     () => setLaneTrim(null),
   );
 
-  useEffect(() => {
-    const video = videoRef.current;
-    const quiet = previewState === "live" ? [] : hushed;
-    if (!video || (removed.length === 0 && quiet.length === 0)) return;
-    let frame = 0;
-    const hop = () => {
-      const now = video.currentTime;
-      const hole = removed.find((span) => now >= span.startSeconds && now < span.endSeconds);
-      if (hole) video.currentTime = hole.endSeconds;
-      if (quiet.length > 0) {
-        video.muted = quiet.some((span) => now >= span.startSeconds && now < span.endSeconds);
-      }
-      if (!video.paused) frame = requestAnimationFrame(hop);
-    };
-    const onPlay = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(hop);
-    };
-    video.addEventListener("play", onPlay);
-    if (!video.paused) onPlay();
-    return () => {
-      video.removeEventListener("play", onPlay);
-      cancelAnimationFrame(frame);
-      if (quiet.length > 0) video.muted = false;
-    };
-  }, [hushed, previewState, removed]);
-
   const save = useCallback(
     () =>
       render.save({
@@ -427,6 +408,18 @@ export function ClipTrimmer({
       }),
     [blanked, end, hushed, levels, overlays, removed, render.save, shape, shot.end, shot.start, start],
   );
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      if (held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
+      if (event.target instanceof Element && event.target.closest("button, [role=slider], [role=separator]")) return;
+      event.preventDefault();
+      preview();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [held, preview]);
 
   const canSave = !busy && kept >= MIN_LENGTH;
 
@@ -445,20 +438,58 @@ export function ClipTrimmer({
     onlySaveAfterUserInteractions: true,
   });
 
+  const timelineCard = useRef<HTMLElement>(null);
+  const timelineBody = useRef<HTMLDivElement>(null);
+  const timelineContent = useRef<HTMLDivElement>(null);
+  const timelineSized = useRef(rowsLayout.defaultLayout !== undefined);
+
+  const fitTimeline = useCallback(() => {
+    const handle = timelinePanel.current;
+    const card = timelineCard.current;
+    const body = timelineBody.current;
+    const content = timelineContent.current;
+    if (!handle || !card || !body || !content || handle.isCollapsed()) return;
+    handle.resize(Math.max(TIMELINE.min, card.offsetHeight - body.offsetHeight + content.offsetHeight));
+  }, [timelinePanel]);
+
+  useEffect(() => {
+    const content = timelineContent.current;
+    if (!content) return;
+    const observer = new ResizeObserver(() => {
+      if (!timelineSized.current) fitTimeline();
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [fitTimeline]);
+
+  const inspecting = picked !== null;
+
+  useLayoutEffect(() => {
+    const handle = inspectorPanel.current;
+    if (!handle) return;
+    if (inspecting) handle.expand();
+    else handle.collapse();
+  }, [inspecting, inspectorPanel]);
+
   const resetLayout = useCallback(() => {
     clearSavedLayout();
+    timelineSized.current = false;
     if (timelinePanel.current?.isCollapsed()) timelinePanel.current.expand();
     sidePanel.current?.resize(SIDE.default);
-    inspectorPanel.current?.resize(INSPECTOR.default);
-    timelinePanel.current?.resize(TIMELINE.default);
-  }, [inspectorPanel, sidePanel, timelinePanel]);
+    if (inspecting) inspectorPanel.current?.resize(INSPECTOR.default);
+    fitTimeline();
+  }, [fitTimeline, inspecting, inspectorPanel, sidePanel, timelinePanel]);
 
   const toggleTimeline = useCallback(() => {
     const handle = timelinePanel.current;
     if (!handle) return;
-    if (handle.isCollapsed()) handle.expand();
-    else handle.collapse();
-  }, [timelinePanel]);
+    if (!handle.isCollapsed()) {
+      handle.collapse();
+      return;
+    }
+    handle.expand();
+    if (!timelineSized.current) fitTimeline();
+  }, [fitTimeline, timelinePanel]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -601,36 +632,6 @@ export function ClipTrimmer({
 
   const exportPercent = render.percent;
 
-  const preview = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (!video.paused) {
-      video.pause();
-      return;
-    }
-    if (video.currentTime < start || video.currentTime >= end - 0.05) video.currentTime = start;
-    void video.play().catch(() => {});
-  }, [end, start]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onTime = () => {
-      setPlayhead(video.currentTime);
-      if (!video.paused && video.currentTime >= end) video.pause();
-    };
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    video.addEventListener("timeupdate", onTime);
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    return () => {
-      video.removeEventListener("timeupdate", onTime);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-    };
-  }, [end]);
-
   const clipMasks = (from: number, to: number) => (
     <ClipMasks from={from} to={to} color={accentColor.value} percent={percent} />
   );
@@ -674,7 +675,7 @@ export function ClipTrimmer({
   const darkened = blanked.some((span) => playhead >= span.startSeconds && playhead < span.endSeconds);
 
   return (
-    <WindowFrame className="select-none [&_input]:select-text [&_textarea]:select-text">
+    <WindowFrame className="select-none [&_button_svg]:pointer-events-none [&_input]:select-text [&_textarea]:select-text">
       <header
         data-tauri-drag-region
         className="relative flex h-11 shrink-0 select-none items-center gap-3 border-b border-white/5 bg-black/40 pl-4 pr-2"
@@ -742,12 +743,15 @@ export function ClipTrimmer({
           orientation="vertical"
           className="min-h-0 flex-1"
           defaultLayout={rowsLayout.defaultLayout}
-          onLayoutChanged={rowsLayout.onLayoutChanged}
+          onLayoutChanged={(layout, meta) => {
+            if (meta.isUserInteraction) timelineSized.current = true;
+            rowsLayout.onLayoutChanged(layout, meta);
+          }}
           resizeTargetMinimumSize={HIT_AREA}
         >
           <LayoutPanel id="stage" minSize={STAGE_MIN} className="flex flex-col" style={{ overflow: "hidden" }}>
             <div className="flex min-h-0 flex-1 gap-1.5">
-              <nav className="flex w-[5.5rem] shrink-0 flex-col gap-1 overflow-hidden rounded-[var(--border-radius)] border border-white/10 bg-black/30 p-1.5">
+              <nav className="flex w-[6.5rem] shrink-0 flex-col gap-1 overflow-hidden rounded-[var(--border-radius)] border border-white/10 bg-black/30 p-1">
                 {OFFERED_PANELS.map((entry) => (
                   <button
                     key={entry.id}
@@ -766,7 +770,7 @@ export function ClipTrimmer({
                       className="h-5 w-5"
                       style={panel === entry.id ? { color: accentColor.value } : undefined}
                     />
-                    <span className="w-full truncate text-center font-minecraft text-[10px] leading-tight">
+                    <span className="w-full text-center font-minecraft text-[10px] leading-tight [overflow-wrap:anywhere]">
                       {t(entry.label)}
                     </span>
                   </button>
@@ -792,10 +796,11 @@ export function ClipTrimmer({
                   style={{ overflow: "hidden" }}
                 >
                   <aside className={CARD}>
-                    <PanelTitle color={accentColor.value}>
-                      {t((OFFERED_PANELS.find((entry) => entry.id === panel) ?? OFFERED_PANELS[0]).label)}
-                    </PanelTitle>
+                    <PanelTitle color={accentColor.value}>{t(activePanel.label)}</PanelTitle>
                     <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+                      <p className="font-minecraft text-xs leading-relaxed text-white/50">
+                        {t(activePanel.hint)}
+                      </p>
                       {!FULL_EDITOR && (
                         <div className="flex items-start gap-2.5 rounded border border-white/10 bg-black/30 px-3 py-2.5">
                           <Icon
@@ -812,38 +817,33 @@ export function ClipTrimmer({
                         </div>
                       )}
                       {panel === "tools" && (
-                        <>
-                          <div className="flex flex-col gap-2">
-                            {TOOLS.map((tool) => (
-                              <button
-                                key={tool.seed.kind}
-                                type="button"
-                                onClick={() =>
-                                  addOverlay(
-                                    tool.seed.kind === "text"
-                                      ? { ...tool.seed, content: t("clips.editor.overlay.text_default") }
-                                      : tool.seed,
-                                  )
-                                }
-                                disabled={busy}
-                                className={cn(
-                                  "group flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-2 text-left font-minecraft text-xs leading-tight text-white/80 transition-colors",
-                                  busy ? "cursor-not-allowed opacity-40" : "hover:border-white/20 hover:bg-white/5 hover:text-white",
-                                )}
-                              >
-                                <Icon icon={tool.icon} className="h-4 w-4 shrink-0 text-white/60" />
-                                <span className="min-w-0 flex-1 break-words">{t(tool.label)}</span>
-                                <Icon
-                                  icon="solar:add-circle-bold"
-                                  className={cn("h-4 w-4 shrink-0 text-white/30", !busy && "group-hover:text-white/70")}
-                                />
-                              </button>
-                            ))}
-                          </div>
-                          <p className="font-minecraft text-xs leading-relaxed text-white/50">
-                            {t("clips.editor.tools.hint")}
-                          </p>
-                        </>
+                        <div className="flex flex-col gap-2">
+                          {TOOLS.map((tool) => (
+                            <button
+                              key={tool.seed.kind}
+                              type="button"
+                              onClick={() =>
+                                addOverlay(
+                                  tool.seed.kind === "text"
+                                    ? { ...tool.seed, content: t("clips.editor.overlay.text_default") }
+                                    : tool.seed,
+                                )
+                              }
+                              disabled={busy}
+                              className={cn(
+                                "group flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2.5 py-2 text-left font-minecraft text-xs leading-tight text-white/80 transition-colors",
+                                busy ? "cursor-not-allowed opacity-40" : "hover:border-white/20 hover:bg-white/5 hover:text-white",
+                              )}
+                            >
+                              <Icon icon={tool.icon} className="h-4 w-4 shrink-0 text-white/60" />
+                              <span className="min-w-0 flex-1 break-words">{t(tool.label)}</span>
+                              <Icon
+                                icon="solar:add-circle-bold"
+                                className={cn("h-4 w-4 shrink-0 text-white/30", !busy && "group-hover:text-white/70")}
+                              />
+                            </button>
+                          ))}
+                        </div>
                       )}
 
                       {panel === "audio" && (
@@ -919,7 +919,7 @@ export function ClipTrimmer({
                       <div className="flex h-full w-full items-center justify-center" style={{ containerType: "size" }}>
                         <div
                           ref={frameRef}
-                          className="relative overflow-hidden rounded border border-white/10 bg-black shadow-2xl"
+                          className="group relative overflow-hidden rounded border border-white/10 bg-black shadow-2xl"
                           style={{
                             width: `min(100cqw, calc(100cqh * ${ratio}))`,
                             height: `min(100cqh, calc(100cqw / ${ratio}))`,
@@ -929,7 +929,7 @@ export function ClipTrimmer({
                           <video
                             ref={videoRef}
                             src={src}
-                            className="block h-full w-full object-contain"
+                            className="block h-full w-full cursor-pointer object-contain"
                             onClick={preview}
                             onLoadedMetadata={(event) => {
                               const video = event.currentTarget;
@@ -939,17 +939,16 @@ export function ClipTrimmer({
                             }}
                           />
 
-                          {!playing && (
-                            <button
-                              type="button"
-                              onClick={preview}
-                              aria-label={t("clips.trim.preview")}
-                              className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-colors hover:bg-black/40"
-                            >
-                              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-black/50">
-                                <Icon icon="solar:play-bold" className="h-7 w-7" style={{ color: accentColor.value }} />
-                              </span>
-                            </button>
+                          {buffering && (
+                            <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/50">
+                              <Icon icon="svg-spinners:ring-resize" className="h-6 w-6" style={{ color: accentColor.value }} />
+                            </span>
+                          )}
+
+                          {!playing && !buffering && (
+                            <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/40 opacity-0 transition-opacity duration-150 group-hover:opacity-70">
+                              <Icon icon="solar:play-bold" className="h-5 w-5 text-white" />
+                            </span>
                           )}
 
                           {darkened && <div className="pointer-events-none absolute inset-0 bg-black" />}
@@ -1031,7 +1030,12 @@ export function ClipTrimmer({
                   </main>
                 </LayoutPanel>
 
-                <ResizeBar orientation="vertical" label={t("clips.editor.menu.resize")} color={accentColor.value} />
+                <ResizeBar
+                  orientation="vertical"
+                  label={t("clips.editor.menu.resize")}
+                  color={accentColor.value}
+                  disabled={!inspecting}
+                />
 
                 <LayoutPanel
                   id="inspector"
@@ -1039,6 +1043,8 @@ export function ClipTrimmer({
                   defaultSize={INSPECTOR.default}
                   minSize={INSPECTOR.min}
                   maxSize={INSPECTOR.max}
+                  collapsible
+                  collapsedSize={0}
                   groupResizeBehavior="preserve-pixel-size"
                   className="flex"
                   style={{ overflow: "hidden" }}
@@ -1072,7 +1078,7 @@ export function ClipTrimmer({
             className="flex flex-col"
             style={{ overflow: "hidden" }}
           >
-            <section className={CARD}>
+            <section ref={timelineCard} className={CARD}>
               <div className={PANEL_HEAD}>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <ClipIconButton
@@ -1130,189 +1136,183 @@ export function ClipTrimmer({
                 >
                   {t("clips.trim.save")}
                 </Button>
-                <EdgeGrip panel={timelinePanel} label={t("clips.editor.menu.resize")} color={accentColor.value} />
+                <EdgeGrip
+                  panel={timelinePanel}
+                  label={t("clips.editor.menu.resize")}
+                  color={accentColor.value}
+                  onGrab={() => {
+                    timelineSized.current = true;
+                  }}
+                />
               </div>
-              <div className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-2">
-                <div className="mb-2 flex h-7 items-center gap-3">
-                  {FULL_EDITOR && movable.length > 0 && (
-                    <>
-                      <TrackLink
-                        separate={separate}
-                        color={accentColor.value}
-                        disabled={busy}
-                        onChange={link}
-                        t={t}
-                      />
-                      {separate && (
-                        <p className="min-w-0 truncate font-minecraft text-xs text-white/50">
-                          {t("clips.editor.link.hint")}
-                        </p>
-                      )}
-                    </>
-                  )}
-                  <p className="ml-auto min-w-0 truncate font-minecraft text-[11px] text-white/40">
-                    {removed.length > 0 || splits.length > 0
-                      ? t("clips.editor.remove.hint")
-                      : overlays.length > 0
-                        ? t("clips.editor.overlay.hint")
-                        : t("clips.trim.hint")}
-                  </p>
-                </div>
-
-                <div className="relative flex select-none flex-col gap-1.5">
-                  <div className="flex">
-                    <div className="w-[8.5rem] shrink-0" />
-                    <div
-                      ref={scaleRef}
-                      role="presentation"
-                      onPointerDown={(event) => {
-                        holdPointer(event);
-                        scrubTo(event.clientX);
-                        setScrubbing(true);
-                      }}
-                      className="relative h-6 flex-1 cursor-ew-resize border-b border-white/10"
-                    >
-                      {ruler.minors.map((at) => (
-                        <span
-                          key={`minor-${at}`}
-                          className="absolute bottom-0 h-1.5 w-px bg-white/15"
-                          style={{ left: `${percent(at)}%` }}
+              <div
+                ref={timelineBody}
+                className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
+              >
+                <div ref={timelineContent} className="px-3 py-2">
+                  <div className="mb-2 flex h-7 items-center gap-3">
+                    {FULL_EDITOR && movable.length > 0 && (
+                      <>
+                        <TrackLink
+                          separate={separate}
+                          color={accentColor.value}
+                          disabled={busy}
+                          onChange={link}
+                          t={t}
                         />
-                      ))}
-                      {ruler.majors.map((at) => (
-                        <span
-                          key={`major-${at}`}
-                          className="absolute bottom-0 top-0 border-l border-white/25 pl-1 font-minecraft text-[10px] leading-4 text-white/50"
-                          style={{ left: `${percent(at)}%` }}
-                        >
-                          {formatTick(at, ruler.step)}
-                        </span>
-                      ))}
-                    </div>
+                        {separate && (
+                          <p className="min-w-0 truncate font-minecraft text-xs text-white/50">
+                            {t("clips.editor.link.hint")}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <p className="ml-auto min-w-0 truncate font-minecraft text-[11px] text-white/40">
+                      {removed.length > 0 || splits.length > 0
+                        ? t("clips.editor.remove.hint")
+                        : overlays.length > 0
+                          ? t("clips.editor.overlay.hint")
+                          : t("clips.trim.hint")}
+                    </p>
                   </div>
 
-                  <Lane
-                    icon="solar:videocamera-bold"
-                    name={t("clips.editor.timeline.video")}
-                    tint={accentColor.value}
-                    height="h-16"
-                    active={pick?.lane === "video"}
-                    onPick={() => setPick({ lane: "video", at: playhead })}
-                    onScrub={(clientX) => {
-                      scrubTo(clientX);
-                      setScrubbing(true);
-                      setPick({ lane: "video", at: secondsAt(clientX) });
-                    }}
-                  >
-                    {filmstrip ? (
-                      <img
-                        src={filmstrip}
-                        alt=""
-                        draggable={false}
-                        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Icon icon="svg-spinners:ring-resize" className="h-4 w-4 text-white/40" />
-                      </div>
-                    )}
-
-                    {laneMarks("video", blanked, unblank)}
-
-                    {separate && (
-                      <div className="pointer-events-none absolute inset-0 z-10">
-                        {clipMasks(shot.from, shot.to)}
-                        {clipHandles(shot.from, shot.to)}
-                      </div>
-                    )}
-                  </Lane>
-
-                  {drawn.map((track) => {
-                    const own = laneWindow(windows[track.stream], start, end);
-                    const apart = separate && (track.adjustable || lanes.length === 1);
-                    return (
-                      <AudioLane
-                        key={track.stream}
-                        track={track}
-                        name={trackName(track.label, t)}
-                        movable={apart}
-                        volume={track.adjustable ? (volumes[track.stream] ?? 100) : 100}
+                  <div className="relative flex select-none flex-col gap-1.5">
+                    <div className="flex">
+                      <div className="w-[9.5rem] shrink-0" />
+                      <Ruler
+                        scale={scaleRef}
                         duration={duration}
-                        tone={accentColor.light}
-                        disabled={busy}
-                        clipFrom={start}
-                        clipTo={end}
-                        from={own.from}
-                        to={own.to}
-                        trimmed={own.start !== null || own.end !== null}
-                        trimming={laneTrim?.stream === track.stream ? laneTrim.edge : null}
-                        onChange={(volume) =>
-                          setVolumes((current) => ({ ...current, [track.stream]: volume }))
-                        }
-                        active={pick?.lane === track.stream}
-                        onSelect={() => setPick({ lane: track.stream, at: playhead })}
-                        onPick={(clientX) => {
+                        percent={percent}
+                        onScrub={(clientX) => {
                           scrubTo(clientX);
                           setScrubbing(true);
-                          setPick({ lane: track.stream, at: secondsAt(clientX) });
                         }}
-                        marks={laneMarks(track.stream, muted[track.stream] ?? [], (index) =>
-                          unmute(track.stream, index),
-                        )}
-                        onTrim={(edge) => setLaneTrim({ stream: track.stream, edge })}
-                        onTrimNudge={(edge, by) =>
-                          trimTrack(track.stream, edge, (edge === "start" ? own.from : own.to) + by)
-                        }
-                        onTrimReset={() =>
-                          setWindows((current) => ({ ...current, [track.stream]: NO_WINDOW }))
-                        }
-                        t={t}
                       />
-                    );
-                  })}
+                    </div>
 
-                  {overlays.map((overlay, index) => (
-                    <OverlayLane
-                      key={index}
-                      overlay={overlay}
-                      duration={duration}
-                      active={chosen === index}
-                      accent={accentColor.value}
-                      name={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
-                      disabled={busy}
-                      onPick={() => setChosen(index)}
-                      onGrab={(mode, event) => grabBar(index, mode, event)}
-                    />
-                  ))}
+                    <Lane
+                      icon="solar:videocamera-bold"
+                      name={t("clips.editor.timeline.video")}
+                      tint={accentColor.value}
+                      height="h-16"
+                      active={pick?.lane === "video"}
+                      onPick={() => setPick({ lane: "video", at: playhead })}
+                      onScrub={(clientX) => {
+                        scrubTo(clientX);
+                        setScrubbing(true);
+                        setPick({ lane: "video", at: secondsAt(clientX) });
+                      }}
+                    >
+                      {filmstrip ? (
+                        <img
+                          src={filmstrip}
+                          alt=""
+                          draggable={false}
+                          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Icon icon="svg-spinners:ring-resize" className="h-4 w-4 text-white/40" />
+                        </div>
+                      )}
 
-                  <div className="pointer-events-none absolute inset-y-0 left-[8.5rem] right-0">
-                    {!separate && clipMasks(start, end)}
-                    {part?.lane === "all" && highlight(part.span)}
-                    {removed.map((span, index) => gapBlock(span, index, () => unremove(index)))}
-                    {splits.map((at) => (
-                      <SplitMark
-                        key={at}
-                        at={at}
+                      {laneMarks("video", blanked, unblank)}
+
+                      {separate && (
+                        <div className="pointer-events-none absolute inset-0 z-10">
+                          {clipMasks(shot.from, shot.to)}
+                          {clipHandles(shot.from, shot.to)}
+                        </div>
+                      )}
+                    </Lane>
+
+                    {drawn.map((track) => {
+                      const own = laneWindow(windows[track.stream], start, end);
+                      const apart = separate && (track.adjustable || lanes.length === 1);
+                      return (
+                        <AudioLane
+                          key={track.stream}
+                          track={track}
+                          name={trackName(track.label, t)}
+                          movable={apart}
+                          volume={track.adjustable ? (volumes[track.stream] ?? 100) : 100}
+                          duration={duration}
+                          tone={accentColor.light}
+                          disabled={busy}
+                          clipFrom={start}
+                          clipTo={end}
+                          from={own.from}
+                          to={own.to}
+                          trimmed={own.start !== null || own.end !== null}
+                          trimming={laneTrim?.stream === track.stream ? laneTrim.edge : null}
+                          onChange={(volume) =>
+                            setVolumes((current) => ({ ...current, [track.stream]: volume }))
+                          }
+                          active={pick?.lane === track.stream}
+                          onSelect={() => setPick({ lane: track.stream, at: playhead })}
+                          onPick={(clientX) => {
+                            scrubTo(clientX);
+                            setScrubbing(true);
+                            setPick({ lane: track.stream, at: secondsAt(clientX) });
+                          }}
+                          marks={laneMarks(track.stream, muted[track.stream] ?? [], (index) =>
+                            unmute(track.stream, index),
+                          )}
+                          onTrim={(edge) => setLaneTrim({ stream: track.stream, edge })}
+                          onTrimNudge={(edge, by) =>
+                            trimTrack(track.stream, edge, (edge === "start" ? own.from : own.to) + by)
+                          }
+                          onTrimReset={() =>
+                            setWindows((current) => ({ ...current, [track.stream]: NO_WINDOW }))
+                          }
+                          t={t}
+                        />
+                      );
+                    })}
+
+                    {overlays.map((overlay, index) => (
+                      <OverlayLane
+                        key={index}
+                        overlay={overlay}
+                        duration={duration}
+                        active={chosen === index}
+                        accent={accentColor.value}
+                        name={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
                         disabled={busy}
-                        percent={percent}
-                        onRemove={() => unsplit(at)}
-                        t={t}
+                        onPick={() => setChosen(index)}
+                        onGrab={(mode, event) => grabBar(index, mode, event)}
                       />
                     ))}
-                    <div
-                      className="absolute inset-y-0 w-px bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
-                      style={{ left: `${percent(playhead)}%` }}
-                    />
-                    <span
-                      className="absolute top-0 h-3.5 w-3 -translate-x-1/2"
-                      style={{
-                        left: `${percent(playhead)}%`,
-                        backgroundColor: accentColor.value,
-                        clipPath: "polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)",
-                      }}
-                    />
 
-                    {!separate && clipHandles(start, end)}
+                    <div className="pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
+                      {!separate && clipMasks(start, end)}
+                      {part?.lane === "all" && highlight(part.span)}
+                      {removed.map((span, index) => gapBlock(span, index, () => unremove(index)))}
+                      {splits.map((at) => (
+                        <SplitMark
+                          key={at}
+                          at={at}
+                          disabled={busy}
+                          percent={percent}
+                          onRemove={() => unsplit(at)}
+                          t={t}
+                        />
+                      ))}
+                      <div
+                        className="absolute inset-y-0 w-px bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
+                        style={{ left: `${percent(playhead)}%` }}
+                      />
+                      <span
+                        className="absolute top-0 h-3.5 w-3 -translate-x-1/2"
+                        style={{
+                          left: `${percent(playhead)}%`,
+                          backgroundColor: accentColor.value,
+                          clipPath: "polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)",
+                        }}
+                      />
+
+                      {!separate && clipHandles(start, end)}
+                    </div>
                   </div>
                 </div>
               </div>

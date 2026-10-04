@@ -59,18 +59,22 @@ export function ResizeBar({
   orientation,
   label,
   color,
+  disabled = false,
 }: {
   orientation: "vertical" | "horizontal";
   label: string;
   color: string;
+  disabled?: boolean;
 }) {
   const across = orientation === "vertical";
   return (
     <Separator
       aria-label={label}
+      disabled={disabled}
       className={cn(
         "group relative z-20 shrink-0 outline-none",
-        across ? "w-1.5" : "h-1.5",
+        across ? (disabled ? "w-0" : "w-1.5") : "h-1.5",
+        disabled && "invisible",
       )}
     >
       <span
@@ -91,10 +95,12 @@ export function EdgeGrip({
   panel,
   label,
   color,
+  onGrab,
 }: {
   panel: RefObject<PanelImperativeHandle | null>;
   label: string;
   color: string;
+  onGrab: () => void;
 }) {
   const start = useRef<{ y: number; size: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -114,6 +120,7 @@ export function EdgeGrip({
         event.currentTarget.setPointerCapture(event.pointerId);
         start.current = { y: event.clientY, size: handle.getSize().inPixels };
         setDragging(true);
+        onGrab();
       }}
       onPointerMove={(event) => {
         if (!start.current) return;

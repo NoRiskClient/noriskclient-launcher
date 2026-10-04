@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "@iconify/react";
 
 import type { ClipAudioTrack, ClipOverlay, Span } from "../../../services/clip-service";
@@ -8,13 +8,106 @@ import { Waveform } from "../ClipTimeline";
 import { ClipIconButton } from "../ClipIconButton";
 import { Tooltip } from "../../ui/Tooltip";
 import { cn } from "../../../lib/utils";
-import { NUDGE, OVERLAY_ICON, type Translate, overlayTint, formatTime } from "./shared";
+import { NUDGE, OVERLAY_ICON, type Translate, overlayTint, formatTime, formatTick, rulerTicks } from "./shared";
 import { holdPointer } from "./useWindowDrag";
 
 const LINK_MODES: { separate: boolean; icon: string; label: string }[] = [
   { separate: false, icon: "solar:link-bold", label: "clips.editor.link.linked" },
   { separate: true, icon: "solar:link-broken-bold", label: "clips.editor.link.separate" },
 ];
+
+const LABEL_GAP = 6;
+
+export function Ruler({
+  scale,
+  duration,
+  percent,
+  onScrub,
+}: {
+  scale: RefObject<HTMLDivElement>;
+  duration: number;
+  percent: (seconds: number) => number;
+  onScrub: (clientX: number) => void;
+}) {
+  const probe = useRef<HTMLSpanElement>(null);
+  const [width, setWidth] = useState(0);
+  const [room, setRoom] = useState(0);
+  const ticks = useMemo(() => rulerTicks(duration), [duration]);
+  const labels = useMemo(
+    () => ticks.majors.map((at) => formatTick(at, ticks.step)),
+    [ticks],
+  );
+  const widest = labels.reduce((longest, label) => (label.length > longest.length ? label : longest), "");
+
+  useEffect(() => {
+    const track = scale.current;
+    const sample = probe.current;
+    if (!track || !sample) return;
+    const observer = new ResizeObserver(() => {
+      setWidth(track.clientWidth);
+      setRoom(sample.offsetWidth);
+    });
+    observer.observe(track);
+    observer.observe(sample);
+    return () => observer.disconnect();
+  }, [scale]);
+
+  const marks = useMemo(() => {
+    let edge = -Infinity;
+    return ticks.majors.map((at) => {
+      const x = (percent(at) / 100) * width;
+      const measured = room > 0 && width > 0;
+      if (measured && x >= edge && x + room <= width) {
+        edge = x + room + LABEL_GAP;
+        return { end: false, shown: true };
+      }
+      if (measured && x - room >= edge) {
+        edge = x + LABEL_GAP;
+        return { end: true, shown: true };
+      }
+      return { end: x + 1 > width, shown: false };
+    });
+  }, [percent, room, ticks, width]);
+
+  return (
+    <div
+      ref={scale}
+      role="presentation"
+      onPointerDown={(event) => {
+        holdPointer(event);
+        onScrub(event.clientX);
+      }}
+      className="relative h-6 min-w-0 flex-1 cursor-ew-resize overflow-hidden border-b border-white/10"
+    >
+      <span
+        ref={probe}
+        aria-hidden="true"
+        className="invisible absolute left-0 top-0 whitespace-nowrap border-l pl-1 font-minecraft text-[10px]"
+      >
+        {widest}
+      </span>
+      {ticks.minors.map((at) => (
+        <span
+          key={`minor-${at}`}
+          className="absolute bottom-0 h-1.5 w-px bg-white/15"
+          style={{ left: `${percent(at)}%` }}
+        />
+      ))}
+      {ticks.majors.map((at, index) => (
+        <span
+          key={`major-${at}`}
+          className={cn(
+            "absolute bottom-0 top-0 whitespace-nowrap border-white/25 font-minecraft text-[10px] leading-4 text-white/50",
+            marks[index].end ? "border-r pr-1 text-right" : "border-l pl-1",
+          )}
+          style={marks[index].end ? { right: `${100 - percent(at)}%` } : { left: `${percent(at)}%` }}
+        >
+          {marks[index].shown && labels[index]}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function Lane({
   icon,
@@ -58,7 +151,7 @@ export function Lane({
     <div className="flex">
       <div
         className={cn(
-          "flex w-[8.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
+          "flex w-[9.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
           active ? "border-white/20 bg-white/10" : "border-white/10 bg-black/30",
           height,
         )}

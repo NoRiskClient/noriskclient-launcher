@@ -37,7 +37,7 @@ export function ClipIconButton({
       )}
       {...rest}
     >
-      <Icon icon={icon} className="w-4 h-4" />
+      <Icon icon={icon} className="pointer-events-none w-4 h-4" />
     </button>
   );
 
