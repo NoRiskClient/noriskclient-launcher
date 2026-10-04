@@ -1,4 +1,4 @@
-use norisk_ipc::{ClipOverlay, Corner, OverlayKind};
+use norisk_ipc::{ClipOverlay, Corner, OverlayKind, TextAlign, TextVertical};
 
 const BLUR_PASSES: usize = 3;
 
@@ -145,8 +145,10 @@ fn stamp_of(kind: &OverlayKind, width: usize, height: usize, channel: Channel) -
             content,
             size,
             colour,
+            align,
+            vertical,
         } => {
-            if !text(&mut alpha, width, height, content, *size, channel.scale()) {
+            if !text(&mut alpha, width, height, content, *size, (*align, *vertical), channel.scale()) {
                 return None;
             }
             *colour
@@ -177,7 +179,15 @@ fn press(plane: &mut Plane, rect: Rect, stamp: &Stamp) {
     }
 }
 
-fn text(alpha: &mut [u8], width: usize, height: usize, content: &str, size: u32, scale: f32) -> bool {
+fn text(
+    alpha: &mut [u8],
+    width: usize,
+    height: usize,
+    content: &str,
+    size: u32,
+    (align, vertical): (TextAlign, TextVertical),
+    scale: f32,
+) -> bool {
     use ab_glyph::{Font, ScaleFont};
 
     let Some(font) = PARSED
@@ -197,33 +207,50 @@ fn text(alpha: &mut [u8], width: usize, height: usize, content: &str, size: u32,
         (size.clamp(4, 512) as f32 * scale).max(1.0),
     ));
     let line_height = scaled.height() + scaled.line_gap();
+    let glyph_height = scaled.ascent() - scaled.descent();
 
-    let mut pen_x = 0.0f32;
-    let mut baseline = scaled.ascent();
-
+    let mut lines: Vec<(Vec<(ab_glyph::GlyphId, f32)>, f32)> = vec![(Vec::new(), 0.0)];
     for character in content.chars() {
         if character == '\n' {
-            pen_x = 0.0;
-            baseline += line_height;
+            lines.push((Vec::new(), 0.0));
             continue;
         }
-
         let glyph_id = font.glyph_id(character);
         let advance = scaled.h_advance(glyph_id);
-
-        if pen_x + advance > width as f32 && pen_x > 0.0 {
-            pen_x = 0.0;
-            baseline += line_height;
+        if lines.last().is_some_and(|(_, pen)| *pen > 0.0 && pen + advance > width as f32) {
+            lines.push((Vec::new(), 0.0));
         }
-        if baseline - scaled.descent() > height as f32 {
-            break;
-        }
+        let (glyphs, pen) = lines.last_mut().expect("there is always a line");
+        glyphs.push((glyph_id, *pen));
+        *pen += advance;
+    }
 
-        let glyph = glyph_id.with_scale_and_position(
-            scaled.scale(),
-            ab_glyph::point(pen_x, baseline),
-        );
-        if let Some(outline) = font.outline_glyph(glyph) {
+    let fitting = ((height as f32 - glyph_height) / line_height).floor().max(0.0) as usize + 1;
+    lines.truncate(fitting.min(lines.len()));
+    let block = glyph_height + line_height * (lines.len() - 1) as f32;
+    let spare_height = (height as f32 - block).max(0.0);
+    let top = match vertical {
+        TextVertical::Top => 0.0,
+        TextVertical::Center => spare_height / 2.0,
+        TextVertical::Bottom => spare_height,
+    };
+
+    for (row, (glyphs, line_width)) in lines.iter().enumerate() {
+        let spare = (width as f32 - line_width).max(0.0);
+        let offset = match align {
+            TextAlign::Left => 0.0,
+            TextAlign::Center => spare / 2.0,
+            TextAlign::Right => spare,
+        };
+        let baseline = top + scaled.ascent() + line_height * row as f32;
+        for &(glyph_id, x) in glyphs {
+            let glyph = glyph_id.with_scale_and_position(
+                scaled.scale(),
+                ab_glyph::point(offset + x, baseline),
+            );
+            let Some(outline) = font.outline_glyph(glyph) else {
+                continue;
+            };
             let bounds = outline.px_bounds();
             outline.draw(|x, y, coverage| {
                 let at_x = bounds.min.x as i64 + x as i64;
@@ -240,8 +267,6 @@ fn text(alpha: &mut [u8], width: usize, height: usize, content: &str, size: u32,
                 *slot = (*slot).max(cover);
             });
         }
-
-        pen_x += advance;
     }
     true
 }
@@ -250,10 +275,30 @@ const ARROW_HEAD_SHARE: f64 = 0.3;
 const ARROW_HEAD_PER_THICKNESS: f64 = 3.0;
 const ARROW_WING_SHARE: f64 = 0.6;
 
+fn heading(towards: Corner) -> (i8, i8) {
+    match towards {
+        Corner::TopLeft => (-1, -1),
+        Corner::TopRight => (1, -1),
+        Corner::BottomLeft => (-1, 1),
+        Corner::BottomRight => (1, 1),
+        Corner::Top => (0, -1),
+        Corner::Right => (1, 0),
+        Corner::Bottom => (0, 1),
+        Corner::Left => (-1, 0),
+    }
+}
+
+fn ends(size: f64, way: i8, wing: f64) -> (f64, f64) {
+    let last = size - 1.0;
+    match way {
+        1 => (0.0, (last - wing).max(0.0)),
+        -1 => (last, wing.min(last)),
+        _ => (last / 2.0, last / 2.0),
+    }
+}
+
 fn arrow(alpha: &mut [u8], columns: usize, rows: usize, thickness: f64, towards: Corner) {
     let (width, height) = (columns as f64, rows as f64);
-    let flip_x = matches!(towards, Corner::TopLeft | Corner::BottomLeft);
-    let flip_y = matches!(towards, Corner::TopLeft | Corner::TopRight);
 
     let thickness = thickness.max(1.0).min(width.min(height));
     let half = thickness / 2.0;
@@ -262,7 +307,10 @@ fn arrow(alpha: &mut [u8], columns: usize, rows: usize, thickness: f64, towards:
         .min(width.min(height) / 2.0);
     let wing = head * ARROW_WING_SHARE;
 
-    let (run_x, run_y) = ((width - 1.0 - wing).max(0.0), (height - 1.0 - wing).max(0.0));
+    let (way_x, way_y) = heading(towards);
+    let (tail_x, tip_x) = ends(width, way_x, wing);
+    let (tail_y, tip_y) = ends(height, way_y, wing);
+    let (run_x, run_y) = (tip_x - tail_x, tip_y - tail_y);
     let length = run_x.hypot(run_y).max(1.0);
     let (unit_x, unit_y) = (run_x / length, run_y / length);
     let head = head.min(length);
@@ -270,8 +318,8 @@ fn arrow(alpha: &mut [u8], columns: usize, rows: usize, thickness: f64, towards:
 
     for y in 0..rows {
         for x in 0..columns {
-            let along_x = if flip_x { width - 1.0 - x as f64 } else { x as f64 };
-            let along_y = if flip_y { height - 1.0 - y as f64 } else { y as f64 };
+            let along_x = x as f64 - tail_x;
+            let along_y = y as f64 - tail_y;
 
             let forward = along_x * unit_x + along_y * unit_y;
             let aside = (along_x * unit_y - along_y * unit_x).abs();
@@ -525,7 +573,7 @@ mod tests {
         let kinds = [
             OverlayKind::Box { colour: 0xff3b30 },
             OverlayKind::Arrow { colour: 0x0a84ff, thickness: 4, towards: Corner::TopRight },
-            OverlayKind::Text { content: "CLIP".into(), size: 28, colour: 0xffcc00 },
+            OverlayKind::Text { content: "CLIP".into(), size: 28, colour: 0xffcc00, align: Default::default(), vertical: Default::default() },
         ];
 
         for kind in kinds {
@@ -761,7 +809,7 @@ mod tests {
             0,
             &mut plane,
             rect,
-            &OverlayKind::Text { content: "HALLO".into(), size: 32, colour: 0xffffff },
+            &OverlayKind::Text { content: "HALLO".into(), size: 32, colour: 0xffffff, align: Default::default(), vertical: Default::default() },
         );
 
         let changed = data.iter().zip(&original).filter(|(a, b)| a != b).count();
@@ -801,7 +849,7 @@ mod tests {
             0,
             &mut plane,
             Rect { left: 0, top: 0, width, height },
-            &OverlayKind::Text { content: "   ".into(), size: 20, colour: 0xffffff },
+            &OverlayKind::Text { content: "   ".into(), size: 20, colour: 0xffffff, align: Default::default(), vertical: Default::default() },
         );
 
         assert_eq!(data, original);
@@ -856,5 +904,101 @@ mod tests {
     fn a_thin_rectangle_never_halves_away_to_nothing() {
         let chroma = halve(Rect { left: 0, top: 0, width: 1, height: 1 }, 10, 10);
         assert!(chroma.width >= 1 && chroma.height >= 1);
+    }
+
+    fn ink_by_half(towards: Corner) -> (usize, usize, usize, usize) {
+        let (width, height) = (120, 120);
+        let mut alpha = vec![0u8; width * height];
+        arrow(&mut alpha, width, height, 6.0, towards);
+        let inked = |x: usize, y: usize| alpha[y * width + x] > 0;
+        let left = (0..height).map(|y| (0..width / 2).filter(|&x| inked(x, y)).count()).sum();
+        let right = (0..height).map(|y| (width / 2..width).filter(|&x| inked(x, y)).count()).sum();
+        let top = (0..height / 2).map(|y| (0..width).filter(|&x| inked(x, y)).count()).sum();
+        let bottom = (height / 2..height).map(|y| (0..width).filter(|&x| inked(x, y)).count()).sum();
+        (left, right, top, bottom)
+    }
+
+    #[test]
+    fn a_straight_arrow_carries_its_head_on_the_side_it_points_to() {
+        let (left, right, top, bottom) = ink_by_half(Corner::Right);
+        assert!(right > left, "a right arrow is heavier on the left ({left} vs {right})");
+        assert!(top.abs_diff(bottom) * 10 < top + bottom, "a right arrow is not level ({top} vs {bottom})");
+
+        let (left, right, _, _) = ink_by_half(Corner::Left);
+        assert!(left > right, "a left arrow is heavier on the right ({left} vs {right})");
+
+        let (left, right, top, bottom) = ink_by_half(Corner::Top);
+        assert!(top > bottom, "an up arrow is heavier at the bottom ({top} vs {bottom})");
+        assert!(left.abs_diff(right) * 10 < left + right, "an up arrow is not upright ({left} vs {right})");
+
+        let (_, _, top, bottom) = ink_by_half(Corner::Bottom);
+        assert!(bottom > top, "a down arrow is heavier at the top ({top} vs {bottom})");
+    }
+
+    fn stamped_text(width: usize, height: usize, align: TextAlign, vertical: TextVertical) -> Vec<u8> {
+        let mut data = vec![0u8; width * height];
+        let mut plane = Plane {
+            data: &mut data,
+            stride: width,
+            width,
+            height,
+            channel: Channel::Luma,
+        };
+        let rect = Rect { left: 0, top: 0, width, height };
+        Stamps::default().apply(
+            0,
+            &mut plane,
+            rect,
+            &OverlayKind::Text {
+                content: "HI".into(),
+                size: 24,
+                colour: 0xffffff,
+                align,
+                vertical,
+            },
+        );
+        data
+    }
+
+    fn inked_rows(vertical: TextVertical) -> (usize, usize) {
+        let (width, height) = (120, 160);
+        let data = stamped_text(width, height, TextAlign::Center, vertical);
+        let inked: Vec<usize> = (0..height)
+            .filter(|&y| (0..width).any(|x| data[y * width + x] != 0))
+            .collect();
+        (inked[0], height - 1 - inked[inked.len() - 1])
+    }
+
+    #[test]
+    fn text_sits_at_the_height_it_was_placed() {
+        let (above, below) = inked_rows(TextVertical::Top);
+        assert!(above < 12 && below > 100, "top text is not at the top ({above}, {below})");
+
+        let (above, below) = inked_rows(TextVertical::Bottom);
+        assert!(below < 12 && above > 100, "bottom text is not at the bottom ({above}, {below})");
+
+        let (above, below) = inked_rows(TextVertical::Center);
+        assert!(above.abs_diff(below) < 12, "middle text is off centre ({above}, {below})");
+    }
+
+    fn inked_columns(align: TextAlign) -> (usize, usize) {
+        let (width, height) = (240, 60);
+        let data = stamped_text(width, height, align, TextVertical::Center);
+        let inked: Vec<usize> = (0..width)
+            .filter(|&x| (0..height).any(|y| data[y * width + x] != 0))
+            .collect();
+        (inked[0], width - 1 - inked[inked.len() - 1])
+    }
+
+    #[test]
+    fn text_sits_where_its_alignment_puts_it() {
+        let (left_gap, right_gap) = inked_columns(TextAlign::Left);
+        assert!(left_gap < 8 && right_gap > 150, "left text is not at the left ({left_gap}, {right_gap})");
+
+        let (left_gap, right_gap) = inked_columns(TextAlign::Right);
+        assert!(right_gap < 8 && left_gap > 150, "right text is not at the right ({left_gap}, {right_gap})");
+
+        let (left_gap, right_gap) = inked_columns(TextAlign::Center);
+        assert!(left_gap.abs_diff(right_gap) < 8, "centred text is off centre ({left_gap}, {right_gap})");
     }
 }

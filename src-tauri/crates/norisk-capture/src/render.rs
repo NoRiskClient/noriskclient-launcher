@@ -77,10 +77,12 @@ fn at_frame_height(overlay: &norisk_ipc::ClipOverlay, frame_height: u32) -> nori
             thickness: scaled(*thickness),
             towards: *towards,
         },
-        OverlayKind::Text { content, size, colour } => OverlayKind::Text {
+        OverlayKind::Text { content, size, colour, align, vertical } => OverlayKind::Text {
             content: content.clone(),
             size: scaled(*size),
             colour: *colour,
+            align: *align,
+            vertical: *vertical,
         },
         other => other.clone(),
     };
@@ -939,7 +941,7 @@ mod tests {
             end_seconds: 2.0,
         };
         let text = ClipOverlay {
-            kind: OverlayKind::Text { content: "HI".into(), size: 48, colour: 0 },
+            kind: OverlayKind::Text { content: "HI".into(), size: 48, colour: 0, align: Default::default(), vertical: Default::default() },
             ..arrow.clone()
         };
         let blur = ClipOverlay { kind: OverlayKind::Blur { strength: 12 }, ..arrow.clone() };
@@ -1064,6 +1066,8 @@ mod render_tests {
                     content: "NORISK CLIPS".into(),
                     size: 48,
                     colour: 0xff3b30,
+                    align: norisk_ipc::TextAlign::Center,
+                    vertical: norisk_ipc::TextVertical::Center,
                 },
                 left: 0.08,
                 top: 0.62,

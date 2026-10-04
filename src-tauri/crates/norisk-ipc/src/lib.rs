@@ -770,7 +770,33 @@ pub enum OverlayKind {
     Blur { strength: u32 },
     Box { colour: u32 },
     Arrow { colour: u32, thickness: u32, towards: Corner },
-    Text { content: String, size: u32, colour: u32 },
+    Text {
+        content: String,
+        size: u32,
+        colour: u32,
+        #[serde(default)]
+        align: TextAlign,
+        #[serde(default)]
+        vertical: TextVertical,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextAlign {
+    Left,
+    #[default]
+    Center,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextVertical {
+    Top,
+    #[default]
+    Center,
+    Bottom,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -781,6 +807,10 @@ pub enum Corner {
     BottomLeft,
     #[default]
     BottomRight,
+    Top,
+    Right,
+    Bottom,
+    Left,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

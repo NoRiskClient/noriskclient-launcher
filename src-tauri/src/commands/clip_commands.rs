@@ -414,10 +414,12 @@ fn tidy_overlay(
             thickness: thickness.clamp(ARROW_THICKNESS.0, ARROW_THICKNESS.1),
             towards,
         },
-        OverlayKind::Text { content, size, colour } => OverlayKind::Text {
+        OverlayKind::Text { content, size, colour, align, vertical } => OverlayKind::Text {
             content,
             size: size.clamp(TEXT_SIZE.0, TEXT_SIZE.1),
             colour,
+            align,
+            vertical,
         },
         other => other,
     };
