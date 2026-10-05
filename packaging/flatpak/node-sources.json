@@ -4598,6 +4598,13 @@
     },
     {
         "type": "file",
+        "url": "https://registry.yarnpkg.com/react-resizable-panels/-/react-resizable-panels-4.14.2.tgz#df39ef4acb8cf42c4f96d40f6c56b0510d8257c4",
+        "sha512": "b37e667d7870a4f10f9c1f8128f09927d5595340876f523db6b9bdb628c418136fd52ae5d07cc8c1e10d7979ec42f7745e6f4178e0641330c65493993369a411",
+        "dest-filename": "react-resizable-panels-4.14.2.tgz",
+        "dest": "flatpak-node/yarn-mirror"
+    },
+    {
+        "type": "file",
         "url": "https://registry.yarnpkg.com/read/-/read-5.0.1.tgz#e6b0a84743406182fdfc20b2418a11b39b7ef837",
         "sha512": "fa7b2aa6a6249297add9454f1bc662b84f1dd75dc32b8bc7604a0485cad704094f8aae9d8bb4114ee36229001b69161e8286ee5f606967a4236a728e5e725d4c",
         "dest-filename": "read-5.0.1.tgz",
