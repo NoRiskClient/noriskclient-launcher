@@ -9,8 +9,7 @@
     "single_log_window_*",
     "updater",
     "chat_*",
-    "tester_window",
-    "clip_editor"
+    "tester_window"
   ],
   "permissions": [
     "core:default",

@@ -79,6 +79,10 @@ impl From<&norisk_ipc::ClipManifest> for ClipDetails {
 }
 
 impl ClipDetails {
+    fn recorded(&self) -> bool {
+        self.width > 0 && self.height > 0
+    }
+
     pub fn sliced(&self, start_seconds: f64, end_seconds: f64) -> Self {
         let step = self.peak_step_ms.max(1) as f64 / 1_000.0;
         let from = (start_seconds.max(0.0) / step).floor() as usize;
@@ -125,8 +129,11 @@ fn plain(path: PathBuf) -> PathBuf {
         return path;
     };
     match text.strip_prefix("\\\\?\\") {
-        Some(rest) if !rest.starts_with("UNC\\") => PathBuf::from(rest),
-        _ => path,
+        Some(rest) => match rest.strip_prefix("UNC\\") {
+            Some(share) => PathBuf::from(format!("\\\\{share}")),
+            None => PathBuf::from(rest),
+        },
+        None => path,
     }
 }
 
@@ -140,13 +147,13 @@ pub fn meta_dir() -> PathBuf {
     LAUNCHER_DIRECTORY.root_dir().join("clip-meta")
 }
 
-fn meta_name(clip: &Path) -> String {
+fn meta_name(clip: &Path, print: u32) -> String {
     let stem = clip
         .file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_else(|| "clip".to_string());
 
-    format!("{stem}-{:08x}", fingerprint(clip))
+    format!("{stem}-{print:08x}")
 }
 
 fn resolved(clip: &Path) -> PathBuf {
@@ -154,8 +161,17 @@ fn resolved(clip: &Path) -> PathBuf {
 }
 
 fn fingerprint(clip: &Path) -> u32 {
-    let flattened = plain(clip.to_path_buf());
-    let text = flattened.to_string_lossy().to_lowercase();
+    hashed(&plain(clip.to_path_buf()).to_string_lossy())
+}
+
+fn unc_fingerprint(clip: &Path) -> Option<u32> {
+    let text = clip.to_str()?;
+    let share = text.strip_prefix("\\\\").filter(|rest| !rest.starts_with("?\\"))?;
+    Some(hashed(&format!("\\\\?\\UNC\\{share}")))
+}
+
+fn hashed(text: &str) -> u32 {
+    let text = text.to_lowercase();
 
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in text.as_bytes() {
@@ -166,7 +182,11 @@ fn fingerprint(clip: &Path) -> u32 {
 }
 
 fn meta_path(clip: &Path, extension: &str) -> PathBuf {
-    meta_dir().join(format!("{}.{extension}", meta_name(clip)))
+    meta_path_with(clip, fingerprint(clip), extension)
+}
+
+fn meta_path_with(clip: &Path, print: u32, extension: &str) -> PathBuf {
+    meta_dir().join(format!("{}.{extension}", meta_name(clip, print)))
 }
 
 pub fn thumbnail_path(clip: &Path) -> PathBuf {
@@ -199,11 +219,14 @@ pub fn details_path(clip: &Path) -> PathBuf {
     meta_path(&resolved(clip), "nrc.json")
 }
 
-fn adopt_sidecars(clip: &Path, earlier: &Path) {
+fn adopt_sidecars(clip: &Path, earlier: u32) {
+    if earlier == fingerprint(clip) {
+        return;
+    }
     for extension in ["nrc.json", "thumb.jpg"] {
         let target = meta_path(clip, extension);
-        let old = meta_path(earlier, extension);
-        if target == old || target.exists() || !old.exists() {
+        let old = meta_path_with(clip, earlier, extension);
+        if target.exists() || !old.exists() {
             continue;
         }
         if let Err(e) = std::fs::rename(&old, &target) {
@@ -309,12 +332,15 @@ pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
                 return None;
             }
             if let Some(earlier) = earlier {
-                adopt_sidecars(&path, &earlier.join(entry.file_name()));
+                adopt_sidecars(&path, fingerprint(&earlier.join(entry.file_name())));
+            }
+            if let Some(earlier) = unc_fingerprint(&path) {
+                adopt_sidecars(&path, earlier);
             }
             let details = read_details_at(&meta_path(&path, "nrc.json"));
             let thumbnail = Some(meta_path(&path, "thumb.jpg")).filter(|thumb| thumb.exists());
             Some(ClipEntry {
-                managed: details.is_some() || thumbnail.is_some(),
+                managed: details.as_ref().is_some_and(ClipDetails::recorded),
                 name: path.file_stem()?.to_string_lossy().into_owned(),
                 size_bytes: metadata.len(),
                 created_at: metadata
@@ -579,7 +605,8 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
         .and_then(|s| s.to_str())
         .ok_or_else(|| AppError::Other("that clip has no usable name".into()))?;
 
-    let base = stem.rsplit_once(suffix).map_or(stem, |(head, _)| head);
+    let base = unsuffixed(stem, suffix);
+    let mut pending = PENDING.lock().unwrap_or_else(|poison| poison.into_inner());
 
     for attempt in 0..1000 {
         let name = if attempt == 0 {
@@ -587,9 +614,9 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
         } else {
             format!("{base}{suffix}{}.{extension}", attempt + 1)
         };
-        let candidate = dir.join(name);
-        if !candidate.exists() {
-            return Ok(plain(candidate));
+        let candidate = plain(dir.join(name));
+        if !candidate.exists() && pending.insert(reservation(&candidate)) {
+            return Ok(candidate);
         }
     }
 
@@ -597,6 +624,37 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
         "there are already a thousand {} versions of this clip",
         if suffix.is_empty() { extension } else { suffix.trim_start_matches('_') },
     )))
+}
+
+fn unsuffixed<'a>(stem: &'a str, suffix: &str) -> &'a str {
+    if suffix.is_empty() {
+        return stem;
+    }
+    stem.trim_end_matches(|c: char| c.is_ascii_digit())
+        .strip_suffix(suffix)
+        .filter(|base| !base.is_empty())
+        .unwrap_or(stem)
+}
+
+static PENDING: std::sync::Mutex<std::collections::BTreeSet<String>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+
+fn reservation(destination: &Path) -> String {
+    plain(destination.to_path_buf()).to_string_lossy().to_lowercase()
+}
+
+pub fn release_destination(destination: &Path) {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(&reservation(destination));
+}
+
+pub fn release_all_destinations() {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .clear();
 }
 
 #[cfg(test)]
@@ -1224,6 +1282,140 @@ mod tests {
         assert_eq!(destination.file_name().unwrap(), "clip_trimmed2.mp4");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_suffix_inside_the_name_is_not_cut_off() {
+        let dir = temp_dir("suffix-mid-name");
+        let clip = write_clip(&dir, "my_edited_run.mp4", 10);
+
+        let destination =
+            shaped_destination(&dir, &clip, norisk_ipc::ClipShape::Original).unwrap();
+        assert_eq!(destination.file_name().unwrap(), "my_edited_run_edited.mp4");
+    }
+
+    #[test]
+    fn a_numbered_export_is_named_after_its_original() {
+        let dir = temp_dir("suffix-numbered");
+        let second = write_clip(&dir, "clip_trimmed3.mp4", 10);
+
+        let destination = trimmed_destination(&dir, &second).unwrap();
+        assert_eq!(destination.file_name().unwrap(), "clip_trimmed.mp4");
+    }
+
+    #[test]
+    fn two_quick_exports_of_one_clip_get_different_names() {
+        let dir = temp_dir("reserve");
+        let clip = write_clip(&dir, "rush.mp4", 10);
+
+        let first = trimmed_destination(&dir, &clip).unwrap();
+        let second = trimmed_destination(&dir, &clip).unwrap();
+        assert_ne!(first, second, "the engine has not written either file yet");
+
+        release_destination(&first);
+        assert_eq!(trimmed_destination(&dir, &clip).unwrap(), first);
+    }
+
+    #[test]
+    fn a_mapped_drive_path_is_handed_out_as_a_plain_share() {
+        assert_eq!(
+            plain(PathBuf::from("\\\\?\\UNC\\server\\share\\clips\\a.mp4")),
+            PathBuf::from("\\\\server\\share\\clips\\a.mp4"),
+        );
+        assert_eq!(
+            plain(PathBuf::from("\\\\?\\C:\\clips\\a.mp4")),
+            PathBuf::from("C:\\clips\\a.mp4"),
+        );
+    }
+
+    #[test]
+    fn a_video_with_only_a_still_or_a_mark_is_not_the_launchers() {
+        let dir = temp_dir("managed-foreign");
+        let holiday = write_clip(&dir, "holiday.mp4", 32);
+        write_thumbnail(&dir, &holiday, &jpeg()).unwrap();
+        set_favourite(&dir, &holiday, true).unwrap();
+        set_favourite(&dir, &holiday, false).unwrap();
+
+        let listed = list(&dir).unwrap();
+        assert!(!listed[0].managed, "the storage limit could otherwise delete it");
+    }
+
+    #[test]
+    fn a_recorded_clip_is_the_launchers() {
+        let dir = temp_dir("managed-own");
+        let clip = write_clip(&dir, "recorded.mp4", 32);
+        write_details(&clip, &details_with(Vec::new())).unwrap();
+        set_favourite(&dir, &clip, true).unwrap();
+        set_favourite(&dir, &clip, false).unwrap();
+
+        assert!(list(&dir).unwrap()[0].managed);
+    }
+
+    fn roundabout(dir: &Path) -> PathBuf {
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        dir.join("sub").join("..")
+    }
+
+    fn plant_details(clip: &Path, details: &ClipDetails) -> PathBuf {
+        std::fs::create_dir_all(meta_dir()).unwrap();
+        let path = meta_path(clip, "nrc.json");
+        std::fs::write(&path, serde_json::to_vec(details).unwrap()).unwrap();
+        path
+    }
+
+    #[test]
+    fn details_filed_under_another_spelling_of_the_folder_are_taken_over() {
+        let dir = temp_dir("adopt");
+        write_clip(&dir, "adopted.mp4", 32);
+        let given = roundabout(&dir);
+        let old = plant_details(&given.join("adopted.mp4"), &details_with(Vec::new()));
+
+        let listed = list(&given).unwrap();
+
+        assert_eq!(listed[0].duration_seconds, Some(10.0));
+        assert!(listed[0].managed);
+        assert!(!old.exists(), "the details moved rather than being copied");
+    }
+
+    #[test]
+    fn taking_over_never_overwrites_what_is_already_filed() {
+        let dir = temp_dir("adopt-kept");
+        let clip = write_clip(&dir, "kept.mp4", 32);
+        write_details(&clip, &ClipDetails { favourite: true, ..details_with(Vec::new()) })
+            .unwrap();
+        let given = roundabout(&dir);
+        let old = plant_details(
+            &given.join("kept.mp4"),
+            &ClipDetails { duration_seconds: 99.0, ..details_with(Vec::new()) },
+        );
+
+        let listed = list(&given).unwrap();
+
+        assert!(listed[0].favourite);
+        assert_eq!(listed[0].duration_seconds, Some(10.0));
+        assert!(old.exists());
+    }
+
+    #[test]
+    fn a_clip_is_filed_the_same_however_its_path_is_written() {
+        let dir = temp_dir("same-filing");
+        let clip = write_clip(&dir, "same.mp4", 32);
+        write_details(&roundabout(&dir).join("same.mp4"), &details_with(Vec::new())).unwrap();
+
+        assert!(read_details(&clip).is_some());
+        assert_eq!(details_path(&clip), details_path(&dir.join(".").join("same.mp4")));
+    }
+
+    #[test]
+    fn same_named_clips_in_different_folders_do_not_share_details() {
+        let one = temp_dir("share-one");
+        let other = temp_dir("share-other");
+        let first = write_clip(&one, "twin.mp4", 32);
+        let second = write_clip(&other, "twin.mp4", 32);
+        write_details(&first, &details_with(Vec::new())).unwrap();
+
+        assert!(read_details(&second).is_none());
+        assert_ne!(details_path(&first), details_path(&second));
     }
 
     #[test]

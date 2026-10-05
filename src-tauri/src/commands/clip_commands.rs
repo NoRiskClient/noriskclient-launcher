@@ -225,7 +225,7 @@ pub async fn capture_encoder_capabilities() -> Result<Vec<EncoderCapability>, Co
 
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     let mut capabilities = Vec::new();
-    while std::time::Instant::now() < deadline {
+    while std::time::Instant::now() < deadline && supervisor.is_running().await {
         if let Some(ready) = supervisor.ready_info().await {
             if !ready.capabilities.is_empty() {
                 capabilities = ready.capabilities;
@@ -338,12 +338,12 @@ pub async fn clip_export_vertical(
     let dir = clip_dir().await?;
     let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
     let shape = shape.unwrap_or_default();
-    let destination = crate::utils::clip_library::shaped_destination(&dir, &source, shape)?;
     let duration = clip_duration(&source).await;
     let within = |seconds: Option<f64>| seconds.map(|s| within_clip(s, duration));
 
     let state = State::get().await?;
-    state.capture_supervisor.send(LauncherToCapture::ExportVertical(
+    let destination = crate::utils::clip_library::shaped_destination(&dir, &source, shape)?;
+    dispatch(&state, &destination, LauncherToCapture::ExportVertical(
         norisk_ipc::ExportVerticalRequest {
             source,
             destination: destination.clone(),
@@ -365,6 +365,16 @@ pub async fn clip_export_vertical(
     ))?;
 
     Ok(destination)
+}
+
+fn dispatch(
+    state: &State,
+    destination: &std::path::Path,
+    command: LauncherToCapture,
+) -> crate::error::Result<()> {
+    state.capture_supervisor.send(command).inspect_err(|_| {
+        crate::utils::clip_library::release_destination(destination);
+    })
 }
 
 async fn clip_duration(source: &std::path::Path) -> Option<f64> {
@@ -441,15 +451,17 @@ pub async fn clip_export_gif(
 ) -> Result<std::path::PathBuf, CommandError> {
     let dir = clip_dir().await?;
     let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
-    let destination = crate::utils::clip_library::gif_destination(&dir, &source)?;
 
     let state = State::get().await?;
-    state
-        .capture_supervisor
-        .send(LauncherToCapture::ExportGif(norisk_ipc::ExportGifRequest {
+    let destination = crate::utils::clip_library::gif_destination(&dir, &source)?;
+    dispatch(
+        &state,
+        &destination,
+        LauncherToCapture::ExportGif(norisk_ipc::ExportGifRequest {
             source,
             destination: destination.clone(),
-        }))?;
+        }),
+    )?;
 
     Ok(destination)
 }
@@ -472,12 +484,13 @@ pub async fn clip_trim(
 
     let dir = clip_dir().await?;
     let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
-    let destination = crate::utils::clip_library::trimmed_destination(&dir, &source)?;
 
     let state = State::get().await?;
-    state
-        .capture_supervisor
-        .send(LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
+    let destination = crate::utils::clip_library::trimmed_destination(&dir, &source)?;
+    dispatch(
+        &state,
+        &destination,
+        LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
             source,
             destination: destination.clone(),
             start_seconds,
@@ -485,7 +498,8 @@ pub async fn clip_trim(
             video_start_seconds,
             video_end_seconds,
             levels: levels.unwrap_or_default(),
-        }))?;
+        }),
+    )?;
 
     Ok(destination)
 }
@@ -590,6 +604,8 @@ pub struct EditorClip {
 
 static EDITOR_CLIP: std::sync::Mutex<Option<EditorClip>> = std::sync::Mutex::new(None);
 
+static EDITOR_OPENING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[tauri::command]
 pub fn clip_editor_current() -> Option<EditorClip> {
     EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()).clone()
@@ -620,6 +636,7 @@ pub async fn clip_open_editor(
         path: source.to_string_lossy().into_owned(),
         name,
     };
+    let _opening = EDITOR_OPENING.lock().await;
     *EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()) = Some(clip.clone());
 
     if let Some(window) = app.get_webview_window(EDITOR_LABEL) {

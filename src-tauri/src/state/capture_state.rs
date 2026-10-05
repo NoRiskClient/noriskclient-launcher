@@ -24,7 +24,9 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
-const HEARTBEAT_GRACE: Duration = Duration::from_secs(12);
+const ENGINE_REPORTS_PROTOCOL: bool = cfg!(not(target_os = "macos"));
+
+const HEARTBEAT_GRACE: Duration = Duration::from_secs(20);
 
 const BACKOFF: &[Duration] = &[
     Duration::from_secs(1),
@@ -113,6 +115,7 @@ pub struct CaptureSupervisor {
     last_error: Arc<RwLock<Option<norisk_ipc::CaptureError>>>,
     app: Arc<RwLock<Option<tauri::AppHandle>>>,
     running: Arc<RwLock<bool>>,
+    incompatible: std::sync::atomic::AtomicBool,
 }
 
 impl CaptureSupervisor {
@@ -130,6 +133,7 @@ impl CaptureSupervisor {
             last_error: Arc::new(RwLock::new(None)),
             app: Arc::new(RwLock::new(None)),
             running: Arc::new(RwLock::new(false)),
+            incompatible: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -164,6 +168,12 @@ impl CaptureSupervisor {
     }
 
     pub fn send(&self, command: LauncherToCapture) -> Result<()> {
+        if self.incompatible.load(std::sync::atomic::Ordering::Acquire) {
+            return Err(AppError::Other(
+                "the capture engine does not match this launcher; update or reinstall the launcher"
+                    .into(),
+            ));
+        }
         {
             let mut session = self
                 .session
@@ -334,6 +344,7 @@ impl CaptureSupervisor {
         }
 
         let mut receiver = self.take_command_receiver().await?;
+        self.incompatible.store(false, std::sync::atomic::Ordering::Release);
 
         let mut stale = 0;
         while receiver.try_recv().is_ok() {
@@ -410,6 +421,7 @@ impl CaptureSupervisor {
 
         loop {
             let outcome = self.run_once(&exe, &mut commands).await;
+            crate::utils::clip_library::release_all_destinations();
             if let Some(app) = self.app.read().await.as_ref() {
                 use tauri::Emitter;
                 let _ = app.emit("clip_engine_stopped", ());
@@ -417,6 +429,14 @@ impl CaptureSupervisor {
             match outcome {
                 Outcome::Shutdown => {
                     log::info!("Capture engine shut down as requested");
+                    return commands;
+                }
+                Outcome::Incompatible => {
+                    log::error!("Capture engine does not match this launcher; not restarting it");
+                    *self.ready.write().await = None;
+                    *self.active.write().await = None;
+                    *self.last_status.write().await = None;
+                    *self.state.write().await = CaptureState::Failed;
                     return commands;
                 }
                 Outcome::Lost(reason) => {
@@ -547,6 +567,10 @@ impl CaptureSupervisor {
                                 last_pong = Instant::now();
                             }
                             self.absorb(event).await;
+                            if self.incompatible.load(std::sync::atomic::Ordering::Acquire) {
+                                let _ = child.kill().await;
+                                return Outcome::Incompatible;
+                            }
                         }
                         Err(e) => log::warn!("Undecodable message from the capture engine: {e}"),
                     },
@@ -620,7 +644,8 @@ impl CaptureSupervisor {
     async fn absorb(&self, event: CaptureToLauncher) {
         match event {
             CaptureToLauncher::Ready(info) => {
-                if cfg!(not(target_os = "macos")) && info.protocol_version != norisk_ipc::PROTOCOL_VERSION {
+                if ENGINE_REPORTS_PROTOCOL && info.protocol_version != norisk_ipc::PROTOCOL_VERSION {
+                    self.incompatible.store(true, std::sync::atomic::Ordering::Release);
                     log::error!(
                         "Capture engine speaks protocol {} but this launcher speaks {}",
                         info.protocol_version,
@@ -630,14 +655,17 @@ impl CaptureSupervisor {
                         code: norisk_ipc::ErrorCode::Protocol,
                         message: format!(
                             "The capture engine speaks protocol {} but the launcher speaks {}. \
-                             Restart the launcher so both halves are the same version.",
+                             Update or reinstall the launcher so both halves are the same version.",
                             info.protocol_version,
                             norisk_ipc::PROTOCOL_VERSION
                         ),
                         recoverable: false,
+                        source: None,
                     })))
                     .await;
-                } else {
+                    return;
+                }
+                {
                     let mut last_error = self.last_error.write().await;
                     if last_error.as_ref().is_some_and(|e| e.code == norisk_ipc::ErrorCode::Protocol) {
                         *last_error = None;
@@ -809,6 +837,7 @@ impl CaptureSupervisor {
                         "height": exported.height,
                     }),
                 );
+                crate::utils::clip_library::release_destination(&exported.path);
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_exported", &exported) {
@@ -836,6 +865,7 @@ impl CaptureSupervisor {
                         "truncated": exported.truncated,
                     }),
                 );
+                crate::utils::clip_library::release_destination(&exported.path);
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_gif_exported", &exported) {
@@ -875,6 +905,7 @@ impl CaptureSupervisor {
                     .await;
                 }
 
+                crate::utils::clip_library::release_destination(&trimmed.path);
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_trimmed", &trimmed) {
@@ -928,6 +959,7 @@ impl Default for CaptureSupervisor {
 
 enum Outcome {
     Shutdown,
+    Incompatible,
     Lost(String),
 }
 
