@@ -82,6 +82,9 @@ pub fn inject(pid: u32, thread_id: u32, dll: &Path) -> Result<Injected> {
         .to_owned();
 
     if is_module_loaded(pid, &file_name)? {
+        if fits_the_hook(pid).is_ok() {
+            keep_d3d11_loaded(pid);
+        }
         return Ok(Injected::AlreadyPresent);
     }
 
@@ -92,6 +95,8 @@ pub fn inject(pid: u32, thread_id: u32, dll: &Path) -> Result<Injected> {
     if is_never_hooked(&executable) {
         anyhow::bail!("{executable} is not a program to load a capture hook into");
     }
+
+    keep_d3d11_loaded(pid);
 
     match inject_through_message_hook(pid, thread_id, &dll, &file_name) {
         Ok(()) => return Ok(Injected::Loaded),
@@ -125,6 +130,25 @@ fn fits_the_hook(pid: u32) -> Result<()> {
         anyhow::bail!("this is an ARM computer, and the capture hook only fits x64 programs");
     }
     Ok(())
+}
+
+fn keep_d3d11_loaded(pid: u32) {
+    if !is_module_loaded(pid, "opengl32.dll").unwrap_or(false) {
+        return;
+    }
+    let mut buffer = [0u16; 260];
+    let length = unsafe { windows::Win32::System::SystemInformation::GetSystemDirectoryW(Some(&mut buffer)) } as usize;
+    if length == 0 || length >= buffer.len() {
+        log::warn!("Could not find the system folder, so d3d11.dll stays unpinned in process {pid}");
+        return;
+    }
+    let system = std::path::PathBuf::from(String::from_utf16_lossy(&buffer[..length]));
+    for library in ["d3d11.dll", "dxgi.dll"] {
+        match inject_through_remote_thread(pid, &system.join(library)) {
+            Ok(()) => log::info!("Pinned {library} in process {pid} so the graphics driver cannot outlive it"),
+            Err(e) => log::warn!("Could not pin {library} in process {pid}: {e:#}"),
+        }
+    }
 }
 
 fn inject_through_message_hook(
