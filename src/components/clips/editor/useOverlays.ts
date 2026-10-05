@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import type { ClipCorner, ClipOverlay } from "../../../services/clip-service";
-import { MIN_BOX, MIN_LENGTH, clamp, type NewOverlay } from "./shared";
+import { MIN_BOX, MIN_LENGTH, clamp, type NewOverlay, type TimeView } from "./shared";
 import { useWindowDrag } from "./useWindowDrag";
 
 interface BoxDrag {
@@ -52,12 +52,12 @@ function span(from: number, to: number): { start: number; size: number; flipped:
 interface Stage {
   start: number;
   end: number;
-  duration: number;
+  view: TimeView;
   frameRef: RefObject<HTMLDivElement | null>;
   scaleRef: RefObject<HTMLDivElement | null>;
 }
 
-export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage) {
+export function useOverlays({ start, end, view, frameRef, scaleRef }: Stage) {
   const [overlays, setOverlays] = useState<ClipOverlay[]>([]);
   const latest = useRef<ClipOverlay[]>([]);
   const [chosen, setChosen] = useState<number | null>(null);
@@ -181,19 +181,20 @@ export function useOverlays({ start, end, duration, frameRef, scaleRef }: Stage)
     barDrag,
     (event, barDrag) => {
       const rect = scaleRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0 || duration <= 0) return;
-      const by = ((event.clientX - barDrag.fromX) / rect.width) * duration;
+      if (!rect || rect.width === 0 || view.length <= 0) return;
+      const by = ((event.clientX - barDrag.fromX) / rect.width) * view.length;
+      const from = view.toView(barDrag.startSeconds);
+      const to = view.toView(barDrag.endSeconds);
       if (barDrag.mode === "move") {
-        const span = barDrag.endSeconds - barDrag.startSeconds;
-        const from = clamp(barDrag.startSeconds + by, 0, duration - span);
-        editOverlay(barDrag.index, { startSeconds: from, endSeconds: from + span });
+        const at = clamp(from + by, 0, view.length - (to - from));
+        editOverlay(barDrag.index, { startSeconds: view.fromView(at), endSeconds: view.fromView(at + to - from) });
       } else if (barDrag.mode === "start") {
         editOverlay(barDrag.index, {
-          startSeconds: clamp(barDrag.startSeconds + by, 0, barDrag.endSeconds - MIN_LENGTH),
+          startSeconds: view.fromView(clamp(from + by, 0, to - MIN_LENGTH)),
         });
       } else {
         editOverlay(barDrag.index, {
-          endSeconds: clamp(barDrag.endSeconds + by, barDrag.startSeconds + MIN_LENGTH, duration),
+          endSeconds: view.fromView(clamp(to + by, from + MIN_LENGTH, view.length)),
         });
       }
     },

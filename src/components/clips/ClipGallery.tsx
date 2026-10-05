@@ -64,7 +64,8 @@ export function ClipGallery({
   const [vertical, setVertical] = useState<ClipEntry | null>(null);
   const [renaming, setRenaming] = useState<ClipEntry | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const gifFor = useRef<string | null>(null);
+  const [gifting, setGifting] = useState<string[]>([]);
+  const gifs = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     try {
@@ -104,12 +105,11 @@ export function ClipGallery({
     onGamesChange?.(games);
   }, [games, onGamesChange]);
 
-  const gifDone = useCallback(() => {
-    const source = gifFor.current;
-    gifFor.current = null;
-    if (source !== null) {
-      setBusy((current) => (current !== null && samePath(current, source) ? null : current));
+  const gifDone = useCallback((source: string | null) => {
+    for (const path of gifs.current) {
+      if (source === null || samePath(path, source)) gifs.current.delete(path);
     }
+    setGifting([...gifs.current]);
   }, []);
 
   useClipEngineEvents({
@@ -117,33 +117,32 @@ export function ClipGallery({
     clip_trimmed: (clip) => void follow(clip),
     clip_exported: (clip) => void follow(clip),
     clip_gif_exported: (gif) => {
-      if (gifFor.current === null || !samePath(gif.source, gifFor.current)) return;
-      gifDone();
+      if (![...gifs.current].some((path) => samePath(path, gif.source))) return;
+      gifDone(gif.source);
       toast.success(
         gif.truncated ? t("clips.gallery.gif_done_shortened") : t("clips.gallery.gif_done"),
       );
     },
     clip_error: (error) => {
       if (error.code !== "clip_write" && error.code !== "protocol") return;
-      gifDone();
+      gifDone(error.source ?? null);
     },
-    clip_engine_stopped: gifDone,
+    clip_engine_stopped: () => gifDone(null),
   });
 
   const makeGif = useCallback(
     async (clip: ClipEntry) => {
-      setBusy(clip.path);
-      gifFor.current = clip.path;
+      gifs.current.add(clip.path);
+      setGifting([...gifs.current]);
       try {
         await exportGif(clip.path);
       } catch (e) {
-        gifFor.current = null;
-        setBusy(null);
+        gifDone(clip.path);
         console.error("Could not start the GIF export", e);
         toast.error(parseErrorMessage(e));
       }
     },
-    [],
+    [gifDone],
   );
 
   const setFavourite = useCallback(
@@ -324,7 +323,7 @@ export function ClipGallery({
                 key={clip.path}
                 clip={clip}
                 index={index}
-                busy={busy === clip.path}
+                busy={busy === clip.path || gifting.includes(clip.path)}
                 onPlay={() => {
                   setSelected(clip);
                   void trackEvent("clip_played", { duration_s: clip.durationSeconds });

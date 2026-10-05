@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "@iconify/react";
 
 import type { ClipAudioTrack, ClipOverlay, Span } from "../../../services/clip-service";
@@ -8,8 +8,18 @@ import { Waveform } from "../ClipTimeline";
 import { ClipIconButton } from "../ClipIconButton";
 import { Tooltip } from "../../ui/Tooltip";
 import { cn } from "../../../lib/utils";
-import { NUDGE, OVERLAY_ICON, type Translate, overlayTint, formatTime, formatTick, rulerTicks } from "./shared";
+import {
+  NUDGE,
+  OVERLAY_ICON,
+  type TimeView,
+  type Translate,
+  overlayTint,
+  formatTime,
+  formatTick,
+  rulerTicks,
+} from "./shared";
 import { holdPointer } from "./useWindowDrag";
+import type { MarkEdge } from "./useCuts";
 
 const LINK_MODES: { separate: boolean; icon: string; label: string }[] = [
   { separate: false, icon: "solar:link-bold", label: "clips.editor.link.linked" },
@@ -21,14 +31,13 @@ const LABEL_GAP = 6;
 export function Ruler({
   scale,
   duration,
-  percent,
   onScrub,
 }: {
   scale: RefObject<HTMLDivElement>;
   duration: number;
-  percent: (seconds: number) => number;
   onScrub: (clientX: number) => void;
 }) {
+  const percent = useCallback((at: number) => (duration > 0 ? (at / duration) * 100 : 0), [duration]);
   const probe = useRef<HTMLSpanElement>(null);
   const [width, setWidth] = useState(0);
   const [room, setRoom] = useState(0);
@@ -246,7 +255,7 @@ export function AudioLane({
   name,
   movable,
   volume,
-  duration,
+  view,
   tone,
   disabled,
   clipFrom,
@@ -269,7 +278,7 @@ export function AudioLane({
   name: string;
   movable: boolean;
   volume: number;
-  duration: number;
+  view: TimeView;
   tone: string;
   disabled: boolean;
   clipFrom: number;
@@ -290,8 +299,7 @@ export function AudioLane({
 }) {
   const muted = volume === 0;
   const trimmable = movable && !disabled;
-  const span = duration > 0 ? duration : 1;
-  const at = (seconds: number) => (seconds / span) * 100;
+  const at = view.percent;
 
   return (
     <Lane
@@ -327,9 +335,9 @@ export function AudioLane({
         ) : undefined
       }
     >
-      <div className="absolute inset-0">
+      <Pieces view={view}>
         <Waveform peaks={track.peaks} gain={volume / 100} muted={muted} />
-      </div>
+      </Pieces>
 
       {marks}
 
@@ -349,7 +357,7 @@ export function AudioLane({
           <Handle
             left={at(from)}
             active={trimming === "start"}
-            time={formatTime(from)}
+            time={formatTime(view.toView(from))}
             label={t("clips.editor.audio.trim_start", { name })}
             color={tone}
             onGrab={() => onTrim("start")}
@@ -358,7 +366,7 @@ export function AudioLane({
           <Handle
             left={at(to)}
             active={trimming === "end"}
-            time={formatTime(to)}
+            time={formatTime(view.toView(to))}
             label={t("clips.editor.audio.trim_end", { name })}
             color={tone}
             onGrab={() => onTrim("end")}
@@ -390,7 +398,7 @@ export function AudioLane({
 
 export function OverlayLane({
   overlay,
-  duration,
+  view,
   active,
   accent,
   name,
@@ -399,7 +407,7 @@ export function OverlayLane({
   onGrab,
 }: {
   overlay: ClipOverlay;
-  duration: number;
+  view: TimeView;
   active: boolean;
   accent: string;
   name: string;
@@ -408,9 +416,8 @@ export function OverlayLane({
   onGrab: (mode: "move" | "start" | "end", event: { clientX: number }) => void;
 }) {
   const tint = overlayTint(overlay, accent);
-  const span = duration > 0 ? duration : 1;
-  const left = (overlay.startSeconds / span) * 100;
-  const width = ((overlay.endSeconds - overlay.startSeconds) / span) * 100;
+  const left = view.percent(overlay.startSeconds);
+  const width = view.percent(overlay.endSeconds) - left;
 
   return (
     <Lane
@@ -563,13 +570,14 @@ export function ClipMasks({
   from,
   to,
   color,
-  percent,
+  view,
 }: {
   from: number;
   to: number;
   color: string;
-  percent: (seconds: number) => number;
+  view: TimeView;
 }) {
+  const percent = view.percent;
   return (
     <>
       <div
@@ -584,7 +592,7 @@ export function ClipMasks({
         className="absolute inset-y-0 border-x-2"
         style={{
           left: `${percent(from)}%`,
-          width: `${percent(Math.max(0, to - from))}%`,
+          width: `${Math.max(0, percent(to) - percent(from))}%`,
           borderColor: color,
         }}
       />
@@ -598,7 +606,7 @@ export function ClipHandles({
   dragging,
   color,
   disabled,
-  percent,
+  view,
   onGrab,
   onMove,
   t,
@@ -608,7 +616,7 @@ export function ClipHandles({
   dragging: "start" | "end" | null;
   color: string;
   disabled: boolean;
-  percent: (seconds: number) => number;
+  view: TimeView;
   onGrab: (which: "start" | "end") => void;
   onMove: (which: "start" | "end", seconds: number) => void;
   t: Translate;
@@ -616,127 +624,197 @@ export function ClipHandles({
   return (
     <>
       <Handle
-        left={percent(from)}
+        left={view.percent(from)}
         active={dragging === "start"}
-        time={formatTime(from)}
+        time={formatTime(view.toView(from))}
         label={t("clips.trim.handle_start")}
         color={color}
         disabled={disabled}
         onGrab={() => onGrab("start")}
-        onNudge={(by) => onMove("start", from + by)}
+        onNudge={(by) => onMove("start", view.shift(from, by))}
       />
       <Handle
-        left={percent(to)}
+        left={view.percent(to)}
         active={dragging === "end"}
-        time={formatTime(to)}
+        time={formatTime(view.toView(to))}
         label={t("clips.trim.handle_end")}
         color={color}
         disabled={disabled}
         onGrab={() => onGrab("end")}
-        onNudge={(by) => onMove("end", to + by)}
+        onNudge={(by) => onMove("end", view.shift(to, by))}
       />
     </>
   );
 }
 
-export function SpanHighlight({
+export function CutRange({
   span,
   color,
-  percent,
+  dragging,
+  view,
+  label,
+  startLabel,
+  endLabel,
+  className,
+  onGrab,
+  onNudge,
 }: {
   span: Span;
   color: string;
-  percent: (seconds: number) => number;
+  dragging: MarkEdge | null;
+  view: TimeView;
+  label: string;
+  startLabel: string;
+  endLabel: string;
+  className: string;
+  onGrab: (edge: MarkEdge, clientX: number) => void;
+  onNudge: (edge: "start" | "end", by: number) => void;
 }) {
+  const left = view.percent(span.startSeconds);
+  const right = view.percent(span.endSeconds);
   return (
-    <div
-      className="absolute inset-y-0 rounded border-2"
-      style={{
-        left: `${percent(span.startSeconds)}%`,
-        width: `${percent(span.endSeconds - span.startSeconds)}%`,
-        borderColor: color,
-        backgroundColor: `${color}1f`,
-      }}
-    />
+    <div className={cn("pointer-events-none absolute inset-x-0 z-20", className)}>
+      <div
+        role="presentation"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          holdPointer(event);
+          onGrab("move", event.clientX);
+        }}
+        className={cn(
+          "pointer-events-auto absolute inset-y-0 flex items-center justify-center overflow-hidden rounded border-2",
+          dragging === "move" ? "cursor-grabbing" : "cursor-grab",
+        )}
+        style={{
+          left: `${left}%`,
+          width: `${right - left}%`,
+          borderColor: color,
+          backgroundColor: `${color}40`,
+          backgroundImage: `repeating-linear-gradient(135deg, ${color}33 0 6px, transparent 6px 12px)`,
+          boxShadow: `0 0 12px ${color}80`,
+        }}
+      >
+        <span className="pointer-events-none truncate px-3 font-minecraft text-[11px] text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+          {label}
+        </span>
+      </div>
+      <Handle
+        left={left}
+        active={dragging === "start"}
+        time={formatTime(view.toView(span.startSeconds))}
+        label={startLabel}
+        color={color}
+        onGrab={() => onGrab("start", 0)}
+        onNudge={(by) => onNudge("start", by)}
+      />
+      <Handle
+        left={right}
+        active={dragging === "end"}
+        time={formatTime(view.toView(span.endSeconds))}
+        label={endLabel}
+        color={color}
+        onGrab={() => onGrab("end", 0)}
+        onNudge={(by) => onNudge("end", by)}
+      />
+    </div>
+  );
+}
+
+function RestoreButton({ disabled, onRestore, t }: { disabled: boolean; onRestore: () => void; t: Translate }) {
+  return (
+    <Tooltip
+      content={t("clips.editor.remove.restore")}
+      position="top"
+      wrapperClassName="pointer-events-auto absolute left-1/2 top-0.5 z-10 -translate-x-1/2"
+    >
+      <button
+        type="button"
+        aria-label={t("clips.editor.remove.restore")}
+        disabled={disabled}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onRestore}
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white/60 transition-colors hover:text-white"
+      >
+        <Icon icon="solar:restart-bold" className="h-3 w-3" />
+      </button>
+    </Tooltip>
   );
 }
 
 export function GapBlock({
   span,
   disabled,
-  percent,
+  view,
   onRestore,
   t,
 }: {
   span: Span;
   disabled: boolean;
-  percent: (seconds: number) => number;
+  view: TimeView;
+  onRestore: () => void;
+  t: Translate;
+}) {
+  const left = view.percent(span.startSeconds);
+  return (
+    <div
+      className="absolute inset-y-0 border-x border-dashed border-white/30 bg-[#08080b]/90"
+      style={{ left: `${left}%`, width: `${view.percent(span.endSeconds) - left}%` }}
+    >
+      <RestoreButton disabled={disabled} onRestore={onRestore} t={t} />
+    </div>
+  );
+}
+
+export function JoinMark({
+  span,
+  color,
+  disabled,
+  view,
+  onRestore,
+  t,
+}: {
+  span: Span;
+  color: string;
+  disabled: boolean;
+  view: TimeView;
   onRestore: () => void;
   t: Translate;
 }) {
   return (
     <div
-      className="absolute inset-y-0 border-x border-dashed border-white/30 bg-[#08080b]/90"
-      style={{
-        left: `${percent(span.startSeconds)}%`,
-        width: `${percent(span.endSeconds - span.startSeconds)}%`,
-      }}
+      className="absolute bottom-0 top-[1.875rem] w-0.5 -translate-x-1/2"
+      style={{ left: `${view.percent(span.startSeconds)}%`, backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
     >
-      <Tooltip
-        content={t("clips.editor.remove.restore")}
-        position="top"
-        wrapperClassName="pointer-events-auto absolute left-1/2 top-0.5 -translate-x-1/2"
-      >
-        <button
-          type="button"
-          aria-label={t("clips.editor.remove.restore")}
-          disabled={disabled}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onRestore}
-          className="flex h-4 w-4 items-center justify-center rounded-full text-white/40 transition-colors hover:text-white"
-        >
-          <Icon icon="solar:restart-bold" className="h-3 w-3" />
-        </button>
-      </Tooltip>
+      <RestoreButton disabled={disabled} onRestore={onRestore} t={t} />
     </div>
   );
 }
 
-export function SplitMark({
-  at,
-  disabled,
-  percent,
-  onRemove,
-  t,
-}: {
-  at: number;
-  disabled: boolean;
-  percent: (seconds: number) => number;
-  onRemove: () => void;
-  t: Translate;
-}) {
+export function Pieces({ view, children }: { view: TimeView; children: ReactNode }) {
   return (
-    <div
-      className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white/70"
-      style={{ left: `${percent(at)}%` }}
-    >
-      <Tooltip
-        content={t("clips.editor.split.remove")}
-        position="top"
-        wrapperClassName="pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2"
-      >
-        <button
-          type="button"
-          aria-label={t("clips.editor.split.remove")}
-          disabled={disabled}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onRemove}
-          className="group flex h-4 w-4 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white/70 transition-colors hover:text-white"
-        >
-          <Icon icon="solar:scissors-bold" className="h-2.5 w-2.5 group-hover:hidden" />
-          <Icon icon="solar:close-circle-bold" className="hidden h-3.5 w-3.5 group-hover:block" />
-        </button>
-      </Tooltip>
-    </div>
+    <>
+      {view.pieces.map((piece) => {
+        const left = view.percent(piece.startSeconds);
+        const length = piece.endSeconds - piece.startSeconds;
+        return (
+          <div
+            key={piece.startSeconds}
+            className="pointer-events-none absolute inset-y-0 overflow-hidden"
+            style={{ left: `${left}%`, width: `${view.percent(piece.endSeconds) - left}%` }}
+          >
+            <div
+              className="absolute inset-y-0"
+              style={{
+                left: `${(-piece.startSeconds / length) * 100}%`,
+                width: `${(view.whole / length) * 100}%`,
+              }}
+            >
+              {children}
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }

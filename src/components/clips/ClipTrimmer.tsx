@@ -40,10 +40,12 @@ import {
   tidy,
   laneWindow,
   formatTime,
+  timeView,
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
-import { useCuts, type PartLane } from "./editor/useCuts";
+import { BlankCover, PlayheadClock, PlayheadMark, usePlayhead } from "./editor/Playhead";
+import { useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { EditorHelpModal, EditorMenuBar, shortcutText, type MenuDef } from "./editor/EditorMenuBar";
@@ -56,9 +58,10 @@ import {
   Readout,
   ClipMasks,
   ClipHandles,
-  SpanHighlight,
+  CutRange,
   GapBlock,
-  SplitMark,
+  JoinMark,
+  Pieces,
 } from "./editor/Timeline";
 import { PanelTitle, OverlayInspector } from "./editor/Inspector";
 import {
@@ -105,6 +108,8 @@ interface Props {
 
 const STEP_SECONDS = 1 / 30;
 
+const CONTROLS = "button, input, select, a[href], [role=button], [role=slider], [role=separator], [role=menuitem]";
+
 export function ClipTrimmer({
   src,
   path,
@@ -120,26 +125,15 @@ export function ClipTrimmer({
 }: Props) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const standbyRef = useRef<HTMLVideoElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const scaleRef = useRef<HTMLDivElement>(null);
+  const { playhead, live, moveTo, follow } = usePlayhead(videoRef);
 
   const [start, setStart] = useState(0);
   const [end, setEnd] = useState(0);
   const [dragging, setDragging] = useState<"start" | "end" | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
-  const [playhead, setPlayhead] = useState(0);
-  const overlayEdit = useOverlays({ start, end, duration, frameRef, scaleRef });
-  const {
-    overlays,
-    chosen,
-    setChosen,
-    picked,
-    editOverlay,
-    addOverlay,
-    dropOverlay,
-    grabBox,
-    grabBar,
-  } = overlayEdit;
 
   const [ratio, setRatio] = useState(16 / 9);
   const [shape, setShape] = useState<ClipShape>("original");
@@ -148,6 +142,7 @@ export function ClipTrimmer({
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
+  const [markDrag, setMarkDrag] = useState<{ edge: MarkEdge; offset: number } | null>(null);
   const markSavedRef = useRef<() => void>(() => {});
   const markSaved = useCallback(() => markSavedRef.current(), []);
   const render = useClipRender({ path, onDone: markSaved, onTrim: onSave, t });
@@ -169,23 +164,36 @@ export function ClipTrimmer({
   const cuts = useCuts({ playhead, separate, start, end, shot, windows });
   const {
     removed,
-    splits,
     blanked,
     muted,
-    pick,
-    setPick,
-    part,
+    lane,
+    setLane,
+    target,
     kept,
-    canSplit,
-    split,
-    cuttable,
-    cutPart,
+    mark,
+    beginMark,
+    cancelMark,
+    reshapeMark,
+    applyMark,
     hushed,
-    unsplit,
     unremove,
     unblank,
     unmute,
   } = cuts;
+
+  const view = useMemo(() => timeView(removed, duration), [duration, removed]);
+  const overlayEdit = useOverlays({ start, end, view, frameRef, scaleRef });
+  const {
+    overlays,
+    chosen,
+    setChosen,
+    picked,
+    editOverlay,
+    addOverlay,
+    dropOverlay,
+    grabBox,
+    grabBar,
+  } = overlayEdit;
 
   const doc = useMemo(
     () => ({
@@ -248,19 +256,21 @@ export function ClipTrimmer({
   const previewState = useTrimPreview({
     path,
     video: videoRef,
+    standby: standbyRef,
     levels,
     muted,
     active: adjustable.length > 0,
   });
 
-  const { playing, buffering, toggle: preview } = usePlayback({
+  const { playing, buffering, toggle: preview, settle } = usePlayback({
     video: videoRef,
+    standby: standbyRef,
     start,
     end,
     removed,
     quiet: hushed,
     ownsSound: previewState !== "live",
-    onTime: setPlayhead,
+    onTime: follow,
   });
 
   const drawn = movable.length > 0 ? movable : lanes;
@@ -289,45 +299,43 @@ export function ClipTrimmer({
 
   const filmstrip = useFilmstrip(src, duration);
 
-  const percent = useCallback(
-    (seconds: number) => (duration > 0 ? (seconds / duration) * 100 : 0),
-    [duration],
-  );
-
   const seek = useCallback(
     (seconds: number) => {
+      settle();
       const video = videoRef.current;
       if (video) video.currentTime = Math.max(0, Math.min(seconds, duration));
     },
-    [duration],
+    [duration, settle],
   );
 
   const jump = useCallback(
     (to: number) => {
       const at = Math.min(Math.max(to, start), end);
       seek(at);
-      setPlayhead(at);
+      moveTo(at);
     },
-    [end, seek, start],
+    [end, moveTo, seek, start],
   );
 
-  const secondsAt = useCallback(
+  const viewAt = useCallback(
     (clientX: number) => {
       const scale = scaleRef.current;
-      if (!scale || duration <= 0) return 0;
+      if (!scale || view.length <= 0) return 0;
       const rect = scale.getBoundingClientRect();
-      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * duration;
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * view.length;
     },
-    [duration],
+    [view],
   );
+
+  const secondsAt = useCallback((clientX: number) => view.fromView(viewAt(clientX)), [view, viewAt]);
 
   const scrubTo = useCallback(
     (clientX: number) => {
       const seconds = secondsAt(clientX);
       seek(seconds);
-      setPlayhead(seconds);
+      moveTo(seconds);
     },
-    [secondsAt, seek],
+    [moveTo, secondsAt, seek],
   );
 
   useWindowDrag(
@@ -392,6 +400,18 @@ export function ClipTrimmer({
     () => setLaneTrim(null),
   );
 
+  useWindowDrag(
+    markDrag,
+    (event, markDrag) => reshapeMark(markDrag.edge, view.fromView(viewAt(event.clientX) - markDrag.offset)),
+    () => setMarkDrag(null),
+  );
+
+  const grabMark = useCallback(
+    (edge: MarkEdge, clientX: number) =>
+      setMarkDrag({ edge, offset: edge === "move" && mark ? viewAt(clientX) - view.toView(mark.startSeconds) : 0 }),
+    [mark, view, viewAt],
+  );
+
   const save = useCallback(
     () =>
       render.save({
@@ -409,17 +429,72 @@ export function ClipTrimmer({
     [blanked, end, hushed, levels, overlays, removed, render.save, shape, shot.end, shot.start, start],
   );
 
+  const keyboardFocus = useRef(false);
+
+  useEffect(() => {
+    const pointer = () => {
+      keyboardFocus.current = false;
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Tab") keyboardFocus.current = true;
+      if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
+      if (keyboardFocus.current && event.target instanceof Element && event.target.closest(CONTROLS)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) preview();
+    };
+    window.addEventListener("pointerdown", pointer, true);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointerdown", pointer, true);
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [held, preview]);
+
+  const cutHint = useCallback(() => toast(t("clips.editor.cut.too_little"), { id: "clip-cut-hint" }), [t]);
+
+  const toggleMark = useCallback(() => {
+    if (mark) cancelMark();
+    else if (!beginMark()) cutHint();
+  }, [beginMark, cancelMark, cutHint, mark]);
+
+  const removeMark = useCallback(() => {
+    if (!applyMark()) cutHint();
+  }, [applyMark, cutHint]);
+
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      if (held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
-      if (event.target instanceof Element && event.target.closest("button, [role=slider], [role=separator]")) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (busy || held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (FULL_EDITOR && mark) {
+          event.preventDefault();
+          removeMark();
+        } else if (chosen !== null) {
+          event.preventDefault();
+          dropOverlay(chosen);
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        if (FULL_EDITOR && mark) {
+          event.preventDefault();
+          cancelMark();
+        } else if (chosen !== null) {
+          event.preventDefault();
+          setChosen(null);
+        }
+        return;
+      }
+      if (!FULL_EDITOR) return;
+      if (event.key.toLowerCase() !== "s" || event.shiftKey || event.repeat) return;
       event.preventDefault();
-      preview();
+      toggleMark();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [held, preview]);
+  }, [busy, cancelMark, chosen, dropOverlay, held, mark, removeMark, setChosen, toggleMark]);
 
   const canSave = !busy && kept >= MIN_LENGTH;
 
@@ -442,6 +517,7 @@ export function ClipTrimmer({
   const timelineBody = useRef<HTMLDivElement>(null);
   const timelineContent = useRef<HTMLDivElement>(null);
   const timelineSized = useRef(rowsLayout.defaultLayout !== undefined);
+  const gripping = useRef(false);
 
   const fitTimeline = useCallback(() => {
     const handle = timelinePanel.current;
@@ -561,18 +637,12 @@ export function ClipTrimmer({
         FULL_EDITOR
           ? [
               {
-                id: "split",
-                label: t("clips.editor.transport.split"),
+                id: "mark",
+                label: t("clips.editor.cut.start"),
                 icon: "solar:scissors-square-bold",
-                disabled: busy || !canSplit,
-                onSelect: split,
-              },
-              {
-                id: "remove",
-                label: t("clips.editor.transport.remove"),
-                icon: "solar:trash-bin-trash-bold",
-                disabled: busy || !cuttable,
-                onSelect: cutPart,
+                shortcut: "S",
+                disabled: busy,
+                onSelect: toggleMark,
               },
             ]
           : [],
@@ -633,7 +703,7 @@ export function ClipTrimmer({
   const exportPercent = render.percent;
 
   const clipMasks = (from: number, to: number) => (
-    <ClipMasks from={from} to={to} color={accentColor.value} percent={percent} />
+    <ClipMasks from={from} to={to} color={accentColor.value} view={view} />
   );
 
   const clipHandles = (from: number, to: number) => (
@@ -643,36 +713,46 @@ export function ClipTrimmer({
       dragging={dragging}
       color={accentColor.value}
       disabled={busy}
-      percent={percent}
+      view={view}
       onGrab={setDragging}
       onMove={moveHandle}
       t={t}
     />
   );
 
-  const highlight = (span: Span) => (
-    <SpanHighlight span={span} color={accentColor.value} percent={percent} />
-  );
+  const cutRange = (inset: string) =>
+    mark && (
+      <CutRange
+        span={mark}
+        color={accentColor.value}
+        dragging={markDrag?.edge ?? null}
+        view={view}
+        label={t("clips.editor.cut.label")}
+        startLabel={t("clips.editor.cut.handle_start")}
+        endLabel={t("clips.editor.cut.handle_end")}
+        className={inset}
+        onGrab={grabMark}
+        onNudge={(edge, by) => reshapeMark(edge, view.shift(edge === "start" ? mark.startSeconds : mark.endSeconds, by))}
+      />
+    );
 
   const gapBlock = (span: Span, key: number, onRestore: () => void) => (
     <GapBlock
       key={key}
       span={span}
       disabled={busy}
-      percent={percent}
+      view={view}
       onRestore={onRestore}
       t={t}
     />
   );
 
-  const laneMarks = (lane: PartLane, gaps: Span[], restore: (index: number) => void) => (
+  const laneMarks = (owner: PartLane, gaps: Span[], restore: (index: number) => void) => (
     <div className="pointer-events-none absolute inset-0">
-      {part?.lane === lane && highlight(part.span)}
       {gaps.map((span, index) => gapBlock(span, index, () => restore(index)))}
+      {target === owner && cutRange("inset-y-0")}
     </div>
   );
-
-  const darkened = blanked.some((span) => playhead >= span.startSeconds && playhead < span.endSeconds);
 
   return (
     <WindowFrame className="select-none [&_button_svg]:pointer-events-none [&_input]:select-text [&_textarea]:select-text">
@@ -744,8 +824,9 @@ export function ClipTrimmer({
           className="min-h-0 flex-1"
           defaultLayout={rowsLayout.defaultLayout}
           onLayoutChanged={(layout, meta) => {
-            if (meta.isUserInteraction) timelineSized.current = true;
-            rowsLayout.onLayoutChanged(layout, meta);
+            const byUser = meta.isUserInteraction || gripping.current;
+            if (byUser) timelineSized.current = true;
+            rowsLayout.onLayoutChanged(layout, { ...meta, isUserInteraction: byUser });
           }}
           resizeTargetMinimumSize={HIT_AREA}
         >
@@ -915,7 +996,7 @@ export function ClipTrimmer({
 
                 <LayoutPanel id="main" minSize={MAIN_MIN} className="flex" style={{ overflow: "hidden" }}>
                   <main className={CARD}>
-                    <div className="min-h-0 flex-1 px-4 pb-2 pt-4">
+                    <div className="min-h-0 flex-1 px-4 pb-2 pt-4" onPointerDown={() => setChosen(null)}>
                       <div className="flex h-full w-full items-center justify-center" style={{ containerType: "size" }}>
                         <div
                           ref={frameRef}
@@ -938,6 +1019,14 @@ export function ClipTrimmer({
                               }
                             }}
                           />
+                          <video
+                            ref={standbyRef}
+                            src={src}
+                            muted
+                            preload="auto"
+                            aria-hidden="true"
+                            className="pointer-events-none invisible absolute inset-0 block h-full w-full object-contain"
+                          />
 
                           {buffering && (
                             <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/50">
@@ -951,7 +1040,7 @@ export function ClipTrimmer({
                             </span>
                           )}
 
-                          {darkened && <div className="pointer-events-none absolute inset-0 bg-black" />}
+                          <BlankCover live={live} blanked={blanked} />
 
                           {guide && (
                             <div
@@ -984,12 +1073,7 @@ export function ClipTrimmer({
                     </div>
 
                     <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pb-3 pt-1">
-                      <span
-                        className="min-w-0 truncate font-minecraft text-lg tabular-nums leading-none"
-                        style={{ color: accentColor.value }}
-                      >
-                        {formatTime(playhead)}
-                      </span>
+                      <PlayheadClock live={live} view={view} color={accentColor.value} />
                       <div className="flex items-center gap-1.5">
                         <ClipIconButton
                           icon="solar:skip-previous-bold"
@@ -1001,7 +1085,7 @@ export function ClipTrimmer({
                           icon="solar:rewind-back-bold"
                           label={t("clips.editor.transport.step_back")}
                           tooltipPosition="top"
-                          onClick={() => jump(playhead - STEP_SECONDS)}
+                          onClick={() => jump(view.shift(playhead, -STEP_SECONDS))}
                         />
                         <ClipIconButton
                           icon={playing ? "solar:pause-bold" : "solar:play-bold"}
@@ -1014,7 +1098,7 @@ export function ClipTrimmer({
                           icon="solar:rewind-forward-bold"
                           label={t("clips.editor.transport.step_forward")}
                           tooltipPosition="top"
-                          onClick={() => jump(playhead + STEP_SECONDS)}
+                          onClick={() => jump(view.shift(playhead, STEP_SECONDS))}
                         />
                         <ClipIconButton
                           icon="solar:skip-next-bold"
@@ -1024,7 +1108,7 @@ export function ClipTrimmer({
                         />
                       </div>
                       <span className="min-w-0 justify-self-end truncate font-minecraft text-sm tabular-nums leading-none text-white/50">
-                        {formatTime(duration)}
+                        {formatTime(view.length)}
                       </span>
                     </div>
                   </main>
@@ -1098,28 +1182,25 @@ export function ClipTrimmer({
                       <span className="mx-1 h-6 w-px bg-white/10" />
                       <ClipIconButton
                         icon="solar:scissors-square-bold"
-                        label={t("clips.editor.transport.split")}
-                        onClick={split}
-                        disabled={busy || !canSplit}
-                      />
-                      <ClipIconButton
-                        icon="solar:trash-bin-trash-bold"
-                        label={t("clips.editor.transport.remove")}
-                        onClick={cutPart}
-                        disabled={busy || !cuttable}
+                        label={t("clips.editor.cut.start")}
+                        aria-pressed={mark !== null}
+                        onClick={toggleMark}
+                        disabled={busy}
+                        className={cn(mark && "bg-white/10")}
+                        style={mark ? { color: accentColor.value, borderColor: accentColor.value } : undefined}
                       />
                     </>
                   )}
                 </div>
                 <span className="h-6 w-px shrink-0 bg-white/10" />
                 <div className="flex min-w-0 items-center gap-4 overflow-hidden">
-                  <Readout label={t("clips.trim.from")} value={formatTime(shot.from)} />
+                  <Readout label={t("clips.trim.from")} value={formatTime(view.toView(shot.from))} />
                   <Readout
                     label={t("clips.trim.kept_label")}
                     value={`${kept.toFixed(1)} s`}
                     strong
                   />
-                  <Readout label={t("clips.trim.to")} value={formatTime(shot.to)} />
+                  <Readout label={t("clips.trim.to")} value={formatTime(view.toView(shot.to))} />
                 </div>
                 <Button
                   variant="success"
@@ -1140,8 +1221,9 @@ export function ClipTrimmer({
                   panel={timelinePanel}
                   label={t("clips.editor.menu.resize")}
                   color={accentColor.value}
-                  onGrab={() => {
-                    timelineSized.current = true;
+                  onDrag={(active) => {
+                    gripping.current = active;
+                    if (active) timelineSized.current = true;
                   }}
                 />
               </div>
@@ -1167,13 +1249,39 @@ export function ClipTrimmer({
                         )}
                       </>
                     )}
-                    <p className="ml-auto min-w-0 truncate font-minecraft text-[11px] text-white/40">
-                      {removed.length > 0 || splits.length > 0
-                        ? t("clips.editor.remove.hint")
-                        : overlays.length > 0
+                    {mark ? (
+                      <div className="ml-auto flex shrink-0 items-center gap-2">
+                        <span className="font-minecraft text-xs text-white/60">{t("clips.editor.cut.label")}</span>
+                        <span className="font-minecraft text-sm tabular-nums" style={{ color: accentColor.value }}>
+                          {`${(view.toView(mark.endSeconds) - view.toView(mark.startSeconds)).toFixed(1)} s`}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          onClick={cancelMark}
+                          icon={<Icon icon="solar:close-circle-bold" className="h-4 w-4" />}
+                        >
+                          {t("common.cancel")}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="xs"
+                          onClick={removeMark}
+                          disabled={busy}
+                          icon={<Icon icon="solar:trash-bin-trash-bold" className="h-4 w-4" />}
+                        >
+                          {t("clips.editor.cut.apply")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="ml-auto min-w-0 truncate font-minecraft text-[11px] text-white/40">
+                        {overlays.length > 0
                           ? t("clips.editor.overlay.hint")
-                          : t("clips.trim.hint")}
-                    </p>
+                          : FULL_EDITOR
+                            ? t("clips.editor.remove.hint")
+                            : t("clips.trim.hint")}
+                      </p>
+                    )}
                   </div>
 
                   <div className="relative flex select-none flex-col gap-1.5">
@@ -1181,8 +1289,7 @@ export function ClipTrimmer({
                       <div className="w-[9.5rem] shrink-0" />
                       <Ruler
                         scale={scaleRef}
-                        duration={duration}
-                        percent={percent}
+                        duration={view.length}
                         onScrub={(clientX) => {
                           scrubTo(clientX);
                           setScrubbing(true);
@@ -1195,21 +1302,27 @@ export function ClipTrimmer({
                       name={t("clips.editor.timeline.video")}
                       tint={accentColor.value}
                       height="h-16"
-                      active={pick?.lane === "video"}
-                      onPick={() => setPick({ lane: "video", at: playhead })}
+                      active={separate && lane === "video"}
+                      onPick={() => {
+                        setLane("video");
+                        setChosen(null);
+                      }}
                       onScrub={(clientX) => {
                         scrubTo(clientX);
                         setScrubbing(true);
-                        setPick({ lane: "video", at: secondsAt(clientX) });
+                        setLane("video");
+                        setChosen(null);
                       }}
                     >
                       {filmstrip ? (
-                        <img
-                          src={filmstrip}
-                          alt=""
-                          draggable={false}
-                          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
-                        />
+                        <Pieces view={view}>
+                          <img
+                            src={filmstrip}
+                            alt=""
+                            draggable={false}
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90"
+                          />
+                        </Pieces>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <Icon icon="svg-spinners:ring-resize" className="h-4 w-4 text-white/40" />
@@ -1236,7 +1349,7 @@ export function ClipTrimmer({
                           name={trackName(track.label, t)}
                           movable={apart}
                           volume={track.adjustable ? (volumes[track.stream] ?? 100) : 100}
-                          duration={duration}
+                          view={view}
                           tone={accentColor.light}
                           disabled={busy}
                           clipFrom={start}
@@ -1248,19 +1361,23 @@ export function ClipTrimmer({
                           onChange={(volume) =>
                             setVolumes((current) => ({ ...current, [track.stream]: volume }))
                           }
-                          active={pick?.lane === track.stream}
-                          onSelect={() => setPick({ lane: track.stream, at: playhead })}
+                          active={separate && lane === track.stream}
+                          onSelect={() => {
+                            setLane(track.stream);
+                            setChosen(null);
+                          }}
                           onPick={(clientX) => {
                             scrubTo(clientX);
                             setScrubbing(true);
-                            setPick({ lane: track.stream, at: secondsAt(clientX) });
+                            setLane(track.stream);
+                            setChosen(null);
                           }}
                           marks={laneMarks(track.stream, muted[track.stream] ?? [], (index) =>
                             unmute(track.stream, index),
                           )}
                           onTrim={(edge) => setLaneTrim({ stream: track.stream, edge })}
                           onTrimNudge={(edge, by) =>
-                            trimTrack(track.stream, edge, (edge === "start" ? own.from : own.to) + by)
+                            trimTrack(track.stream, edge, view.shift(edge === "start" ? own.from : own.to, by))
                           }
                           onTrimReset={() =>
                             setWindows((current) => ({ ...current, [track.stream]: NO_WINDOW }))
@@ -1274,7 +1391,7 @@ export function ClipTrimmer({
                       <OverlayLane
                         key={index}
                         overlay={overlay}
-                        duration={duration}
+                        view={view}
                         active={chosen === index}
                         accent={accentColor.value}
                         name={t(OVERLAY_NAME[overlay.kind], { index: index + 1 })}
@@ -1286,32 +1403,21 @@ export function ClipTrimmer({
 
                     <div className="pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
                       {!separate && clipMasks(start, end)}
-                      {part?.lane === "all" && highlight(part.span)}
-                      {removed.map((span, index) => gapBlock(span, index, () => unremove(index)))}
-                      {splits.map((at) => (
-                        <SplitMark
-                          key={at}
-                          at={at}
+                      {removed.map((span, index) => (
+                        <JoinMark
+                          key={index}
+                          span={span}
+                          color={accentColor.value}
                           disabled={busy}
-                          percent={percent}
-                          onRemove={() => unsplit(at)}
+                          view={view}
+                          onRestore={() => unremove(index)}
                           t={t}
                         />
                       ))}
-                      <div
-                        className="absolute inset-y-0 w-px bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
-                        style={{ left: `${percent(playhead)}%` }}
-                      />
-                      <span
-                        className="absolute top-0 h-3.5 w-3 -translate-x-1/2"
-                        style={{
-                          left: `${percent(playhead)}%`,
-                          backgroundColor: accentColor.value,
-                          clipPath: "polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)",
-                        }}
-                      />
+                      <PlayheadMark live={live} view={view} color={accentColor.value} />
 
                       {!separate && clipHandles(start, end)}
+                      {target === "all" && cutRange("bottom-0 top-[1.875rem]")}
                     </div>
                   </div>
                 </div>
@@ -1324,7 +1430,7 @@ export function ClipTrimmer({
   );
 }
 
-function WindowButton({
+export function WindowButton({
   icon,
   label,
   onClick,

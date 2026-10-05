@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type { Span } from "../../../services/clip-service";
-import { MIN_LENGTH, NUDGE, hollowed, laneWindow, merged, tidy, type LaneWindow } from "./shared";
+import { MIN_LENGTH, NUDGE, clamp, hollowed, laneWindow, merged, tidy, type LaneWindow } from "./shared";
 
 export type PartLane = "all" | "video" | number;
 
+export type MarkEdge = "start" | "end" | "move";
+
 export interface CutState {
   removed: Span[];
-  splits: number[];
   blanked: Span[];
   muted: Record<number, Span[]>;
 }
@@ -21,71 +22,88 @@ interface Timing {
   windows: Record<number, LaneWindow>;
 }
 
+interface Room {
+  from: number;
+  to: number;
+}
+
+const MARK_SHARE = 0.15;
+const MARK_MIN = 0.3;
+
+function fit(span: Span, room: Room): Span | null {
+  const longest = room.to - room.from;
+  if (longest < NUDGE) return null;
+  const length = clamp(span.endSeconds - span.startSeconds, NUDGE, longest);
+  const from = clamp(span.startSeconds, room.from, room.to - length);
+  return { startSeconds: from, endSeconds: from + length };
+}
+
 export function useCuts({ playhead, separate, start, end, shot, windows }: Timing) {
   const [removed, setRemoved] = useState<Span[]>([]);
-  const [splits, setSplits] = useState<number[]>([]);
   const [blanked, setBlanked] = useState<Span[]>([]);
   const [muted, setMuted] = useState<Record<number, Span[]>>({});
-  const [pick, setPick] = useState<{ lane: PartLane; at: number } | null>(null);
+  const [lane, setLane] = useState<PartLane | null>(null);
+  const [draft, setDraft] = useState<Span | null>(null);
 
-  const snapshot = useMemo(
-    (): CutState => ({ removed, splits, blanked, muted }),
-    [blanked, muted, removed, splits],
-  );
+  const snapshot = useMemo((): CutState => ({ removed, blanked, muted }), [blanked, muted, removed]);
   const restore = useCallback((saved: CutState) => {
     setRemoved(saved.removed);
-    setSplits(saved.splits);
     setBlanked(saved.blanked);
     setMuted(saved.muted);
   }, []);
 
-  const inside = useCallback(
-    (at: number) => removed.some((span) => at >= span.startSeconds && at < span.endSeconds),
-    [removed],
+  const kept = Math.max(0, shot.to - shot.from - hollowed(removed, shot.from, shot.to));
+  const target: PartLane = separate ? (lane ?? "all") : "all";
+  const room = useMemo(
+    (): Room =>
+      typeof target === "number" ? laneWindow(windows[target], start, end) : { from: shot.from, to: shot.to },
+    [end, shot.from, shot.to, start, target, windows],
   );
 
-  const kept = Math.max(0, shot.to - shot.from - hollowed(removed, shot.from, shot.to));
+  const mark = useMemo(() => (draft ? fit(draft, room) : null), [draft, room]);
 
-  const canSplit =
-    playhead > shot.from + NUDGE &&
-    playhead < shot.to - NUDGE &&
-    !inside(playhead) &&
-    splits.every((at) => Math.abs(at - playhead) >= NUDGE);
+  const beginMark = useCallback((): boolean => {
+    const size = Math.max(MARK_MIN, kept * MARK_SHARE);
+    const placed = fit({ startSeconds: playhead - size / 2, endSeconds: playhead + size / 2 }, room);
+    setDraft(placed);
+    return placed !== null;
+  }, [kept, playhead, room]);
 
-  const split = useCallback(() => {
-    if (!canSplit) return;
-    setSplits((current) => [...current, tidy(playhead)].sort((a, b) => a - b));
-  }, [canSplit, playhead]);
+  const cancelMark = useCallback(() => setDraft(null), []);
 
-  const part = useMemo((): { lane: PartLane; span: Span } | null => {
-    if (!pick) return null;
-    const lane: PartLane = separate ? pick.lane : "all";
-    const range =
-      typeof lane === "number" ? laneWindow(windows[lane], start, end) : { from: shot.from, to: shot.to };
-    const own = lane === "video" ? blanked : typeof lane === "number" ? (muted[lane] ?? []) : [];
-    if (inside(pick.at) || own.some((span) => pick.at >= span.startSeconds && pick.at < span.endSeconds)) {
-      return null;
-    }
-    const edges = [range.from, ...splits.filter((at) => at > range.from && at < range.to), range.to];
-    for (let i = 1; i < edges.length; i++) {
-      if (pick.at >= edges[i - 1] && pick.at < edges[i]) {
-        return { lane, span: { startSeconds: edges[i - 1], endSeconds: edges[i] } };
+  const reshapeMark = useCallback(
+    (edge: MarkEdge, at: number) => {
+      if (!mark) return;
+      if (edge === "move") {
+        const length = mark.endSeconds - mark.startSeconds;
+        const from = clamp(at, room.from, room.to - length);
+        setDraft({ startSeconds: from, endSeconds: from + length });
+      } else if (edge === "start") {
+        const from = clamp(at, room.from, mark.endSeconds - NUDGE);
+        setDraft({ startSeconds: from, endSeconds: mark.endSeconds });
+      } else {
+        const to = clamp(at, mark.startSeconds + NUDGE, room.to);
+        setDraft({ startSeconds: mark.startSeconds, endSeconds: to });
       }
+    },
+    [mark, room],
+  );
+
+  const applyMark = useCallback((): boolean => {
+    if (!mark) return false;
+    const span = { startSeconds: tidy(mark.startSeconds), endSeconds: tidy(mark.endSeconds) };
+    if (target === "all") {
+      const next = merged([...removed, span]);
+      if (shot.to - shot.from - hollowed(next, shot.from, shot.to) < MIN_LENGTH) return false;
+      setRemoved(next);
+    } else if (target === "video") {
+      setBlanked((current) => merged([...current, span]));
+    } else {
+      setMuted((current) => ({ ...current, [target]: merged([...(current[target] ?? []), span]) }));
     }
-    return null;
-  }, [blanked, end, inside, muted, pick, separate, shot.from, shot.to, splits, start, windows]);
-
-  const cuttable =
-    part !== null &&
-    (part.lane !== "all" || kept - (part.span.endSeconds - part.span.startSeconds) >= MIN_LENGTH);
-
-  const cutPart = useCallback(() => {
-    if (!part || !cuttable) return;
-    const { lane, span } = part;
-    if (lane === "all") setRemoved((current) => merged([...current, span]));
-    else if (lane === "video") setBlanked((current) => merged([...current, span]));
-    else setMuted((current) => ({ ...current, [lane]: merged([...(current[lane] ?? []), span]) }));
-  }, [cuttable, part]);
+    setDraft(null);
+    return true;
+  }, [mark, removed, shot.from, shot.to, target]);
 
   const hushed = useMemo(
     () =>
@@ -95,10 +113,6 @@ export function useCuts({ playhead, separate, start, end, shot, windows }: Timin
     [muted],
   );
 
-  const unsplit = useCallback(
-    (at: number) => setSplits((current) => current.filter((other) => other !== at)),
-    [],
-  );
   const unremove = useCallback(
     (index: number) => setRemoved((current) => current.filter((_, at) => at !== index)),
     [],
@@ -118,19 +132,18 @@ export function useCuts({ playhead, separate, start, end, shot, windows }: Timin
 
   return {
     removed,
-    splits,
     blanked,
     muted,
-    pick,
-    setPick,
-    part,
+    lane,
+    setLane,
+    target,
     kept,
-    canSplit,
-    split,
-    cuttable,
-    cutPart,
+    mark,
+    beginMark,
+    cancelMark,
+    reshapeMark,
+    applyMark,
     hushed,
-    unsplit,
     unremove,
     unblank,
     unmute,

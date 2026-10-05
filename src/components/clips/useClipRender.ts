@@ -11,7 +11,7 @@ import {
   type TrackLevel,
 } from "../../services/clip-service";
 import { parseErrorMessage } from "../../utils/error-utils";
-import { useClipEngineEvents } from "./useClipEngineEvents";
+import { useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
 import type { Translate } from "./editor/shared";
 
 interface RenderProgress {
@@ -47,39 +47,46 @@ interface Options {
 
 export function useClipRender({ path, onDone, onTrim, t }: Options) {
   const [rendering, setRendering] = useState<RenderProgress | null>(null);
-  const renderingRef = useRef(false);
+  const job = useRef<"trim" | "export" | null>(null);
 
   const finish = useCallback(() => {
-    renderingRef.current = false;
+    job.current = null;
     setRendering(null);
   }, []);
 
+  const succeed = () => {
+    finish();
+    toast.success(t("clips.trim.saved"));
+    onDone();
+  };
+
+  const fail = () => {
+    finish();
+    toast.error(t("clips.trim.failed"));
+  };
+
   useClipEngineEvents({
     clip_export_progress: (progress) => {
-      if (!renderingRef.current || !samePath(progress.source, path)) return;
+      if (job.current !== "export" || !samePath(progress.source, path)) return;
       setRendering({ done: progress.done, total: progress.total });
     },
     clip_exported: (clip) => {
-      if (!renderingRef.current || !samePath(clip.source, path)) return;
-      finish();
-      toast.success(t("clips.trim.saved"));
-      onDone();
+      if (job.current === "export" && samePath(clip.source, path)) succeed();
+    },
+    clip_trimmed: (clip) => {
+      if (job.current === "trim" && samePath(clip.source, path)) succeed();
     },
     clip_engine_stopped: () => {
-      if (!renderingRef.current) return;
-      finish();
-      toast.error(t("clips.trim.failed"));
+      if (job.current) fail();
     },
     clip_error: (error) => {
-      if (!renderingRef.current) return;
-      if (error.code !== "clip_write" && error.code !== "protocol") return;
-      finish();
-      toast.error(t("clips.trim.failed"));
+      if (job.current && writeFailed(error, path)) fail();
     },
   });
 
   const save = useCallback(
     async (edit: ClipEdit) => {
+      setRendering({ done: 0, total: 0 });
       if (
         edit.overlays.length === 0 &&
         edit.shape === "original" &&
@@ -87,11 +94,11 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         edit.blanked.length === 0 &&
         edit.hushed.length === 0
       ) {
-        if (await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd)) onDone();
+        job.current = "trim";
+        if (!(await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd))) finish();
         return;
       }
-      renderingRef.current = true;
-      setRendering({ done: 0, total: 0 });
+      job.current = "export";
       try {
         await exportVertical(path, edit.shape, edit.overlays, {
           startSeconds: edit.start,
@@ -109,7 +116,7 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         toast.error(parseErrorMessage(e));
       }
     },
-    [finish, onDone, onTrim, path],
+    [finish, onTrim, path],
   );
 
   const percent =

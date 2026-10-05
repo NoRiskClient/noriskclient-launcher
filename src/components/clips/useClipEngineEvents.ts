@@ -1,16 +1,23 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-import type {
-  ExportProgress,
-  ExportedClip,
-  ExportedGif,
-  TrimmedClip,
+import {
+  samePath,
+  type ExportProgress,
+  type ExportedClip,
+  type ExportedGif,
+  type TrimmedClip,
 } from "../../services/clip-service";
 
 export interface CaptureError {
   code: string;
   message?: string;
   recoverable?: boolean;
+  source?: string | null;
+}
+
+export function writeFailed(error: CaptureError, path: string): boolean {
+  if (error.code !== "clip_write" && error.code !== "protocol") return false;
+  return error.source == null || samePath(error.source, path);
 }
 
 export interface ClipEngineHandlers {

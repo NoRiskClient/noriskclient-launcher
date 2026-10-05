@@ -8,7 +8,7 @@ import { Modal } from "../ui/Modal";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useThemeStore } from "../../store/useThemeStore";
 import { exportVertical, samePath } from "../../services/clip-service";
-import { useClipEngineEvents } from "./useClipEngineEvents";
+import { useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
@@ -40,6 +40,14 @@ export function VerticalExport({ src, path, onClose, onDone, t }: Props) {
     clip_exported: (clip) => {
       if (!samePath(clip.source, path)) return;
       onDone();
+    },
+    clip_error: (error) => {
+      if (stage.kind === "running" && writeFailed(error, path)) {
+        setStage({ kind: "failed", why: t("clips.trim.failed") });
+      }
+    },
+    clip_engine_stopped: () => {
+      if (stage.kind === "running") setStage({ kind: "failed", why: t("clips.trim.failed") });
     },
   });
 

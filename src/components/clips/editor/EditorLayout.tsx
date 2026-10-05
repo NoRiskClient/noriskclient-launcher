@@ -95,18 +95,20 @@ export function EdgeGrip({
   panel,
   label,
   color,
-  onGrab,
+  onDrag,
 }: {
   panel: RefObject<PanelImperativeHandle | null>;
   label: string;
   color: string;
-  onGrab: () => void;
+  onDrag: (active: boolean) => void;
 }) {
   const start = useRef<{ y: number; size: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const stop = () => {
+    if (!start.current) return;
     start.current = null;
     setDragging(false);
+    onDrag(false);
   };
 
   return (
@@ -120,7 +122,7 @@ export function EdgeGrip({
         event.currentTarget.setPointerCapture(event.pointerId);
         start.current = { y: event.clientY, size: handle.getSize().inPixels };
         setDragging(true);
-        onGrab();
+        onDrag(true);
       }}
       onPointerMove={(event) => {
         if (!start.current) return;

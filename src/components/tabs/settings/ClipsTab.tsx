@@ -552,7 +552,7 @@ export function ClipsTab() {
               </div>
             </SettingRow>
 
-            {effectiveAudioSource === "system" && (
+            {effectiveAudioSource === "system" && !isMacOS() && (
               <SettingRow
                 label={t("settings.clips.audio.exclude")}
                 description={t(
@@ -723,18 +723,20 @@ export function ClipsTab() {
                   />
                 </SettingRow>
 
-                <SettingRow
-                  label={t("settings.clips.audio.microphone_denoise")}
-                  description={t("settings.clips.audio.microphone_denoise.description")}
-                  searchKeywords={kw("settings.clips.audio.microphone_denoise", "rauschen", "noise", "luefter", "fan", "tastatur", "hintergrund")}
-                  disabled={!clips.enabled}
-                >
-                  <ToggleSwitch
-                    checked={clips.microphone_denoise}
-                    onChange={(microphone_denoise) => patch({ microphone_denoise })}
-                    disabled={!clips.enabled || saving}
-                  />
-                </SettingRow>
+                {!isMacOS() && (
+                  <SettingRow
+                    label={t("settings.clips.audio.microphone_denoise")}
+                    description={t("settings.clips.audio.microphone_denoise.description")}
+                    searchKeywords={kw("settings.clips.audio.microphone_denoise", "rauschen", "noise", "luefter", "fan", "tastatur", "hintergrund")}
+                    disabled={!clips.enabled}
+                  >
+                    <ToggleSwitch
+                      checked={clips.microphone_denoise}
+                      onChange={(microphone_denoise) => patch({ microphone_denoise })}
+                      disabled={!clips.enabled || saving}
+                    />
+                  </SettingRow>
+                )}
               </>
             )}
           </>

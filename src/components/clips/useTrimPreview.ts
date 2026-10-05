@@ -16,12 +16,13 @@ export type PreviewState = "unavailable" | "loading" | "live";
 interface Options {
   path: string;
   video: React.RefObject<HTMLVideoElement | null>;
+  standby: React.RefObject<HTMLVideoElement | null>;
   levels: TrackLevel[];
   muted: Record<number, Span[]>;
   active: boolean;
 }
 
-export function useTrimPreview({ path, video, levels, muted, active }: Options): PreviewState {
+export function useTrimPreview({ path, video, standby, levels, muted, active }: Options): PreviewState {
   const [state, setState] = useState<PreviewState>("loading");
   const context = useRef<AudioContext | null>(null);
   const buffers = useRef<Map<number, AudioBuffer>>(new Map());
@@ -38,6 +39,7 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
     if (!active) return;
 
     let alive = true;
+    let loaded = false;
     let stopListening: (() => void) | undefined;
 
     const load = async (tracks: PreviewTrack[]) => {
@@ -82,7 +84,8 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
       const unlisten = await listen<{ source: string; tracks: PreviewTrack[] }>(
         "clip_audio_preview",
         (event) => {
-          if (!samePath(event.payload.source, path)) return;
+          if (loaded || !samePath(event.payload.source, path)) return;
+          loaded = true;
           void load(event.payload.tracks);
         },
       );
@@ -135,6 +138,7 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
   useEffect(() => {
     const element = video.current;
     if (!element || state !== "live") return;
+    const spare = standby.current;
 
     element.muted = true;
 
@@ -143,13 +147,14 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
       playing.current = [];
     };
 
-    const startAll = () => {
+    const covered = () => !!spare && !spare.paused;
+
+    const startAt = (at: number) => {
       const audio = context.current;
       if (!audio) return;
       stopAll();
       void audio.resume().catch(() => {});
 
-      const at = element.currentTime;
       for (const [stream, buffer] of buffers.current) {
         const gain = gains.current.get(stream);
         if (!gain) continue;
@@ -186,6 +191,24 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
       }
     };
 
+    const startAll = () => startAt(element.currentTime);
+
+    const stopUncovered = () => {
+      if (!covered()) stopAll();
+    };
+
+    const onSpareWaiting = () => {
+      if (covered()) stopAll();
+    };
+
+    const onSparePlaying = () => {
+      if (spare) startAt(spare.currentTime);
+    };
+
+    const onSparePause = () => {
+      if (element.paused) stopAll();
+    };
+
     restart.current = () => {
       if (!element.paused && !element.seeking) startAll();
     };
@@ -196,25 +219,31 @@ export function useTrimPreview({ path, video, levels, muted, active }: Options):
 
     element.addEventListener("playing", startAll);
     element.addEventListener("waiting", stopAll);
-    element.addEventListener("pause", stopAll);
+    element.addEventListener("pause", stopUncovered);
     element.addEventListener("ended", stopAll);
     element.addEventListener("seeked", onSeek);
-    element.addEventListener("seeking", stopAll);
+    element.addEventListener("seeking", stopUncovered);
+    spare?.addEventListener("playing", onSparePlaying);
+    spare?.addEventListener("waiting", onSpareWaiting);
+    spare?.addEventListener("pause", onSparePause);
 
     if (!element.paused) startAll();
 
     return () => {
       element.removeEventListener("playing", startAll);
       element.removeEventListener("waiting", stopAll);
-      element.removeEventListener("pause", stopAll);
+      element.removeEventListener("pause", stopUncovered);
       element.removeEventListener("ended", stopAll);
       element.removeEventListener("seeked", onSeek);
-      element.removeEventListener("seeking", stopAll);
+      element.removeEventListener("seeking", stopUncovered);
+      spare?.removeEventListener("playing", onSparePlaying);
+      spare?.removeEventListener("waiting", onSpareWaiting);
+      spare?.removeEventListener("pause", onSparePause);
       restart.current = null;
       stopAll();
       element.muted = false;
     };
-  }, [state, video]);
+  }, [standby, state, video]);
 
   return state;
 }

@@ -152,6 +152,61 @@ export function hollowed(spans: Span[], from: number, to: number): number {
   );
 }
 
+export interface TimeView {
+  whole: number;
+  length: number;
+  pieces: Span[];
+  toView: (seconds: number) => number;
+  fromView: (seconds: number) => number;
+  percent: (seconds: number) => number;
+  shift: (seconds: number, by: number) => number;
+}
+
+function toView(holes: Span[], seconds: number): number {
+  let out = seconds;
+  for (const hole of holes) {
+    if (seconds <= hole.startSeconds) break;
+    out -= Math.min(seconds, hole.endSeconds) - hole.startSeconds;
+  }
+  return out;
+}
+
+function fromView(holes: Span[], seconds: number): number {
+  let out = seconds;
+  for (const hole of holes) {
+    if (out < hole.startSeconds) break;
+    out += hole.endSeconds - hole.startSeconds;
+  }
+  return out;
+}
+
+function keptPieces(holes: Span[], duration: number): Span[] {
+  const out: Span[] = [];
+  let at = 0;
+  for (const hole of holes) {
+    if (hole.startSeconds > at) out.push({ startSeconds: at, endSeconds: Math.min(hole.startSeconds, duration) });
+    at = Math.max(at, hole.endSeconds);
+  }
+  if (duration > at) out.push({ startSeconds: at, endSeconds: duration });
+  return out.filter((piece) => piece.endSeconds > piece.startSeconds);
+}
+
+export function timeView(removed: Span[], duration: number): TimeView {
+  const holes = merged(removed);
+  const length = Math.max(0, duration - hollowed(holes, 0, duration));
+  const view = (seconds: number) => toView(holes, seconds);
+  const source = (seconds: number) => fromView(holes, seconds);
+  return {
+    whole: duration,
+    length,
+    pieces: keptPieces(holes, duration),
+    toView: view,
+    fromView: source,
+    percent: (seconds) => (length > 0 ? (view(seconds) / length) * 100 : 0),
+    shift: (seconds, by) => source(view(seconds) + by),
+  };
+}
+
 export function tidy(value: number): number {
   return Number(value.toFixed(2));
 }

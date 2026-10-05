@@ -8,7 +8,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { ClipTrimmer } from "./ClipTrimmer";
+import { ClipTrimmer, WindowButton } from "./ClipTrimmer";
 import {
   closeClipEditor,
   getClipDetails,
@@ -22,6 +22,9 @@ import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { WindowFrame } from "../ui/WindowFrame";
+import { Button } from "../ui/buttons/Button";
+
+const PROBE_TIMEOUT_MS = 15_000;
 
 export function ClipEditorWindow() {
   const { t } = useTranslation();
@@ -30,6 +33,7 @@ export function ClipEditorWindow() {
   const [duration, setDuration] = useState(0);
   const [details, setDetails] = useState<ClipDetails | null>(null);
   const [saving, setSaving] = useState(false);
+  const [broken, setBroken] = useState(false);
   const path = clip?.path ?? null;
   const src = useMemo(() => (path ? convertFileSrc(path) : null), [path]);
   const { confirm, confirmDialog, isOpen: dialogOpen } = useConfirmDialog();
@@ -112,13 +116,26 @@ export function ClipEditorWindow() {
 
   useEffect(() => {
     setDuration(0);
+    setBroken(false);
     if (!src) return;
     const probe = document.createElement("video");
+    const fail = () => setBroken(true);
+    const timeout = window.setTimeout(fail, PROBE_TIMEOUT_MS);
     probe.preload = "metadata";
-    probe.onloadedmetadata = () => setDuration(probe.duration);
+    probe.onloadedmetadata = () => {
+      window.clearTimeout(timeout);
+      if (Number.isFinite(probe.duration) && probe.duration > 0) setDuration(probe.duration);
+      else fail();
+    };
+    probe.onerror = () => {
+      window.clearTimeout(timeout);
+      fail();
+    };
     probe.src = src;
     return () => {
+      window.clearTimeout(timeout);
       probe.onloadedmetadata = null;
+      probe.onerror = null;
       probe.removeAttribute("src");
       probe.load();
     };
@@ -154,7 +171,6 @@ export function ClipEditorWindow() {
       setSaving(true);
       try {
         await trimClip(path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
-        toast.success(t("clips.trim.saved"));
         return true;
       } catch (e) {
         console.error("Could not trim the clip", e);
@@ -170,15 +186,52 @@ export function ClipEditorWindow() {
   if (!clip || !src || duration <= 0) {
     return (
       <>
-        <WindowFrame className="select-none items-center justify-center" data-tauri-drag-region>
-          <Icon
-            icon="svg-spinners:ring-resize"
-            className="pointer-events-none mb-3 h-7 w-7"
-            style={{ color: accent }}
-          />
-          <span className="pointer-events-none font-minecraft text-xs tracking-wider text-white/50">
-            {t("common.loading")}
-          </span>
+        <WindowFrame className="select-none [&_button_svg]:pointer-events-none">
+          <header
+            data-tauri-drag-region
+            className="flex h-11 shrink-0 items-center gap-3 border-b border-white/5 bg-black/40 pl-4 pr-2"
+          >
+            <Icon
+              icon="solar:videocamera-record-bold"
+              className="pointer-events-none h-4 w-4 shrink-0"
+              style={{ color: accent }}
+            />
+            <span
+              data-tauri-drag-region
+              className="min-w-0 flex-1 truncate font-minecraft text-xs normal-case tracking-wider"
+              style={{ color: accent }}
+            >
+              {clip?.name}
+            </span>
+            <WindowButton icon="mdi:close" label={t("window.close")} danger onClick={closeNow} />
+          </header>
+          <div
+            data-tauri-drag-region
+            className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
+          >
+            {broken ? (
+              <>
+                <Icon icon="solar:videocamera-record-bold" className="pointer-events-none h-8 w-8 text-white/30" />
+                <span className="pointer-events-none max-w-sm font-minecraft text-sm leading-relaxed text-white/70">
+                  {t("clips.editor.load_failed")}
+                </span>
+                <Button variant="secondary" size="sm" onClick={closeNow}>
+                  {t("common.close")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Icon
+                  icon="svg-spinners:ring-resize"
+                  className="pointer-events-none h-7 w-7"
+                  style={{ color: accent }}
+                />
+                <span className="pointer-events-none font-minecraft text-xs tracking-wider text-white/50">
+                  {t("common.loading")}
+                </span>
+              </>
+            )}
+          </div>
         </WindowFrame>
         {confirmDialog}
       </>
