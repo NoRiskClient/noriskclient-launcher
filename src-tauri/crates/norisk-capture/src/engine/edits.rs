@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use norisk_ipc::{CaptureError, CaptureToLauncher, ErrorCode};
@@ -5,6 +6,8 @@ use norisk_ipc::{CaptureError, CaptureToLauncher, ErrorCode};
 use super::Engine;
 
 const PROGRESS_EVERY: Duration = Duration::from_millis(150);
+
+static ONE_EDIT_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 impl Engine {
     pub(super) fn prepare_preview(&self, request: norisk_ipc::AudioPreviewRequest) {
@@ -73,13 +76,7 @@ impl Engine {
             request.source.clone(),
             move |report| {
                 let started = Instant::now();
-                let existed = request.destination.exists();
-                let result = crate::gif::to_gif(&request.source, &request.destination, report)
-                    .inspect_err(|_| {
-                        if !existed {
-                            let _ = std::fs::remove_file(&request.destination);
-                        }
-                    })?;
+                let result = crate::gif::to_gif(&request.source, &request.destination, report)?;
                 log::info!(
                     "Turned {} into a GIF in {} ms",
                     request.source.display(),
@@ -110,10 +107,12 @@ impl Engine {
         F: FnOnce(&dyn Fn(u32, u32)) -> anyhow::Result<CaptureToLauncher> + Send + 'static,
     {
         let events = self.events.clone();
+        let about = source.clone();
 
         let spawned = std::thread::Builder::new()
             .name(thread.into())
             .spawn(move || {
+                let _turn = ONE_EDIT_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
                 let last = std::cell::Cell::new(None::<Instant>);
                 let report = |done: u32, total: u32| {
                     let finished = done >= total;
@@ -140,46 +139,49 @@ impl Engine {
                             code: ErrorCode::ClipWrite,
                             message: format!("{e:#}"),
                             recoverable: true,
+                            source: Some(source.clone()),
                         }));
                     }
                 }
             });
 
         if let Err(e) = spawned {
-            self.emit_error(ErrorCode::ClipWrite, format!("{unstarted}: {e}"), true);
+            self.emit_error_about(ErrorCode::ClipWrite, format!("{unstarted}: {e}"), true, Some(about));
         }
     }
 
     pub(super) fn trim_clip(&self, request: norisk_ipc::TrimClipRequest) {
-        let started = Instant::now();
-        match crate::trim::trim(
-            &request.source,
-            &request.destination,
-            request.start_seconds,
-            request.end_seconds,
-            request.video_start_seconds,
-            request.video_end_seconds,
-            &request.levels,
-        ) {
-            Ok(result) => {
+        self.spawn_export(
+            "nrc-trim",
+            "Trim failed",
+            "could not start the trim",
+            request.source.clone(),
+            move |_| {
+                let started = Instant::now();
+                let result = crate::trim::trim(
+                    &request.source,
+                    &request.destination,
+                    request.start_seconds,
+                    request.end_seconds,
+                    request.video_start_seconds,
+                    request.video_end_seconds,
+                    &request.levels,
+                )?;
                 log::info!(
                     "Trimmed {:.1}s out of {} in {} ms",
                     result.end_seconds - result.start_seconds,
                     request.source.display(),
                     started.elapsed().as_millis()
                 );
-                let _ = self
-                    .events
-                    .send(CaptureToLauncher::ClipTrimmed(norisk_ipc::TrimmedClip {
-                        path: result.path,
-                        source: request.source,
-                        duration_seconds: result.duration_seconds,
-                        size_bytes: result.size_bytes,
-                        start_seconds: result.start_seconds,
-                        end_seconds: result.end_seconds,
-                    }));
-            }
-            Err(e) => self.emit_error(ErrorCode::ClipWrite, format!("{e:#}"), true),
-        }
+                Ok(CaptureToLauncher::ClipTrimmed(norisk_ipc::TrimmedClip {
+                    path: result.path,
+                    source: request.source,
+                    duration_seconds: result.duration_seconds,
+                    size_bytes: result.size_bytes,
+                    start_seconds: result.start_seconds,
+                    end_seconds: result.end_seconds,
+                }))
+            },
+        );
     }
 }

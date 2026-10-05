@@ -571,7 +571,6 @@ fn encoders_to_try(
 
     let mut tries = vec![first];
     for other in hardware_for(first.0)
-        .chain([(first.0, EncoderPreference::Software)])
         .chain(hardware_for(ClipCodec::H264))
         .chain([(ClipCodec::H264, EncoderPreference::Software)])
     {
@@ -632,7 +631,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_failing_newer_codec_falls_back_to_h264_hardware_before_h264_software() {
+    fn a_failing_newer_codec_falls_back_to_h264_hardware_and_never_to_its_own_software_encoder() {
         use norisk_ipc::{ClipCodec, EncoderCapability, EncoderPreference};
 
         let capability = |codec, encoder, hardware| EncoderCapability {
@@ -648,6 +647,9 @@ mod tests {
             capability(ClipCodec::H264, EncoderPreference::Software, false),
             capability(ClipCodec::H265, EncoderPreference::Nvenc, true),
             capability(ClipCodec::H265, EncoderPreference::Amf, true),
+            capability(ClipCodec::H265, EncoderPreference::Software, false),
+            capability(ClipCodec::Av1, EncoderPreference::Nvenc, true),
+            capability(ClipCodec::Av1, EncoderPreference::Software, false),
         ];
 
         assert_eq!(
@@ -655,7 +657,24 @@ mod tests {
             vec![
                 (ClipCodec::H265, EncoderPreference::Nvenc),
                 (ClipCodec::H265, EncoderPreference::Amf),
+                (ClipCodec::H264, EncoderPreference::Nvenc),
+                (ClipCodec::H264, EncoderPreference::Software),
+            ]
+        );
+        assert_eq!(
+            encoders_to_try(&matrix, (ClipCodec::Av1, EncoderPreference::Nvenc)),
+            vec![
+                (ClipCodec::Av1, EncoderPreference::Nvenc),
+                (ClipCodec::H264, EncoderPreference::Nvenc),
+                (ClipCodec::H264, EncoderPreference::Software),
+            ]
+        );
+        assert_eq!(
+            encoders_to_try(&matrix, (ClipCodec::H265, EncoderPreference::Software)),
+            vec![
                 (ClipCodec::H265, EncoderPreference::Software),
+                (ClipCodec::H265, EncoderPreference::Nvenc),
+                (ClipCodec::H265, EncoderPreference::Amf),
                 (ClipCodec::H264, EncoderPreference::Nvenc),
                 (ClipCodec::H264, EncoderPreference::Software),
             ]

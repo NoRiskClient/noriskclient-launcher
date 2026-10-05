@@ -1,5 +1,5 @@
 use std::ffi::CString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use ffmpeg_next::ffi as ff;
@@ -10,7 +10,7 @@ use crate::encoder::hw::av_error;
 
 #[derive(Debug, Clone)]
 pub struct WrittenClip {
-    pub path: std::path::PathBuf,
+    pub path: PathBuf,
     pub duration_seconds: f64,
     pub size_bytes: u64,
     pub width: u32,
@@ -51,6 +51,62 @@ impl AudioTrack {
     }
 }
 
+const SPARE_BYTES: u64 = 32 * 1024 * 1024;
+
+pub(crate) fn part_path(destination: &Path) -> PathBuf {
+    let mut name = destination.as_os_str().to_owned();
+    name.push(".part");
+    PathBuf::from(name)
+}
+
+struct PartGuard(Option<PathBuf>);
+
+impl Drop for PartGuard {
+    fn drop(&mut self) {
+        if let Some(part) = self.0.take() {
+            let _ = std::fs::remove_file(part);
+        }
+    }
+}
+
+pub(crate) fn staged<T>(destination: &Path, write: impl FnOnce(&Path) -> Result<T>) -> Result<T> {
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let part = part_path(destination);
+    let mut guard = PartGuard(Some(part.clone()));
+    let written = write(&part)?;
+    std::fs::rename(&part, destination)
+        .with_context(|| format!("could not move the finished file to {}", destination.display()))?;
+    guard.0 = None;
+    Ok(written)
+}
+
+pub(crate) fn room_for(path: &Path, bytes: u64) -> Result<()> {
+    use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+
+    let Some(folder) = path.parent() else {
+        return Ok(());
+    };
+    let mut free = 0u64;
+    let asked = unsafe {
+        GetDiskFreeSpaceExW(&windows::core::HSTRING::from(folder), Some(&mut free), None, None)
+    };
+    if asked.is_err() {
+        return Ok(());
+    }
+
+    let needed = bytes + bytes / 10 + SPARE_BYTES;
+    if free < needed {
+        bail!(
+            "the drive is too full for this clip: it needs about {} MB and only {} MB are free",
+            needed / (1024 * 1024),
+            free / (1024 * 1024)
+        );
+    }
+    Ok(())
+}
+
 pub fn write_mp4(
     clip: &Clip,
     path: &Path,
@@ -63,11 +119,29 @@ pub fn write_mp4(
     if track.extradata.is_empty() {
         bail!("no codec header available — the MP4 track header would be incomplete");
     }
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
+    let bytes: u64 = clip
+        .packets
+        .iter()
+        .chain(audio.iter().flat_map(|track| &track.packets))
+        .map(|packet| packet.data.len() as u64)
+        .sum();
+    room_for(path, bytes)?;
 
+    let mut written = staged(path, |part| mux(clip, part, path, track, audio))?;
+    written.path = path.to_path_buf();
+    Ok(written)
+}
+
+fn mux(
+    clip: &Clip,
+    path: &Path,
+    named: &Path,
+    track: &TrackInfo,
+    audio: &[AudioTrack],
+) -> Result<WrittenClip> {
     let path_c = CString::new(path.to_string_lossy().as_ref())
+        .context("clip path contains an interior nul")?;
+    let named_c = CString::new(named.to_string_lossy().as_ref())
         .context("clip path contains an interior nul")?;
 
     unsafe {
@@ -76,7 +150,7 @@ pub fn write_mp4(
             &mut format_ctx,
             std::ptr::null_mut(),
             std::ptr::null(),
-            path_c.as_ptr(),
+            named_c.as_ptr(),
         );
         if rc < 0 || format_ctx.is_null() {
             bail!("could not create an MP4 context: {}", av_error(rc));
@@ -448,6 +522,9 @@ mod tests {
             extradata,
         };
         let written = write_mp4(&clip, &path, &track, &[]).expect("muxing failed");
+        assert_eq!(written.path, path);
+        assert_eq!(written.size_bytes, std::fs::metadata(&path).unwrap().len());
+        assert!(!part_path(&path).exists(), "nothing half-written may stay behind");
         let back = crate::trim::read(&path).expect("demuxing failed");
         let _ = std::fs::remove_file(&path);
 
@@ -465,6 +542,74 @@ mod tests {
             "90 frames at 60 fps should be 1.5s, got {:.2}s",
             written.duration_seconds
         );
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("nrc-staged-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    fn names_in(dir: &Path) -> Vec<String> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn a_write_that_fails_halfway_leaves_nothing_in_the_folder() {
+        let dir = scratch("fails");
+        let destination = dir.join("fight.mp4");
+
+        let result = staged(&destination, |part| -> Result<()> {
+            std::fs::write(part, b"half a clip")?;
+            bail!("the drive filled up")
+        });
+
+        assert!(result.is_err());
+        assert_eq!(names_in(&dir), Vec::<String>::new());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_write_that_fails_keeps_the_file_it_would_have_replaced() {
+        let dir = scratch("keeps");
+        let destination = dir.join("fight.mp4");
+        std::fs::write(&destination, b"the old clip").unwrap();
+
+        let result = staged(&destination, |part| -> Result<()> {
+            std::fs::write(part, b"half a clip")?;
+            bail!("the encoder gave up")
+        });
+
+        assert!(result.is_err());
+        assert_eq!(names_in(&dir), vec!["fight.mp4".to_string()]);
+        assert_eq!(std::fs::read(&destination).unwrap(), b"the old clip");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_write_in_progress_never_looks_like_a_clip_and_a_finished_one_does() {
+        let dir = scratch("finishes");
+        let destination = dir.join("fight.mp4");
+
+        staged(&destination, |part| -> Result<()> {
+            assert_eq!(part.parent(), destination.parent());
+            assert_ne!(
+                part.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase),
+                Some("mp4".to_string())
+            );
+            assert!(!destination.exists());
+            std::fs::write(part, b"a whole clip")?;
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(names_in(&dir), vec!["fight.mp4".to_string()]);
+        assert_eq!(std::fs::read(&destination).unwrap(), b"a whole clip");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -95,6 +95,7 @@ fn refusal(error: impl std::fmt::Display) -> CaptureToLauncher {
              Restart the launcher so both halves are the same version."
         ),
         recoverable: true,
+        source: None,
     })
 }
 

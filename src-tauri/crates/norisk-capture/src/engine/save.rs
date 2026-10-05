@@ -11,7 +11,6 @@ use crate::encoder::video::TIME_BASE_DEN;
 use crate::writer::{write_mp4, TrackInfo};
 
 const FRESH_ENOUGH_SECONDS: f64 = 5.0;
-const SPARE_BYTES: u64 = 32 * 1024 * 1024;
 const PLAYBACK_CHECK_PACKETS: usize = 120;
 
 impl Engine {
@@ -135,9 +134,7 @@ impl Engine {
 
         std::thread::Builder::new()
             .name("nrc-save".into())
-            .spawn(move || match room_for(&path, clip.bytes)
-                .and_then(|()| write_mp4(&clip, &path, &track, audio_track.as_slice()))
-            {
+            .spawn(move || match write_mp4(&clip, &path, &track, audio_track.as_slice()) {
                 Ok(written) => {
                     log::info!(
                         "Saved {:.1}s clip to {}",
@@ -167,6 +164,7 @@ impl Engine {
                         code: ErrorCode::ClipWrite,
                         message: format!("{e:#}"),
                         recoverable: true,
+                        source: None,
                     }));
                 }
             })
@@ -199,31 +197,6 @@ fn chrono_now() -> String {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     format!("{secs}")
-}
-
-fn room_for(path: &std::path::Path, bytes: u64) -> Result<()> {
-    use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
-
-    let Some(folder) = path.parent() else {
-        return Ok(());
-    };
-    let mut free = 0u64;
-    let asked = unsafe {
-        GetDiskFreeSpaceExW(&windows::core::HSTRING::from(folder), Some(&mut free), None, None)
-    };
-    if asked.is_err() {
-        return Ok(());
-    }
-
-    let needed = bytes + bytes / 10 + SPARE_BYTES;
-    if free < needed {
-        anyhow::bail!(
-            "the drive is too full for this clip: it needs about {} MB and only {} MB are free",
-            needed / (1024 * 1024),
-            free / (1024 * 1024)
-        );
-    }
-    Ok(())
 }
 
 fn plays_back(path: &std::path::Path) -> Result<()> {

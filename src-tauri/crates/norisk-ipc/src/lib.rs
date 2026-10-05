@@ -341,6 +341,8 @@ pub struct CaptureError {
     pub code: ErrorCode,
     pub message: String,
     pub recoverable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -609,6 +611,7 @@ mod tests {
             code: ErrorCode::Internal,
             message: "line one\nline two".into(),
             recoverable: true,
+            source: None,
         });
 
         let line = encode_line(&msg).unwrap();
@@ -616,6 +619,38 @@ mod tests {
 
         let back: CaptureToLauncher = decode_line(&line).unwrap();
         assert_eq!(back, msg);
+    }
+
+    #[test]
+    fn an_error_names_the_clip_it_failed_on_as_a_plain_path() {
+        let failed = CaptureToLauncher::Error(CaptureError {
+            code: ErrorCode::ClipWrite,
+            message: "disk full".into(),
+            recoverable: true,
+            source: Some(PathBuf::from("C:/clips/fight.mp4")),
+        });
+
+        let wire: serde_json::Value = serde_json::to_value(&failed).unwrap();
+        assert_eq!(wire["source"], "C:/clips/fight.mp4");
+        assert_eq!(decode_line::<CaptureToLauncher>(&encode_line(&failed).unwrap()).unwrap(), failed);
+    }
+
+    #[test]
+    fn an_error_without_a_clip_leaves_the_source_off_and_older_errors_still_parse() {
+        let general = CaptureToLauncher::Error(CaptureError {
+            code: ErrorCode::Internal,
+            message: "boom".into(),
+            recoverable: true,
+            source: None,
+        });
+        let wire: serde_json::Value = serde_json::to_value(&general).unwrap();
+        assert!(wire.get("source").is_none());
+
+        let older: CaptureToLauncher = decode_line(
+            r#"{"type":"error","code":"internal","message":"boom","recoverable":true}"#,
+        )
+        .unwrap();
+        assert_eq!(older, general);
     }
 
     #[test]

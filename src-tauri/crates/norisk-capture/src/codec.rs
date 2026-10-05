@@ -36,6 +36,8 @@ impl Decoder {
 
             (*context).width = track.width as i32;
             (*context).height = track.height as i32;
+            (*context).thread_count = decode_threads();
+            (*context).thread_type = ff::FF_THREAD_FRAME as i32 | ff::FF_THREAD_SLICE as i32;
 
             if !track.extradata.is_empty() {
                 let size = track.extradata.len();
@@ -144,6 +146,10 @@ impl Drop for Frame {
 }
 
 unsafe impl Send for Decoder {}
+
+fn decode_threads() -> i32 {
+    std::thread::available_parallelism().map_or(0, |cores| (cores.get() / 2).clamp(1, 8) as i32)
+}
 
 pub(crate) fn shown_at(frame: &Frame) -> i64 {
     unsafe {

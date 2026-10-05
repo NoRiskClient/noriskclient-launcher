@@ -38,8 +38,6 @@ pub fn to_gif(
     let clip = crate::trim::read(source)?;
 
     let delay = ((100.0 / TARGET_FPS as f64).round() as u16).max(2);
-    let budget = MAX_SECONDS * 100 / delay as u32;
-    let mut pacer = Pacer::new(delay);
 
     let (width, height) = fit(clip.track.width, clip.track.height);
 
@@ -51,6 +49,45 @@ pub fn to_gif(
         clip.track.fps,
         delay as u32 * 10,
     );
+
+    let (written, filled, truncated) = crate::writer::staged(destination, |part| {
+        encode(&clip, part, (width, height), delay, &progress)
+    })?;
+
+    let size_bytes = std::fs::metadata(destination)
+        .map(|meta| meta.len())
+        .unwrap_or(0);
+    let duration_seconds = filled as f64 * delay as f64 / 100.0;
+
+    if truncated {
+        log::info!("The clip is longer than {MAX_SECONDS}s; the GIF holds its first {written} frames");
+    }
+    log::info!(
+        "Wrote {} ({written} frames, {:.1} MB)",
+        destination.display(),
+        size_bytes as f64 / 1e6,
+    );
+
+    Ok(GifResult {
+        path: destination.to_path_buf(),
+        width,
+        height,
+        frames: written,
+        duration_seconds,
+        size_bytes,
+        truncated,
+    })
+}
+
+fn encode(
+    clip: &crate::trim::SourceClip,
+    destination: &Path,
+    (width, height): (u32, u32),
+    delay: u16,
+    progress: &impl Fn(u32, u32),
+) -> Result<(u32, u32, bool)> {
+    let budget = MAX_SECONDS * 100 / delay as u32;
+    let mut pacer = Pacer::new(delay);
 
     let file = std::fs::File::create(destination)
         .with_context(|| format!("could not create {}", destination.display()))?;
@@ -123,29 +160,7 @@ pub fn to_gif(
         .map_err(|e| anyhow::anyhow!("{}", e.error()))
         .with_context(|| format!("could not finish writing {}", destination.display()))?;
 
-    let size_bytes = std::fs::metadata(destination)
-        .map(|meta| meta.len())
-        .unwrap_or(0);
-    let duration_seconds = filled as f64 * delay as f64 / 100.0;
-
-    if truncated {
-        log::info!("The clip is longer than {MAX_SECONDS}s; the GIF holds its first {written} frames");
-    }
-    log::info!(
-        "Wrote {} ({written} frames, {:.1} MB)",
-        destination.display(),
-        size_bytes as f64 / 1e6,
-    );
-
-    Ok(GifResult {
-        path: destination.to_path_buf(),
-        width,
-        height,
-        frames: written,
-        duration_seconds,
-        size_bytes,
-        truncated,
-    })
+    Ok((written, filled, truncated))
 }
 
 struct Pacer {
