@@ -14,8 +14,6 @@ opt-level = 3
 
 [profile.dev.package.norisk-capture]
 opt-level = 3
-overflow-checks = false
-debug-assertions = false
 
 [profile.dev.package.ab_glyph]
 opt-level = 3
