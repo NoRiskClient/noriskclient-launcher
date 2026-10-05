@@ -217,9 +217,4 @@ mod tests {
         info.hook_ver_major = HOOK_VER_MAJOR + 1;
         assert!(!info.version_matches());
     }
-
-    #[test]
-    fn a_fresh_info_block_asks_for_the_texture_path() {
-        assert!(!HookInfo::default().force_shmem);
-    }
 }

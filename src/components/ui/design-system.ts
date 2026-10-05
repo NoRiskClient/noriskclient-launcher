@@ -300,3 +300,14 @@ export const getToastBaseStyles = (config: ToastStyleConfig): React.CSSPropertie
 };
 
 export const TOAST_BASE_CLASSES = "font-smallcaps tracking-wider text-shadow-sm";
+
+export const MENU_PANEL_CLASSES =
+  "bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden";
+
+export const menuItemClasses = (compact: boolean): string =>
+  `w-full flex items-center gap-2.5 text-left font-minecraft transition-colors duration-150 ${
+    compact ? "px-2.5 py-1.5 text-xs" : "px-4 py-3 text-base"
+  }`;
+
+export const menuSeparatorClasses = (compact: boolean): string =>
+  `border-t border-white/10 ${compact ? "my-1 mx-2" : "my-1.5 mx-3"}`;

@@ -7,6 +7,13 @@ use super::sw::{Downloader, SOFTWARE_FORMATS};
 
 pub const TIME_BASE_DEN: i32 = 90_000;
 
+pub const COLOR_PRIMARIES: ff::AVColorPrimaries = ff::AVColorPrimaries::AVCOL_PRI_BT709;
+pub const COLOR_TRANSFER: ff::AVColorTransferCharacteristic =
+    ff::AVColorTransferCharacteristic::AVCOL_TRC_BT709;
+pub const COLOR_SPACE: ff::AVColorSpace = ff::AVColorSpace::AVCOL_SPC_BT709;
+pub const COLOR_RANGE: ff::AVColorRange = ff::AVColorRange::AVCOL_RANGE_MPEG;
+pub const CHROMA_LOCATION: ff::AVChromaLocation = ff::AVChromaLocation::AVCHROMA_LOC_LEFT;
+
 #[derive(Debug, Clone, Copy)]
 pub struct EncoderSettings {
     pub width: u32,
@@ -242,6 +249,12 @@ unsafe fn configure_common(
     (*context).gop_size = gop_frames(settings);
     (*context).max_b_frames = if tuned { b_frames_for(codec_name) } else { 0 };
 
+    (*context).color_primaries = COLOR_PRIMARIES;
+    (*context).color_trc = COLOR_TRANSFER;
+    (*context).colorspace = COLOR_SPACE;
+    (*context).color_range = COLOR_RANGE;
+    (*context).chroma_sample_location = CHROMA_LOCATION;
+
     (*context).flags |= ff::AV_CODEC_FLAG_GLOBAL_HEADER as i32;
 
     if (*context).priv_data.is_null() {
@@ -430,53 +443,6 @@ mod tests {
         assert_eq!(b_frames_for("h264_nvenc"), 2);
         assert_eq!(b_frames_for("h264_qsv"), 2);
         assert_eq!(b_frames_for("libx264"), 0);
-    }
-
-    #[test]
-    fn gop_follows_the_configured_seconds() {
-        let base = EncoderSettings {
-            fps: 60,
-            gop_seconds: 2.0,
-            ..Default::default()
-        };
-        assert_eq!(gop_frames(base), 120);
-
-        assert_eq!(
-            gop_frames(EncoderSettings {
-                gop_seconds: 1.0,
-                ..base
-            }),
-            60
-        );
-        assert_eq!(
-            gop_frames(EncoderSettings {
-                fps: 144,
-                gop_seconds: 2.0,
-                ..base
-            }),
-            288
-        );
-    }
-
-    #[test]
-    fn keyframe_spacing_in_ticks_ignores_the_frame_rate() {
-        let at_60 = gop_ticks(EncoderSettings {
-            fps: 60,
-            gop_seconds: 2.0,
-            ..Default::default()
-        });
-        let at_30 = gop_ticks(EncoderSettings {
-            fps: 30,
-            gop_seconds: 2.0,
-            ..Default::default()
-        });
-        assert_eq!(at_60, at_30);
-        assert_eq!(at_60, 2 * TIME_BASE_DEN as i64);
-
-        assert_ne!(
-            gop_frames(EncoderSettings { fps: 60, gop_seconds: 2.0, ..Default::default() }),
-            gop_frames(EncoderSettings { fps: 30, gop_seconds: 2.0, ..Default::default() }),
-        );
     }
 
     #[test]

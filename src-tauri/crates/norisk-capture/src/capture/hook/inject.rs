@@ -85,6 +85,8 @@ pub fn inject(pid: u32, thread_id: u32, dll: &Path) -> Result<Injected> {
         return Ok(Injected::AlreadyPresent);
     }
 
+    fits_the_hook(pid)?;
+
     let executable = process_executable(pid)
         .with_context(|| format!("could not read what program {pid} is"))?;
     if is_never_hooked(&executable) {
@@ -100,6 +102,29 @@ pub fn inject(pid: u32, thread_id: u32, dll: &Path) -> Result<Injected> {
 
     inject_through_remote_thread(pid, &dll)?;
     Ok(Injected::Loaded)
+}
+
+fn fits_the_hook(pid: u32) -> Result<()> {
+    use windows::Win32::System::SystemInformation::{
+        IMAGE_FILE_MACHINE, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_UNKNOWN,
+    };
+    use windows::Win32::System::Threading::{IsWow64Process2, PROCESS_QUERY_LIMITED_INFORMATION};
+
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }
+        .with_context(|| format!("could not look at process {pid}"))?;
+    let mut machine = IMAGE_FILE_MACHINE::default();
+    let mut native = IMAGE_FILE_MACHINE::default();
+    let asked = unsafe { IsWow64Process2(process, &mut machine, Some(&mut native)) };
+    let _ = unsafe { CloseHandle(process) };
+    asked.with_context(|| format!("could not tell what kind of program {pid} is"))?;
+
+    if machine != IMAGE_FILE_MACHINE_UNKNOWN {
+        anyhow::bail!("process {pid} is a 32-bit program, and the capture hook only fits 64-bit ones");
+    }
+    if native == IMAGE_FILE_MACHINE_ARM64 {
+        anyhow::bail!("this is an ARM computer, and the capture hook only fits x64 programs");
+    }
+    Ok(())
 }
 
 fn inject_through_message_hook(
@@ -238,12 +263,7 @@ fn process_executable(pid: u32) -> Option<String> {
 
     unsafe { Module32FirstW(snapshot.0, &mut entry) }.ok()?;
 
-    let end = entry
-        .szModule
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(entry.szModule.len());
-    Some(String::from_utf16_lossy(&entry.szModule[..end]))
+    Some(crate::capture::utf16_to_string(&entry.szModule))
 }
 
 fn inject_through_remote_thread(pid: u32, dll: &Path) -> Result<()> {
@@ -344,13 +364,7 @@ pub fn is_module_loaded(pid: u32, file_name: &str) -> Result<bool> {
     }
 
     loop {
-        let name = String::from_utf16_lossy(
-            &entry.szModule[..entry
-                .szModule
-                .iter()
-                .position(|&c| c == 0)
-                .unwrap_or(entry.szModule.len())],
-        );
+        let name = crate::capture::utf16_to_string(&entry.szModule);
         if name.eq_ignore_ascii_case(file_name) {
             return Ok(true);
         }

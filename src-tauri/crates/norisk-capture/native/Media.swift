@@ -219,13 +219,17 @@ func editMedia(_ message: [String: Any]) async throws {
     guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first else { throw failure("The clip has no video track.") }
     let video = try await addTrack(sourceVideo, to: composition, range: range)
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
-    let levels = message["levels"] as? [[String: Int]] ?? []
-    let changed = levels.contains { $0["volume"] != 100 }
+    let levels: [(stream: Int, volume: Int)] = (message["levels"] as? [[String: Any]] ?? []).compactMap { level in
+        guard let stream = (level["stream"] as? NSNumber)?.intValue,
+              let volume = (level["volume"] as? NSNumber)?.intValue else { return nil }
+        return (stream: stream, volume: volume)
+    }
+    let changed = levels.contains { $0.volume != 100 }
     if changed && !audio.isEmpty {
         let stems = audio.count > 1 ? Array(audio.dropFirst()) : audio
         let offset = audio.count > 1 ? 1 : 0
         let gains = stems.indices.map { index -> Float in
-            Float(min(200, max(0, levels.first { $0["stream"] == index + offset }?["volume"] ?? 100))) / 100
+            Float(min(200, max(0, levels.first { $0.stream == index + offset }?.volume ?? 100))) / 100
         }
         let mixed = temp.appendingPathComponent("mix.m4a")
         try await makeMix(stems, range: range, gains: gains, to: mixed)

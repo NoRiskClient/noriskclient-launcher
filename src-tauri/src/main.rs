@@ -908,11 +908,16 @@ async fn main() {
             commands::clip_commands::clip_details,
             commands::clip_commands::clip_set_favourite,
             commands::clip_commands::clip_open_apps,
+            commands::clip_commands::clip_list_screens,
             commands::clip_commands::clip_save_thumbnail,
             commands::clip_commands::clip_export_vertical,
+            commands::clip_commands::clip_export_gif,
             commands::clip_commands::clip_prepare_preview,
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
+            commands::clip_commands::clip_open_editor,
+            commands::clip_commands::clip_editor_current,
+            commands::clip_commands::clip_editor_close,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

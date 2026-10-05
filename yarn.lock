@@ -3840,6 +3840,11 @@ react-refresh@^0.17.0:
   resolved "https://registry.npmjs.org/react-refresh/-/react-refresh-0.17.0.tgz"
   integrity sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==
 
+react-resizable-panels@^4.14.2:
+  version "4.14.2"
+  resolved "https://registry.yarnpkg.com/react-resizable-panels/-/react-resizable-panels-4.14.2.tgz#df39ef4acb8cf42c4f96d40f6c56b0510d8257c4"
+  integrity sha512-s35mfXhwpPEPnB+BKPCZJ9VZU0CHb1I9trm9tijEGBNv1Srl0HzIweENeXnsQvd0Xm9BeOBkEzDGVJOZM2mkEQ==
+
 react-router-dom@^7.5.3:
   version "7.5.3"
   resolved "https://registry.npmjs.org/react-router-dom/-/react-router-dom-7.5.3.tgz"

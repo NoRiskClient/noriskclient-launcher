@@ -12,6 +12,15 @@ members = ["crates/norisk-ipc", "crates/norisk-logging", "crates/norisk-capture"
 [profile.release.package.norisk-capture]
 opt-level = 3
 
+[profile.dev.package.norisk-capture]
+opt-level = 3
+
+[profile.dev.package.ab_glyph]
+opt-level = 3
+
+[profile.dev.package.ab_glyph_rasterizer]
+opt-level = 3
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
