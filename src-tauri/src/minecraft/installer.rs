@@ -97,6 +97,7 @@ pub async fn install_minecraft_version(
     quick_play_multiplayer: Option<String>,
     migration_info: Option<crate::utils::profile_utils::MigrationInfo>,
     extra_local_mods: Vec<std::path::PathBuf>,
+    extra_jvm_args: Vec<String>,
     // Use the passed-in profile as-is instead of reloading by id (override launches).
     skip_profile_reload: bool,
 ) -> Result<()> {
@@ -589,6 +590,13 @@ pub async fn install_minecraft_version(
             current_jvm_args.extend(custom_args);
             launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
         }
+    }
+
+    if !extra_jvm_args.is_empty() {
+        info!("Adding runtime JVM arguments for this launch: {:?}", extra_jvm_args);
+        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
+        current_jvm_args.extend(extra_jvm_args);
+        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
     }
 
     // Combine Game arguments from modloader (if any) and profile settings (extra_game_args)

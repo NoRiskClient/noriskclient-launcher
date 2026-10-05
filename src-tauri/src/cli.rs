@@ -46,6 +46,7 @@ struct LaunchArgs {
     quick_play: QuickPlay,
     local_mods: Vec<String>,
     account: Option<String>,
+    jvm_args: Vec<String>,
 }
 
 impl LaunchArgs {
@@ -63,6 +64,7 @@ impl LaunchArgs {
             quick_play: QuickPlay::from_matches(sub)?,
             local_mods: arg_list(sub, "mods"),
             account: arg_str(sub, "account"),
+            jvm_args: arg_words(sub, "jvm-args"),
         })
     }
 }
@@ -100,6 +102,7 @@ impl TempLaunchArgs {
             quick_play_multiplayer: qp.server,
             local_mods: arg_list(sub, "mods"),
             account: arg_str(sub, "account"),
+            jvm_args: arg_words(sub, "jvm-args"),
         })
     }
 }
@@ -118,6 +121,12 @@ fn arg_flag(sub: &SubcommandMatches, name: &str) -> bool {
         Some(a) => a.value.as_bool().unwrap_or(true),
         None => false,
     }
+}
+
+fn arg_words(sub: &SubcommandMatches, name: &str) -> Vec<String> {
+    arg_str(sub, name)
+        .map(|s| s.split_whitespace().map(String::from).collect())
+        .unwrap_or_default()
 }
 
 /// Comma-separated multi-value arg → trimmed, non-empty parts.
@@ -262,6 +271,7 @@ async fn run_action(action: DispatchAction, tag: &'static str) {
                 a.quick_play.server,
                 a.local_mods,
                 a.account,
+                Some(a.jvm_args),
             )
             .await
             {

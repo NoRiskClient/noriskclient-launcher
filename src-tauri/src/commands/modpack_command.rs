@@ -78,6 +78,7 @@ async fn install_and_launch(args: &ModpackArgs) -> Result<Uuid, String> {
         None,
         Vec::new(),
         None,
+        None,
     )
     .await
     .map_err(|e| format!("launch failed: {:?}", e))?;

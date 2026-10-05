@@ -78,6 +78,12 @@
               "description": "Local mod jar(s) to load in-place (runtime-only): comma-separated paths, each a .jar file or a directory of jars"
             },
             {
+              "name": "jvm-args",
+              "takesValue": true,
+              "requireEquals": true,
+              "description": "Extra JVM arguments for this launch only, space separated. Use the = form so values starting with a dash work, e.g. --jvm-args=\"-XX:+CreateCoredumpOnCrash\""
+            },
+            {
               "name": "account",
               "short": "a",
               "takesValue": true,
@@ -175,6 +181,12 @@
               "name": "mods",
               "takesValue": true,
               "description": "Local mod jar(s) to load in-place: comma-separated paths, each a .jar file or a directory of jars"
+            },
+            {
+              "name": "jvm-args",
+              "takesValue": true,
+              "requireEquals": true,
+              "description": "Extra JVM arguments for this launch only, space separated. Use the = form so values starting with a dash work, e.g. --jvm-args=\"-XX:+CreateCoredumpOnCrash\""
             },
             {
               "name": "account",
