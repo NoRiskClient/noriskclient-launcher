@@ -1,11 +1,12 @@
 "use client";
 
 import type React from "react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 
 interface LoadingOverlayProps extends React.HTMLAttributes<HTMLDivElement> {
   isLoading: boolean;
@@ -41,9 +42,10 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
     const overlayRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
-    const isFirstRender = useRef(true);
     const [isVisible, setIsVisible] = useState(isLoading);
     const accentColor = useThemeStore((state) => state.accentColor);
+    const animationsEnabled = useAnimationsEnabled();
+    const safeProgress = Number.isFinite(progress) && progress >= 0 ? Math.min(100, progress) : undefined;
 
     const mergedRef = (node: HTMLDivElement) => {
       if (ref) {
@@ -56,27 +58,24 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
       overlayRef.current = node;
     };
 
-    useEffect(() => {
-      if (isFirstRender.current) {
-        isFirstRender.current = false;
-        return;
-      }
-
+    useLayoutEffect(() => {
       const overlay = overlayRef.current;
       const content = contentRef.current;
 
       if (!overlay || !content) return;
 
-      const tl = gsap.timeline();
-
       if (isLoading) {
         setIsVisible(true);
-        tl.set(overlay, { display: "flex", opacity: 1 }).set(content, {
+        gsap.set(overlay, { opacity: 1 });
+        gsap.set(content, {
           scale: 1,
           y: 0,
           opacity: 1,
         });
+      } else if (!animationsEnabled) {
+        setIsVisible(false);
       } else {
+        const tl = gsap.timeline();
         tl.to(content, {
           scale: 0.95,
           y: -20,
@@ -89,24 +88,21 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
             { opacity: 0, duration: 0.3, ease: "power2.in" },
             "-=0.1",
           )
-          .set(overlay, { display: "none" })
           .call(() => setIsVisible(false));
+        return () => { tl.kill(); };
       }
+    }, [isLoading, animationsEnabled]);
 
-      return () => {
-        tl.kill();
-      };
-    }, [isLoading]);
-
-    useEffect(() => {
-      if (progressRef.current && progress >= 0 && showProgressBar) {
-        gsap.to(progressRef.current, {
-          width: `${Math.min(100, progress)}%`,
-          duration: 0.4,
+    useLayoutEffect(() => {
+      if (progressRef.current && safeProgress !== undefined && showProgressBar) {
+        const tween = gsap.to(progressRef.current, {
+          width: `${safeProgress}%`,
+          duration: animationsEnabled ? 0.4 : 0,
           ease: "power1.out",
         });
+        return () => { tween.kill(); };
       }
-    }, [progress, showProgressBar]);
+    }, [safeProgress, showProgressBar, animationsEnabled, isLoading]);
 
     const getVariantColors = () => {
       switch (variant) {
@@ -200,13 +196,16 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
       return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
     };
 
-    if (!isVisible) return null;
+    if (!isLoading && !isVisible) return null;
 
     return (
       <div
         ref={mergedRef}
+        role="status"
+        aria-live="polite"
+        aria-busy={isLoading}
         className={cn(
-          "absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm transition-opacity",
+          "absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm",
           className,
         )}
         style={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
@@ -247,6 +246,11 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
 
             {showProgressBar && (
               <div
+                role="progressbar"
+                aria-label={message}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={safeProgress}
                 className={cn(
                   "w-full overflow-hidden rounded-full bg-black/20",
                   sizeStyles.progressHeight,
@@ -255,13 +259,13 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
               >
                 <div
                   ref={progressRef}
-                  className="h-full rounded-full transition-all"
+                  className={cn("h-full rounded-full", animationsEnabled && "transition-all")}
                   style={{
                     backgroundColor: colors.text,
                     width:
-                      progress >= 0 ? `${Math.min(100, progress)}%` : "30%",
+                      safeProgress !== undefined ? `${safeProgress}%` : "30%",
                     animation:
-                      progress < 0
+                      safeProgress === undefined && animationsEnabled
                         ? "loading-bar 2s ease-in-out infinite"
                         : "none",
                   }}

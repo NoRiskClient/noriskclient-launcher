@@ -1,10 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { cn } from "../../lib/utils";
-import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { 
   getVariantColors,
   getAccessibilityProps
@@ -33,26 +33,19 @@ export function TabContent({
     label: ariaLabel
   });
 
-  useEffect(() => {
-    if (contentRef.current && active) {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
+  useEntranceAnimation(contentRef, { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, [active]);
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.inert = !active;
   }, [active]);
 
   return (
     <div
       ref={contentRef}
       role={role}
-      aria-hidden={!active}      className={cn(
+      hidden={!active}
+      aria-hidden={!active}
+      className={cn(
         "relative flex-1 min-h-0 p-4 overflow-auto custom-scrollbar rounded-none",
         className,
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/i18n';
 import { Modal } from '../ui/Modal';
@@ -10,12 +10,13 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { getProfile } from '../../services/profile-service';
 import { uploadLogToMclogs } from '../../services/log-service';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { shareCrashLogLink, crashLogShareMessageKey } from '../../services/crash-log-share';
 import { checkCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
 import type { CrashlogDto, ProcessMetadata } from '../../types/processState';
 import type { CrashCheckResult } from '../../types/crash-analysis';
 import { openExternalUrl } from '../../services/tauri-service';
 import { useGlobalModal } from '../../hooks/useGlobalModal';
+import { useAnimationsEnabled } from '../../hooks/useEntranceAnimation';
 import { CrashAnalysisModal } from './CrashAnalysisModal';
 import { logError, logWarn } from '../../utils/logging-utils';
 import { Window } from '@tauri-apps/api/window';
@@ -23,9 +24,11 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { EventPayload, CrashReportContentAvailablePayload } from '../../types/events';
 import { EventType } from '../../types/events';
+import { parseErrorMessage } from '../../utils/error-utils';
 
 export function GlobalCrashReportModal() {
   const { t } = useTranslation();
+  const animationsEnabled = useAnimationsEnabled();
   const { isCrashModalOpen, crashData, closeCrashModal } = useCrashModalStore();
   const { showModal, hideModal } = useGlobalModal();
   const [profileName, setProfileName] = useState<string>('');
@@ -35,7 +38,23 @@ export function GlobalCrashReportModal() {
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
   const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
+  const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
+  const processingRef = useRef<symbol | null>(null);
+  const normalBodyRef = useRef<HTMLDivElement>(null);
+  const normalBodyHidden = isProcessing || shareFallbackUrl !== null;
   const hasFetchedCrashReportRef = React.useRef(false);
+
+  useLayoutEffect(() => {
+    if (normalBodyRef.current) normalBodyRef.current.inert = normalBodyHidden;
+  }, [normalBodyHidden, isCrashModalOpen]);
+
+  useLayoutEffect(() => {
+    // A replacement crash must not inherit an earlier upload's busy guard or late UI updates.
+    processingRef.current = null;
+    setIsProcessing(false);
+    setStatusText(null);
+    return () => { processingRef.current = null; };
+  }, [crashData, isCrashModalOpen]);
 
   useEffect(() => {
     if (crashData?.profile_id) {
@@ -54,6 +73,7 @@ export function GlobalCrashReportModal() {
           });
       }
       setMclogsUrl(null);
+      setShareFallbackUrl(null);
       setIsProcessing(false);
       setAnalyzeWithNoRisk(true);
       setDisplayedCrashReportContent(crashData.crash_report_content);
@@ -62,6 +82,7 @@ export function GlobalCrashReportModal() {
     } else {
       setProfileName('');
       setMclogsUrl(null);
+      setShareFallbackUrl(null);
       setIsProcessing(false);
       setDisplayedCrashReportContent(undefined);
       setIsListeningForCrashContent(false);
@@ -197,19 +218,32 @@ export function GlobalCrashReportModal() {
     return null;
   }
 
-  const shareLogLink = async (url: string) => {
-    try { await writeText(url); } catch {}
-    try { await openExternalUrl(url); } catch {}
+  const assertActiveOperation = (operation: symbol) => {
+    if (processingRef.current !== operation) throw new Error('Crash report processing was superseded');
   };
 
-  const buildLogContent = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
+  const shareLogLink = async (url: string, analysisFailed: boolean, operation: symbol) => {
+    assertActiveOperation(operation);
+    const result = await shareCrashLogLink(url, () => processingRef.current === operation);
+    assertActiveOperation(operation);
+    const message = t(crashLogShareMessageKey(result, analysisFailed));
+    if (analysisFailed || !result.copied || !result.opened) toast.error(message);
+    else toast.success(message);
+    if (!result.copied && !result.opened) setShareFallbackUrl(url);
+    return result;
+  };
+
+  const buildLogContent = async (profileId: string, metadata: ProcessMetadata, operation: symbol): Promise<string> => {
+    assertActiveOperation(operation);
     let crashReport = displayedCrashReportContent;
     if (crashData?.process_id && !crashReport) {
       setStatusText(t('crash_modal.toast.fetching_before_upload'));
       try {
         crashReport = (await fetchCrashReport(profileId, crashData.process_id, metadata.start_time)) ?? undefined;
+        assertActiveOperation(operation);
         if (crashReport) setDisplayedCrashReportContent(crashReport);
       } catch (e) {
+        assertActiveOperation(operation);
         logWarn(`Failed to fetch crash report before upload, continuing with existing data: ${e}`);
       }
     }
@@ -218,6 +252,7 @@ export function GlobalCrashReportModal() {
     const gameLog = metadata.log_session_id
       ? (await getProcessLogCursor(metadata.log_session_id, 0)).output
       : "";
+    assertActiveOperation(operation);
 
     const content = crashReport?.trim()
       ? `--- CRASH REPORT ---
@@ -233,27 +268,32 @@ ${gameLog}`
     return content;
   };
 
-  const ensureUploaded = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
+  const ensureUploaded = async (profileId: string, metadata: ProcessMetadata, operation: symbol): Promise<string> => {
+    assertActiveOperation(operation);
     if (mclogsUrl) return mclogsUrl;
-    const content = await buildLogContent(profileId, metadata);
+    const content = await buildLogContent(profileId, metadata, operation);
+    assertActiveOperation(operation);
     setStatusText(t('crash_modal.toast.uploading_mclogs'));
     const url = await uploadLogToMclogs(content);
+    assertActiveOperation(operation);
     setMclogsUrl(url);
     return url;
   };
 
-  const analyze = async (url: string, profileId: string, metadata: ProcessMetadata) => {
+  const analyze = async (url: string, profileId: string, metadata: ProcessMetadata, operation: symbol) => {
+    assertActiveOperation(operation);
     setStatusText(t('crash_modal.toast.analyzing'));
     const payload: CrashlogDto = { mcLogsUrl: url, metadata, locale: i18n.language };
     let result: CrashCheckResult;
     try {
       result = await checkCrashLog(payload);
     } catch (e) {
+      assertActiveOperation(operation);
       logError(`Crash analysis failed, falling back to log link: ${e}`);
-      toast.error(t('crash_modal.toast.analyze_failed'));
-      await shareLogLink(url);
+      await shareLogLink(url, true, operation);
       return;
     }
+    assertActiveOperation(operation);
     closeCrashModal();
     showModal(
       'crash-analysis',
@@ -266,6 +306,7 @@ ${gameLog}`
   };
 
   const handlePrimaryAction = async () => {
+    if (processingRef.current) return;
     const profileId = crashData?.profile_id;
     const metadata = crashData?.process_metadata;
     if (!profileId || !metadata) {
@@ -274,23 +315,30 @@ ${gameLog}`
       return;
     }
 
+    const operation = Symbol('crash-report-processing');
+    processingRef.current = operation;
+    setShareFallbackUrl(null);
     setIsProcessing(true);
     setStatusText(t('crash_modal.toast.processing'));
     try {
-      const url = await ensureUploaded(profileId, metadata);
+      const url = await ensureUploaded(profileId, metadata, operation);
+      assertActiveOperation(operation);
       if (analyzeWithNoRisk) {
-        await analyze(url, profileId, metadata);
+        await analyze(url, profileId, metadata, operation);
       } else {
-        toast.success(t('crash_modal.toast.url_copied'));
-        await shareLogLink(url);
-        closeCrashModal();
+        const shared = await shareLogLink(url, false, operation);
+        if (shared.copied || shared.opened) closeCrashModal();
       }
-    } catch (error: any) {
-      toast.error(error.message || t('crash_modal.toast.unexpected_error'));
+    } catch (error) {
+      if (processingRef.current !== operation) return;
+      toast.error(parseErrorMessage(error) || t('crash_modal.toast.unexpected_error'));
       logError(`Crash report processing error: ${error}`);
     } finally {
-      setIsProcessing(false);
-      setStatusText(null);
+      if (processingRef.current === operation) {
+        processingRef.current = null;
+        setIsProcessing(false);
+        setStatusText(null);
+      }
     }
   };
 
@@ -352,42 +400,73 @@ ${gameLog}`
       title={t('crash_modal.title')}
       titleIcon={<Icon icon="solar:danger-bold" className="w-7 h-7 text-red-400" />}
       titleSubtitle={titleSubtitleNode}
-      onClose={() => !isProcessing && closeCrashModal()}
+      onClose={() => { if (!processingRef.current) closeCrashModal(); }}
+      canClose={() => !processingRef.current}
+      closeOnClickOutside={!isProcessing}
+      closeOnEscape={!isProcessing}
+      hideCloseButton={isProcessing}
+      reserveCloseButtonSpace
       width="lg"
       footer={modalFooter}
     >
-      <div className="p-6 space-y-4 text-white text-base text-center">
-        {isProcessing ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-10">
-            <Icon icon="solar:shield-check-bold" className="w-12 h-12 text-amber-300 animate-pulse" />
+      <div className="relative p-6 text-white text-base text-center" aria-busy={isProcessing}>
+        {/* Keep the actual normal content in flow so asynchronous completion cannot re-center the panel. */}
+        <div
+          ref={normalBodyRef}
+          aria-hidden={normalBodyHidden}
+          className={`space-y-4 ${normalBodyHidden ? 'invisible opacity-0 pointer-events-none' : ''}`}
+        >
+          <p className="pt-3 text-gray-300 text-lg font-minecraft">
+            {t('crash_modal.description')}
+          </p>
+
+          <p className="pt-4 text-base font-smallcaps text-red-400">
+            {t('crash_modal.exit_code')}: {crashData.exit_code ?? 'N/A'}
+          </p>
+
+          <div className="pt-4 space-y-3 text-left">
+            <p className="text-sm font-minecraft text-gray-400">
+              {t('crash_modal.upload_notice')}
+            </p>
+            <Checkbox
+              checked={analyzeWithNoRisk}
+              onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
+              disabled={normalBodyHidden}
+              label={t('crash_modal.report_checkbox')}
+              size="sm"
+            />
+          </div>
+        </div>
+        {isProcessing && (
+          <div className="absolute inset-6 flex flex-col items-center justify-center gap-4 overflow-y-auto" role="status" aria-live="polite">
+            <Icon icon="solar:shield-check-bold" className={`w-12 h-12 text-amber-300 ${animationsEnabled ? 'animate-pulse' : ''}`} />
             <p className="text-lg font-minecraft text-gray-200">
               {statusText ?? t('common.loading')}
             </p>
           </div>
-        ) : (
-          <>
-            <p className="pt-3 text-gray-300 text-lg font-minecraft">
-              {t('crash_modal.description')}
+        )}
+        {!isProcessing && shareFallbackUrl && (
+          <div className="absolute inset-6 space-y-3 overflow-y-auto text-left">
+            <p className="text-sm text-red-200 font-minecraft" role="alert">
+              {t('crash_modal.toast.link_share_failed')}
             </p>
-
-            <p className="pt-4 text-base font-smallcaps text-red-400">
-              {t('crash_modal.exit_code')}: {crashData.exit_code ?? 'N/A'}
-            </p>
-
-            <div className="pt-4 space-y-3 text-left">
-              <p className="text-sm font-minecraft text-gray-400">
-                {t('crash_modal.upload_notice')}
-              </p>
-              <Checkbox
-                checked={analyzeWithNoRisk}
-                onChange={(e) => setAnalyzeWithNoRisk(e.target.checked)}
-                label={t('crash_modal.report_checkbox')}
-                size="sm"
+            <label className="block text-sm font-minecraft text-gray-300">
+              {t('crash_modal.log_link')}
+              <input
+                readOnly
+                autoFocus
+                value={shareFallbackUrl}
+                aria-label={t('crash_modal.log_link')}
+                onFocus={event => event.currentTarget.select()}
+                className="mt-1 block w-full min-w-0 rounded-md border border-white/20 bg-black/30 px-3 py-2 text-sm text-white font-sans select-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               />
-            </div>
-          </>
+            </label>
+            <Button variant="secondary" size="sm" onClick={() => setShareFallbackUrl(null)}>
+              {t('common.back')}
+            </Button>
+          </div>
         )}
       </div>
     </Modal>
   );
-} 
+}

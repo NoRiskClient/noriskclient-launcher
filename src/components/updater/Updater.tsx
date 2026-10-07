@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Icon } from "@iconify/react";
@@ -22,7 +22,7 @@ import { NebulaLightning } from "../effects/NebulaLightning";
 import { NebulaLiquidChrome } from "../effects/NebulaLiquidChrome";
 import { MatrixRainEffect } from "../effects/MatrixRainEffect";
 import { EnchantmentParticlesEffect } from "../effects/EnchantmentParticlesEffect";
-import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
+import { useAnimationsEnabled, useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface UpdaterStatusPayload {
   message: string;
@@ -42,6 +42,7 @@ interface UpdaterStatusPayload {
 
 export default function Updater() {
   const { t } = useTranslation();
+  const animationsEnabled = useAnimationsEnabled();
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [progress, setProgress] = useState<number | null>(null);
   const [status, setStatus] =
@@ -50,7 +51,7 @@ export default function Updater() {
   const logoRef = useRef<HTMLImageElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const appWindow = getCurrentWindow();
+  const appWindow = useMemo(() => getCurrentWindow(), []);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -111,13 +112,6 @@ export default function Updater() {
           setProgress(eventProgress);
           setStatusMessage(t('updater.downloading', { progress: eventProgress }));
 
-          if (progressRef.current) {
-            gsap.to(progressRef.current, {
-              width: `${eventProgress}%`,
-              duration: 0.3,
-              ease: "power1.out",
-            });
-          }
         } else {
           setProgress(null);
         }
@@ -160,25 +154,36 @@ export default function Updater() {
         clearTimeout(closeTimerRef.current);
       }
     };
-  }, [appWindow]);
+  }, [appWindow, t]);
+
+  useEffect(() => {
+    const bar = progressRef.current;
+    if (!bar) return;
+    gsap.to(bar, {
+      width: `${progress ?? 0}%`,
+      duration: animationsEnabled ? 0.3 : 0,
+      ease: "power1.out",
+    });
+    return () => { gsap.killTweensOf(bar, "width"); };
+  }, [progress, animationsEnabled, isThemeLoaded]);
 
   const getStatusIcon = () => {
     switch (status) {
       case "checking":
         return (
-          <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+          <Icon icon="solar:refresh-bold" aria-hidden="true" className={`w-4 h-4 shrink-0 ${animationsEnabled ? "animate-spin" : ""}`} />
         );
       case "downloading":
-        return <Icon icon="solar:download-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:download-bold" aria-hidden="true" className="w-4 h-4 shrink-0" />;
       case "installing":
-        return <Icon icon="solar:box-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:box-bold" aria-hidden="true" className="w-4 h-4 shrink-0" />;
       case "uptodate":
       case "finished":
-        return <Icon icon="solar:check-circle-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:check-circle-bold" aria-hidden="true" className="w-4 h-4 shrink-0" />;
       case "error":
-        return <Icon icon="solar:danger-triangle-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:danger-triangle-bold" aria-hidden="true" className="w-4 h-4 shrink-0" />;
       default:
-        return <Icon icon="solar:info-circle-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:info-circle-bold" aria-hidden="true" className="w-4 h-4 shrink-0" />;
     }
   };
 
@@ -216,7 +221,7 @@ export default function Updater() {
   if (!isThemeLoaded || !accentColor || !accentColor.value) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-black">
-        <div className="animate-pulse text-white text-xs font-smallcaps">
+        <div className={cn("text-white text-xs font-smallcaps", animationsEnabled && "animate-pulse")}>
           {t('updater.loading_theme')}
         </div>
       </div>
@@ -241,10 +246,11 @@ export default function Updater() {
           borderColor: `${safeAccentColor}70`,
         }}
       >
-        <div className="w-full pt-6" />
+        <div className="w-full h-6 shrink-0" />
 
-        <div className="flex-1 w-full flex flex-col items-center justify-center px-6 gap-8">
-          <div className="flex flex-col items-center">
+        <div className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden custom-scrollbar px-6">
+        <div className="min-h-full w-full flex flex-col items-center justify-center gap-8">
+          <div className="shrink-0 flex flex-col items-center">
             <img
               ref={logoRef}
               src="/logo.png"
@@ -256,11 +262,11 @@ export default function Updater() {
             </p>
           </div>
 
-          <div className="flex items-center justify-center mb-4">
+          <div role={status === "error" ? "alert" : "status"} className="shrink-0 min-w-0 w-full flex items-center justify-center mb-4">
             {status === "uptodate" || status === "finished" ? (
               <div
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "min-w-0 max-w-full flex items-center justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -270,16 +276,17 @@ export default function Updater() {
               >
                 <Icon
                   icon="solar:check-circle-bold"
-                  className="w-5 h-5 text-green-400"
+                  aria-hidden="true"
+                  className="w-5 h-5 shrink-0 text-green-400"
                 />
-                <span className="font-smallcaps text-xs text-white">
+                <span className="min-w-0 font-smallcaps text-xs text-white [overflow-wrap:anywhere]">
                   {t('updater.complete')}
                 </span>
               </div>
             ) : status === "error" ? (
               <div
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "min-w-0 max-w-full flex items-start justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -289,16 +296,17 @@ export default function Updater() {
               >
                 <Icon
                   icon="solar:danger-triangle-bold"
-                  className="w-5 h-5 text-red-400"
+                  aria-hidden="true"
+                  className="w-5 h-5 shrink-0 text-red-400"
                 />
-                <span className="font-smallcaps text-xs text-white">
+                <span className="min-w-0 font-smallcaps text-xs text-white [overflow-wrap:anywhere]">
                   {statusMessage}
                 </span>
               </div>
             ) : (
               <div
                 className={cn(
-                  "flex items-center justify-center gap-2 py-2 px-4",
+                  "min-w-0 max-w-full flex items-center justify-center gap-2 py-2 px-4",
                   "border rounded-md",
                 )}
                 style={{
@@ -307,34 +315,40 @@ export default function Updater() {
                 }}
               >
                 {getStatusIcon()}
-                <span className="font-smallcaps text-xs text-white">
+                <span className="min-w-0 font-smallcaps text-xs text-white [overflow-wrap:anywhere]">
                   {statusMessage || t('updater.initializing')}
                 </span>
               </div>
             )}
           </div>
 
-          {progress !== null && (
             <div
-              className="w-3/4 h-2.5 rounded-md overflow-hidden border"
+              role={progress !== null ? "progressbar" : undefined}
+              aria-label={t("updater.title")}
+              aria-valuemin={progress !== null ? 0 : undefined}
+              aria-valuemax={progress !== null ? 100 : undefined}
+              aria-valuenow={progress ?? undefined}
+              aria-hidden={progress === null}
+              className="shrink-0 w-3/4 h-2.5 rounded-md overflow-hidden border"
               style={{
                 backgroundColor: `${safeAccentColor}15`,
                 borderColor: `${safeAccentColor}50`,
+                visibility: progress === null ? "hidden" : "visible",
               }}
             >
               <div
                 ref={progressRef}
                 className="h-full rounded-sm"
                 style={{
-                  width: `${progress}%`,
+                  width: "0%",
                   backgroundColor: safeAccentColor,
                 }}
               />
             </div>
-          )}
+        </div>
         </div>
 
-        <div className="w-full p-6 flex justify-center">
+        <div className="w-full h-[5.625rem] shrink-0 p-6 flex items-center justify-center">
           {status === "error" && (
             <Button
               variant="destructive"

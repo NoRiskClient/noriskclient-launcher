@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
@@ -33,32 +33,58 @@ export function GamePicker({
   onScreen,
 }: Props) {
   const [apps, setApps] = useState<OpenApp[] | null>(null);
-  const [screens, setScreens] = useState<ScreenInfo[]>([]);
+  const [screens, setScreens] = useState<ScreenInfo[] | null>(null);
+  const [appsError, setAppsError] = useState(false);
+  const [screensError, setScreensError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  const requestRef = useRef(0);
   const accentColor = useThemeStore((state) => state.accentColor);
   const offerScreens = Boolean(onScreen) && !isMacOS();
   const [view, setView] = useState<"apps" | "screens">(screen ? "screens" : "apps");
   const showing = offerScreens ? view : "apps";
 
   const refresh = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    const request = ++requestRef.current;
+    const isCurrent = () => requestRef.current === request;
     setLoading(true);
+    setAppsError(false);
+    setScreensError(false);
     try {
-      const [open, shown] = await Promise.all([
-        listOpenApps(),
-        offerScreens ? listScreens() : Promise.resolve([]),
+      await Promise.all([
+        listOpenApps()
+          .then((open) => { if (isCurrent()) setApps(open); })
+          .catch((error) => {
+            if (!isCurrent()) return;
+            console.error("Could not list the open programs", error);
+            setAppsError(true);
+          }),
+        offerScreens
+          ? listScreens()
+              .then((shown) => { if (isCurrent()) setScreens(shown); })
+              .catch((error) => {
+                if (!isCurrent()) return;
+                console.error("Could not list the screens", error);
+                setScreensError(true);
+              })
+          : Promise.resolve(),
       ]);
-      setApps(open);
-      setScreens(shown);
-    } catch (e) {
-      console.error("Could not list the open programs", e);
-      setApps([]);
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [offerScreens]);
 
   useEffect(() => {
     void refresh();
+    return () => {
+      requestRef.current += 1;
+      loadingRef.current = false;
+    };
   }, [refresh]);
 
   const rows: OpenApp[] = apps ? [...apps] : [];
@@ -69,7 +95,7 @@ export function GamePicker({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")}>
+    <div className={cn("flex flex-col gap-2 rounded-lg bg-black/20 border border-white/10 p-3", disabled && "opacity-50")} aria-busy={loading}>
       <div className="flex items-center gap-2">
         {offerScreens ? (
           <GroupTabs
@@ -77,14 +103,14 @@ export function GamePicker({
               {
                 id: "apps",
                 icon: "solar:widget-bold",
-                name: `${t("settings.clips.games.apps")} (${apps?.length ?? 0})`,
+                name: `${t("settings.clips.games.apps")}${apps !== null && !appsError ? ` (${apps.length})` : ""}`,
                 count: apps?.length ?? 0,
               },
               {
                 id: "screens",
                 icon: "solar:monitor-bold",
-                name: `${t("settings.clips.games.screens")} (${screens.length})`,
-                count: screens.length,
+                name: `${t("settings.clips.games.screens")}${screens !== null && !screensError ? ` (${screens.length})` : ""}`,
+                count: screens?.length ?? 0,
               },
             ]}
             activeGroup={showing}
@@ -107,9 +133,21 @@ export function GamePicker({
             />
           }
         >
-          {t("settings.clips.games.refresh")}
+          {t(appsError || screensError ? "common.retry" : "settings.clips.games.refresh")}
         </Button>
       </div>
+
+      {loading && <p className="px-2 font-minecraft text-xs text-white/60" role="status">{t("common.loading")}</p>}
+      {appsError && (
+        <p className="rounded-md border border-red-400/30 bg-red-400/10 px-3 py-2 font-minecraft text-xs text-red-200 break-words" role="alert">
+          {t("settings.clips.games.apps_error")}
+        </p>
+      )}
+      {offerScreens && screensError && (
+        <p className="rounded-md border border-red-400/30 bg-red-400/10 px-3 py-2 font-minecraft text-xs text-red-200 break-words" role="alert">
+          {t("settings.clips.games.screens_error")}
+        </p>
+      )}
 
       <div className="flex max-h-64 flex-col gap-1 overflow-y-auto custom-scrollbar pr-1">
         <Row
@@ -128,7 +166,7 @@ export function GamePicker({
             name={app.name}
             detail={
               app.pid === 0
-                ? t("settings.clips.games.closed", { executable: app.executable })
+                ? t(apps !== null && !appsError && !loading ? "settings.clips.games.closed" : "settings.clips.games.saved_selection", { executable: app.executable })
                 : app.executable
             }
             selected={value?.executable === app.executable}
@@ -139,7 +177,7 @@ export function GamePicker({
           />
         ))}
 
-        {showing === "apps" && apps !== null && apps.length === 0 && (
+        {showing === "apps" && !loading && !appsError && apps !== null && apps.length === 0 && (
           <p className="px-2 py-3 text-center font-minecraft text-xs text-white/40">
             {t("settings.clips.games.empty")}
           </p>
@@ -147,7 +185,7 @@ export function GamePicker({
 
         {showing === "screens" && (
           <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-3">
-            {screens.map((shown, index) => {
+            {(screens ?? []).map((shown, index) => {
               const name = t("settings.clips.games.screen", { number: index + 1 });
               const selected = screen?.device === shown.device;
               return (
@@ -195,6 +233,11 @@ export function GamePicker({
               );
             })}
           </div>
+        )}
+        {showing === "screens" && !loading && !screensError && screens !== null && screens.length === 0 && (
+          <p className="px-2 py-3 text-center font-minecraft text-xs text-white/40">
+            {t("settings.clips.games.screens_empty")}
+          </p>
         )}
       </div>
 

@@ -16,6 +16,8 @@ import { DropdownHeader } from "../ui/./dropdown/DropdownHeader";
 import { DropdownFooter } from "../ui/./dropdown/DropdownFooter";
 import { useThemeStore } from "../../store/useThemeStore";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface RunningInstancesIndicatorProps {
   className?: string;
@@ -35,21 +37,27 @@ export function RunningInstancesIndicator({
     new Set(),
   );
   const buttonRef = useRef<HTMLDivElement>(null);
+  const fetchingRef = useRef(false);
+  const openingLogRef = useRef(false);
+  const [openingLog, setOpeningLog] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const fetchProcesses = useCallback(async () => {
-    setError(null);
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    setIsLoading(true);
     try {
       const fetchedProcesses = await ProcessService.getRunningProcesses();
       setProcesses(fetchedProcesses);
+      setError(null);
     } catch (err) {
       setError(t('instances.fetch_failed'));
       console.error(err);
-      setProcesses([]);
     } finally {
-      if (isLoading) setIsLoading(false);
+      fetchingRef.current = false;
+      setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [t]);
 
   useEffect(() => {
     fetchProcesses();
@@ -128,10 +136,20 @@ export function RunningInstancesIndicator({
   };
 
   const handleOpenLogWindow = async () => {
+    if (openingLogRef.current) return;
+    openingLogRef.current = true;
+    setOpeningLog(true);
     try {
       await invoke("open_minecraft_log_window", { crashedProcess: null });
     } catch (err) {
       console.error("Failed to open log window:", err);
+      toast.error(t('instances.logs_failed', {
+        defaultValue: 'Could not open logs: {{error}}',
+        error: parseErrorMessage(err),
+      }));
+    } finally {
+      openingLogRef.current = false;
+      setOpeningLog(false);
     }
   };
 
@@ -142,17 +160,40 @@ export function RunningInstancesIndicator({
     <div className={cn("relative", className)}>
       <div ref={buttonRef} className="relative">
         <Button
-          variant={hasInstances ? "success" : "flat"}
+          variant={error ? "destructive" : hasInstances ? "success" : "flat"}
           size="sm"
-          onClick={handleOpenLogWindow}
-          icon={<Icon icon="solar:monitor-bold" className="w-4 h-4" />}
-          className="h-10"
+          onClick={error ? () => void fetchProcesses() : handleOpenLogWindow}
+          disabled={openingLog || (!!error && isLoading)}
+          aria-busy={openingLog || isLoading}
+          title={error ? `${error} ${t('common.retry', { defaultValue: 'Retry' })}` : t('instances.logs')}
+          icon={<Icon icon={openingLog ? "svg-spinners:ring-resize" : "solar:monitor-bold"} className="w-4 h-4" />}
+          className="h-10 [&>span]:min-w-0 [&>span:first-child]:shrink-0"
         >
-          {isLoading && instanceCount === 0
+          <span className="inline-grid min-w-0">
+            <span aria-hidden="true" className="invisible pointer-events-none col-start-1 row-start-1">
+              {t('instances.loading')}
+            </span>
+            <span aria-hidden="true" className="invisible pointer-events-none col-start-1 row-start-1">
+              {t('instances.no_instances')}
+            </span>
+            <span aria-hidden="true" className="invisible pointer-events-none col-start-1 row-start-1">
+              {t('instances.unavailable', { defaultValue: 'Status unavailable' })}
+            </span>
+            <span aria-hidden="true" className="invisible pointer-events-none col-start-1 row-start-1">
+              {hasInstances
+                ? `${instanceCount} ${t('common.instance', { count: instanceCount })}`
+                : t('common.instance', { count: instanceCount })}
+            </span>
+            <span className="col-start-1 row-start-1 truncate">
+          {error
+            ? t('instances.unavailable', { defaultValue: 'Status unavailable' })
+            : isLoading && instanceCount === 0
             ? t('instances.loading')
             : instanceCount === 0
               ? t('instances.no_instances')
               : `${instanceCount} ${t('common.instance', { count: instanceCount })}`}
+            </span>
+          </span>
         </Button>
       </div>
 

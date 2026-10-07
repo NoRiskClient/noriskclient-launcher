@@ -94,6 +94,8 @@ interface Props {
   busy: boolean;
   paused?: boolean;
   details: ClipDetails | null;
+  detailsStatus?: "loading" | "ready" | "error";
+  onRetryDetails?: () => void;
   onCancel: () => void;
   onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
   onSave: (
@@ -118,6 +120,8 @@ export function ClipTrimmer({
   busy: saving,
   paused = false,
   details,
+  detailsStatus = details ? "ready" : "loading",
+  onRetryDetails,
   onCancel,
   onStateChange,
   onSave,
@@ -131,7 +135,7 @@ export function ClipTrimmer({
   const { playhead, live, moveTo, follow } = usePlayhead(videoRef);
 
   const [start, setStart] = useState(0);
-  const [end, setEnd] = useState(0);
+  const [end, setEnd] = useState(() => (Number.isFinite(duration) && duration > 0 ? duration : 0));
   const [dragging, setDragging] = useState<"start" | "end" | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
 
@@ -514,28 +518,57 @@ export function ClipTrimmer({
   });
 
   const timelineCard = useRef<HTMLElement>(null);
+  const timelineHeader = useRef<HTMLDivElement>(null);
   const timelineBody = useRef<HTMLDivElement>(null);
   const timelineContent = useRef<HTMLDivElement>(null);
   const timelineSized = useRef(rowsLayout.defaultLayout !== undefined);
   const gripping = useRef(false);
+  const timelineFitting = useRef(false);
 
   const fitTimeline = useCallback(() => {
+    if (timelineFitting.current) return;
     const handle = timelinePanel.current;
     const card = timelineCard.current;
     const body = timelineBody.current;
     const content = timelineContent.current;
-    if (!handle || !card || !body || !content || handle.isCollapsed()) return;
-    handle.resize(Math.max(TIMELINE.min, card.offsetHeight - body.offsetHeight + content.offsetHeight));
+    if (!handle || !card || !body || !content) return;
+    const heights = [card.offsetHeight, body.offsetHeight, content.offsetHeight];
+    if (heights.some((height) => !Number.isFinite(height) || height <= 0)) return;
+    const group = card.closest("[data-group]");
+    if (group?.id !== ROWS_ID || group.querySelector(':scope > [data-separator="active"]')) return;
+
+    let current: number;
+    try {
+      // Panel refs exist before their group/constraints are necessarily registered.
+      current = handle.getSize().inPixels;
+      if (handle.isCollapsed()) return;
+    } catch {
+      return;
+    }
+    if (!Number.isFinite(current) || current <= 0) return;
+    const target = Math.max(TIMELINE.min, heights[0] - heights[1] + heights[2]);
+    if (Math.abs(current - target) <= 1) return;
+    timelineFitting.current = true;
+    try {
+      handle.resize(target);
+    } finally {
+      timelineFitting.current = false;
+    }
   }, [timelinePanel]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const content = timelineContent.current;
     if (!content) return;
+    let alive = true;
+    if (!timelineSized.current) fitTimeline();
     const observer = new ResizeObserver(() => {
-      if (!timelineSized.current) fitTimeline();
+      if (alive && !timelineSized.current) fitTimeline();
     });
     observer.observe(content);
-    return () => observer.disconnect();
+    return () => {
+      alive = false;
+      observer.disconnect();
+    };
   }, [fitTimeline]);
 
   const inspecting = picked !== null;
@@ -756,6 +789,15 @@ export function ClipTrimmer({
 
   return (
     <WindowFrame className="select-none [&_button_svg]:pointer-events-none [&_input]:select-text [&_textarea]:select-text">
+      <style>{`
+        .clip-editor-transport { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .clip-editor-transport-buttons { order: 1; }
+        .clip-editor-duration { order: 2; margin-left: auto; }
+        @container clip-preview (max-width: 480px) {
+          .clip-editor-transport-buttons { order: 3; flex-basis: 100%; justify-content: center; }
+          .clip-editor-duration { order: 1; }
+        }
+      `}</style>
       <header
         data-tauri-drag-region
         className="relative flex h-11 shrink-0 select-none items-center gap-3 border-b border-white/5 bg-black/40 pl-4 pr-2"
@@ -800,7 +842,17 @@ export function ClipTrimmer({
         </div>
 
         {render.rendering && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-white/10">
+          <span
+            role="progressbar"
+            aria-label={t("clips.editor.save_progress", { defaultValue: "Saving clip" })}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={exportPercent ?? undefined}
+            aria-valuetext={exportPercent === null
+              ? t("common.saving", { defaultValue: "Saving…" })
+              : `${exportPercent}%`}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-white/10"
+          >
             <span
               className={cn(
                 "block h-full transition-[width] duration-200",
@@ -827,6 +879,7 @@ export function ClipTrimmer({
             const byUser = meta.isUserInteraction || gripping.current;
             if (byUser) timelineSized.current = true;
             rowsLayout.onLayoutChanged(layout, { ...meta, isUserInteraction: byUser });
+            if (!byUser && !timelineSized.current && !timelineFitting.current) fitTimeline();
           }}
           resizeTargetMinimumSize={HIT_AREA}
         >
@@ -929,7 +982,22 @@ export function ClipTrimmer({
 
                       {panel === "audio" && (
                         <>
-                          {adjustable.length === 0 ? (
+                          {detailsStatus === "loading" ? (
+                            <p role="status" className="font-minecraft text-xs leading-relaxed text-white/50">
+                              {t("clips.editor.audio.loading", { defaultValue: "Reading audio tracks…" })}
+                            </p>
+                          ) : detailsStatus === "error" ? (
+                            <div className="flex flex-col items-start gap-2">
+                              <p role="status" className="font-minecraft text-xs leading-relaxed text-red-300">
+                                {t("clips.editor.audio.failed", { defaultValue: "Audio track details could not be read. Preview remains available." })}
+                              </p>
+                              {onRetryDetails && (
+                                <Button variant="secondary" size="sm" onClick={onRetryDetails} disabled={busy}>
+                                  {t("common.retry", { defaultValue: "Retry" })}
+                                </Button>
+                              )}
+                            </div>
+                          ) : adjustable.length === 0 ? (
                             <p className="font-minecraft text-xs leading-relaxed text-white/50">
                               {t("clips.editor.audio.none")}
                             </p>
@@ -995,7 +1063,7 @@ export function ClipTrimmer({
                 <ResizeBar orientation="vertical" label={t("clips.editor.menu.resize")} color={accentColor.value} />
 
                 <LayoutPanel id="main" minSize={MAIN_MIN} className="flex" style={{ overflow: "hidden" }}>
-                  <main className={CARD}>
+                  <main className={CARD} style={{ containerType: "inline-size", containerName: "clip-preview" }}>
                     <div className="min-h-0 flex-1 px-4 pb-2 pt-4" onPointerDown={() => setChosen(null)}>
                       <div className="flex h-full w-full items-center justify-center" style={{ containerType: "size" }}>
                         <div
@@ -1072,9 +1140,9 @@ export function ClipTrimmer({
                       </div>
                     </div>
 
-                    <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pb-3 pt-1">
+                    <div className="clip-editor-transport shrink-0 gap-x-3 gap-y-2 px-4 pb-3 pt-1">
                       <PlayheadClock live={live} view={view} color={accentColor.value} />
-                      <div className="flex items-center gap-1.5">
+                      <div className="clip-editor-transport-buttons flex shrink-0 items-center gap-1.5">
                         <ClipIconButton
                           icon="solar:skip-previous-bold"
                           label={t("clips.editor.transport.to_start")}
@@ -1107,7 +1175,7 @@ export function ClipTrimmer({
                           onClick={() => jump(end)}
                         />
                       </div>
-                      <span className="min-w-0 justify-self-end truncate font-minecraft text-sm tabular-nums leading-none text-white/50">
+                      <span className="clip-editor-duration shrink-0 whitespace-nowrap font-minecraft text-sm tabular-nums leading-none text-white/50">
                         {formatTime(view.length)}
                       </span>
                     </div>
@@ -1158,12 +1226,18 @@ export function ClipTrimmer({
             collapsible
             collapsedSize={TIMELINE.collapsed}
             groupResizeBehavior="preserve-pixel-size"
-            onResize={(size) => setTimelineShown(size.inPixels > TIMELINE.collapsed)}
+            onResize={(size) => {
+              const shown = size.inPixels > TIMELINE.collapsed;
+              if (!shown && timelineBody.current?.contains(document.activeElement)) {
+                timelineHeader.current?.focus({ preventScroll: true });
+              }
+              setTimelineShown(shown);
+            }}
             className="flex flex-col"
             style={{ overflow: "hidden" }}
           >
             <section ref={timelineCard} className={CARD}>
-              <div className={PANEL_HEAD}>
+              <div ref={timelineHeader} tabIndex={-1} className={PANEL_HEAD}>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <ClipIconButton
                     icon="solar:undo-left-bold"
@@ -1229,6 +1303,7 @@ export function ClipTrimmer({
               </div>
               <div
                 ref={timelineBody}
+                hidden={!timelineShown}
                 className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
               >
                 <div ref={timelineContent} className="px-3 py-2">

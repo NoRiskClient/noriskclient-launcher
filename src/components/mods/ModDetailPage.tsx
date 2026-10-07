@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
@@ -18,6 +18,7 @@ import { ModDetailDescription } from "./ModDetailDescription";
 import { ModDetailVersions } from "./ModDetailVersions";
 import { ModDetailSidebar } from "./ModDetailSidebar";
 import { useThemeStore } from "../../store/useThemeStore";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 // Convert Modrinth project to unified format
 function modrinthToUnified(
@@ -212,27 +213,39 @@ export function ModDetailPage({
   const navigate = useNavigate();
   const { accentColor } = useThemeStore();
 
-  const [project, setProject] = useState<UnifiedProjectDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const readKey = `${source ?? ''}:${projectId ?? ''}`;
+  const [readState, setReadState] = useState<{ key: string; project: UnifiedProjectDetails | null; isLoading: boolean; error: string | null }>(
+    () => ({ key: readKey, project: null, isLoading: true, error: null })
+  );
+  const [retryVersion, setRetryVersion] = useState(0);
+  const readRequest = useRef<{ key: string; pending: boolean; active: boolean } | null>(null);
+  const project = readState.key === readKey ? readState.project : null;
+  const isLoading = readState.key !== readKey || readState.isLoading;
+  const error = readState.key === readKey ? readState.error : null;
   const [showVersions, setShowVersions] = useState(false);
 
   useEffect(() => { setDiscordState("Viewing a Mod"); }, []);
 
   useEffect(() => {
+    const request = { key: readKey, pending: true, active: true };
+    readRequest.current = request;
+    const isCurrent = () => request.active && readRequest.current === request;
+    const setError = (message: string) => {
+      if (isCurrent()) setReadState(previous => ({ ...previous, error: message }));
+    };
+    const setProject = (loaded: UnifiedProjectDetails) => {
+      if (isCurrent()) setReadState(previous => ({ ...previous, project: loaded, error: null }));
+    };
+    setReadState(previous => ({ key: readKey, project: previous.key === readKey ? previous.project : null, isLoading: true, error: null }));
     async function loadProject() {
-      if (!source || !projectId) {
-        setError(t('mod_detail.invalid_url_params'));
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
       try {
+        if (!source || !projectId) {
+          setError(t('mod_detail.invalid_url_params'));
+          return;
+        }
         if (source.toLowerCase() === "modrinth") {
           const projects = await ModrinthService.getProjectDetails([projectId]);
+          if (!isCurrent()) return;
           if (projects.length > 0) {
             const modrinthProject = projects[0];
 
@@ -345,12 +358,13 @@ export function ModDetailPage({
             setError(t('mod_detail.project_not_found'));
           }
         } else if (source.toLowerCase() === "curseforge") {
-          const modId = parseInt(projectId, 10);
-          if (isNaN(modId)) {
+          const modId = Number(projectId);
+          if (!/^[1-9]\d*$/.test(projectId) || !Number.isSafeInteger(modId) || modId > 0xffffffff) {
             setError(t('mod_detail.invalid_curseforge_id'));
             return;
           }
           const response = await CurseForgeService.getModsByIds([modId]);
+          if (!isCurrent()) return;
           if (response.data && response.data.length > 0) {
             const mod = response.data[0];
 
@@ -372,14 +386,22 @@ export function ModDetailPage({
         }
       } catch (err) {
         console.error("Failed to load project:", err);
-        setError(err instanceof Error ? err.message : "Failed to load project");
+        setError(parseErrorMessage(err) || t('mod_detail.project_read_failed'));
       } finally {
-        setIsLoading(false);
+        request.pending = false;
+        if (isCurrent()) setReadState(previous => ({ ...previous, isLoading: false }));
       }
     }
 
-    loadProject();
-  }, [source, projectId]);
+    void loadProject();
+    return () => { request.active = false; };
+  }, [source, projectId, retryVersion]);
+
+  const retryRead = () => {
+    if (readRequest.current?.key !== readKey || readRequest.current.pending) return;
+    readRequest.current.pending = true;
+    setRetryVersion(value => value + 1);
+  };
 
   const handleBack = () => {
     if (onBack) {
@@ -390,7 +412,7 @@ export function ModDetailPage({
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading && !project) {
     return (
       <div className="flex flex-col h-full p-6">
         {!hideBackButton && (
@@ -413,7 +435,7 @@ export function ModDetailPage({
   }
 
   // Error state
-  if (error || !project) {
+  if (!project) {
     return (
       <div className="flex flex-col h-full p-6">
         {!hideBackButton && (
@@ -428,7 +450,10 @@ export function ModDetailPage({
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Icon icon="solar:danger-triangle-bold" className="w-12 h-12 text-red-500" />
-            <span className="text-red-400 font-minecraft">{error || t('mod_detail.project_not_found')}</span>
+            <span className="max-w-full max-h-48 overflow-y-auto [overflow-wrap:anywhere] text-red-400 font-minecraft" role="alert">{error || t('mod_detail.project_not_found')}</span>
+            <button type="button" onClick={retryRead} disabled={isLoading} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft disabled:opacity-50">
+              {t('common.retry')}
+            </button>
             <button
               onClick={handleBack}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-minecraft transition-colors"
@@ -461,6 +486,16 @@ export function ModDetailPage({
           accent-themed scrollbar as the rest of the V3 UI; without it the
           native Chromium default shows up here and reads as foreign. */}
       <div className={`flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 ${hideBackButton ? "pt-6" : ""}`}>
+        {(error || isLoading) && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3">
+            <p className="min-w-0 max-h-32 overflow-y-auto flex-1 [overflow-wrap:anywhere] text-white/70" role={error ? 'alert' : 'status'}>
+              {error || t('mod_detail.loading_project')}
+            </p>
+            <button type="button" onClick={retryRead} disabled={isLoading} className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50">
+              {t('common.retry')}
+            </button>
+          </div>
+        )}
         {/* Header */}
         <ModDetailHeader
           project={project}

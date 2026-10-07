@@ -23,6 +23,14 @@ export interface BatchUpdateResult {
     failed: number[];
 }
 
+function parseCurseForgeId(value: string, label: string): number {
+    // ModPackSource uses Rust u32 IDs, not the unrelated update fingerprint.
+    if (!/^[1-9]\d*$/.test(value)) throw new Error(`Invalid CurseForge ${label}: ${value}`);
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id > 0xffffffff) throw new Error(`Invalid CurseForge ${label}: ${value}`);
+    return id;
+}
+
 class UnifiedService {
     static async searchMods(params: UnifiedModSearchParams): Promise<UnifiedModSearchResponse> {
         return invoke<UnifiedModSearchResponse>("search_mods_unified_command", { params });
@@ -77,6 +85,29 @@ class UnifiedService {
         payloads: SwitchContentVersionPayload[]
     ): Promise<BatchUpdateResult> {
         return invoke<BatchUpdateResult>("update_contents_from_profile", { payloads });
+    }
+
+    static buildModpackSwitchRequest(profileId: string, version: UnifiedVersion): ModpackSwitchRequest {
+        if (!profileId.trim()) throw new Error("Missing profile ID for modpack switch");
+        const file = version.files.find(f => f.primary) ?? version.files[0];
+        if (!file?.url?.trim()) throw new Error("Selected modpack version has no download file");
+        const url = new URL(file.url);
+        if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Invalid modpack download URL");
+
+        let source: ModPackSource;
+        if (version.source === ModPlatform.Modrinth) {
+            if (!version.project_id.trim() || !version.id.trim()) throw new Error("Missing Modrinth project or version ID");
+            source = { source: "modrinth", project_id: version.project_id, version_id: version.id };
+        } else if (version.source === ModPlatform.CurseForge) {
+            source = {
+                source: "curse_forge",
+                project_id: parseCurseForgeId(version.project_id, "project ID"),
+                file_id: parseCurseForgeId(version.id, "file ID"),
+            };
+        } else {
+            throw new Error(`Unsupported modpack source: ${version.source}`);
+        }
+        return { profile_id: profileId, download_url: file.url, modpack_source: source };
     }
 
     static async switchModpackVersion(request: ModpackSwitchRequest): Promise<ModpackSwitchResponse> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "@iconify/react";
 
 import type { ClipAudioTrack, ClipOverlay, Span } from "../../../services/clip-service";
@@ -48,17 +48,24 @@ export function Ruler({
   );
   const widest = labels.reduce((longest, label) => (label.length > longest.length ? label : longest), "");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const track = scale.current;
     const sample = probe.current;
     if (!track || !sample) return;
-    const observer = new ResizeObserver(() => {
+    let alive = true;
+    const measure = () => {
+      if (!alive) return;
       setWidth(track.clientWidth);
       setRoom(sample.offsetWidth);
-    });
+    };
+    if (track.clientWidth > 0 && sample.offsetWidth > 0) measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(track);
     observer.observe(sample);
-    return () => observer.disconnect();
+    return () => {
+      alive = false;
+      observer.disconnect();
+    };
   }, [scale]);
 
   const marks = useMemo(() => {
@@ -734,7 +741,7 @@ function RestoreButton({ disabled, onRestore, t }: { disabled: boolean; onRestor
         disabled={disabled}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={onRestore}
-        className="flex h-4 w-4 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white/60 transition-colors hover:text-white"
+        className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white/60 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
         <Icon icon="solar:restart-bold" className="h-3 w-3" />
       </button>
@@ -783,7 +790,7 @@ export function JoinMark({
 }) {
   return (
     <div
-      className="absolute bottom-0 top-[1.875rem] w-0.5 -translate-x-1/2"
+      className="pointer-events-none absolute bottom-0 top-[1.875rem] z-30 w-0.5 -translate-x-1/2"
       style={{ left: `${view.percent(span.startSeconds)}%`, backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
     >
       <RestoreButton disabled={disabled} onRestore={onRestore} t={t} />

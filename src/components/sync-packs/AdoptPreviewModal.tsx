@@ -71,7 +71,7 @@ export function AdoptPreviewModal({
                 style={{ color: accentColor.value }}
               />
 
-              <span className="min-w-0 flex-1 truncate font-minecraft text-base text-white/90">
+              <span className="min-w-0 flex-1 break-all font-minecraft text-base text-white/90" title={entry.target_path}>
                 {entry.target_path}
               </span>
 

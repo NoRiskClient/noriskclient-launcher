@@ -58,7 +58,6 @@ function getErrorMessage(e: unknown): string {
 }
 
 const formatSize = (bytes: number) => {
-  if (bytes === 0) return "-";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -82,25 +81,27 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryGeneration, setRetryGeneration] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       try {
         const f = await loader();
         if (!cancelled) setFiles(f);
       } catch (e) {
         logError(`Failed to load files: ${e}`);
-        if (!cancelled) setFiles([]);
+        if (!cancelled) setError(getErrorMessage(e));
       }
       if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loader, retryGeneration]);
 
   async function handleUpload(file: FileInfo) {
     setUploadingFile(file.path);
@@ -131,33 +132,46 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
     <SettingsSection id={`settings-section-${id}`} title={title} icon={icon}>
       <div className="py-2">
         <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
-          {loading ? (
+          {error && <div role="alert" className="m-3 p-3 max-h-40 overflow-y-auto rounded border border-red-400/30 bg-red-500/10 text-xs text-red-100">
+            <p className="[overflow-wrap:anywhere]">{t("debug.files_load_failed", { error })}</p>
+            <button type="button" onClick={() => setRetryGeneration(value => value + 1)} disabled={loading} className="mt-2 rounded px-2 py-1 hover:bg-white/10 disabled:opacity-50">{t("common.retry")}</button>
+          </div>}
+          {loading && files.length === 0 ? (
             <div className="p-8 text-center text-white/50">
               <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 mx-auto mb-2" />
               {t("common.loading")}
             </div>
-          ) : files.length === 0 ? (
+          ) : files.length === 0 && !error ? (
             <div className="p-8 text-center text-white/50 font-minecraft">{t("debug.no_files")}</div>
           ) : (
             <div className="divide-y divide-white/10">
               {files.map((file, i) => (
-                <div key={i} className="p-3 hover:bg-white/5 flex items-center gap-4">
+                <div key={file.path || i} className="p-3 hover:bg-white/5 flex flex-wrap items-start gap-3">
                   <Icon
                     icon={crash ? "solar:danger-triangle-bold" : "solar:document-text-bold"}
                     className={`w-5 h-5 flex-shrink-0 ${crash ? "text-red-400" : "text-white/60"}`}
                   />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-white font-minecraft truncate">{file.name}</div>
-                    <div className="text-xs text-white/40 font-sans truncate">{file.path}</div>
-                  </div>
+                  <details className="flex-[1_1_180px] min-w-0 group">
+                    <summary aria-label={`${t("debug.file_details")}: ${file.name}`} className="cursor-pointer rounded focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40">
+                      <span className="block text-white font-minecraft truncate">{file.name}</span>
+                      <span className="block text-xs text-white/40 font-sans truncate">{file.path}</span>
+                    </summary>
+                    <div className="mt-2 rounded bg-black/20 p-2 select-text text-xs [overflow-wrap:anywhere]">
+                      <p className="font-minecraft text-white/90">{file.name}</p>
+                      <p className="mt-1 font-sans text-white/60">{file.path}</p>
+                      <p className="mt-1 text-white/50">{formatSize(file.size)} · {formatDate(file.modified)}</p>
+                    </div>
+                  </details>
                   <div className="text-sm text-white/50 font-sans whitespace-nowrap">
                     {formatSize(file.size)}
                   </div>
-                  <div className="text-sm text-white/50 font-sans whitespace-nowrap hidden lg:block">
+                  <div className="text-sm text-white/50 font-sans whitespace-nowrap">
                     {formatDate(file.modified)}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      aria-label={`${t("debug.copy_content")}: ${file.name}`}
                       onClick={() => handleCopyContent(file)}
                       className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
                       title={t("debug.copy_content")}
@@ -165,6 +179,8 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
                       <Icon icon="solar:copy-bold" className="w-4 h-4 text-white/70" />
                     </button>
                     <button
+                      type="button"
+                      aria-label={`${t("debug.upload_mclogs")}: ${file.name}`}
                       onClick={() => handleUpload(file)}
                       disabled={uploadingFile === file.path}
                       className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"

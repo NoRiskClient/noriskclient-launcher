@@ -36,7 +36,7 @@ export interface AddPresetSourceModalProps {
   onConfirm: (source: {
     seedFrom?: string | null;
     externalPath?: string | null;
-  }) => Promise<void>;
+  }) => Promise<boolean>;
 }
 
 export function AddPresetSourceModal({
@@ -54,8 +54,6 @@ export function AddPresetSourceModal({
   const [isDragOver, setIsDragOver] = useState(false);
   const busyRef = useRef(false);
 
-  busyRef.current = isBusy;
-
   const { data: candidates, loading: isLoading } = useAsyncResource<SeedCandidate[]>(
     () =>
       SyncPackService.listSyncSeedCandidates(preset.path).then((list) =>
@@ -69,10 +67,10 @@ export function AddPresetSourceModal({
   const run = useCallback(
     async (source: { seedFrom?: string | null; externalPath?: string | null }) => {
       if (busyRef.current) return;
+      busyRef.current = true;
       setIsBusy(true);
       try {
-        await onConfirm(source);
-        onClose();
+        if (await onConfirm(source)) onClose();
       } catch (err) {
         toast.error(
           t("syncPacks.drop.error", {
@@ -81,6 +79,7 @@ export function AddPresetSourceModal({
           }),
         );
       } finally {
+        busyRef.current = false;
         setIsBusy(false);
       }
     },
@@ -139,17 +138,25 @@ export function AddPresetSourceModal({
       : matching;
 
   const handlePick = useCallback(async () => {
-    const selection = await openDialog({ directory: isFolder, multiple: false });
-    if (typeof selection === "string") {
-      await run({ externalPath: selection });
+    if (busyRef.current) return;
+    try {
+      const selection = await openDialog({ directory: isFolder, multiple: false });
+      if (typeof selection === "string") {
+        await run({ externalPath: selection });
+      }
+    } catch (err) {
+      toast.error(t("syncPacks.drop.error", { name: preset.path, error: parseErrorMessage(err) }));
     }
-  }, [isFolder, run]);
+  }, [isFolder, preset.path, run, t]);
 
   return (
     <Modal
       title={t("syncPacks.seed.title", { path: preset.path })}
       titleSubtitle={t("syncPacks.seed.subtitle")}
-      onClose={onClose}
+      onClose={() => { if (!busyRef.current) onClose(); }}
+      closeOnEscape={!isBusy}
+      closeOnClickOutside={!isBusy}
+      hideCloseButton={isBusy}
       width="lg"
     >
       <div className="flex h-[560px] flex-col gap-5 px-6 pb-6 pt-2">
@@ -169,8 +176,9 @@ export function AddPresetSourceModal({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("syncPacks.seed.searchPlaceholder")}
+              aria-label={t("syncPacks.seed.searchPlaceholder")}
               disabled={isLoading}
-              className="ml-auto w-[260px] rounded border border-white/10 bg-black/30 px-3 py-2 font-minecraft text-sm text-white/80 outline-none transition-colors placeholder:text-white/25 focus:border-white/25 disabled:opacity-40"
+              className="ml-auto w-[260px] rounded border border-white/10 bg-black/30 px-3 py-2 font-minecraft text-sm text-white/80 outline-none focus:outline focus:outline-2 focus:[outline-style:solid] focus:-outline-offset-2 focus:outline-white/70 transition-colors placeholder:text-white/25 focus:border-white/25 disabled:opacity-40"
             />
           </div>
 

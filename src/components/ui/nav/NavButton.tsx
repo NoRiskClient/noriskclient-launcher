@@ -49,12 +49,12 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
     const colors = getVariantColors();
 
     const baseClasses = cn(
-      "font-smallcaps relative overflow-hidden transition-all duration-300",
-      "w-16 rounded-md text-white flex items-center justify-center",
-      label ? "py-2" : "h-16",
+      "font-smallcaps relative transition-all duration-300",
+      "w-16 h-16 shrink-0 rounded-md text-white flex items-center justify-center",
+      label && "py-2",
       variant !== "ghost" && "border-2 border-b-4 border-transparent",
       "text-shadow-sm",
-      "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1 focus-visible:ring-offset-black/20",
+      "focus:outline-none focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]",
     );
 
     const activeStateClasses = cn(
@@ -103,8 +103,9 @@ export const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
         {...props}
       >
         <span
+          aria-hidden="true"
           className={cn(
-            "absolute inset-0 bg-gradient-radial from-white/30 via-transparent to-transparent",
+            "absolute inset-0 overflow-hidden rounded-md pointer-events-none bg-gradient-radial from-white/30 via-transparent to-transparent",
             isActive
               ? "opacity-30"
               : "opacity-0 transition-opacity duration-300",

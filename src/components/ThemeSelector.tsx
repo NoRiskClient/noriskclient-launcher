@@ -7,12 +7,14 @@ import { useLauncherTheme } from "../hooks/useLauncherTheme";
 import { LAUNCHER_THEMES } from "../store/launcher-theme-store";
 import { SimpleTooltip } from "./ui/Tooltip";
 import { getLauncherConfig } from "../services/launcher-config-service";
+import { useTranslation } from "react-i18next";
 
 interface ThemeSelectorProps {
   disabled?: boolean;
 }
 
 export function ThemeSelector({ disabled }: ThemeSelectorProps) {
+  const { t } = useTranslation();
   const [debugFlag, setDebugFlag] = useState(false);
   const { selectedThemeId, toggleTheme, isThemeUnlocked } = useLauncherTheme();
   const themes = Object.values(LAUNCHER_THEMES);
@@ -49,7 +51,7 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
             }}
             disabled={disabled || (!debugFlag && !isThemeUnlocked(theme.id))}
             className={cn(
-              "relative flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all duration-200",
+              "relative flex max-w-full items-center gap-3 pl-4 pr-10 py-3 rounded-lg border-2 transition-all duration-200",
               isSelected
                 ? "border-white/60 bg-white/10"
                 : "border-[#ffffff20] bg-black/20",
@@ -62,7 +64,7 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
           >
             <div
               className={cn(
-                "w-8 h-8 rounded-md border-2 shadow-lg transition-transform",
+                "w-8 h-8 shrink-0 rounded-md border-2 shadow-lg transition-transform",
                 (!debugFlag && !isThemeUnlocked(theme.id)) ? "border-white/10" : "border-white/20",
                 isSelected && "scale-105"
               )}
@@ -71,34 +73,32 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
                 boxShadow: isSelected ? `0 0 12px ${theme.accentColor.value}50` : undefined,
               }}
             />
-            <div className="flex flex-col items-start">
+            <div className="min-w-0 flex flex-col items-start text-left">
               <span
                 className={cn(
-                  "font-minecraft text-base transition-colors",
+                  "whitespace-normal [overflow-wrap:anywhere] font-minecraft text-base transition-colors",
                   isSelected ? "text-white" : "text-white/80"
                 )}
               >
                 {theme.name}
               </span>
               {(!debugFlag && !isThemeUnlocked(theme.id)) && theme.unlockRequirement && (
-                <span className="text-xs text-white/40 font-minecraft">
+                <span className="whitespace-normal [overflow-wrap:anywhere] text-xs text-white/40 font-minecraft">
                   {theme.unlockRequirement.type === "advent-door" && (
-                    <>Unlock: Open door {theme.unlockRequirement.day}</>
+                    <>{t('settings.theme.unlock_advent_door', { day: theme.unlockRequirement.day })}</>
                   )}
                 </span>
               )}
             </div>
-            {(!debugFlag && !isThemeUnlocked(theme.id)) && (
-              <Icon
-                icon="solar:lock-keyhole-bold"
-                className="w-4 h-4 text-white/40 absolute top-2 right-2"
-              />
-            )}
-            {isSelected && (
-              <Icon
-                icon="solar:check-circle-bold"
-                className="w-5 h-5 text-white absolute top-2 right-2"
-              />
+            {((!debugFlag && !isThemeUnlocked(theme.id)) || isSelected) && (
+              <div className="absolute top-2 right-2 w-5 flex flex-col items-center gap-1" aria-hidden="true">
+                {(!debugFlag && !isThemeUnlocked(theme.id)) && (
+                  <Icon icon="solar:lock-keyhole-bold" className="w-4 h-4 text-white/40" />
+                )}
+                {isSelected && (
+                  <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white" />
+                )}
+              </div>
             )}
           </button>
         );
@@ -107,7 +107,8 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
           return (
             <SimpleTooltip
               key={theme.id}
-              content={`Open advent calendar door ${theme.unlockRequirement?.day} to unlock this theme`}
+              content={t('settings.theme.unlock_advent_tooltip', { day: theme.unlockRequirement?.day })}
+              wrapperClassName="max-w-full min-w-0"
             >
               {button}
             </SimpleTooltip>

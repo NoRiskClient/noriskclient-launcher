@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { Icon } from "@iconify/react";
@@ -11,8 +11,9 @@ import {
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
+import { useSettingControl } from "./settings/SettingControlContext";
 
-interface RangeSliderProps {
+interface RangeSliderProps extends React.AriaAttributes {
   value: number;
   onChange: (value: number) => void;
   onChangeEnd?: (value: number) => void;
@@ -56,7 +57,10 @@ export function RangeSlider({
   recommendedValue,
   recommendedRange,
   unit,
+  ...ariaProps
 }: RangeSliderProps) {
+  const descriptionId = useId();
+  const row = useSettingControl();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -73,6 +77,7 @@ export function RangeSlider({
   const accessibilityProps = getAccessibilityProps({
     label,
     description,
+    descriptionId,
     disabled,
     required: false
   });
@@ -100,7 +105,7 @@ export function RangeSlider({
   };
 
   const getPercentage = useCallback((val: number) => {
-    return ((val - min) / (max - min)) * 100;
+    return max > min ? Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100)) : 0;
   }, [min, max]);
 
   const updateVisualPosition = useCallback((newValue: number) => {
@@ -110,11 +115,6 @@ export function RangeSlider({
     progressRef.current.style.width = `${percentage}%`;
     thumbRef.current.style.left = `${percentage}%`;
 
-    if (valueDisplayRef.current) {
-      valueDisplayRef.current.innerHTML = unit
-        ? `${newValue} <span class="text-white/70">${unit}</span>`
-        : String(newValue);
-    }
   }, [getPercentage, unit]);
 
   const calculateValueFromMouseEvent = useCallback((e: MouseEvent | React.MouseEvent) => {
@@ -127,7 +127,7 @@ export function RangeSlider({
     let newValue = min + percentage * (max - min);
 
     if (step > 0) {
-      newValue = Math.round(newValue / step) * step;
+      newValue = min + Math.round((newValue - min) / step) * step;
     }
 
     return Math.max(min, Math.min(max, newValue));
@@ -218,6 +218,7 @@ export function RangeSlider({
       ref={sliderRef}
       className={cn(
         "relative w-full",
+        "focus-within:ring-2 focus-within:ring-white/70 focus-within:rounded-[var(--border-radius)]",
         disabled && "opacity-50 cursor-not-allowed",
         className,
       )}
@@ -368,10 +369,14 @@ export function RangeSlider({
           valueLabel ? `${valueLabel}: ${localValue}` : `${localValue}`
         }
         {...accessibilityProps}
+        aria-labelledby={label || valueLabel ? undefined : row.labelId}
+        aria-label={label || valueLabel}
+        aria-describedby={[row.descriptionId, description && descriptionId].filter(Boolean).join(" ") || undefined}
+        {...ariaProps}
       />
       {description && (
         <p 
-          id={accessibilityProps["aria-describedby"]}
+          id={descriptionId}
           className="text-sm text-gray-400 mt-1 font-minecraft"
         >
           {description}

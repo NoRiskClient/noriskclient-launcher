@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { deleteFile } from "../../services/file-service";
 import type { ScreenshotInfo as ActualScreenshotInfo } from "../../types/profile";
 import { IconButton } from "../ui/buttons/IconButton";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
@@ -12,6 +13,7 @@ import { Image as TauriImage } from "@tauri-apps/api/image";
 import { revealItemInDir } from "../../utils/opener-utils";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ProfileScreenshotModalProps {
   isOpen: boolean;
@@ -76,7 +78,7 @@ export function ProfileScreenshotModal({
 
     setIsDeleting(true);
 
-    const deletePromise = invoke("delete_file", { filePath: screenshot.path });
+    const deletePromise = deleteFile(screenshot.path);
 
     toast.promise(
       deletePromise,
@@ -91,7 +93,7 @@ export function ProfileScreenshotModal({
         error: (err) => {
           setIsDeleting(false);
           console.error("Failed to delete screenshot:", err);
-          return t('screenshots.delete_failed', { error: err.toString() });
+          return t('screenshots.delete_failed', { error: parseErrorMessage(err) });
         },
       }
     );
@@ -172,4 +174,4 @@ export function ProfileScreenshotModal({
       </div>
     </Modal>
   );
-} 
+}

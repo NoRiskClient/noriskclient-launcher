@@ -4,28 +4,42 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useRef, useState } from "react";
+import { forwardRef, useCallback, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { PlayerHead } from "../common/PlayerHead";
 import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface CurrentAccountDisplayProps {
+  expanded: boolean;
+  menuId: string;
   onClick?: () => void;
   className?: string;
   compact?: boolean;
   variant?: "default" | "flat";
 }
 
-export function CurrentAccountDisplay({
+export const CurrentAccountDisplay = forwardRef<HTMLButtonElement, CurrentAccountDisplayProps>(function CurrentAccountDisplay({
+  expanded,
+  menuId,
   onClick,
   className,
   compact = false,
   variant = "flat",
-}: CurrentAccountDisplayProps) {
+}: CurrentAccountDisplayProps, forwardedRef) {
   const { activeAccount } = useMinecraftAuthStore();
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const buttonRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const assignButtonRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    if (typeof forwardedRef === "function") forwardedRef(node);
+    else if (forwardedRef) forwardedRef.current = node;
+  }, [forwardedRef]);
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.focus({ preventScroll: true });
+    onClick?.();
+  };
   const [isHovered, setIsHovered] = useState(false);
   useEntranceAnimation(
     buttonRef,
@@ -89,35 +103,48 @@ export function CurrentAccountDisplay({
     return accentColor.value;
   };
 
+  const shadowStyle: CSSProperties & {
+    "--nrc-account-shadow": string;
+    "--nrc-account-hover-shadow": string;
+    "--nrc-account-active-shadow": string;
+  } = {
+    "--nrc-account-shadow": getBoxShadow(),
+    "--nrc-account-hover-shadow": getHoverBoxShadow(),
+    "--nrc-account-active-shadow": getActiveBoxShadow(),
+  };
+
   if (!activeAccount) {
     return (
-      <div
-        ref={buttonRef}
+      <button
+        type="button"
+        ref={assignButtonRef}
+        aria-label={t('auth.addAccount')}
+        aria-haspopup="menu"
+        aria-expanded={expanded}
+        aria-controls={expanded ? menuId : undefined}
         className={cn(
           "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
           "rounded-md text-white tracking-wider",
           "flex items-center gap-3 px-4 py-1",
           "text-shadow-sm",
           getBorderClasses(),
-          variant !== "flat" &&
-            "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
+          "[box-shadow:var(--nrc-account-shadow)] hover:[box-shadow:var(--nrc-account-hover-shadow)] active:[box-shadow:var(--nrc-account-active-shadow)]",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2",
           "cursor-pointer",
           getHoverTransform(),
-          variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
           "hover:brightness-110",
           getActiveTransform(),
-          variant !== "flat" && `active:shadow-[${getActiveBoxShadow()}]`,
           "active:brightness-90",
           className,
         )}
-        onClick={onClick}
+        onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
+          ...shadowStyle,
           backgroundColor: `${accentColor.value}30`,
           borderColor: `${accentColor.value}80`,
           borderBottomColor: getBorderBottomColor(),
-          boxShadow: getBoxShadow(),
           filter: isHovered ? "brightness(1.1)" : "brightness(1)",
         }}
       >
@@ -134,7 +161,7 @@ export function CurrentAccountDisplay({
 
         <span className="absolute inset-0 opacity-0 hover:opacity-30 transition-opacity duration-300 bg-gradient-radial from-white/30 via-transparent to-transparent" />
 
-        <div
+        <span
           className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
           style={{
             borderColor: `${accentColor.value}60`,
@@ -142,19 +169,19 @@ export function CurrentAccountDisplay({
           }}
         >
           <span className="text-white font-smallcaps text-xs">+</span>
-        </div>
+        </span>
 
-        <div className="flex items-center gap-1 min-w-0">
+        <span className="flex items-center gap-1 min-w-0">
           <span className="text-sm text-white font-smallcaps">
             {t('auth.addAccount')}
           </span>
-        </div>
+        </span>
 
         <Icon
           icon="solar:alt-arrow-down-bold"
           className="w-4 h-4 text-white/90 ml-1 flex-shrink-0"
         />
-      </div>
+      </button>
     );
   }
 
@@ -162,33 +189,36 @@ export function CurrentAccountDisplay({
     activeAccount.minecraft_username || activeAccount.username || t('auth.unknown');
 
   return (
-    <div
-      ref={buttonRef}
+    <button
+      type="button"
+      ref={assignButtonRef}
+      aria-label={`${t('auth.minecraftAccounts')}: ${username}`}
+      aria-haspopup="menu"
+      aria-expanded={expanded}
+      aria-controls={expanded ? menuId : undefined}
       className={cn(
         "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
         "rounded-md text-white tracking-wider",
         "flex items-center gap-3 px-4 py-1",
         "text-shadow-sm",
         getBorderClasses(),
-        variant !== "flat" &&
-          "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
+        "[box-shadow:var(--nrc-account-shadow)] hover:[box-shadow:var(--nrc-account-hover-shadow)] active:[box-shadow:var(--nrc-account-active-shadow)]",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2",
         "cursor-pointer",
         getHoverTransform(),
-        variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
         "hover:brightness-110",
         getActiveTransform(),
-        variant !== "flat" && `active:shadow-[${getActiveBoxShadow()}]`,
         "active:brightness-90",
         className,
       )}
-      onClick={onClick}
+      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
+        ...shadowStyle,
         backgroundColor: `${accentColor.value}30`,
         borderColor: `${accentColor.value}80`,
         borderBottomColor: getBorderBottomColor(),
-        boxShadow: getBoxShadow(),
         filter: isHovered ? "brightness(1.1)" : "brightness(1)",
       }}
     >
@@ -205,7 +235,7 @@ export function CurrentAccountDisplay({
 
       <span className="absolute inset-0 opacity-0 hover:opacity-30 transition-opacity duration-300 bg-gradient-radial from-white/30 via-transparent to-transparent" />
 
-      <div
+      <span
         className="relative w-7 h-7 overflow-hidden border-2 rounded-sm flex-shrink-0 flex items-center justify-center"
         style={{
           borderColor: `${accentColor.value}60`,
@@ -219,23 +249,23 @@ export function CurrentAccountDisplay({
           fill
           className="text-xs"
         />
-      </div>
+      </span>
 
       {!compact && (
-        <div className="flex flex-col min-w-0">
+        <span className="flex flex-col min-w-0">
           <span
             className="text-base text-white font-smallcaps truncate"
             title={username}
           >
             {username}
           </span>
-        </div>
+        </span>
       )}
 
       <Icon
         icon="solar:alt-arrow-down-bold"
         className="w-4 h-4 text-white/90 ml-1 flex-shrink-0"
       />
-    </div>
+    </button>
   );
-}
+});

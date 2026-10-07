@@ -25,6 +25,9 @@ const statusOptions: StatusOption[] = [
   { value: "INVISIBLE", labelKey: "friends.status.invisible", color: "#6b7280", glow: "none" },
 ];
 
+// OFFLINE is an observed connection state, not a selectable presence preference.
+const offlineStatus: StatusOption = { value: "OFFLINE", labelKey: "friends.status.offline", color: "#6b7280", glow: "none" };
+
 export function StatusSelector({ currentStatus }: StatusSelectorProps) {
   const { t } = useTranslation();
   const { setStatus } = useFriendsStore();
@@ -33,7 +36,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
   const [isChanging, setIsChanging] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const current = statusOptions.find((s) => s.value === currentStatus) || statusOptions[0];
+  const current = statusOptions.find((s) => s.value === currentStatus) || offlineStatus;
 
   const handleSelect = async (status: OnlineState) => {
     if (isChanging || status === currentStatus) {

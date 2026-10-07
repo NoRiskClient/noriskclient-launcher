@@ -48,17 +48,19 @@ export function GroupPicker({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={t("placeholders.group_name")}
+          aria-label={t("placeholders.group_name")}
           className="text-sm w-full"
           autoFocus
         />
         <Tooltip content={t("common.cancel")} wrapperClassName="shrink-0">
           <button
             type="button"
+            aria-label={t("common.cancel")}
             onClick={() => {
               onChange("");
               setIsTyping(false);
             }}
-            className="p-2 rounded-lg border border-white/10 text-white/50 hover:text-white hover:border-white/25 transition-colors"
+            className="p-2 rounded-lg border border-white/10 text-white/50 hover:text-white hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           >
             <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
           </button>
@@ -71,6 +73,7 @@ export function GroupPicker({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
+        aria-pressed={value === ""}
         onClick={() => onChange("")}
         className="px-3 py-1.5 rounded-lg border font-minecraft text-sm tracking-wide transition-colors"
         style={chipStyle(value === "")}
@@ -82,6 +85,7 @@ export function GroupPicker({
         <button
           key={option}
           type="button"
+          aria-pressed={value === option}
           onClick={() => onChange(option)}
           className="px-3 py-1.5 rounded-lg border font-minecraft text-sm tracking-wide transition-colors"
           style={chipStyle(value === option)}

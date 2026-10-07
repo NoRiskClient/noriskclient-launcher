@@ -46,7 +46,7 @@ export function useConfirmDialog() {
     return new Promise((resolve) => {
       setOptions({ ...options, fullscreen: options.fullscreen ?? true });
       setInputValue(options.inputInitialValue || "");
-      setIsValid(!options.inputRequired || !!options.inputInitialValue);
+      setIsValid(!options.inputRequired || !!options.inputInitialValue?.trim());
       setResolveRef(() => resolve);
       setIsOpen(true);
     });
@@ -66,6 +66,8 @@ export function useConfirmDialog() {
       e.stopPropagation();
     }
 
+    if (options.type === "input" && !isValid) return;
+
     setIsOpen(false);
     if (options.type === "input") {
       resolveRef(inputValue);
@@ -81,20 +83,6 @@ export function useConfirmDialog() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-
-      if (e.key === "Enter" && isValid) {
-        e.preventDefault();
-        handleConfirm();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isValid]);
-
-  useEffect(() => {
     if (isOpen && confirmButtonRef.current) {
       confirmButtonRef.current.focus();
     }
@@ -103,6 +91,7 @@ export function useConfirmDialog() {
   const renderFooter = () => (
     <div className="flex justify-end gap-3">
       <Button
+        type="button"
         variant="secondary"
         onClick={handleClose}
         size="md"
@@ -111,6 +100,7 @@ export function useConfirmDialog() {
         {options.cancelText || t('common.cancel')}
       </Button>
       <Button
+        type="button"
         ref={confirmButtonRef}
         variant={options.type === "danger" ? "destructive" : "default"}
         onClick={handleConfirm}
@@ -152,6 +142,7 @@ export function useConfirmDialog() {
             <p className="text-lg font-minecraft">{options.inputLabel}</p>
           )}
           <Input
+            label={options.inputLabel}
             value={inputValue}
             onChange={handleInputChange}
             placeholder={options.inputPlaceholder}

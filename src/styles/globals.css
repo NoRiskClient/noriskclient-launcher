@@ -318,28 +318,30 @@
     background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.8);
 }
 
-/* Scrollbar hidden by default, revealed (accent-tinted) only while hovering the area */
+/* Keep the gutter stable; reveal its thumb for pointer and keyboard users. */
 .scrollbar-hover {
-    scrollbar-width: none;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
 }
 .scrollbar-hover::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-}
-.scrollbar-hover:hover {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4) transparent;
-}
-.scrollbar-hover:hover::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
-.scrollbar-hover:hover::-webkit-scrollbar-track {
+.scrollbar-hover:hover,
+.scrollbar-hover:focus-within {
+    scrollbar-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4) transparent;
+}
+.scrollbar-hover::-webkit-scrollbar-track {
     background: transparent;
 }
-.scrollbar-hover:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4);
+.scrollbar-hover::-webkit-scrollbar-thumb {
+    background-color: transparent;
     border-radius: 3px;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb,
+.scrollbar-hover:focus-within::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.4);
 }
 .scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
     background-color: rgba(var(--accent-rgb, 79, 142, 255), 0.6);
@@ -562,4 +564,84 @@ nav button:not(.no-radius),
 
 .animate-claim-glow {
     animation: nrc-claim-glow 1.6s ease-in-out infinite;
+}
+
+/* react-hot-toast caches its first system-motion lookup. Keep the live shared
+   NRC policy authoritative, including changes while a toast is already shown.
+   Normal motion remains the library's original entrance/exit/icon choreography. */
+[data-modal-live-region][data-motion-disabled="true"],
+[data-modal-live-region][data-motion-disabled="true"] *,
+[data-modal-live-region][data-motion-disabled="true"] *::before,
+[data-modal-live-region][data-motion-disabled="true"] *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+}
+
+/* Keep dialogs centered in the viewport. Their existing height cap reserves
+   equal top/bottom margins; the bounded feedback lane fits the upper half.
+   Long messages remain keyboard-scrollable without moving dialog controls. */
+html[data-nrc-feedback-host="true"] {
+    --modal-feedback-space: clamp(64px, 14vh, 104px);
+}
+html[data-nrc-feedback-host="true"] .nrc-modal-panel {
+    max-height: min(90vh, calc(100dvh - 32px - var(--modal-feedback-space)));
+}
+/* The two settings consumers preserve their normal 600px minimum only when it
+   fits. A fixed min-height must not override the shared available-height cap. */
+.nrc-settings-panel {
+    min-height: min(600px, calc(100dvh - 32px - var(--modal-feedback-space, 0px)));
+}
+[data-modal-feedback-rail="true"] {
+    position: fixed;
+    z-index: 9999;
+    top: 8px;
+    right: 16px;
+    width: min(366px, calc(100vw - 32px));
+    max-height: calc(var(--modal-feedback-space) / 2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.45) transparent;
+}
+[data-modal-feedback-rail="true"]::-webkit-scrollbar {
+    width: 8px;
+}
+[data-modal-feedback-rail="true"]::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.45);
+    border-radius: 4px;
+}
+
+/* Theme the existing neutral focus utilities without changing their geometry,
+   pointer/keyboard policy, shadows, validation colors or normal white text.
+   The html scope also wins over variants appended later by Tailwind 3. */
+html [class~="focus:outline-white/70"]:focus,
+html [class~="focus-visible:outline-white"]:focus-visible,
+html [class~="focus-visible:outline-white/30"]:focus-visible,
+html [class~="focus-visible:outline-white/40"]:focus-visible,
+html [class~="focus-visible:outline-white/70"]:focus-visible,
+html [class~="focus-visible:outline-white/80"]:focus-visible,
+html [class~="focus-within:outline-white/70"]:focus-within,
+html [class~="focus-within:outline-white/80"]:focus-within,
+html .group:focus-within [class~="group-focus-within:outline-white/80"] {
+    outline-color: var(--accent);
+}
+
+html [class~="focus:ring-white/30"]:focus,
+html [class~="focus:ring-white/60"]:focus,
+html [class~="focus:ring-white/80"]:focus,
+html [class~="focus-visible:ring-white/30"]:focus-visible,
+html [class~="focus-visible:ring-white/70"]:focus-visible,
+html [class~="focus-visible:ring-white/80"]:focus-visible,
+html [class~="focus-within:ring-white/30"]:focus-within,
+html [class~="focus-within:ring-white/70"]:focus-within {
+    --tw-ring-color: var(--accent);
+}
+
+html [class~="focus:border-white/25"]:focus,
+html [class~="focus:border-white/30"]:focus,
+html [class~="focus:border-white/40"]:focus,
+html [class~="focus-visible:border-white/60"]:focus-visible {
+    border-color: var(--accent);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
@@ -45,6 +46,8 @@ export function LauncherGroupSection({
   onRetry,
 }: LauncherGroupSectionProps) {
   const { t } = useTranslation();
+  const titleId = useId();
+  const contentId = useId();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const selectable = visibleInstances.filter((instance) =>
@@ -63,21 +66,23 @@ export function LauncherGroupSection({
       }}
     >
       <div
-        onClick={onToggleCollapsed}
-        className="group/head flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
+        className="group/head flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
       >
-        <Icon
-          icon="solar:alt-arrow-right-linear"
-          className="h-4 w-4 flex-shrink-0 text-white/30 transition-transform group-hover/head:text-white/60"
-          style={{ transform: collapsed ? undefined : "rotate(90deg)" }}
-        />
+        <button type="button" onClick={onToggleCollapsed} aria-labelledby={titleId}
+          aria-expanded={!collapsed} aria-controls={contentId}
+          className="-ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-white/40 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80">
+          <Icon icon="solar:alt-arrow-right-linear" aria-hidden="true"
+            className="h-4 w-4 transition-transform"
+            style={{ transform: collapsed ? undefined : "rotate(90deg)" }} />
+        </button>
 
-        <div onClick={(event) => event.stopPropagation()} className="flex-shrink-0">
+        <div className="flex-shrink-0">
           <CheckboxV2
             size="sm"
             checked={allSelected}
             indeterminate={selectedHere > 0 && !allSelected}
             onChange={onToggleLauncher}
+            aria-labelledby={titleId}
             disabled={phase === "error" || selectable.length === 0}
           />
         </div>
@@ -87,7 +92,7 @@ export function LauncherGroupSection({
         </Tooltip>
 
         <div className="min-w-0 flex-1">
-          <span className="truncate font-minecraft text-base normal-case text-white">
+          <span id={titleId} className="truncate font-minecraft text-base normal-case text-white">
             {launcher.displayName}
           </span>
           {!launcher.autoDetected && (
@@ -108,11 +113,10 @@ export function LauncherGroupSection({
             wrapperClassName="flex-shrink-0"
           >
             <button
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemove();
-              }}
-              className="flex h-6 w-6 items-center justify-center rounded text-white/40 opacity-0 transition-all hover:bg-white/10 hover:text-white group-hover/head:opacity-100"
+              type="button"
+              aria-label={t("profiles.launcherImport.manual.remove")}
+              onClick={onRemove}
+              className="flex h-6 w-6 items-center justify-center rounded text-white/40 opacity-0 transition-all hover:bg-white/10 hover:text-white group-hover/head:opacity-100 group-focus-within/head:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
             >
               <Icon icon="solar:close-circle-linear" className="h-4 w-4" />
             </button>
@@ -120,56 +124,59 @@ export function LauncherGroupSection({
         )}
       </div>
 
-      {!collapsed && (
-        <div className="border-t border-white/[0.07]">
-          {phase === "loading" && (
-            <div className="flex items-center gap-2 px-4 py-3 font-minecraft text-xs text-white/45">
-              <Icon icon="svg-spinners:ring-resize" className="h-3.5 w-3.5" />
-              {t("profiles.launcherImport.loading_instances")}
-            </div>
-          )}
+      <div id={contentId} hidden={collapsed} className="border-t border-white/[0.07]">
+        {!collapsed && (
+          <>
+            {phase === "loading" && (
+              <div className="flex items-center gap-2 px-4 py-3 font-minecraft text-xs text-white/45">
+                <Icon icon="svg-spinners:ring-resize" className="h-3.5 w-3.5" />
+                {t("profiles.launcherImport.loading_instances")}
+              </div>
+            )}
 
-          {phase === "error" && (
-            <div className="flex items-center gap-3 px-4 py-3">
-              <span className="min-w-0 flex-1 truncate font-minecraft text-xs text-amber-300/80">
-                {t("profiles.launcherImport.instances_failed", {
-                  launcher: launcher.displayName,
-                  error: error ?? "",
-                })}
-              </span>
-              <button
-                onClick={onRetry}
-                className="flex-shrink-0 px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/45 transition-colors hover:text-white"
-              >
-                {t("profiles.launcherImport.retry")}
-              </button>
-            </div>
-          )}
+            {phase === "error" && (
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span className="min-w-0 flex-1 truncate font-minecraft text-xs text-amber-300/80">
+                  {t("profiles.launcherImport.instances_failed", {
+                    launcher: launcher.displayName,
+                    error: error ?? "",
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="flex-shrink-0 px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/45 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
+                >
+                  {t("profiles.launcherImport.retry")}
+                </button>
+              </div>
+            )}
 
-          {phase === "ready" && visibleInstances.length === 0 && (
-            <div className="px-4 py-3 font-minecraft text-xs text-white/35">
-              {instances.length === 0
-                ? t("profiles.launcherImport.launcher_empty")
-                : t("profiles.launcherImport.no_match_in_launcher")}
-            </div>
-          )}
+            {phase === "ready" && visibleInstances.length === 0 && (
+              <div className="px-4 py-3 font-minecraft text-xs text-white/35">
+                {instances.length === 0
+                  ? t("profiles.launcherImport.launcher_empty")
+                  : t("profiles.launcherImport.no_match_in_launcher")}
+              </div>
+            )}
 
-          {visibleInstances.length > 0 && (
-            <div className="space-y-1.5 p-2">
-              {visibleInstances.map((instance) => (
-                <LauncherInstanceRow
-                  key={instance.instanceDir}
-                  instance={instance}
-                  selected={selected.includes(instance.instanceDir)}
-                  importedProfileId={importedThisSession[instance.instanceDir]}
-                  onToggle={() => onToggleInstance(instance.instanceDir)}
-                  onOpenProfile={onOpenProfile}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            {visibleInstances.length > 0 && (
+              <div className="space-y-1.5 p-2">
+                {visibleInstances.map((instance) => (
+                  <LauncherInstanceRow
+                    key={instance.instanceDir}
+                    instance={instance}
+                    selected={selected.includes(instance.instanceDir)}
+                    importedProfileId={importedThisSession[instance.instanceDir]}
+                    onToggle={() => onToggleInstance(instance.instanceDir)}
+                    onOpenProfile={onOpenProfile}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

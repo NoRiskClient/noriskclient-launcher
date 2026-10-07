@@ -29,10 +29,15 @@ export function useEntranceAnimation<T extends HTMLElement>(
   const animationsEnabled = useAnimationsEnabled();
 
   useLayoutEffect(() => {
-    if (!animationsEnabled || !ref.current) return;
-    const tween = gsap.fromTo(ref.current, from, to);
+    const node = ref.current;
+    if (!node) return;
+    // Revert owned inline styles when motion changes mid-tween. Merely killing
+    // a fromTo can leave the element at opacity:0 / a partial transform.
+    const context = gsap.context(() => {
+      if (animationsEnabled) gsap.fromTo(node, from, to);
+    }, node);
     return () => {
-      tween.kill();
+      context.revert();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animationsEnabled, ...deps]);

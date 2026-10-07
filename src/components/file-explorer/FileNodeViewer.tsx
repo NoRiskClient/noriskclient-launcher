@@ -6,6 +6,7 @@ import { Icon } from '@iconify/react';
 import { cn } from '../../lib/utils';
 import type { FileNode } from '../../types/fileSystem'; // Adjust path as necessary
 import { Checkbox } from '../ui/Checkbox'; // Adjust path as necessary
+import { Tooltip } from '../ui/Tooltip';
 import { useThemeStore } from '../../store/useThemeStore'; // For styling consistency if needed
 
 // Helper to format file size
@@ -48,6 +49,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
   expandedNodes,
   selectedFiles,
 }) => {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -100,15 +102,17 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
                 onToggleExpand(node.path, e);
             }}
             className="expand-toggle-button p-0.5 mr-1 text-white/70 hover:text-white flex-shrink-0"
-            aria-label={currentIsExpanded ? 'Collapse' : 'Expand'}
+            aria-label={t(currentIsExpanded ? 'file_tree.collapse_node' : 'file_tree.expand_node', { path: node.path })}
+            aria-expanded={currentIsExpanded}
           >
-            <Icon icon={currentIsExpanded ? "solar:alt-arrow-down-bold" : "solar:alt-arrow-right-bold"} className="w-4 h-4" />
+            <Icon aria-hidden="true" icon={currentIsExpanded ? "solar:alt-arrow-down-bold" : "solar:alt-arrow-right-bold"} className="w-4 h-4" />
           </button>
         ) : (
           <span className="expand-placeholder w-[20px] mr-1 flex-shrink-0"></span>
         )}        {checkboxesEnabled && (
           <div className="filenode-checkbox-area mr-2 flex-shrink-0 self-center">
             <Checkbox
+              aria-label={t('file_tree.select_node', { path: node.path })}
               checked={currentIsSelected}
               onChange={handleCheckboxChange}
               customSize="sm"
@@ -116,9 +120,13 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
           </div>
         )}
 
-        <Icon icon={node.is_dir ? "solar:folder-bold" : "solar:document-bold"} className="w-4 h-4 mr-2 flex-shrink-0 text-white/90 self-center" />
+        <Icon aria-hidden="true" icon={node.is_dir ? "solar:folder-bold" : "solar:document-bold"} className="w-4 h-4 mr-2 flex-shrink-0 text-white/90 self-center" />
         
-        <span 
+        <Tooltip
+          content={<><div>{node.name}</div><div className="mt-1 text-white/70">{node.path}</div></>}
+          wrapperClassName="flex-1 min-w-0"
+        >
+          <span
             className={cn(
               "node-name flex-1 truncate text-sm font-minecraft self-center", 
               {"cursor-pointer": node.is_dir || checkboxesEnabled && !node.is_dir }
@@ -132,8 +140,9 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
                 } 
             }}
         >
-          {node.name}
-        </span>
+            {node.name}
+          </span>
+        </Tooltip>
 
         {!node.is_dir && (
           <span className="node-size text-xs text-white/60 font-minecraft w-[70px] text-right mr-2 tabular-nums flex-shrink-0 self-center">
@@ -364,4 +373,4 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
       {nodesToRender.map((node) => renderNodeRecursive(node, 0))}
     </ul>
   );
-}; 
+};

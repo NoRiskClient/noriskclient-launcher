@@ -40,6 +40,8 @@ export function ServerLaunchCard({
 
   const {
     isLaunching,
+    isPreparing,
+    isBusy,
     statusMessage,
     launchState,
     handleQuickPlayLaunch
@@ -103,7 +105,7 @@ export function ServerLaunchCard({
   };
 
   const handleClick = () => {
-    if (!profileId) return;
+    if (!profileId || isPreparing) return;
     handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
   };
 
@@ -114,7 +116,7 @@ export function ServerLaunchCard({
       : null;
 
   const renderContent = () => {
-    if (isLaunching && statusMessage) {
+    if (isBusy && statusMessage) {
       return (
         <div className="flex flex-col items-center justify-center w-full">
           <span className="text-white font-minecraft text-sm">
@@ -185,7 +187,7 @@ export function ServerLaunchCard({
     );
   };
 
-  const isDisabled = !profileId;
+  const isDisabled = !profileId || isPreparing;
 
   return (
     <div
@@ -194,9 +196,10 @@ export function ServerLaunchCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={isDisabled ? undefined : handleClick}
+      aria-busy={isBusy}
     >
       <div className="relative w-16 h-16 flex-shrink-0 rounded flex items-center justify-center overflow-hidden">
-        {isLaunching ? (
+        {isBusy ? (
           <Icon
             icon="svg-spinners:ring-resize"
             className="w-8 h-8 text-white/70"
@@ -233,18 +236,20 @@ export function ServerLaunchCard({
             handleQuickPlayLaunch(undefined, serverAddress, launchOverrides);
           }}
           disabled={isDisabled}
-          className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95"
+          aria-busy={isBusy}
+          aria-label={isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : isLaunching ? t('server.stop') : t('server.join')}
+          className="w-20 h-8 flex items-center justify-center gap-1.5 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:brightness-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           style={{
             backgroundColor: isLaunching ? '#ef444460' : `${accentColor.value}35`,
             border: `2px solid ${isLaunching ? '#ef444490' : `${accentColor.value}60`}`,
           }}
         >
           <Icon
-            icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"}
+            icon={isPreparing ? "svg-spinners:ring-resize" : isLaunching ? "solar:stop-bold" : "solar:play-bold"}
             className="w-4 h-4 text-white"
           />
           <span className="font-minecraft text-xs text-white uppercase">
-            {isLaunching ? t('server.stop') : t('server.join')}
+            {isPreparing ? t('launch.preparing_action', { defaultValue: 'Wait...' }) : isLaunching ? t('server.stop') : t('server.join')}
           </span>
         </button>
 

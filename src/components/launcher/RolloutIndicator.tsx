@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { FocusEvent, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -15,6 +16,8 @@ import {
   setLauncherConfig,
 } from "../../services/launcher-config-service";
 import { getPackRolloutConfig } from "../../services/flagsmith-service";
+import { toast } from "react-hot-toast";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 const ACTIVE_COLOR = "#f59e0b";
 const FALLBACK_PCT = 5;
@@ -41,6 +44,11 @@ export function RolloutIndicator() {
   const [pct, setPct] = useState<number>(FALLBACK_PCT);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverId = useId();
+  const togglingRef = useRef(false);
+  const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   useEffect(() => {
     invoke<boolean>("is_pack_rollout_active")
@@ -87,7 +95,10 @@ export function RolloutIndicator() {
   };
 
   const handleIconLeave = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY);
+    closeTimer.current = setTimeout(() => {
+      if (document.activeElement !== buttonRef.current &&
+          !popoverRef.current?.contains(document.activeElement)) setOpen(false);
+    }, CLOSE_DELAY);
   };
 
   const handlePopoverEnter = () => {
@@ -98,12 +109,37 @@ export function RolloutIndicator() {
   };
 
   const handlePopoverLeave = () => {
+    handleIconLeave();
+  };
+
+  const handleBlur = (e: FocusEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (next === buttonRef.current || (next && popoverRef.current?.contains(next))) return;
     setOpen(false);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && open) {
+      e.preventDefault();
+      e.stopPropagation();
+      buttonRef.current?.focus();
+      setOpen(false);
+    } else if (e.key === 'Tab' && e.shiftKey && popoverRef.current?.contains(e.target as Node)) {
+      e.preventDefault();
+      buttonRef.current?.focus();
+    } else if (e.key === 'Tab' && !e.shiftKey && e.currentTarget === buttonRef.current && open) {
+      const first = popoverRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])');
+      if (first) { e.preventDefault(); first.focus(); }
+    }
   };
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (togglingRef.current) return;
+    togglingRef.current = true;
+    setToggling(true);
+    setToggleError(null);
     try {
       const current = await getLauncherConfig();
       const newOverride = optedOut ? "auto" : "off";
@@ -114,6 +150,15 @@ export function RolloutIndicator() {
       setOptedOut(!optedOut);
     } catch (err) {
       console.error("[RolloutIndicator] Failed to toggle rollout override:", err);
+      const message = t('rollout.popover.save_failed', {
+        defaultValue: 'Could not change testing preference: {{error}}',
+        error: parseErrorMessage(err),
+      });
+      setToggleError(message);
+      toast.error(message);
+    } finally {
+      togglingRef.current = false;
+      setToggling(false);
     }
   };
 
@@ -148,8 +193,15 @@ export function RolloutIndicator() {
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
+        onFocus={handleIconEnter}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        aria-expanded={open}
+        aria-controls={open ? popoverId : undefined}
+        aria-busy={toggling}
+        aria-disabled={toggling}
         className={cn(
-          "relative w-full h-full flex items-center justify-center cursor-pointer",
+          "relative w-full h-full flex items-center justify-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white",
           optedOut ? "opacity-40 grayscale" : "",
           animate ? "animate-pulse" : "",
         )}
@@ -160,12 +212,18 @@ export function RolloutIndicator() {
             : t("rollout.popover.click_to_opt_out")
         }
       >
-        <Icon icon="solar:bolt-bold" className="w-full h-full" />
+        <Icon icon={toggling ? "svg-spinners:ring-resize" : "solar:bolt-bold"} aria-hidden className="w-full h-full" />
       </button>
 
       {open &&
         createPortal(
           <div
+            ref={popoverRef}
+            id={popoverId}
+            role="region"
+            aria-labelledby={`${popoverId}-title`}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
             className="fixed z-[1000] w-[20rem] animate-slide-up-fade-in border border-b-2 rounded-md overflow-hidden"
             style={{
               left: pos.x,
@@ -195,7 +253,7 @@ export function RolloutIndicator() {
                   filter: optedOut ? "grayscale(1)" : undefined,
                 }}
               />
-              <h3 className="font-smallcaps text-sm text-white tracking-wide leading-none pt-1">
+              <h3 id={`${popoverId}-title`} className="font-smallcaps text-sm text-white tracking-wide leading-none pt-1">
                 {optedOut
                   ? t("rollout.popover.title_opted_out")
                   : t("rollout.popover.title")}
@@ -203,6 +261,8 @@ export function RolloutIndicator() {
             </div>
 
             <div className="p-4 flex flex-col gap-3.5">
+              {toggleError && <p role="alert" className="font-minecraft text-xs text-red-200 break-words">{toggleError}</p>}
+              {toggling && <p role="status" className="font-minecraft text-xs text-white/80">{t('common.saving', { defaultValue: 'Saving...' })}</p>}
               {optedOut ? (
                 <p className="font-minecraft text-sm text-white/80 leading-relaxed">
                   {t("rollout.popover.body_opted_out")}
@@ -230,10 +290,12 @@ export function RolloutIndicator() {
                   variant="secondary"
                   size="sm"
                   icon={<Icon icon="ic:baseline-discord" className="w-5 h-5" />}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    openExternalUrl(DISCORD_URL);
+                    try { await openExternalUrl(DISCORD_URL); }
+                    catch (error) { toast.error(t('rollout.popover.open_failed', {
+                      defaultValue: 'Could not open Discord: {{error}}', error: parseErrorMessage(error),
+                    })); }
                   }}
                   className="w-full justify-center"
                 >

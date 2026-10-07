@@ -31,6 +31,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
+import { getModalPortalZIndex, useModalScope } from "../../../ui/ModalScope";
+import { usePopupNavigation } from "../../../ui/dropdown/usePopupNavigation";
 
 interface ThemedDropdownProps {
   open: boolean;
@@ -63,23 +65,25 @@ interface ThemedDropdownProps {
    */
   triggerRef?: React.RefObject<HTMLElement | null>;
   matchTriggerWidth?: boolean;
+  id?: string;
+  ariaLabel?: string;
 }
 
 export function ThemedDropdown({
   open, onClose, children,
   width = "w-48", align = "right", scrollable = false,
   maxWidth = "max-w-xs", className = "",
-  triggerRef, matchTriggerWidth = false,
+  triggerRef, matchTriggerWidth = false, id, ariaLabel,
 }: ThemedDropdownProps) {
   const accent = useThemeStore((s) => s.accentColor.value);
+  const modalOwner = useModalScope();
   const [pos, setPos] = useState<{ top: number; left: number; width?: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [flipped, setFlipped] = useState(false);
+  const [layer, setLayer] = useState(1001);
 
   useLayoutEffect(() => {
     if (!open || !triggerRef?.current) {
       setPos(null);
-      setFlipped(false);
       return;
     }
     const r = triggerRef.current.getBoundingClientRect();
@@ -89,24 +93,35 @@ export function ThemedDropdown({
       left: align === "right" ? r.right - minW : r.left,
       ...(matchTriggerWidth ? { width: r.width } : {}),
     });
-    setFlipped(false);
   }, [open, triggerRef, width, align, matchTriggerWidth]);
 
   useLayoutEffect(() => {
-    if (flipped || !pos || !panelRef.current || !triggerRef?.current) return;
-    const panel = panelRef.current.getBoundingClientRect();
-    const trigger = triggerRef.current.getBoundingClientRect();
-    const overflowsBelow = panel.bottom > window.innerHeight - 8;
-    const fitsAbove = trigger.top - panel.height - 4 >= 8;
-    if (overflowsBelow && fitsAbove) {
-      setFlipped(true);
-      setPos({ top: trigger.top - panel.height - 4, left: pos.left, width: pos.width });
-    }
-  }, [pos, flipped, triggerRef]);
+    const panel = panelRef.current, trigger = triggerRef?.current;
+    if (!open || !panel || !trigger || !pos) return;
+    const place = () => {
+      setLayer(getModalPortalZIndex(modalOwner, 1001));
+      const r = trigger.getBoundingClientRect();
+      const height = panel.offsetHeight, measuredWidth = panel.offsetWidth;
+      const below = r.bottom + 4;
+      const top = below + height > window.innerHeight - 8 && r.top - height - 4 >= 8 ? r.top - height - 4 : below;
+      const left = align === "right" ? r.right - measuredWidth : r.left;
+      const next = {
+        top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
+        left: Math.max(8, Math.min(left, window.innerWidth - measuredWidth - 8)),
+        ...(matchTriggerWidth ? { width: Math.min(r.width, window.innerWidth - 16) } : {}),
+      };
+      setPos(previous => previous?.top === next.top && previous?.left === next.left && previous?.width === next.width ? previous : next);
+    };
+    place();
+    const observer = new ResizeObserver(place); observer.observe(panel); observer.observe(trigger);
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { observer.disconnect(); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, pos !== null, triggerRef, align, matchTriggerWidth, modalOwner]);
+  usePopupNavigation(open && (!triggerRef || pos !== null), panelRef, triggerRef, onClose);
 
   if (!open) return null;
 
-  const scrollClass = scrollable ? "max-h-80 overflow-y-auto custom-scrollbar" : "overflow-hidden";
+  const scrollClass = scrollable ? "max-h-80 overflow-y-auto custom-scrollbar" : "overflow-y-auto custom-scrollbar";
   // `w-XX` wird zur Untergrenze (statt fixer Breite). Das Panel waechst mit
   // dem Inhalt (`w-max`), bis `max-w-*` cap erreicht. Verhindert dass lange
   // Texte in lokalisierten Labels den Panel-Rand ueberschreiten. Der
@@ -118,7 +133,9 @@ export function ThemedDropdown({
     borderColor: `${accent}66`,
     backdropFilter: "blur(16px)",
     WebkitBackdropFilter: "blur(16px)",
-    minWidth: `${minWidthPx}px`,
+    minWidth: `min(${minWidthPx}px, calc(100vw - 16px))`,
+    maxWidth: "calc(100vw - 16px)",
+    maxHeight: scrollable ? "min(20rem, calc(100vh - 16px))" : "calc(100vh - 16px)",
   };
 
   // Portal mode: escape parent `opacity` / `overflow` by rendering into body.
@@ -126,12 +143,17 @@ export function ThemedDropdown({
     if (!pos) return null;
     return createPortal(
       <>
-        <div className="fixed inset-0 z-[1000]" onClick={onClose} />
+        <div data-modal-owner={modalOwner} className="fixed inset-0 z-[1000]" style={{ zIndex: layer - 1 }} onClick={onClose} />
         <div
           ref={panelRef}
+          id={id}
+          role="menu"
+          aria-label={ariaLabel}
+          data-modal-owner={modalOwner}
           style={{
             ...panelStyle,
             position: "fixed",
+            zIndex: layer,
             top: pos.top,
             left: pos.left,
             ...(pos.width ? { minWidth: pos.width, width: pos.width } : {}),
@@ -151,6 +173,10 @@ export function ThemedDropdown({
     <>
       <div className="fixed inset-0 z-10" onClick={onClose} />
       <div
+        ref={panelRef}
+        id={id}
+        role="menu"
+        aria-label={ariaLabel}
         style={panelStyle}
         className={`absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}
       >
@@ -207,6 +233,12 @@ export function ThemedDropdownItem({
 
   return (
     <button
+      type="button"
+      role={typeof selected === "boolean" ? "menuitemradio" : "menuitem"}
+      aria-checked={typeof selected === "boolean" ? selected : undefined}
+      data-selected={selected || undefined}
+      data-popup-item
+      tabIndex={-1}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       disabled={disabled}
       style={style}
@@ -220,10 +252,10 @@ export function ThemedDropdownItem({
         if (selected || disabled) return;
         e.currentTarget.style.backgroundColor = "transparent";
       }}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
+      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 focus-visible:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
     >
       {icon && <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />}
-      <span className="flex-1 min-w-0">{children}</span>
+      <span className="flex-1 min-w-0 break-words">{children}</span>
     </button>
   );
 }

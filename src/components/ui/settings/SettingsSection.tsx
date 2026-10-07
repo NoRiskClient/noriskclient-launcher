@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, Fragment, cloneElement, isValidElement, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../../lib/utils";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -16,6 +16,19 @@ interface SettingsSectionProps {
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+}
+
+/** React fragments are structural, not settings rows; inspect their actual children. */
+export function filterSettingsRows(children: ReactNode, query: string): ReactNode[] {
+  const visit = (nodes: ReactNode, prefix: string): ReactNode[] => Children.toArray(nodes).flatMap((child, index) => {
+    if (!isValidElement(child)) return [];
+    const key = `${prefix}/${child.key ?? index}`;
+    const props = child.props as { children?: ReactNode; label?: unknown; searchKeywords?: string[] };
+    if (child.type === Fragment) return visit(props.children, key);
+    const hay = [typeof props.label === "string" ? props.label : "", ...(props.searchKeywords ?? [])].join(" ");
+    return fuzzyMatch(hay, query) ? [cloneElement(child, { key })] : [];
+  });
+  return visit(children, "settings");
 }
 
 export function SettingsSection({
@@ -39,16 +52,7 @@ export function SettingsSection({
     const sectionMatch = fuzzyMatch(sectionHay, query);
 
     if (!sectionMatch) {
-      const kept = Children.toArray(children).filter((child) => {
-        if (!isValidElement(child)) return false;
-        const p = child.props as { label?: unknown; searchKeywords?: string[] };
-        if (typeof p.label !== "string" && !p.searchKeywords) return false;
-        const hay = [
-          typeof p.label === "string" ? p.label : "",
-          ...(p.searchKeywords ?? []),
-        ].join(" ");
-        return fuzzyMatch(hay, query);
-      });
+      const kept = filterSettingsRows(children, query);
       if (kept.length === 0) return null;
       body = kept;
     }

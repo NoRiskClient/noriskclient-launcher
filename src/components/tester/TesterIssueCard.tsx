@@ -12,7 +12,7 @@ import { VoteControls } from "./VoteControls";
 interface TesterIssueCardProps {
   issue: TesterIssue;
   busy: boolean;
-  onSubmit: (vote: BugVote | ReviewVote, description?: string) => void;
+  onSubmit: (vote: BugVote | ReviewVote, description?: string) => Promise<boolean>;
   onOpenIssue: () => void;
 }
 

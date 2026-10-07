@@ -290,7 +290,7 @@ const AddSkinCard = memo(
           <div className="flex-grow min-w-0 w-full text-center">
             {/* Skin Name */}
             <h3
-              className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
+              className="font-minecraft text-white text-base whitespace-normal break-words leading-6 min-h-12 max-w-full normal-case mb-1"
               title={t('skins.addNewSkin')}
             >
               {t('skins.addNewSkin')}
@@ -321,7 +321,7 @@ export function SkinsTab() {
     error: accountError,
     initializeAccounts,
   } = useMinecraftAuthStore();
-  const { showModal, hideModal } = useGlobalModal();
+  const { showModal } = useGlobalModal();
   const { t } = useTranslation();
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
 
@@ -440,29 +440,21 @@ export function SkinsTab() {
   };
 
   const saveSkin = async (skin: MinecraftSkin) => {
-    if (!skin) return;
+    const updatedSkin = await MinecraftSkinService.updateSkinProperties(
+      skin.id,
+      skin.name,
+      skin.variant,
+    );
 
-    try {
-      const updatedSkin = await MinecraftSkinService.updateSkinProperties(
-        skin.id,
-        skin.name,
-        skin.variant,
+    if (updatedSkin) {
+      setLocalSkins((prevSkins) =>
+        prevSkins.map((s) => (s.id === updatedSkin.id ? updatedSkin : s)),
       );
-
-      if (updatedSkin) {
-        setLocalSkins((prevSkins) =>
-          prevSkins.map((s) => (s.id === updatedSkin.id ? updatedSkin : s)),
-        );
-        if (selectedLocalSkin?.id === updatedSkin.id) {
-          setSelectedLocalSkin(updatedSkin);
-        }
-        hideModal('add-skin-modal');
-      } else {
-        toast.error(t('skins.skinNotFound'));
+      if (selectedLocalSkin?.id === updatedSkin.id) {
+        setSelectedLocalSkin(updatedSkin);
       }
-    } catch (err) {
-      console.error("Error updating skin properties:", err);
-      toast.error(parseErrorMessage(err));
+    } else {
+      throw new Error(t('skins.skinNotFound'));
     }
   };
 
@@ -482,12 +474,8 @@ export function SkinsTab() {
       setLocalSkins((prevSkins) =>
         [...prevSkins, newSkin].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      hideModal('add-skin-modal');
     } catch (err) {
-      console.error("Error adding new skin:", err);
-      const errorMessage =
-        parseErrorMessage(err);
-      toast.error(t('skins.failedToAddSkin', { error: errorMessage }));
+      throw new Error(t('skins.failedToAddSkin', { error: parseErrorMessage(err) }));
     }
   };
 
@@ -529,22 +517,22 @@ export function SkinsTab() {
   };
 
   const saveAndApplySkin = async (skin: MinecraftSkin) => {
-    try {
-      await saveSkin(skin);
-      await applyLocalSkin(skin);
-    } catch (err) {
-      console.error("Save and apply failed:", err);
-      toast.error(parseErrorMessage(err));
-    }
+    if (!activeAccount) throw new Error(t('skins.mustBeLoggedIn'));
+    await saveSkin(skin);
+    // The modal owns feedback and closing for the combined operation.
+    // Reapply the same ID too: its model variant may have just changed.
+    await applyLocalSkin(skin, { silent: true, force: true });
   };
 
-  const applyLocalSkin = async (skin: MinecraftSkin) => {
+  const applyLocalSkin = async (skin: MinecraftSkin, options: { silent?: boolean; force?: boolean } = {}) => {
     if (!activeAccount) {
+      if (options.silent) throw new Error(t('skins.mustBeLoggedIn'));
       toast.error(t('skins.mustBeLoggedIn'));
       return;
     }
 
-    if (isSkinApplied(skin)) {
+    if (!options.force && isSkinApplied(skin)) {
+      if (options.silent) throw new Error(t('skins.skinAlreadyApplied', { name: skin.name }));
       toast.error(t('skins.skinAlreadyApplied', { name: skin.name }));
       return;
     }
@@ -559,12 +547,13 @@ export function SkinsTab() {
         skin.name,
       );
 
-      toast.success(
+      if (!options.silent) toast.success(
         t('skins.appliedSkinSuccess', { name: skin.name, variant: skin.variant }),
       );
       await loadSkinData();
     } catch (err) {
       console.error("Error applying local skin:", err);
+      if (options.silent) throw err;
       toast.error(parseErrorMessage(err));
     } finally {
       setLoading(false);

@@ -10,6 +10,7 @@ import { ModPlatform } from '../types/unified';
 import { ContentType } from '../types/content';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
+import { useRef, useState } from 'react';
 
 /**
  * Checks if a profile's loader is compatible with Iris shader mod
@@ -277,11 +278,27 @@ export function IrisRequiredModal({
   projectTitle: string;
   profileId: string;
   installType?: string;
-  onInstallIris?: () => void;
+  onInstallIris?: () => void | Promise<void>;
   onClose: () => void;
 }) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const { t } = useTranslation();
+  const installingRef = useRef(false);
+  const [installing, setInstalling] = useState(false);
+  const close = () => { if (!installingRef.current) onClose(); };
+  const install = async () => {
+    if (installingRef.current || !onInstallIris) return;
+    installingRef.current = true;
+    setInstalling(true);
+    try { await onInstallIris(); }
+    catch (error) {
+      console.error('[IrisModal] Install callback failed:', error);
+      toast.error(t('iris.installation_error'));
+    } finally {
+      installingRef.current = false;
+      setInstalling(false);
+    }
+  };
 
   console.log(`⚠️ [ModrinthSearchV2] ${installType}: Iris NOT found in profile ${profileId}, showing modal notification`);
   console.log(`🎨 [ModrinthSearchV2] ${installType}: Showing Iris requirement modal for shader pack '${projectTitle}'`);
@@ -290,16 +307,19 @@ export function IrisRequiredModal({
     <div className="flex justify-end items-center gap-3">
       <Button
         variant="secondary"
-        onClick={onClose}
+        onClick={close}
+        disabled={installing}
       >
         {t('iris.skip_shader_mod')}
       </Button>
       {onInstallIris && (
         <Button
-          onClick={onInstallIris}
-          icon={<Icon icon="ph:download-simple-bold" className="w-4 h-4" />}
+          onClick={() => void install()}
+          disabled={installing}
+          aria-busy={installing}
+          icon={<Icon icon={installing ? "svg-spinners:ring-resize" : "ph:download-simple-bold"} className="w-4 h-4" />}
         >
-          {t('iris.install_iris')}
+          {installing ? t('iris.installing') : t('iris.install_iris')}
         </Button>
       )}
     </div>
@@ -309,7 +329,7 @@ export function IrisRequiredModal({
     <Modal
       title={t('iris.shader_pack_setup')}
       titleIcon={<Icon icon="solar:eye-bold" className="w-6 h-6" style={{ color: accentColor.value }} />}
-      onClose={onClose}
+      onClose={close}
       width="md"
       footer={modalFooter}
     >
@@ -443,6 +463,9 @@ export async function handleIrisCheckAndShowModal(
     if (!hasIris) {
       // Show modal immediately to alert user quickly
       const modalId = `iris-required-${projectId}-${Date.now()}`;
+      // Guard the exported callback too: global modal close/other consumers
+      // can run before the component has committed its busy render.
+      let installing = false;
       showModal(
         modalId,
         <IrisRequiredModal
@@ -450,6 +473,8 @@ export async function handleIrisCheckAndShowModal(
           profileId={profileId}
           installType={installType}
             onInstallIris={async () => {
+              if (installing) return;
+              installing = true;
               try {
                 console.log('🎯 [IrisModal] User clicked "Install Iris" - starting installation...');
 
@@ -488,10 +513,11 @@ export async function handleIrisCheckAndShowModal(
                   duration: 5000
                 });
               } finally {
+                installing = false;
                 hideModal(modalId);
               }
             }}
-          onClose={() => hideModal(modalId)}
+          onClose={() => { if (!installing) hideModal(modalId); }}
         />,
         1200
       );

@@ -20,6 +20,7 @@ import { CapeList } from "./CapeList";
 import { NO_CAPE_ID, createNoCapePlaceholder } from "./noCape";
 import type { CapeFiltersData } from "./CapeFilters";
 import { Icon } from "@iconify/react";
+import { CapeTemplatePicker } from "./CapeTemplatePicker";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Modal } from "../ui/Modal";
@@ -41,8 +42,13 @@ import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
 import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { getEquippedCosmetics } from "../../services/cosmetic-equip-service";
 
 
+
+const DEFAULT_CAPE_SORT = "mostUsed";
+type FailedCapeRead = { page: number; append: boolean };
+type EquippedCapeRead = { accountId: string | null; status: "unknown" | "loading" | "ready" | "error"; hash: string | null };
 
 export function CapeBrowser(): JSX.Element {
   const { t } = useTranslation();
@@ -63,7 +69,7 @@ export function CapeBrowser(): JSX.Element {
   const [isUnequipping, setIsUnequipping] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<CapeFiltersData>({
-    sortBy: "",
+    sortBy: DEFAULT_CAPE_SORT,
     timeFrame: "",
     showOwnedOnly: false,
     showFavoritesOnly: false,
@@ -72,6 +78,79 @@ export function CapeBrowser(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isExperimental, setIsExperimental] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
+  const { activeAccount } = useMinecraftAuthStore();
+  const [allReadFailure, setAllReadFailure] = useState<FailedCapeRead | null>(null);
+  const [myReadFailure, setMyReadFailure] = useState<FailedCapeRead | null>(null);
+  const [nrcEquipped, setNrcEquipped] = useState<EquippedCapeRead>({ accountId: null, status: "unknown", hash: null });
+  const [isRetryingVanilla, setIsRetryingVanilla] = useState(false);
+  const mountedRef = useRef(true);
+  const isLoadingRef = useRef(false);
+  const readSequenceRef = useRef(0);
+  const latestReadRef = useRef({ all: 0, my: 0 });
+  const pendingReadsRef = useRef(new Set<number>());
+  const equippedReadRef = useRef(0);
+  const equippedReadPendingRef = useRef<{ accountId: string; generation: number } | null>(null);
+  const mutationPendingRef = useRef(false);
+  const vanillaRetryRef = useRef(false);
+
+  const beginMutation = () => {
+    if (mutationPendingRef.current) {
+      throw Object.assign(new Error(t('capes.operationInProgress')), { capeOperationPending: true });
+    }
+    mutationPendingRef.current = true;
+  };
+
+  const beginRead = (owned: boolean) => {
+    const id = ++readSequenceRef.current;
+    latestReadRef.current[owned ? "my" : "all"] = id;
+    pendingReadsRef.current.add(id);
+    isLoadingRef.current = true;
+    (owned ? setMyReadFailure : setAllReadFailure)(null);
+    return id;
+  };
+  const isCurrentRead = (id: number, owned: boolean) =>
+    mountedRef.current && latestReadRef.current[owned ? "my" : "all"] === id;
+  const finishRead = (id: number) => {
+    pendingReadsRef.current.delete(id);
+    isLoadingRef.current = pendingReadsRef.current.size > 0;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      equippedReadRef.current += 1;
+    };
+  }, []);
+
+  const readEquippedCape = useCallback(async (force = false) => {
+    const accountId = useMinecraftAuthStore.getState().activeAccount?.id ?? null;
+    if (!force && accountId && equippedReadPendingRef.current?.accountId === accountId &&
+      equippedReadPendingRef.current.generation === equippedReadRef.current) return;
+    const generation = ++equippedReadRef.current;
+    setNrcEquipped({ accountId, status: accountId ? "loading" : "unknown", hash: null });
+    if (!accountId) return;
+    equippedReadPendingRef.current = { accountId, generation };
+    const isCurrent = () => mountedRef.current && generation === equippedReadRef.current &&
+      useMinecraftAuthStore.getState().activeAccount?.id === accountId;
+    try {
+      const response = await getEquippedCosmetics(accountId);
+      if (!isCurrent()) return;
+      const hash = response.customCapeHash;
+      if (hash !== null && (typeof hash !== "string" || !hash.trim())) throw new Error("Invalid equipped cape response");
+      // This existing endpoint may return a cached outfit; do not invent a mutation result.
+      setNrcEquipped({ accountId, status: "ready", hash });
+    } catch {
+      if (isCurrent()) setNrcEquipped({ accountId, status: "error", hash: null });
+    } finally {
+      if (equippedReadPendingRef.current?.generation === generation) equippedReadPendingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    readEquippedCape();
+    return () => { equippedReadRef.current += 1; };
+  }, [activeAccount?.id, readEquippedCape]);
 
   useEffect(() => {
     getLauncherConfig().then(config => {
@@ -87,7 +166,7 @@ export function CapeBrowser(): JSX.Element {
 
   const accentColor = useThemeStore((state) => state.accentColor);
   const { favoriteCapeIds, isFavorite } = useCapeFavoritesStore();
-  const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape } = useVanillaCapeStore();
+  const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape, lastFetchTime } = useVanillaCapeStore();
 
   // Computed loading states based on current filter or search
   const isLoading = useMemo(() => {
@@ -115,13 +194,20 @@ export function CapeBrowser(): JSX.Element {
   // Computed equipped cape ID based on current tab
   const equippedCapeId = useMemo(() => {
     if (filters.showVanillaOnly) {
+      if (!activeAccount || isLoadingVanilla || vanillaError || lastFetchTime === null) return null;
       return equippedCape?.id || NO_CAPE_ID;
     }
-    // For NoRisk capes, we don't have equipped state yet
-    return null;
-  }, [filters.showVanillaOnly, equippedCape]);
+    return nrcEquipped.accountId === activeAccount?.id && nrcEquipped.status === "ready"
+      ? nrcEquipped.hash ?? NO_CAPE_ID
+      : null;
+  }, [filters.showVanillaOnly, equippedCape, activeAccount?.id, isLoadingVanilla, vanillaError, lastFetchTime, nrcEquipped]);
 
   const { showModal, hideModal } = useGlobalModal();
+  const currentReadFailure = filters.showVanillaOnly ? null
+    : searchQuery.trim() ? allReadFailure
+    : filters.showOwnedOnly ? myReadFailure
+    : filters.showFavoritesOnly ? null : allReadFailure;
+  const hasReadError = filters.showVanillaOnly ? !!vanillaError : !!currentReadFailure;
 
   // Computed current data based on filter
   const capesData = useMemo(() => {
@@ -214,8 +300,6 @@ export function CapeBrowser(): JSX.Element {
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isLoadingRef = useRef(false);
-  const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
     if (!activeAccount) return;
@@ -230,22 +314,25 @@ export function CapeBrowser(): JSX.Element {
   useEffect(() => {
     const loadAllCapes = async () => {
       if (allCapes.length > 0 || isLoadingAll) return;
-
+      const request = beginRead(false);
       try {
         setIsLoadingAll(true);
         const browseOptions: BrowseCapesOptions = {
           page: 0,
           page_size: 20,
-          sort_by: undefined,
+          sort_by: DEFAULT_CAPE_SORT,
           time_frame: undefined,
         };
         const response = await browseCapes(browseOptions);
+        if (!isCurrentRead(request, false)) return;
         setAllCapes(response.capes);
         setAllPagination(response.pagination);
       } catch (error) {
         console.error("Failed to load ALL capes:", error);
+        if (isCurrentRead(request, false)) setAllReadFailure({ page: 0, append: false });
       } finally {
-        setIsLoadingAll(false);
+        finishRead(request);
+        if (isCurrentRead(request, false)) setIsLoadingAll(false);
       }
     };
 
@@ -254,12 +341,19 @@ export function CapeBrowser(): JSX.Element {
 
   // Load MY capes when account becomes available (using owned/list endpoint for review states)
   useEffect(() => {
+    // Owned data belongs to this account, never to a previously active account.
+    latestReadRef.current.my = ++readSequenceRef.current;
+    setMyCapes([]);
+    setMyPagination(null);
+    setMyReadFailure(null);
+    setIsLoadingMy(false);
     const loadMyCapes = async () => {
-      if (!activeAccount || myCapes.length > 0 || isLoadingMy) return;
-
+      if (!activeAccount) return;
+      const request = beginRead(true);
       try {
         setIsLoadingMy(true);
         const response = await getOwnedCapesList();
+        if (!isCurrentRead(request, true)) return;
         const accepted = response.ACCEPTED || [];
         const inReview = response.IN_REVIEW || [];
         const denied = response.DENIED || [];
@@ -272,10 +366,12 @@ export function CapeBrowser(): JSX.Element {
           totalPages: 1,
         });
       } catch (error) {
+        if (!isCurrentRead(request, true)) return;
         console.error("Failed to load MY capes via owned/list, falling back to getPlayerCapes:", error);
         // Fallback to old endpoint (only returns accepted capes)
         try {
           const fallbackCapes = await getPlayerCapes({ player_identifier: activeAccount.id });
+          if (!isCurrentRead(request, true)) return;
           setMyCapes(fallbackCapes);
           setMyPagination({
             currentPage: 0,
@@ -285,14 +381,16 @@ export function CapeBrowser(): JSX.Element {
           });
         } catch (fallbackError) {
           console.error("Fallback also failed:", fallbackError);
+          if (isCurrentRead(request, true)) setMyReadFailure({ page: 0, append: false });
         }
       } finally {
-        setIsLoadingMy(false);
+        finishRead(request);
+        if (isCurrentRead(request, true)) setIsLoadingMy(false);
       }
     };
 
     loadMyCapes();
-  }, [activeAccount]);
+  }, [activeAccount?.id]);
 
   // Load VANILLA capes when account becomes available and vanilla tab is active
   useEffect(() => {
@@ -323,16 +421,17 @@ export function CapeBrowser(): JSX.Element {
         return;
       }
 
-      isLoadingRef.current = true;
+      const ownedRead = !currentSearchQuery.trim() && currentFilters.showOwnedOnly;
+      const request = beginRead(ownedRead);
 
       if (append) {
-        if (currentFilters.showOwnedOnly) {
+        if (ownedRead) {
           setIsFetchingMoreMy(true);
         } else {
           setIsFetchingMoreAll(true);
         }
       } else {
-        if (currentFilters.showOwnedOnly) {
+        if (ownedRead) {
           setIsLoadingMy(true);
         } else {
           setIsLoadingAll(true);
@@ -350,6 +449,7 @@ export function CapeBrowser(): JSX.Element {
             player_identifier: currentSearchQuery.trim(),
           };
           response = await getPlayerCapes(playerCapesOptions);
+          if (!isCurrentRead(request, false)) return;
 
           // Always use the "all" setters for search results since we're searching globally
           setAllCapes(response);
@@ -364,6 +464,7 @@ export function CapeBrowser(): JSX.Element {
           const setPagination = getPaginationSetter(currentFilters.showOwnedOnly);
           try {
             const ownedResponse = await getOwnedCapesList();
+            if (!isCurrentRead(request, true)) return;
             const accepted = ownedResponse.ACCEPTED || [];
             const inReview = ownedResponse.IN_REVIEW || [];
             const denied = ownedResponse.DENIED || [];
@@ -376,8 +477,10 @@ export function CapeBrowser(): JSX.Element {
               totalPages: 1,
             });
           } catch (ownedError) {
+            if (!isCurrentRead(request, true)) return;
             console.warn("owned/list failed, falling back to getPlayerCapes:", ownedError);
             const fallbackCapes = await getPlayerCapes({ player_identifier: currentActiveAccount.id });
+            if (!isCurrentRead(request, true)) return;
             setCapes(fallbackCapes);
             setPagination({
               currentPage: 0,
@@ -387,6 +490,7 @@ export function CapeBrowser(): JSX.Element {
             });
           }
         } else {
+          if (ownedRead) throw new Error(t('capes.noActiveAccount'));
           // Browse all capes
           const browseOptions: BrowseCapesOptions = {
             page: pageToFetch,
@@ -399,6 +503,7 @@ export function CapeBrowser(): JSX.Element {
                 : currentFilters.timeFrame,
           };
           response = await browseCapes(browseOptions);
+          if (!isCurrentRead(request, false)) return;
 
           // Get the correct setters based on current filter
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
@@ -417,26 +522,24 @@ export function CapeBrowser(): JSX.Element {
           setPagination(response.pagination);
         }
       } catch (err: any) {
+        if (!isCurrentRead(request, ownedRead)) return;
         console.error("Error fetching capes:", err);
         const errorMessage =
           err?.message || t('capes.failedToLoadCapes');
         toast.error(errorMessage);
-        if (!append) {
-          const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
-          const setPagination = getPaginationSetter(currentFilters.showOwnedOnly);
-          setCapes([]);
-          setPagination(null);
-        }
+        (ownedRead ? setMyReadFailure : setAllReadFailure)({ page: pageToFetch, append });
+        // Preserve the last successful page and its pagination on a failed read.
       } finally {
-        isLoadingRef.current = false;
+        finishRead(request);
+        if (!isCurrentRead(request, ownedRead)) return;
         if (append) {
-          if (currentFilters.showOwnedOnly) {
+          if (ownedRead) {
             setIsFetchingMoreMy(false);
           } else {
             setIsFetchingMoreAll(false);
           }
         } else {
-          if (currentFilters.showOwnedOnly) {
+          if (ownedRead) {
             setIsLoadingMy(false);
           } else {
             setIsLoadingAll(false);
@@ -506,10 +609,31 @@ export function CapeBrowser(): JSX.Element {
   }, [currentPage]);
 
   const loadMoreCapes = useCallback(() => {
-    if (hasMoreItems && !isFetchingMore) {
+    if (hasMoreItems && !isFetchingMore && !currentReadFailure) {
       setCurrentPage((prevPage) => prevPage + 1);
     }
-  }, [hasMoreItems, isFetchingMore, paginationInfo, currentPage]);
+  }, [hasMoreItems, isFetchingMore, paginationInfo, currentPage, currentReadFailure]);
+
+  const retryCurrentView = async () => {
+    if (filters.showVanillaOnly) {
+      if (vanillaRetryRef.current || isLoadingVanilla) return;
+      vanillaRetryRef.current = true;
+      setIsRetryingVanilla(true);
+      try {
+        // Existing refresh bypasses the store's five-second failed-fetch throttle.
+        await useVanillaCapeStore.getState().refreshData();
+      } finally {
+        vanillaRetryRef.current = false;
+        if (mountedRef.current) setIsRetryingVanilla(false);
+      }
+      return;
+    }
+    if (isLoadingRef.current) return;
+    const append = currentReadFailure?.append ?? false;
+    const page = append ? currentReadFailure!.page : 0;
+    setCurrentPage(page);
+    await fetchCapesData(page, filters, searchQuery, append);
+  };
 
   const handleSortChange = (value: string) => {
     const newFilters = { ...filters, sortBy: value || undefined };
@@ -539,7 +663,9 @@ export function CapeBrowser(): JSX.Element {
   };
 
   const handleFilterChange = (value: string) => {
-    const newFilters = { ...filters, timeFrame: value || undefined };
+    const timeFrame = value || undefined;
+    if (timeFrame === (filters.timeFrame || undefined)) return;
+    const newFilters = { ...filters, timeFrame };
     const hasMajorFilterChanged = newFilters.timeFrame !== filters.timeFrame;
 
     setFilters(newFilters);
@@ -572,9 +698,7 @@ export function CapeBrowser(): JSX.Element {
     // If search is being cleared (from non-empty to empty), immediately reload default capes
     if (previousValue.trim() !== "" && value.trim() === "") {
       setCurrentPage(0);
-      // Clear search results and trigger reload of default capes
-      setAllCapes([]);
-      setAllPagination(null);
+      // Retain the previous results until the default-cape reload succeeds.
       // Force a reload by triggering search with empty value
       if (!isLoadingRef.current) {
         setIsLoadingAll(true);
@@ -596,28 +720,22 @@ export function CapeBrowser(): JSX.Element {
 
   const refreshCurrentView = () => {
     console.log("[CapeBrowser] Refreshing current view...");
-    // Clear current view data and reload
+    // Keep the last successful data available until the reload succeeds.
     setCurrentPage(0);
 
     if (!isLoadingRef.current) {
       if (searchQuery && searchQuery.trim() !== "") {
-        // When searching, clear search results and reload
-        setAllCapes([]);
-        setAllPagination(null);
+        // When searching, reload the current results.
         setIsLoadingAll(true);
         fetchCapesData(0, filters, searchQuery, false).finally(() => {
           setIsLoadingAll(false);
         });
       } else if (filters.showOwnedOnly) {
-        setMyCapes([]);
-        setMyPagination(null);
         setIsLoadingMy(true);
         fetchCapesData(0, filters, "", false).finally(() => {
           setIsLoadingMy(false);
         });
       } else if (!filters.showFavoritesOnly) {
-        setAllCapes([]);
-        setAllPagination(null);
         setIsLoadingAll(true);
         fetchCapesData(0, filters, "", false).finally(() => {
           setIsLoadingAll(false);
@@ -633,41 +751,55 @@ export function CapeBrowser(): JSX.Element {
       return;
     }
 
+    beginMutation();
     setIsEquippingCapeId(capeHash);
 
-    const promise = filters.showVanillaOnly
-      ? useVanillaCapeStore.getState().equipCape(capeHash)
-      : equipCape(capeHash);
-
-    toast.promise(promise, {
-      loading: t('capes.equippingCape'),
-      success: () => {
-        setIsEquippingCapeId(null);
-        return t('capes.capeEquippedSuccess');
-      },
-      error: (err: any) => {
-        setIsEquippingCapeId(null);
-        console.error("Error equipping cape:", err);
-        return t('capes.failedToEquipCape', { error: translateApiError(err, t('common.unknownError')) });
-      },
-    });
+    try {
+      const promise = filters.showVanillaOnly
+        ? useVanillaCapeStore.getState().equipCape(capeHash)
+        : equipCape(capeHash);
+      await toast.promise(promise, {
+        loading: t('capes.equippingCape'),
+        success: () => t('capes.capeEquippedSuccess'),
+        error: (err: any) => {
+          console.error("Error equipping cape:", err);
+          return t('capes.failedToEquipCape', { error: translateApiError(err, t('common.unknownError')) });
+        },
+      });
+      void readEquippedCape(true);
+    } catch (error) {
+      void readEquippedCape(true);
+      throw error;
+    } finally {
+      mutationPendingRef.current = false;
+      setIsEquippingCapeId(null);
+    }
   };
 
   const handleUnequipCape = async (alsoUnequipVanillaCape = false) => {
+    beginMutation();
     setIsUnequipping(true);
     setIsEquippingCapeId(NO_CAPE_ID);
     try {
-      await Promise.all([
+      const results = await Promise.allSettled([
         unequipCape(),
         ...(alsoUnequipVanillaCape
           ? [useVanillaCapeStore.getState().equipCape(null)]
           : []),
       ]);
+      // Do not release the shared mutation guard while the other operation is still running.
+      const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (rejected) throw rejected.reason;
       toast.success(t('capes.capeUnequippedSuccess'));
+      void readEquippedCape(true);
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
       toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
+      // A mixed NRC/Vanilla request may have partially succeeded. Read, never fabricate a rollback.
+      void readEquippedCape(true);
+      throw err;
     } finally {
+      mutationPendingRef.current = false;
       setIsEquippingCapeId(null);
       setIsUnequipping(false);
     }
@@ -678,6 +810,7 @@ export function CapeBrowser(): JSX.Element {
       <ConfirmDeletionModal
         capeToDelete={cape}
         onConfirmDelete={async () => {
+          beginMutation();
           try {
             await deleteCape(cape._id);
             toast.success(t('capes.capeDeletedSuccess'));
@@ -686,6 +819,9 @@ export function CapeBrowser(): JSX.Element {
           } catch (err: any) {
             console.error("Error deleting cape:", err);
             toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
+            throw err;
+          } finally {
+            mutationPendingRef.current = false;
           }
         }}
         onCancelDelete={() => hideModal('delete-cape-modal')}
@@ -699,6 +835,7 @@ export function CapeBrowser(): JSX.Element {
         capeToDelete={cape}
         showReasonInput
         onConfirmDelete={async (reason?: string) => {
+          beginMutation();
           try {
             await deleteCape(cape._id, undefined, undefined, reason);
             toast.success(t('capes.capeDeletedSuccess'));
@@ -707,6 +844,9 @@ export function CapeBrowser(): JSX.Element {
           } catch (err: any) {
             console.error("Error deleting cape (moderator):", err);
             toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
+            throw err;
+          } finally {
+            mutationPendingRef.current = false;
           }
         }}
         onCancelDelete={() => hideModal('mod-delete-cape-modal')}
@@ -780,18 +920,6 @@ export function CapeBrowser(): JSX.Element {
 
 
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
-  const templateMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showTemplateMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      if (templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
-        setShowTemplateMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showTemplateMenu]);
 
   const handleDownloadTemplate = async (withElytra: boolean) => {
     setShowTemplateMenu(false);
@@ -953,37 +1081,7 @@ export function CapeBrowser(): JSX.Element {
                 <div className="flex items-center gap-3">
                   {activeAccount && (
                     <>
-                      <div className="relative" ref={templateMenuRef}>
-                        <button
-                          onClick={() => setShowTemplateMenu(!showTemplateMenu)}
-                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
-                          title={t('capes.downloadTemplate')}
-                        >
-                          <div className="w-4 h-4 flex items-center justify-center">
-                            <Icon icon="solar:download-bold" className="w-4 h-4" />
-                          </div>
-                          <span>{t('capes.template')}</span>
-                          <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3" />
-                        </button>
-                        {showTemplateMenu && (
-                          <div className="absolute top-full left-0 mt-1 z-50 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden min-w-[180px]">
-                            <button
-                              onClick={() => handleDownloadTemplate(false)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
-                            >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
-                              <span>{t('capes.templateWithoutElytra')}</span>
-                            </button>
-                            <button
-                              onClick={() => handleDownloadTemplate(true)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
-                            >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
-                              <span>{t('capes.templateWithElytra')}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <CapeTemplatePicker open={showTemplateMenu} onOpenChange={setShowTemplateMenu} onSelect={handleDownloadTemplate} />
 
                       <button
                         onClick={handleUploadClick}
@@ -1002,6 +1100,24 @@ export function CapeBrowser(): JSX.Element {
             </div>
             </>)}
 
+            {hasReadError && (
+              <div className="mx-4 mb-4 rounded-md border border-red-400/30 bg-red-950/20 p-3">
+                <p role="alert" className="font-minecraft text-sm text-red-300 break-words">{t('capes.failedToLoadCapes')}</p>
+                {(filters.showVanillaOnly ? vanillaCapes.length > 0 : filters.showOwnedOnly ? myCapes.length > 0 : allCapes.length > 0) && (
+                  <p className="mt-2 font-minecraft text-xs text-white/70">{t('capes.loadedDataMayBeStale')}</p>
+                )}
+                <Button variant="flat-secondary" size="sm" className="mt-3" onClick={retryCurrentView}
+                  disabled={isLoadingAll || isLoadingMy || isFetchingMoreAll || isFetchingMoreMy || isLoadingVanilla || isRetryingVanilla}>
+                  {t('common.try_again')}
+                </Button>
+              </div>
+            )}
+            {!filters.showVanillaOnly && nrcEquipped.accountId === activeAccount?.id && nrcEquipped.status === "error" && (
+              <div className="mx-4 mb-4 flex flex-wrap items-center gap-3 rounded-md border border-white/10 bg-black/20 p-3">
+                <p role="status" className="font-minecraft text-xs text-white/80">{t('capes.equippedStateLoadFailed')}</p>
+                <Button variant="flat-secondary" size="sm" onClick={() => readEquippedCape()}>{t('common.try_again')}</Button>
+              </div>
+            )}
             {/* Cape List */}
             <CapeList
               capes={capesForList}

@@ -48,6 +48,7 @@ interface Options {
 export function useClipRender({ path, onDone, onTrim, t }: Options) {
   const [rendering, setRendering] = useState<RenderProgress | null>(null);
   const job = useRef<"trim" | "export" | null>(null);
+  const generation = useRef(0);
 
   const finish = useCallback(() => {
     job.current = null;
@@ -86,6 +87,9 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
 
   const save = useCallback(
     async (edit: ClipEdit) => {
+      // React's busy render is asynchronous. Guard the job synchronously too.
+      if (job.current) return;
+      const attempt = ++generation.current;
       setRendering({ done: 0, total: 0 });
       if (
         edit.overlays.length === 0 &&
@@ -95,7 +99,15 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         edit.hushed.length === 0
       ) {
         job.current = "trim";
-        if (!(await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd))) finish();
+        try {
+          const accepted = await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd);
+          if (!accepted && generation.current === attempt) finish();
+        } catch (e) {
+          console.error("Could not trim the clip", e);
+          if (generation.current !== attempt || !job.current) return;
+          finish();
+          toast.error(parseErrorMessage(e));
+        }
         return;
       }
       job.current = "export";
@@ -112,6 +124,7 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         });
       } catch (e) {
         console.error("Could not render the clip", e);
+        if (generation.current !== attempt || !job.current) return;
         finish();
         toast.error(parseErrorMessage(e));
       }
@@ -120,7 +133,9 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
   );
 
   const percent =
-    rendering && rendering.total > 0 ? Math.round((rendering.done / rendering.total) * 100) : null;
+    rendering && Number.isFinite(rendering.total) && rendering.total > 0 && Number.isFinite(rendering.done)
+      ? Math.max(0, Math.min(100, Math.round((rendering.done / rendering.total) * 100)))
+      : null;
 
   return { rendering: rendering !== null, percent, save };
 }

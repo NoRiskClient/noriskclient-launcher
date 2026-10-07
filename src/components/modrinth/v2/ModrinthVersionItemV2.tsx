@@ -16,6 +16,26 @@ import { gsap } from "gsap";
 import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
 import { Tooltip } from "../../ui/Tooltip";
 
+// Non-interactive sizing copy of the real labeled sm ActionButton footprint.
+// Shared grid cells use the current font/locale, not language-specific widths.
+function VersionActionLayoutBudget({ labels }: { labels: string[] }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="invisible pointer-events-none min-w-[80px] max-w-full inline-flex items-center gap-2 px-2 py-0.5 border font-smallcaps text-base"
+    >
+      <span className="w-3 h-3 shrink-0" />
+      <span className="grid min-w-0 [overflow-wrap:anywhere]">
+        {labels.map((label, index) => (
+          <span key={index} className="col-start-1 row-start-1">
+            {label}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 interface ModrinthVersionItemV2Props {
   version: UnifiedVersion;
   project: ModrinthSearchHit;
@@ -70,7 +90,8 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     isBlocked = false, // Deprecated
     noRiskStatus = null,
   }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const formatLocale = i18n.resolvedLanguage || i18n.language;
     const isModpack = project.project_type === "modpack";
     const cardRef = useRef<HTMLDivElement>(null);
     const [isCardHovered, setIsCardHovered] = useState(false);
@@ -256,10 +277,11 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
         buttonDisabled = false;
       }
     }
-    const showInstallBorder =
-      selectedProfileId &&
-      (versionStatus?.is_installed ||
-        versionStatus?.is_included_in_norisk_pack);
+    // Reserve the status-border width before the asynchronous install check.
+    const showInstallBorder = Boolean(selectedProfileId);
+    const installActionLabels = isModpack || selectedProfileId
+      ? [t("modrinth.install"), t("modrinth.installing")]
+      : [t("modrinth.install"), t("modrinth.installing"), t("common.installed"), t("modrinth.in_pack")];
 
     return (
       <div
@@ -270,6 +292,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
         className={cn(
           "relative overflow-hidden transition-colors duration-150 rounded-md backdrop-blur-sm",
           "border",
+          showInstallBorder && "border-l-4",
           showInstallBorder &&
             versionStatus?.is_installed &&
             "border-l-green-500 border-l-4",
@@ -328,20 +351,46 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                     icon="solar:download-minimalistic-bold"
                     className="w-3 h-3 mr-0.5"
                   />
-                  {version.downloads.toLocaleString()}
+                  {version.downloads.toLocaleString(formatLocale)}
                 </span>
                 <span className="flex items-center">
                   <Icon
                     icon="solar:calendar-mark-bold"
                     className="w-3 h-3 mr-0.5"
                   />
-                  {new Date(version.date_published).toLocaleDateString()}
+                  {new Date(version.date_published).toLocaleDateString(formatLocale)}
                 </span>
               </div>
             </div>
 
-            <div className="flex justify-between items-center gap-2">
-              <div className="flex flex-wrap items-center gap-1 flex-grow min-w-0">
+            <div className="flex flex-wrap justify-between items-center gap-2">
+              <div
+                role="region"
+                aria-label={version.name + " " + version.version_number}
+                tabIndex={0}
+                className="flex flex-nowrap items-center gap-1 flex-1 min-w-0 min-h-8 overflow-x-scroll whitespace-nowrap custom-scrollbar [&>*]:shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+              >
+                <TagBadge className="flex-shrink-0">
+                  {version.release_type}
+                </TagBadge>
+                {version.game_versions.length > 0 &&
+                  version.game_versions.slice(0, 5).map((gv) => (
+                    <TagBadge key={`gv-${version.id}-${gv}`} variant="default">
+                      {gv}
+                    </TagBadge>
+                  ))}
+                {version.game_versions.length > 5 && (
+                  <TagBadge variant="default">...</TagBadge>
+                )}
+                {version.loaders.length > 0 &&
+                  version.loaders.map((loader) => (
+                    <TagBadge
+                      key={`loader-${version.id}-${loader}`}
+                      variant="default"
+                    >
+                      {loader}
+                    </TagBadge>
+                  ))}
                 {selectedProfileId &&
                   versionStatus?.is_installed &&
                   versionStatus?.is_enabled !== false && (
@@ -377,29 +426,23 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                       {t('modrinth.in_norisk_pack')}
                     </TagBadge>
                   )}
-                <TagBadge className="flex-shrink-0">
-                  {version.release_type}
-                </TagBadge>
-                {version.game_versions.length > 0 &&
-                  version.game_versions.slice(0, 5).map((gv) => (
-                    <TagBadge key={`gv-${version.id}-${gv}`} variant="default">
-                      {gv}
-                    </TagBadge>
-                  ))}
-                {version.game_versions.length > 5 && (
-                  <TagBadge variant="default">...</TagBadge>
-                )}
-                {version.loaders.length > 0 &&
-                  version.loaders.map((loader) => (
-                    <TagBadge
-                      key={`loader-${version.id}-${loader}`}
-                      variant="default"
-                    >
-                      {loader}
-                    </TagBadge>
-                  ))}
               </div>
-              <div className="flex gap-1 flex-shrink-0">
+              <div className="grid min-w-0 max-w-full flex-shrink-0">
+                <div
+                  aria-hidden="true"
+                  className="invisible pointer-events-none col-start-1 row-start-1 flex flex-wrap gap-1"
+                >
+                  {selectedProfileId && onToggleEnableClick && (
+                    <VersionActionLayoutBudget labels={[t("common.active"), t("common.disabled")]} />
+                  )}
+                  <VersionActionLayoutBudget
+                    labels={[
+                      ...installActionLabels,
+                      ...(selectedProfileId && !isModpack && onDeleteClick ? [t("common.delete")] : []),
+                    ]}
+                  />
+                </div>
+                <div className="col-start-1 row-start-1 min-w-0 flex flex-wrap justify-end gap-1 [&>button]:max-w-full [&>button]:[overflow-wrap:anywhere]">
                 {" "}
                 {selectedProfileId &&
                   ((versionStatus?.is_installed &&
@@ -451,6 +494,7 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
                     label={buttonText}
                   />
                 )}
+                </div>
               </div>
             </div>
           </div>

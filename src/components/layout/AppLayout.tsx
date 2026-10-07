@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Icon } from "@iconify/react";
 
@@ -428,10 +428,33 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const updatingRef = useRef(false);
+  const checkingRef = useRef(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
+
+  const checkForUpdates = useCallback(async () => {
+    if (checkingRef.current) return;
+    checkingRef.current = true;
+    setIsCheckingUpdate(true);
+    try {
+      setAvailableUpdate(await checkUpdateAvailable());
+      setUpdateCheckError(null);
+    } catch (error) {
+      console.error("Failed to check for updates:", error);
+      // Background checks stay unobtrusive, but unavailable is not up to date.
+      setUpdateCheckError(t('header.update.check_failed', {
+        defaultValue: 'Could not check for updates. Click to retry.',
+      }));
+    } finally {
+      checkingRef.current = false;
+      setIsCheckingUpdate(false);
+    }
+  }, [t]);
 
   const handleUpdateClick = async () => {
-    if (isUpdating) return; // Prevent multiple simultaneous downloads
-
+    if (updatingRef.current) return;
+    updatingRef.current = true;
     setIsUpdating(true);
     try {
       await toast.promise(
@@ -446,6 +469,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       console.error("Failed to download and install update:", error);
       // Toast error is already handled by the promise toast
     } finally {
+      updatingRef.current = false;
       setIsUpdating(false);
     }
   };
@@ -490,19 +514,6 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       }
     };
 
-  const checkForUpdates = async () => {
-    try {
-      const updateInfo = await checkUpdateAvailable();
-      if (updateInfo) {
-        console.log("Update available:", updateInfo);
-        setAvailableUpdate(updateInfo);
-      }
-    } catch (error) {
-      console.error("Failed to check for updates:", error);
-      // Don't show error to user, just silently fail
-    }
-  };
-
     fetchVersion();
     checkForUpdates();
 
@@ -515,11 +526,11 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     return () => {
       clearInterval(updateCheckInterval);
     };
-  }, []);
+  }, [checkForUpdates]);
 
   return (
     <div
-      className="h-20 flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between px-8 z-10"
+      className="h-20 flex-shrink-0 border-b-2 backdrop-blur-lg flex items-center justify-between gap-3 px-4 xl:px-8 z-10"
       style={{
         borderColor: `${accentColor.value}40`,
         backgroundColor: `rgba(${Number.parseInt(accentColor.value.slice(1, 3), 16)}, ${Number.parseInt(
@@ -529,31 +540,46 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
       }}
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-4" data-tauri-drag-region>
+      <div className="flex flex-1 min-w-0 items-center gap-4" data-tauri-drag-region>
         <NavigationHistory />
 
-        <div className="flex flex-col items-start">
-          <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-col items-start">
+          <div className="flex max-w-full min-w-0 items-center gap-3">
             <h1
-              className="font-smallcaps text-2xl tracking-wider font-bold text-shadow"
+              className="min-w-0 truncate font-smallcaps text-2xl tracking-wider font-bold text-shadow"
               data-tauri-drag-region
             >
               NoRiskClient
             </h1>
             {availableUpdate && (
               <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
-                <div
-                  className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  aria-busy={isUpdating}
+                  aria-label={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}
+                  className={`h-8 w-8 shrink-0 rounded transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                   onClick={handleUpdateClick}
                 >
                   <Icon
                     icon={isUpdating ? "solar:download-minimalistic-bold" : "solar:download-minimalistic-bold"}
-                    className={`w-6 h-6 transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
+                    aria-hidden
+                    className={`w-6 h-6 mx-auto transition-colors ${isUpdating ? 'animate-pulse' : ''}`}
                     style={{
                       color: accentColor.value,
                     }}
                   />
-                </div>
+                </button>
+              </Tooltip>
+            )}
+            {updateCheckError && !availableUpdate && (
+              <Tooltip content={updateCheckError}>
+                <button type="button" onClick={() => void checkForUpdates()}
+                  disabled={isCheckingUpdate} aria-busy={isCheckingUpdate}
+                  aria-label={updateCheckError}
+                  className="h-8 w-8 shrink-0 rounded text-amber-300 hover:bg-white/10 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-50">
+                  <Icon aria-hidden icon={isCheckingUpdate ? 'svg-spinners:ring-resize' : 'solar:danger-triangle-bold'} className="w-5 h-5 mx-auto" />
+                </button>
               </Tooltip>
             )}
           </div>
@@ -561,7 +587,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-4">
         <UserProfileBar />
 
         <WindowControls
@@ -587,7 +613,7 @@ function WindowControls({
 }: WindowControlsProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-3 ml-4">
+    <div className="flex shrink-0 items-center gap-3 ml-4">
       <div
         ref={minimizeRef}
         className="titlebar-button-borderless w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"

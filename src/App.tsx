@@ -39,7 +39,6 @@ import {
   getLauncherConfig,
   setProfileGroupingPreference,
 } from "./services/launcher-config-service";
-import * as ConfigService from "./services/launcher-config-service";
 import { useGlobalDragAndDrop } from './hooks/useGlobalDragAndDrop';
 import { loadIcons } from '@iconify/react';
 import { setScreenTimeTab, trackEvent } from "./services/analytics-service";
@@ -69,6 +68,7 @@ import {
   openTesterWindow,
 } from "./services/tester-service";
 import { useTranslation } from "react-i18next";
+import { useAnalyticsConsentActions } from "./hooks/useAnalyticsConsentActions";
 
 export type ProfilesTabContext = {
   currentGroupingCriterion: string;
@@ -83,13 +83,13 @@ export function App() {
   const {
     analyticsConsent,
     language,
-    setAnalyticsConsent,
     shouldShowAnalyticsBanner,
     incrementLaunchCount,
   } = useThemeStore();
   const { showModal, hideModal } = useGlobalModal();
   const { activeAccount } = useMinecraftAuthStore();
   const { fetchNotifications } = useNotificationStore();
+  const analyticsActions = useAnalyticsConsentActions();
 
   const initializeAccounts = useMinecraftAuthStore((s) => s.initializeAccounts);
   const accountsLoaded = useMinecraftAuthStore((s) => s.accountsLoaded);
@@ -340,13 +340,13 @@ export function App() {
     (async () => {
       try {
         const launcherVersion = await invoke<string>('get_app_version').catch(() => 'unknown');
-        const javaInfo: any = await invoke('get_java_info_command').catch(() => null);
         const osInfo = await invoke<{ os: string; os_version: string; arch: string }>(
           'get_system_os_info',
         ).catch(() => ({ os: 'unknown', os_version: 'unknown', arch: 'unknown' }));
         await trackEvent('launcher_started', {
           launcher_version: launcherVersion,
-          java_version: javaInfo?.version ?? 'unknown',
+          // Launcher startup has no chosen Minecraft runtime/path to inspect.
+          java_version: 'unknown',
           os: osInfo.os,
           os_version: osInfo.os_version,
           arch: osInfo.arch,
@@ -466,98 +466,6 @@ export function App() {
     }
   };
 
-  // Analytics consent banner handlers
-  const handleAnalyticsAccept = async () => {
-    try {
-      // Update ThemeStore state
-      setAnalyticsConsent({
-        hasMadeDecision: true,
-        decision: 'accepted',
-        hasSeenBanner: true,
-        lastShown: new Date().toISOString(),
-      });
-
-      // Enable analytics in launcher config
-      const currentConfig = await ConfigService.getLauncherConfig();
-      await ConfigService.setLauncherConfig({
-        ...currentConfig,
-        enable_analytics: true,
-      });
-
-      // Invalidate analytics cache to reflect the change immediately
-      const { invalidateAnalyticsCache } = await import('./services/analytics-service');
-      invalidateAnalyticsCache();
-
-      toast.success(t('analytics.toast.enabled'));
-    } catch (error) {
-      console.error("Failed to enable analytics:", error);
-      toast.error(t('analytics.toast.enable_failed'));
-    }
-  };
-
-  const handleAnalyticsDecline = async () => {
-    try {
-      // Update ThemeStore state
-      setAnalyticsConsent({
-        hasMadeDecision: true,
-        decision: 'declined',
-        hasSeenBanner: true,
-        lastShown: new Date().toISOString(),
-      });
-
-      // Disable analytics in launcher config
-      const currentConfig = await ConfigService.getLauncherConfig();
-      await ConfigService.setLauncherConfig({
-        ...currentConfig,
-        enable_analytics: false,
-      });
-
-      // Invalidate analytics cache to reflect the change immediately
-      const { invalidateAnalyticsCache } = await import('./services/analytics-service');
-      invalidateAnalyticsCache();
-
-      toast.success(t('analytics.toast.disabled'));
-    } catch (error) {
-      console.error("Failed to disable analytics:", error);
-      toast.error(t('analytics.toast.disable_failed'));
-    }
-  };
-
-  const handleAnalyticsDismiss = () => {
-    const newReminderCount = analyticsConsent.reminderCount + 1;
-    setAnalyticsConsent({
-      hasSeenBanner: true,
-      lastShown: new Date().toISOString(),
-      reminderCount: newReminderCount,
-    });
-    toast(t('analytics.toast.dismissed'));
-  };
-
-  // Sync analytics state with config on app start
-  useEffect(() => {
-    const syncAnalyticsWithConfig = async () => {
-      try {
-        const config = await ConfigService.getLauncherConfig();
-        // Update ThemeStore decision based on config
-        if (config.enable_analytics && analyticsConsent.decision !== 'accepted') {
-          setAnalyticsConsent({
-            hasMadeDecision: true,
-            decision: 'accepted',
-          });
-        } else if (!config.enable_analytics && analyticsConsent.decision === 'accepted') {
-          setAnalyticsConsent({
-            hasMadeDecision: true,
-            decision: 'declined',
-          });
-        }
-      } catch (error) {
-        console.error("Failed to sync analytics with config:", error);
-      }
-    };
-
-    syncAnalyticsWithConfig();
-  }, []); // Only run once on mount
-
   // Increment launch count on app start
   useEffect(() => {
     incrementLaunchCount();
@@ -611,9 +519,12 @@ export function App() {
         <LegalUpdateBanner />
         {!legalNotice && shouldShowAnalyticsBanner() && (
           <AnalyticsConsentBanner
-            onAccept={handleAnalyticsAccept}
-            onDecline={handleAnalyticsDecline}
-            onDismiss={handleAnalyticsDismiss}
+            onAccept={analyticsActions.accept}
+            onDecline={analyticsActions.decline}
+            onDismiss={analyticsActions.dismiss}
+            pending={analyticsActions.pending}
+            error={analyticsActions.error}
+            draft={analyticsActions.draft}
           />
         )}
       </div>

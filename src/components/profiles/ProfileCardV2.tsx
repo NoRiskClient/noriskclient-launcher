@@ -176,9 +176,10 @@ export function ProfileCardV2({
                   // Refresh profiles to ensure the profile prop is updated
                   try {
                     const { fetchProfiles } = useProfileStore.getState();
-                    await fetchProfiles();
+                    await fetchProfiles({ throwOnError: true });
                   } catch (err) {
                     console.error("Failed to refresh profiles after modpack switch:", err);
+                    throw err;
                   }
                 }}
               />
@@ -205,7 +206,7 @@ export function ProfileCardV2({
   ];
 
   // Profile launch hook
-  const { isLaunching, statusMessage, handleLaunch } = useProfileLaunch({
+  const { isLaunching, isPreparing, isBusy, statusMessage, handleLaunch } = useProfileLaunch({
     profileId: profile.id,
     onLaunchSuccess: () => {
       console.log("Profile launched successfully:", profile.name);
@@ -330,11 +331,13 @@ export function ProfileCardV2({
   const actionButtons: ProfileActionButton[] = [
     {
       id: "play",
-      label: isLaunching ? t('profiles.stop') : t('profiles.play'),
-      icon: isLaunching ? "solar:stop-bold" : "solar:play-bold",
+      label: isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : isLaunching ? t('profiles.stop') : t('profiles.play'),
+      icon: isPreparing ? "svg-spinners:ring-resize" : isLaunching ? "solar:stop-bold" : "solar:play-bold",
+      disabled: isPreparing,
       variant: isLaunching ? "destructive" : "primary",
       tooltip: isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying'),
       onClick: (profile, e) => {
+        if (isPreparing) return;
         if (onPlay) {
           onPlay(profile);
         } else {
@@ -403,6 +406,7 @@ export function ProfileCardV2({
     return (
       <div
         className={`relative flex flex-col ${gap} ${padding} rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+        aria-busy={isBusy}
         style={variant === "3d" ? get3DStyling() : {}}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -411,6 +415,7 @@ export function ProfileCardV2({
           const target = e.target as Element;
           if (e.target === e.currentTarget || (!target.closest('button') && !target.closest('.play-overlay'))) {
             if (variant === "3d") {
+              if (isPreparing) return;
               // In 3D mode, launch the profile when clicking the card
               if (onPlay) {
                 onPlay(profile);
@@ -530,14 +535,16 @@ export function ProfileCardV2({
             <ProfileIconV2 profile={profile} size={isCompact ? "md" : "lg"} className="w-full h-full" />
             
             {/* Play button overlay - similar to ProfileCard.tsx */}
-            {(isLaunching || isHovered) && (
+            {(isBusy || isHovered) && (
               <div className="play-overlay absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-150 cursor-pointer rounded-lg">
                 <button
                   onClick={() => handleLaunch()}
-                  className={`${isCompact ? 'w-8 h-8' : 'w-12 h-12'} flex items-center justify-center text-white hover:text-white/80 transition-colors`}
-                  disabled={false}
+                  className={`${isCompact ? 'w-8 h-8' : 'w-12 h-12'} flex items-center justify-center text-white hover:text-white/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white`}
+                  disabled={isPreparing}
+                  aria-busy={isBusy}
+                  aria-label={isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : isLaunching ? t('profiles.stop') : t('profiles.play')}
                 >
-                  {isLaunching ? (
+                  {isPreparing ? <Icon icon="svg-spinners:ring-resize" className={isCompact ? 'w-6 h-6' : 'w-8 h-8'} /> : isLaunching ? (
                     <Icon icon="solar:stop-bold" className={isCompact ? 'w-6 h-6' : 'w-8 h-8'} />
                   ) : (
                     <Icon icon="solar:play-bold" className={isCompact ? 'w-6 h-6' : 'w-8 h-8'} />
@@ -585,7 +592,7 @@ export function ProfileCardV2({
                 </Tooltip>
               )}
             </div>
-            {isLaunching ? (
+            {isBusy ? (
               <div
                 className="text-white/60 text-xs font-minecraft opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
@@ -675,6 +682,7 @@ export function ProfileCardV2({
   return (
     <div
       className={`relative flex items-center gap-4 p-3 rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+      aria-busy={isBusy}
       style={variant === "3d" ? get3DStyling() : {}}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -683,6 +691,7 @@ export function ProfileCardV2({
         const target = e.target as Element;
         if (e.target === e.currentTarget || !target.closest('button')) {
           if (variant === "3d") {
+            if (isPreparing) return;
             // In 3D mode, launch the profile when clicking the card
             if (onPlay) {
               onPlay(profile);
@@ -771,7 +780,7 @@ export function ProfileCardV2({
           )}
         </div>
         
-        {isLaunching ? (
+        {isBusy ? (
           <div
             className="text-white/60 text-xs font-minecraft opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
             style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}

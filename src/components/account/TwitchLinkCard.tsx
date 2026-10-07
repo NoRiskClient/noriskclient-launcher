@@ -1,14 +1,13 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import { listen } from "@tauri-apps/api/event";
 import { Modal } from "../ui/Modal";
 import { Tooltip } from "../ui/Tooltip";
 import { Button } from "../ui/buttons/Button";
-import { CheckboxV2 } from "../ui/CheckboxV2";
 import { AccountLinkRow } from "./AccountLinkRow";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { useLatest } from "../../hooks/useLatest";
@@ -199,20 +198,34 @@ function TwitchScopeInfoModal({
   const accentColor = useThemeStore((s) => s.accentColor);
   const [available, setAvailable] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [scopeState, setScopeState] = useState<"loading" | "ready" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const scopeId = useId();
 
   useEffect(() => {
+    let disposed = false;
+    setScopeState("loading");
     TwitchService.getAvailableScopes()
       .then((scopes) => {
+        if (disposed) return;
+        if (scopes.length === 0) throw new Error("No Twitch scopes available");
         setAvailable(scopes);
         setSelected(new Set(scopes));
+        setScopeState("ready");
       })
-      .catch((err) => console.error("Failed to load Twitch scopes:", err));
-  }, []);
+      .catch((err) => {
+        if (disposed) return;
+        console.error("Failed to load Twitch scopes:", err);
+        setScopeState("error");
+      });
+    return () => { disposed = true; };
+  }, [attempt]);
 
-  const toggle = (scope: string) =>
+  const selectScope = (scope: string, checked: boolean) =>
     setSelected((current) => {
       const next = new Set(current);
-      if (!next.delete(scope)) next.add(scope);
+      if (checked) next.add(scope);
+      else next.delete(scope);
       return next;
     });
 
@@ -234,27 +247,52 @@ function TwitchScopeInfoModal({
         )}
 
         <p className="mb-3 text-xs text-white/60">{t("twitch.scopeInfoPick")}</p>
-        <div className="rounded-md border border-white/10 bg-black/20 divide-y divide-white/5 overflow-hidden">
-          {available.map((scope) => {
+        {/* Seven native scopes occupy 260px. Reserve the same space during IPC. */}
+        <div aria-busy={scopeState === "loading"} className="min-h-[260px] rounded-md border border-white/10 bg-black/20 divide-y divide-white/5 overflow-hidden">
+          {scopeState === "loading" && (
+            <div role="status" className="min-h-[258px] flex items-center justify-center gap-3 px-3 py-4">
+              <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 shrink-0" />
+              {t("twitch.scopesLoading")}
+            </div>
+          )}
+          {scopeState === "error" && (
+            <div className="min-h-[258px] flex flex-col items-center justify-center gap-4 px-4 py-4 text-center">
+              <p role="alert" className="text-white/80">{t("twitch.scopesLoadFailed")}</p>
+              <Button variant="ghost" onClick={() => { setScopeState("loading"); setAttempt((current) => current + 1); }}>
+                {t("common.try_again")}
+              </Button>
+            </div>
+          )}
+          {scopeState === "ready" && available.map((scope) => {
             const key = scope.split(":").join("_");
+            const id = `${scopeId}-${key}`;
             return (
               <div
                 key={scope}
-                onClick={() => toggle(scope)}
-                className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors hover:bg-white/5"
+                className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-white/5"
               >
-                <CheckboxV2 checked={selected.has(scope)} onChange={() => undefined} size="sm" className="pointer-events-none" />
-                <span className="flex-1 text-white/90">{t(`twitch.scope.${key}.title`)}</span>
-                <code className="text-[10px] font-mono text-white/30">{scope}</code>
+                <label htmlFor={id} className="min-w-0 flex flex-1 items-center gap-3 cursor-pointer">
+                  <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                    <input id={id} type="checkbox" checked={selected.has(scope)}
+                      onChange={(event) => selectScope(scope, event.currentTarget.checked)}
+                      aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
+                      className="h-4 w-4 cursor-pointer appearance-none rounded-sm border-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                      style={{ borderColor: selected.has(scope) ? accentColor.value : "rgba(255,255,255,0.4)", backgroundColor: selected.has(scope) ? accentColor.value : "rgba(0,0,0,0.2)" }} />
+                    {selected.has(scope) && <Icon icon="mdi:check" className="pointer-events-none absolute h-3 w-3 text-white" aria-hidden="true" />}
+                  </span>
+                  <span id={`${id}-title`} className="flex-1 text-white/90">{t(`twitch.scope.${key}.title`)}</span>
+                  <code className="text-xs font-mono text-white/60">{scope}</code>
+                  <span id={`${id}-description`} className="sr-only">{t(`twitch.scope.${key}.description`)}</span>
+                </label>
                 <Tooltip content={t(`twitch.scope.${key}.description`)}>
-                  <Icon icon="solar:info-circle-linear" className="w-4 h-4 text-white/30 hover:text-white/70" />
+                  <Icon icon="solar:info-circle-linear" className="w-4 h-4 text-white/60 hover:text-white/90" />
                 </Tooltip>
               </div>
             );
           })}
         </div>
 
-        <p className="mt-3 flex items-center gap-2 text-[11px] text-white/45">
+        <p className="mt-3 flex items-center gap-2 text-xs text-white/70">
           <Icon icon="solar:shield-check-bold" className="w-4 h-4 shrink-0" style={{ color: accentColor.value }} />
           {t("twitch.scopeInfoNoAutomation")}
         </p>
@@ -262,7 +300,8 @@ function TwitchScopeInfoModal({
         <TwitchPrimaryAction
           label={t("twitch.scopeInfoContinue")}
           icon="mdi:twitch"
-          onClick={() => onContinue(available.filter((scope) => selected.has(scope)))}
+          disabled={scopeState !== "ready"}
+          onClick={() => { if (scopeState === "ready") onContinue(available.filter((scope) => selected.has(scope))); }}
         />
       </div>
     </Modal>
@@ -324,7 +363,7 @@ function TwitchDeviceLoginModal({
     });
 
     unlisten
-      .then(() => TwitchService.beginDeviceLogin(scopes))
+      .then(() => { if (!disposed) return TwitchService.beginDeviceLogin(scopes); })
       .catch((err) => {
         if (disposed) return;
         console.error("Failed to start Twitch login:", err);
@@ -382,7 +421,9 @@ function TwitchDeviceLoginModal({
           </>
         ) : (
           <>
-            <p className="text-sm text-white/70 leading-relaxed">{t("twitch.linkInstructions")}</p>
+            <p className="text-sm text-white/70 leading-relaxed">
+              {t(verificationUri ? "twitch.activationInstructions" : "twitch.startingInstructions")}
+            </p>
 
             <span className="mt-5 text-xs text-white/50">{t("twitch.yourCode")}</span>
             {userCode ? (

@@ -1,11 +1,12 @@
 "use client";
 
 import type React from "react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 
 interface LoadingStateProps extends React.HTMLAttributes<HTMLDivElement> {
   message?: string;
@@ -41,9 +42,8 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+    const animationsEnabled = useAnimationsEnabled();
+    const safeProgress = Number.isFinite(progress) && progress >= 0 ? Math.min(100, progress) : undefined;
     const [isVisible, setIsVisible] = useState(isLoading);
 
     const mergedRef = (node: HTMLDivElement) => {
@@ -57,41 +57,34 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
       containerRef.current = node;
     };
 
-    useEffect(() => {
-      if (containerRef.current && isBackgroundAnimationEnabled) {
-        gsap.set(containerRef.current, { y: 0, opacity: 1 });
-      }
-    }, [isBackgroundAnimationEnabled]);
-
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (!containerRef.current) return;
-
       if (isLoading) {
         setIsVisible(true);
-        gsap.to(containerRef.current, {
-          opacity: 1,
-          duration: 0.3,
-          ease: "power2.out",
-        });
+        gsap.set(containerRef.current, { opacity: 1, y: 0 });
+      } else if (!animationsEnabled) {
+        setIsVisible(false);
       } else {
-        gsap.to(containerRef.current, {
+        const tween = gsap.to(containerRef.current, {
           opacity: 0,
           duration: 0.3,
           ease: "power2.in",
           onComplete: () => setIsVisible(false),
         });
+        return () => { tween.kill(); };
       }
-    }, [isLoading]);
+    }, [isLoading, animationsEnabled]);
 
-    useEffect(() => {
-      if (progressRef.current && progress >= 0 && showProgressBar) {
-        gsap.to(progressRef.current, {
-          width: `${Math.min(100, progress)}%`,
-          duration: 0.4,
+    useLayoutEffect(() => {
+      if (progressRef.current && safeProgress !== undefined && showProgressBar) {
+        const tween = gsap.to(progressRef.current, {
+          width: `${safeProgress}%`,
+          duration: animationsEnabled ? 0.4 : 0,
           ease: "power1.out",
         });
+        return () => { tween.kill(); };
       }
-    }, [progress, showProgressBar]);
+    }, [safeProgress, showProgressBar, animationsEnabled, isLoading]);
 
     const getVariantColors = () => {
       switch (variant) {
@@ -178,11 +171,14 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
       return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.light}40, inset 0 0 0 1px ${colors.main}20`;
     };
 
-    if (!isVisible) return null;
+    if (!isLoading && !isVisible) return null;
 
     return (
       <div
         ref={mergedRef}
+        role="status"
+        aria-live="polite"
+        aria-busy={isLoading}
         className={cn(
           "flex flex-col items-center justify-center space-y-4 rounded-md backdrop-blur-md",
           shadowDepth !== "none" && "border-2 border-b-4",
@@ -217,6 +213,11 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
 
         {showProgressBar && (
           <div
+            role="progressbar"
+            aria-label={message}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={safeProgress}
             className={cn(
               "w-full overflow-hidden rounded-full bg-black/20",
               sizeStyles.progressHeight,
@@ -225,12 +226,12 @@ export const LoadingState = forwardRef<HTMLDivElement, LoadingStateProps>(
           >
             <div
               ref={progressRef}
-              className="h-full rounded-full transition-all"
+              className={cn("h-full rounded-full", animationsEnabled && "transition-all")}
               style={{
                 backgroundColor: colors.text,
-                width: progress >= 0 ? `${Math.min(100, progress)}%` : "30%",
+                width: safeProgress !== undefined ? `${safeProgress}%` : "30%",
                 animation:
-                  progress < 0 ? "loading-bar 2s ease-in-out infinite" : "none",
+                  safeProgress === undefined && animationsEnabled ? "loading-bar 2s ease-in-out infinite" : "none",
               }}
             ></div>
           </div>

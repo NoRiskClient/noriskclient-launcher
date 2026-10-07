@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { MainLaunchButton } from './MainLaunchButton';
+import { Button } from '../ui/buttons/Button';
 import { PlayerRig } from './PlayerRig';
 import { useThemeStore } from '../../store/useThemeStore';
 import { Icon } from '@iconify/react';
@@ -45,6 +46,8 @@ interface PlayerActionsDisplayProps {
     profileId: string; 
   }>;
   className?: string;
+  /** Successful empty read only; loading and failed reads must not imply emptiness. */
+  profilesEmpty?: boolean;
   displayMode?: 'playerName' | 'logo';
   outline?: Partial<PromoOutlineConfig>;
 }
@@ -74,6 +77,7 @@ export function PlayerActionsDisplay({
   launchButtonDefaultVersion,
   onLaunchVersionChange,
   launchButtonVersions,
+  profilesEmpty = false,
   className,
   displayMode = 'playerName',
   outline,
@@ -84,7 +88,7 @@ export function PlayerActionsDisplay({
   const setFeatureMode = useThemeStore((state) => state.setFeatureMode);
   const navigate = useNavigate();
 
-  const isLoadingProfiles = launchButtonVersions.length === 0;
+  const hasProfiles = launchButtonVersions.length > 0;
 
   const getFeaturedServerProfileId = (): string | null => {
     if (FEATURED_SERVER.profileId) {
@@ -147,7 +151,7 @@ export function PlayerActionsDisplay({
       )}>
         <PlayerRig playerName={playerName} outline={outline} />
 
-        {!isLoadingProfiles && (
+        {hasProfiles && (
           <>
             {/* Featured Server Toggle - above the launch button */}
             <div
@@ -211,6 +215,19 @@ export function PlayerActionsDisplay({
               )}
             </div>
           </>
+        )}
+        {profilesEmpty && !hasProfiles && (
+          <div className="absolute inset-x-0 bottom-2 z-30 flex flex-col items-center gap-2 px-4 text-center" data-play-empty-profiles>
+            <p className="font-minecraft text-base text-white">{t('profiles.noProfilesFound')}</p>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => navigate('/profiles')}
+              icon={<Icon icon="solar:widget-bold" className="w-4 h-4" />}
+            >
+              {t('nav.profiles')}
+            </Button>
+          </div>
         )}
       </div>
     </div>

@@ -19,6 +19,14 @@ import { cn } from "../../../lib/utils";
 // Define Profile type locally, similar to ModrinthSearchV2.tsx
 type Profile = any;
 
+const PROJECT_TYPE_LABEL_KEYS: Record<ModrinthProjectType, string> = {
+  mod: 'profiles.content.mods',
+  modpack: 'modrinth.project_types.modpacks',
+  resourcepack: 'profiles.content.resourcePacks',
+  shader: 'profiles.content.shaderPacks',
+  datapack: 'profiles.content.dataPacks',
+};
+
 export // Define SelectOption type locally
 interface SelectOption {
   value: UnifiedSortType;
@@ -34,6 +42,8 @@ interface ModrinthSearchControlsV2Props {
   allProjectTypes: ModrinthProjectType[]; // This will be ALL_MODRINTH_PROJECT_TYPES from parent
   profiles: Profile[];
   selectedProfile: Profile | null;
+  /** Reserve the known profile-filter slot while its DTO is still loading. */
+  reserveProfileFilterRow?: boolean;
   onSelectedProfileChange: (profile: Profile | null) => void;
   sortOrder: UnifiedSortType;
   onSortOrderChange: (sort: UnifiedSortType) => void;
@@ -66,6 +76,7 @@ export const ModrinthSearchControlsV2: React.FC<
   allProjectTypes,
   profiles,
   selectedProfile,
+  reserveProfileFilterRow = false,
   onSelectedProfileChange,
   sortOrder,
   onSortOrderChange,
@@ -114,7 +125,7 @@ export const ModrinthSearchControlsV2: React.FC<
   // Create groups array for project types
   const groups: GroupTab[] = allProjectTypes.map(type => ({
     id: type,
-    name: type.charAt(0).toUpperCase() + type.slice(1) + 's',
+    name: t(PROJECT_TYPE_LABEL_KEYS[type]),
     count: 0, // Could be populated with result counts if needed
   }));
 
@@ -130,10 +141,11 @@ export const ModrinthSearchControlsV2: React.FC<
 
       {/* Search & Filter Header */}
       <div className="mb-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 flex-1">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex min-w-0 flex-[1_1_20rem] items-center gap-2">
             <SearchWithFilters
-              placeholder={t('content.search_placeholder', { type: projectType })}
+              className="min-w-0 flex-1"
+              placeholder={t('profiles.v3.toolbar.searchPlaceholder', { type: t(PROJECT_TYPE_LABEL_KEYS[projectType]) })}
               searchValue={searchTerm}
               onSearchChange={onSearchTermChange}
               sortOptions={sortOptions}
@@ -143,7 +155,7 @@ export const ModrinthSearchControlsV2: React.FC<
 
             <button
               onClick={onToggleSidebar}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
+              className="flex shrink-0 items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
               title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
             >
               <div className="w-4 h-8 flex items-center justify-center">
@@ -155,11 +167,11 @@ export const ModrinthSearchControlsV2: React.FC<
           </div>
 
           {/* Platform Selection Buttons - ganz rechts */}
-          <div className="flex items-center gap-1 border border-white/10 rounded-lg p-0.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1 border border-white/10 rounded-lg p-0.5">
             <button
               onClick={() => onModSourceChange(ModPlatform.Modrinth)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
+                "flex shrink-0 items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.Modrinth
                   ? "bg-green-400/40 text-white border border-green-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
@@ -177,7 +189,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={() => onModSourceChange(ModPlatform.CurseForge)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
+                "flex shrink-0 items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.CurseForge
                   ? "bg-orange-400/40 text-white border border-orange-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
@@ -195,16 +207,19 @@ export const ModrinthSearchControlsV2: React.FC<
         </div>
 
         {/* Filter Tags - Under Search */}
-        {totalFilters > 0 && (
-          <div className="flex items-center gap-2 mt-4">
+        {(totalFilters > 0 || reserveProfileFilterRow) && (
+          <div className="flex items-center gap-2 mt-4 min-h-6 overflow-x-auto" data-profile-filter-slot="true">
+            {totalFilters === 0 && <TagBadge size="md" className="invisible flex-shrink-0" aria-hidden="true">{'\u00a0'}</TagBadge>}
+            {totalFilters > 0 && <>
             <TagBadge
-              variant="destructive"
+              variant="default"
               className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
               onClick={onClearAllFilters}
               size="md"
             >
               <Icon
-                icon="solar:trash-bin-trash-bold"
+                icon="solar:refresh-bold"
+                aria-hidden="true"
                 className="w-4 h-4 mr-1"
               />
               <span>{t('content.filters.clear_all')}</span>
@@ -289,6 +304,7 @@ export const ModrinthSearchControlsV2: React.FC<
                 />
               </TagBadge>
             )}
+            </>}
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import { uploadLogToMclogs } from "../../services/log-service";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { getTopDialogId } from "../ui/modal-focus";
 
 // Hex colors for filter buttons
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -112,8 +113,12 @@ export interface LogViewerCoreProps {
   noLogsSubtitle?: string;
   logFiles?: string[];
   selectedLogPath?: string | null;
+  selectionIdentity?: string | null;
   onLogSelect?: (path: string) => void;
   onOpenFolder?: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export function LogViewerCore({
@@ -125,14 +130,23 @@ export function LogViewerCore({
   noLogsSubtitle = "Waiting for log output...",
   logFiles,
   selectedLogPath,
+  selectionIdentity,
   onLogSelect,
   onOpenFolder,
+  isLoading = false,
+  error,
+  onRetry,
 }: LogViewerCoreProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const { showThreadPrefix, toggleShowThreadPrefix } = useLogSettingsStore();
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const handleClearSearch = () => {
+    searchInputRef.current?.focus({ preventScroll: true });
+    setSearchTerm("");
+  };
   const [levelFilters, setLevelFilters] = useState<Record<LogLevel, boolean>>({
     ERROR: true,
     WARN: true,
@@ -149,6 +163,48 @@ export function LogViewerCore({
   const fileDropdownRef = useRef<HTMLDivElement>(null);
   const [isFileDropdownOpen, setIsFileDropdownOpen] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const handleResetFilters = (event: { currentTarget: HTMLButtonElement }) => {
+    const trigger = event.currentTarget;
+    const owner = logContainerRef.current;
+    // Reserve only this active Reset's steady owner before the no-match branch disappears.
+    const topDialogId = getTopDialogId();
+    const ownerScope = owner?.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const triggerScope = trigger.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const ownerDialogId = ownerScope?.dataset.modalOwner ?? ownerScope?.dataset.modalId;
+    const triggerDialogId = triggerScope?.dataset.modalOwner ?? triggerScope?.dataset.modalId;
+    if (document.activeElement === trigger && trigger.isConnected && !trigger.disabled &&
+      owner?.isConnected && owner.contains(trigger) &&
+      !trigger.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !owner.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      owner.getClientRects().length > 0 && getComputedStyle(owner).visibility !== "hidden" &&
+      getComputedStyle(owner).visibility !== "collapse" &&
+      (!topDialogId || (ownerDialogId === topDialogId && triggerDialogId === topDialogId))) {
+      owner.focus({ preventScroll: true });
+    }
+    setSearchTerm("");
+    setLevelFilters({ ERROR: true, WARN: true, INFO: true, DEBUG: true, TRACE: true, UNKNOWN: true });
+  };
+  const handleRetry = (event: { currentTarget: HTMLButtonElement }) => {
+    if (isLoading || !onRetry) return;
+    const trigger = event.currentTarget;
+    const owner = logContainerRef.current;
+    // Reserve our steady owner before native disable/removal, never on read completion.
+    const topDialogId = getTopDialogId();
+    const ownerScope = owner?.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const triggerScope = trigger.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const ownerDialogId = ownerScope?.dataset.modalOwner ?? ownerScope?.dataset.modalId;
+    const triggerDialogId = triggerScope?.dataset.modalOwner ?? triggerScope?.dataset.modalId;
+    if (document.activeElement === trigger && trigger.isConnected && !trigger.disabled &&
+      owner?.isConnected && owner.parentElement?.contains(trigger) &&
+      !trigger.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !owner.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      owner.getClientRects().length > 0 && getComputedStyle(owner).visibility !== "hidden" &&
+      getComputedStyle(owner).visibility !== "collapse" &&
+      (!topDialogId || (ownerDialogId === topDialogId && triggerDialogId === topDialogId))) {
+      owner.focus({ preventScroll: true });
+    }
+    onRetry();
+  };
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isPointerSelecting, setIsPointerSelecting] = useState(false);
@@ -225,11 +281,11 @@ export function LogViewerCore({
   // Delay showing "NO LOGS YET" by 1 second to avoid flicker
   useEffect(() => {
     setShowNoLogs(false);
-    if (filteredLogs.length === 0) {
+    if (logs.length === 0 && !isLoading && !error) {
       const timer = setTimeout(() => setShowNoLogs(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, [filteredLogs.length]);
+  }, [logs.length, isLoading, error]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -281,8 +337,10 @@ export function LogViewerCore({
   useEffect(() => {
     selectionAnchorIndexRef.current = null;
     setSelectionRange(null);
+    isMouseSelectingRef.current = false;
+    setIsPointerSelecting(false);
     window.getSelection()?.removeAllRanges();
-  }, [searchTerm, levelFilters, selectedLogPath]);
+  }, [searchTerm, levelFilters, selectedLogPath, selectionIdentity]);
 
   useEffect(() => {
     const container = logContainerRef.current;
@@ -519,7 +577,7 @@ export function LogViewerCore({
       >
         {log.timestamp ? (
           <>
-            <span className={`pr-2 select-none ${getLevelColorClass(log.level)}`}>
+            <span className={`pr-2 select-none min-w-0 max-w-[50%] whitespace-pre-wrap [overflow-wrap:anywhere] ${getLevelColorClass(log.level)}`}>
               <span className="opacity-80">[{log.timestamp}]</span>
               {showThreadPrefix && (
                 <span className="opacity-80 ml-1">
@@ -528,7 +586,7 @@ export function LogViewerCore({
               )}
             </span>
             <span
-              className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
+              className={`flex-1 min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap ${
                 log.level === "ERROR" || log.level === "WARN"
                   ? getLevelColorClass(log.level)
                   : "text-white/90"
@@ -539,7 +597,7 @@ export function LogViewerCore({
           </>
         ) : (
           <span
-            className={`flex-1 min-w-0 break-words whitespace-pre-wrap ${
+            className={`flex-1 min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap ${
               log.level === "ERROR" || log.level === "WARN"
                 ? getLevelColorClass(log.level)
                 : "text-white/90"
@@ -553,15 +611,15 @@ export function LogViewerCore({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-2">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
       {/* Log Header with Search & Filters */}
       <div
-        className="px-4 py-3 flex items-center gap-4 rounded-lg bg-black/60 backdrop-blur-sm"
+        className="px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-black/60 backdrop-blur-sm shrink-0"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
         {/* Search Input */}
         <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded flex-1 min-w-[200px] max-w-[300px]"
+          className="flex items-center gap-2 px-3 py-1.5 rounded flex-[1_1_200px] min-w-0 max-w-full focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70"
           style={{
             backgroundColor: `${accentColor.value}15`,
             border: `1px solid ${accentColor.value}30`,
@@ -569,16 +627,21 @@ export function LogViewerCore({
         >
           <Icon icon="solar:magnifer-bold" className="w-4 h-4 text-white/50" />
           <input
+            ref={searchInputRef}
             type="text"
+            role="searchbox"
             placeholder={t('placeholders.search_logs')}
+            aria-label={t('placeholders.search_logs')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-transparent text-sm font-minecraft text-white/90 placeholder:text-white/40 outline-none flex-1 min-w-0"
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm("")}
-              className="text-white/40 hover:text-white/70 flex-shrink-0"
+              type="button"
+              aria-label={t("common.clear_search")}
+              onClick={handleClearSearch}
+              className="text-white/40 hover:text-white/70 flex-shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70"
             >
               <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
             </button>
@@ -586,10 +649,12 @@ export function LogViewerCore({
         </div>
 
         {/* Level Filter Buttons */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(["ERROR", "WARN", "INFO", "DEBUG", "TRACE"] as LogLevel[]).map((level) => (
             <button
               key={level}
+              type="button"
+              aria-pressed={levelFilters[level]}
               onClick={() => toggleLevelFilter(level)}
               className="px-2.5 py-1 text-xs font-minecraft rounded transition-all"
               style={{
@@ -605,14 +670,11 @@ export function LogViewerCore({
           ))}
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
         {logFiles && logFiles.length > 0 && onLogSelect && (
           <button
             ref={fileDropdownButtonRef}
             onClick={() => setIsFileDropdownOpen(!isFileDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-minecraft transition-all max-w-[250px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-minecraft transition-all min-w-0 max-w-full"
             style={{
               backgroundColor: isFileDropdownOpen ? `${accentColor.value}25` : `${accentColor.value}15`,
               border: `1px solid ${accentColor.value}30`,
@@ -628,9 +690,12 @@ export function LogViewerCore({
         )}
 
         {/* Settings Button */}
-        <div className="relative">
+        <div className="relative ml-auto shrink-0">
           <button
             ref={settingsButtonRef}
+            type="button"
+            aria-label={t("logs.settings")}
+            aria-expanded={isSettingsOpen}
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
             className="p-1.5 rounded transition-all hover:bg-white/10"
             style={{
@@ -643,21 +708,35 @@ export function LogViewerCore({
         </div>
       </div>
 
+      {error && (
+        <div role="alert" className="shrink-0 max-h-32 overflow-y-auto flex flex-wrap items-start gap-2 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-100">
+          <span className="flex-[1_1_160px] min-w-0 [overflow-wrap:anywhere]">{error}</span>
+          {onRetry && <button type="button" onClick={handleRetry} disabled={isLoading} className="shrink-0 rounded px-2 py-1 hover:bg-white/10 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70">{t("common.retry")}</button>}
+        </div>
+      )}
+
       {/* Log Content */}
       <div
         ref={logContainerRef}
         tabIndex={0}
         role="region"
-        aria-label={t("logs.viewer_region", { defaultValue: "Log output" })}
+        aria-label={t("logs.viewer_region")}
         onMouseDown={() => logContainerRef.current?.focus({ preventScroll: true })}
         onWheel={markUserScroll}
         onTouchMove={markUserScroll}
         onPointerDown={markUserScroll}
-        className="flex-1 min-h-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+        className="flex-1 min-h-0 min-w-0 flex flex-col p-4 font-mono text-sm rounded-lg bg-black/60 backdrop-blur-sm focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
-        {filteredLogs.length === 0 ? (
-          showNoLogs && showNoLogsMessage && (
+        {logs.length > 0 && filteredLogs.length === 0 ? (
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center gap-3 text-center text-white/50">
+            <p className="[overflow-wrap:anywhere]">{t("logs.no_matching_lines")}</p>
+            <button type="button" className="rounded px-3 py-2 hover:bg-white/10 font-minecraft text-xs focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70" onClick={handleResetFilters}>{t("logs.reset_filters")}</button>
+          </div>
+        ) : logs.length === 0 && isLoading && !error ? (
+          <div role="status" className="flex items-center justify-center h-full text-white/50 font-minecraft text-sm">{t("logs.loading")}</div>
+        ) : filteredLogs.length === 0 ? (
+          !error && !isLoading && showNoLogs && showNoLogsMessage && (
             <div className="flex items-center justify-center h-full text-white/30">
               <div className="text-center">
                 <Icon icon={noLogsIcon} className="w-12 h-12 mx-auto mb-2" />
@@ -670,7 +749,7 @@ export function LogViewerCore({
           <Virtuoso
             ref={virtuosoRef}
             className={`custom-scrollbar overflow-x-hidden ${isPointerSelecting ? "select-none" : "select-text"}`}
-            style={{ flex: 1, minHeight: 0 }}
+            style={{ flex: 1, minHeight: 0, minWidth: 0, width: "100%" }}
             data={filteredLogs}
             computeItemKey={(_index, log) => log.id}
             increaseViewportBy={{ top: 400, bottom: 400 }}
@@ -683,13 +762,13 @@ export function LogViewerCore({
 
       {/* Status Bar */}
       <div
-        className="px-4 py-2 flex items-center justify-between rounded-lg bg-black/60 backdrop-blur-sm"
+        className="px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0 rounded-lg bg-black/60 backdrop-blur-sm"
         style={{ boxShadow: `0 4px 20px ${accentColor.value}15` }}
       >
-        <div className="flex items-center gap-4 text-white/50 font-minecraft text-xs">
+        <div className="flex flex-wrap min-w-0 items-center gap-x-4 gap-y-2 text-white/50 font-minecraft text-xs">
           <span className="flex items-center gap-1.5">
             <Icon icon="solar:document-text-bold" className="w-4 h-4" />
-            {t('logs.lines', { count: filteredLogs.length })}
+            {t('logs.lines_matching', { count: logs.length, shown: filteredLogs.length, total: logs.length })}
           </span>
           <button
             onClick={() =>
@@ -719,7 +798,7 @@ export function LogViewerCore({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap min-w-0 items-center gap-2">
           {onClear && (
             <button
               onClick={onClear}
@@ -740,7 +819,7 @@ export function LogViewerCore({
           )}
           <button
             onClick={handleUpload}
-            disabled={isUploading}
+            disabled={isUploading || filteredLogs.length === 0}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors font-minecraft text-xs ${
               isUploading
                 ? "bg-white/5 text-white/40 cursor-wait"
@@ -761,10 +840,10 @@ export function LogViewerCore({
       {isSettingsOpen && settingsButtonRef.current && createPortal(
         <div
           ref={settingsPopupRef}
-          className="fixed min-w-[240px] p-3 rounded-lg border"
+          className="fixed w-60 max-w-[calc(100vw-16px)] p-3 rounded-lg border"
           style={{
             top: settingsButtonRef.current.getBoundingClientRect().bottom + 8,
-            right: window.innerWidth - settingsButtonRef.current.getBoundingClientRect().right,
+            right: Math.max(8, window.innerWidth - settingsButtonRef.current.getBoundingClientRect().right),
             backgroundColor: "rgba(0, 0, 0, 0.95)",
             borderColor: `${accentColor.value}40`,
             boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.value}20`,
@@ -775,7 +854,7 @@ export function LogViewerCore({
             {t('logs.settings')}
           </div>
 
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <button type="button" role="switch" aria-checked={showThreadPrefix} aria-label={t("logs.thread_prefix")} onClick={toggleShowThreadPrefix} className="w-full text-left flex items-center gap-3 cursor-pointer group">
             <div
               className="relative w-9 h-5 rounded-full transition-all cursor-pointer"
               style={{
@@ -783,7 +862,6 @@ export function LogViewerCore({
                   ? `${accentColor.value}80`
                   : "rgba(255,255,255,0.15)",
               }}
-              onClick={toggleShowThreadPrefix}
             >
               <div
                 className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-all"
@@ -800,7 +878,7 @@ export function LogViewerCore({
                 {t('logs.thread_prefix_desc')}
               </div>
             </div>
-          </label>
+          </button>
         </div>,
         document.body
       )}
@@ -808,10 +886,10 @@ export function LogViewerCore({
       {isFileDropdownOpen && fileDropdownButtonRef.current && createPortal(
         <div
           ref={fileDropdownRef}
-          className="fixed min-w-[200px] max-w-[400px] max-h-[300px] overflow-y-auto p-1 rounded-lg border custom-scrollbar"
+          className="fixed w-80 max-w-[calc(100vw-16px)] max-h-[300px] overflow-y-auto p-1 rounded-lg border custom-scrollbar"
           style={{
             top: fileDropdownButtonRef.current.getBoundingClientRect().bottom + 8,
-            right: window.innerWidth - fileDropdownButtonRef.current.getBoundingClientRect().right,
+            right: Math.max(8, window.innerWidth - fileDropdownButtonRef.current.getBoundingClientRect().right),
             backgroundColor: "rgba(0, 0, 0, 0.95)",
             borderColor: `${accentColor.value}40`,
             boxShadow: `0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px ${accentColor.value}20`,
@@ -825,7 +903,7 @@ export function LogViewerCore({
               <button
                 key={path}
                 onClick={() => { onLogSelect?.(path); setIsFileDropdownOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs font-minecraft rounded transition-all hover:bg-white/5"
+                className="w-full text-left px-3 py-2 text-xs font-minecraft rounded transition-all hover:bg-white/5 [overflow-wrap:anywhere]"
                 style={{
                   backgroundColor: isSelected ? `${accentColor.value}20` : undefined,
                   color: isSelected ? accentColor.value : "rgba(255,255,255,0.7)",

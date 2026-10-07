@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useId, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -13,6 +13,7 @@ import {
   type ComponentSize,
   type ComponentVariant
 } from "./design-system";
+import { useSettingControl } from "./settings/SettingControlContext";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -37,10 +38,12 @@ export interface SearchStyleInputProps
 export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputProps>(
   ({ className, placeholder = "Enter name for new profile", icon, error, ...props }, ref) => {
     const accentColor = useThemeStore((state) => state.accentColor);
+    const row = useSettingControl();
+    const errorId = useId();
 
     return (
       <div className="w-full">
-        <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70">
           {icon && (
             <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0" />
           )}
@@ -54,11 +57,14 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
             )}
             spellCheck={false}
             autoComplete="off"
+            aria-labelledby={row.labelId}
+            aria-invalid={!!error || undefined}
+            aria-describedby={[row.descriptionId, error && errorId].filter(Boolean).join(" ") || undefined}
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-red-400 font-smallcaps">
+          <p id={errorId} role="alert" className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}
@@ -80,9 +86,11 @@ export interface SearchStyleTextAreaProps
 
 export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTextAreaProps>(
   ({ className, placeholder = "Enter text...", icon, error, minHeight = "100px", ...props }, ref) => {
+    const row = useSettingControl();
+    const errorId = useId();
     return (
       <div className="w-full">
-        <div className="flex items-start gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex items-start gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70">
           {icon && (
             <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0 mt-1" />
           )}
@@ -96,11 +104,14 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
             style={{ minHeight }}
             spellCheck={false}
             autoComplete="off"
+            aria-labelledby={row.labelId}
+            aria-invalid={!!error || undefined}
+            aria-describedby={[row.descriptionId, error && errorId].filter(Boolean).join(" ") || undefined}
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-red-400 font-smallcaps">
+          <p id={errorId} role="alert" className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}
@@ -132,13 +143,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
     const borderRadius = useThemeStore((state) => state.borderRadius);
+    const row = useSettingControl();
+    const stableId = useId();
+    const descriptionId = `${stableId}-description`, errorId = `${stableId}-error`;
     
     const sizeClasses = getSizeClasses(size, "input");
     const radiusClass = getBorderRadiusClass();
     const accessibilityProps = getAccessibilityProps({
       label,
       description,
+      descriptionId,
       error,
+      errorId,
       disabled: props.disabled
     });
 
@@ -188,6 +204,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className="w-full">        <div
           ref={containerRef}          className={cn(
             "relative overflow-hidden backdrop-blur-md",
+            "focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70",
             getBorderClasses(),
             radiusClass,
             error ? "border-red-500" : "",
@@ -249,12 +266,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 paddingTop: "0",
                 paddingBottom: "0",
               }}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
               spellCheck={false}
               autoComplete="off"
               {...accessibilityProps}
+              aria-labelledby={label ? undefined : row.labelId}
+              aria-describedby={[row.descriptionId, accessibilityProps["aria-describedby"]].filter(Boolean).join(" ") || undefined}
               {...props}
+              onFocus={event => { handleFocus(); props.onFocus?.(event); }}
+              onBlur={event => { handleBlur(); props.onBlur?.(event); }}
             />
 
             {hasClearableValue && (
@@ -269,7 +288,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               </button>
             )}
           </div>
-        </div> {error && ( <p className="mt-1 text-sm text-red-400 font-smallcaps">
+        </div>
+        {description && <p id={descriptionId} className="mt-1 text-xs text-white/60 font-minecraft">{description}</p>}
+        {error && ( <p id={errorId} role="alert" className="mt-1 text-sm text-red-400 font-smallcaps">
             {error}
           </p>
         )}

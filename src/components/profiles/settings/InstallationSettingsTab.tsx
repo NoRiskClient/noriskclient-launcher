@@ -507,6 +507,9 @@ export function InstallationSettingsTab({
                 <Card
                   key={loader.name}
                   variant={isSelected ? "flat" : "flat-secondary"}
+                  disabled={!isCompatible}
+                  selected={isSelected}
+                  ariaLabel={loader.name}
                   className={cn(
                     "p-3 flex flex-col items-center justify-center cursor-pointer platform-${loader.name}",
                     isSelected

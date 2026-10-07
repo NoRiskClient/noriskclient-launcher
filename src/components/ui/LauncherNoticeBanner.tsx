@@ -41,7 +41,12 @@ export function LauncherNoticeBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] flex flex-col gap-3">
+    <div
+      className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain flex flex-col gap-3 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      role="region"
+      aria-label={t("launcher_notices.region_label")}
+      tabIndex={0}
+    >
       {visible.map((notice) => {
         const severity: LauncherNoticeSeverity = notice.severity ?? "warning";
         const color =
@@ -50,6 +55,7 @@ export function LauncherNoticeBanner() {
         return (
           <BannerCard
             key={notice.id}
+            className="shrink-0"
             color={color}
             onDismiss={() => dismiss(notice.id)}
             dismissTitle={t("common.close_banner")}
@@ -63,12 +69,12 @@ export function LauncherNoticeBanner() {
 
               <div className="flex-1 min-w-0">
                 {notice.title && (
-                  <h3 className="text-base font-smallcaps text-white mb-2">
+                  <h3 className="text-base font-smallcaps text-white mb-2 break-words [overflow-wrap:anywhere]">
                     {notice.title}
                   </h3>
                 )}
 
-                <p className="text-sm text-gray-300 font-minecraft leading-relaxed">
+                <p className="text-sm text-gray-300 font-minecraft leading-relaxed break-words [overflow-wrap:anywhere]">
                   {notice.message}
                 </p>
 

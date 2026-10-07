@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { DesignerSettingsTab } from './settings/DesignerSettingsTab';
 import { cn } from "../../lib/utils";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { StatusMessage } from "../ui/StatusMessage";
 
 interface ProfileSettingsProps {
   profile: Profile;
@@ -46,6 +47,9 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const [editedProfile, setEditedProfile] = useState<Profile>({ ...profile });
   const [currentProfile, setCurrentProfile] = useState<Profile>({ ...profile });
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+  const mountedRef = useRef(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [systemRam, setSystemRam] = useState<number>(8192);
   const [recommendedRam, setRecommendedRam] = useState<number>(4096);
@@ -59,6 +63,14 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   const showDesignerTab = usePermission(PERMISSION.DESIGNER_TAB);
   const [tempRamMb, setTempRamMb] = useState(profile.settings?.memory?.max ?? 0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const canDismiss = () => !savingRef.current && !isDeleting;
+  const dismiss = () => { if (canDismiss()) onClose(); };
 
   useEffect(() => {
     ProfileService.getSystemRamMb()
@@ -123,8 +135,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   };
 
   const handleSave = async () => {
+    if (savingRef.current || isDeleting || !mountedRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    setSaveError(null);
     try {
-      setIsSaving(true);
       await updateProfile(profile.id, {
         name: editedProfile.name,
         game_version: editedProfile.game_version,
@@ -152,17 +167,25 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         clear_preferred_account: !editedProfile.preferred_account_id,
       });
 
-      toast.success(t('profiles.settings.saveSuccess'));
-      setRefreshTrigger(prev => prev + 1);
+      if (mountedRef.current) {
+        toast.success(t('profiles.settings.saveSuccess'));
+        setRefreshTrigger(prev => prev + 1);
+      }
     } catch (err) {
       console.error("Failed to save profile:", err);
-      toast.error(t('profiles.settings.saveError'));
+      if (mountedRef.current) {
+        const message = t('profiles.settings.saveError', { error: parseErrorMessage(err) });
+        setSaveError(message);
+        toast.error(message);
+      }
     } finally {
-      setIsSaving(false);
+      savingRef.current = false;
+      if (mountedRef.current) setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
+    if (savingRef.current) return;
     try {
       setIsDeleting(true);
       const deletePromise = deleteProfile(profile.id);
@@ -287,10 +310,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   };
 
   const renderFooter = () => (
-    <div className="flex justify-between">
+    <div className="flex flex-wrap justify-between gap-3">
       <Button
         variant="secondary"
-        onClick={onClose}
+        onClick={dismiss}
+        disabled={isSaving || isDeleting}
         size="md"
         className="text-base"
       >
@@ -299,7 +323,8 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
       <Button
         variant="default"
         onClick={handleSave}
-        disabled={isSaving}
+        disabled={isSaving || isDeleting}
+        aria-busy={isSaving}
         size="md"
         className="text-base"
       >
@@ -337,10 +362,14 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   return (
     <Modal
       title={t('profiles.settings.title', { name: profile.name })}
-      onClose={onClose}
+      onClose={dismiss}
+      canClose={canDismiss}
+      hideCloseButton={isSaving || isDeleting}
+      closeOnEscape={!isSaving && !isDeleting}
+      closeOnClickOutside={!isSaving && !isDeleting}
       width="xl"
       footer={renderFooter()}
-      className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
+      className="nrc-settings-panel !max-w-6xl h-[85vh] flex flex-col"
     >
       <div className="flex h-full p-4 gap-2">
         <div
@@ -354,8 +383,11 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
               return (
                 <button
                   key={tab.id}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                    "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70",
                     isActive
                       ? "text-white"
                       : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
@@ -393,6 +425,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
             ref={contentRef}
             style={{ maxWidth: '100%', boxSizing: 'border-box' }}
           >
+            {saveError && <StatusMessage type="error" message={saveError} className="[overflow-wrap:anywhere]" />}
             {renderTabContent()}
           </div>
         </div>

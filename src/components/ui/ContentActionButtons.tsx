@@ -60,9 +60,9 @@ export function ContentActionButtons({
             variant={action.variant}
             tooltip={action.tooltip}
             disabled={action.disabled || action.loading}
+            loading={action.loading}
             size={size}
             onClick={(e) => handleButtonClick(action, e)}
-            className={action.loading ? "animate-spin" : ""}
           />
         );
 

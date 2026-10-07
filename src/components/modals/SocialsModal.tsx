@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
@@ -50,6 +50,10 @@ export function SocialsModal() {
   const [mobileAppToken, setMobileAppToken] = useState<string | null>(null);
   const [isProcessingMobileApp, setIsProcessingMobileApp] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
+  const [mobileAppLoadFailed, setMobileAppLoadFailed] = useState(false);
+  const mobileAppPendingRef = useRef(false);
+  const mobileAppGenerationRef = useRef(0);
+  const mobileAppErrorId = useId();
 
   const fetchDiscordStatus = useCallback(async (): Promise<boolean> => {
     setIsLoadingDiscord(true);
@@ -82,15 +86,28 @@ export function SocialsModal() {
   }, []);
 
   const fetchMobileAppToken = useCallback(async () => {
+    if (mobileAppPendingRef.current) return;
+    mobileAppPendingRef.current = true;
+    const generation = mobileAppGenerationRef.current;
     setIsLoadingMobileApp(true);
+    setMobileAppLoadFailed(false);
+    setMobileAppToken(null);
+    setShowQrCode(false);
     try {
       const token = await getMobileAppToken();
+      if (generation !== mobileAppGenerationRef.current) return;
+      if (typeof token !== "string" || !token.trim()) throw new Error("Invalid mobile app token response");
       setMobileAppToken(token);
-    } catch (error) {
-      console.error("Failed to fetch mobile app token:", error);
+    } catch {
+      if (generation !== mobileAppGenerationRef.current) return;
+      console.error("Failed to fetch mobile app token");
       setMobileAppToken(null);
+      setMobileAppLoadFailed(true);
     } finally {
-      setIsLoadingMobileApp(false);
+      if (generation === mobileAppGenerationRef.current) {
+        mobileAppPendingRef.current = false;
+        setIsLoadingMobileApp(false);
+      }
     }
   }, []);
 
@@ -119,7 +136,14 @@ export function SocialsModal() {
     } else {
       setShowQrCode(false);
       setMobileAppToken(null);
+      setMobileAppLoadFailed(false);
+      setIsLoadingMobileApp(true);
     }
+    return () => {
+      // A late response from a closed dialog or another account cannot restore its token.
+      mobileAppGenerationRef.current += 1;
+      mobileAppPendingRef.current = false;
+    };
   }, [isModalOpen, activeAccount, fetchDiscordStatus, fetchGithubStatus, fetchMobileAppToken]);
 
   const handleCopyLink = () => {
@@ -188,6 +212,8 @@ export function SocialsModal() {
   };
 
   const handleShowQrCode = async () => {
+    if (!mobileAppToken || isLoadingMobileApp || isProcessingMobileApp || mobileAppPendingRef.current) return;
+    const generation = mobileAppGenerationRef.current;
     const confirmed = await confirm({
       title: t('socials.qr_confirm.title'),
       message: t('socials.qr_confirm.message'),
@@ -195,7 +221,7 @@ export function SocialsModal() {
       cancelText: t('common.cancel'),
       type: "warning",
     });
-    if (confirmed) {
+    if (confirmed && generation === mobileAppGenerationRef.current) {
       setShowQrCode(true);
     }
   };
@@ -304,6 +330,7 @@ export function SocialsModal() {
                         size="sm"
                         onClick={handleShowQrCode}
                         disabled={isProcessingMobileApp || isLoadingMobileApp}
+                        aria-busy={isLoadingMobileApp || undefined}
                         icon={<Icon icon={isLoadingMobileApp ? "mdi:loading" : "mdi:qrcode"} className={isLoadingMobileApp ? "animate-spin" : ""} />}
                         widthClassName="w-[140px]"
                       >
@@ -314,10 +341,12 @@ export function SocialsModal() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      disabled
+                      onClick={fetchMobileAppToken}
+                      aria-describedby={mobileAppErrorId}
+                      icon={<Icon icon="mdi:refresh" />}
                       widthClassName="w-[140px]"
                     >
-                      {t('socials.button.failed')}
+                      {t('common.try_again')}
                     </Button>
                   )}
                   <IconButton
@@ -329,6 +358,13 @@ export function SocialsModal() {
                   />
                 </div>
               </div>
+              <p
+                id={mobileAppErrorId}
+                role={mobileAppLoadFailed ? "alert" : undefined}
+                className="min-h-8 px-3 font-minecraft text-xs leading-4 text-red-300"
+              >
+                {mobileAppLoadFailed ? t('socials.mobile_app_load_failed') : null}
+              </p>
               {showQrCode && mobileAppToken && (
                 <div className="flex justify-center p-3 bg-black/10 rounded-md">
                   <div className="text-center space-y-2">

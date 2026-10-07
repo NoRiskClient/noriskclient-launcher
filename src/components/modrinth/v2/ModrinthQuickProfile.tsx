@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { SearchStyleInput } from "../../ui/Input";
 import { IconButton } from "../../ui/buttons/IconButton";
@@ -38,6 +38,12 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
   const { t } = useTranslation();
   const [showSourceSelectInput, setShowSourceSelectInput] = useState(false);
   const [profileSearchValue, setProfileSearchValue] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const handleClearSearch = () => {
+    if (isLoading) return;
+    searchInputRef.current?.focus({ preventScroll: true });
+    setProfileSearchValue('');
+  };
   const [maxProfilesToShow, setMaxProfilesToShow] = useState(9);
   const { profiles: storeProfiles, loading: profilesLoading } =
     useProfileStore();
@@ -177,12 +183,15 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
           ) : (
             <>
               {/* Search Bar */}
-              <div className="relative">
+              <div className="relative rounded-md focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70">
                 <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                   <Icon icon="solar:magnifer-bold" className="w-3 h-3 text-white/50" />
                 </div>
                 <input
+                  ref={searchInputRef}
                   type="text"
+                  role="searchbox"
+                  aria-label={t('placeholders.search_profiles')}
                   value={profileSearchValue}
                   onChange={(e) => setProfileSearchValue(e.target.value)}
                   placeholder={t('placeholders.search_profiles')}
@@ -191,8 +200,11 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                 />
                 {profileSearchValue && (
                   <button
-                    onClick={() => setProfileSearchValue('')}
-                    className="absolute inset-y-0 right-0 pr-2 flex items-center hover:bg-white/10 rounded-r-md"
+                    type="button"
+                    aria-label={t('common.clear_search')}
+                    disabled={isLoading}
+                    onClick={handleClearSearch}
+                    className="absolute inset-y-0 right-0 pr-2 flex items-center hover:bg-white/10 rounded-r-md focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70"
                   >
                     <Icon icon="solar:close-circle-bold" className="w-3 h-3 text-white/50 hover:text-white" />
                   </button>

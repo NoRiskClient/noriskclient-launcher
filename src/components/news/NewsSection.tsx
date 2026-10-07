@@ -172,6 +172,7 @@ export function NewsSection({ className }: NewsSectionProps) {
                   title={displayTitle}
                   imageUrl={imageUrl}
                   postUrl={postUrl}
+                  disabled={postUrl === "#"}
                   onClick={() => {
                     if (postUrl !== "#") {
                       openExternalUrl(postUrl).catch((err) =>

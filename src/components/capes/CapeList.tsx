@@ -140,16 +140,29 @@ function CapeItemDisplay({
           skinVariant={userSkinVariant}
           capeUrl={capeUrl}
           capeId={capeId}
-          isEquipped={false}
+          isEquipped={isEquipped}
           isExperimental={isExperimental}
-          onEquipCape={() => {
-            onEquipCape(capeId);
+          onEquipCape={async () => {
+            if (isEquipped) {
+              hideModal && hideModal(`cape-preview-${capeId}`);
+              showModal(`unequip-cape`, (
+                <ConfirmUnequipModal
+                  onConfirmUnequip={async () => {
+                    await onEquipCape(NO_CAPE_ID);
+                    hideModal && hideModal(`unequip-cape`);
+                  }}
+                  onCancelUnequip={() => hideModal && hideModal(`unequip-cape`)}
+                />
+              ));
+              return;
+            }
+            await onEquipCape(capeId);
             hideModal && hideModal(`cape-preview-${capeId}`);
           }}
         />
       </Modal>
     ));
-  }, [cape, capeId, isNoCape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
+  }, [cape, capeId, isNoCape, isCurrentlyEquipping, isEquipped, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
 
   const isFavorite = useCapeFavoritesStore((s) =>
     isVanilla ? false : s.isFavorite((cape as CosmeticCape)._id)
@@ -207,9 +220,17 @@ function CapeItemDisplay({
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={(e) => { e.preventDefault(); handleCapeClick(); }}
       onContextMenu={(e) => { e.preventDefault(); handleCapeClick(); }}
     >
+      <button
+        type="button"
+        aria-label={isNoCape ? t('capes.unequipCape') : t('capes.previewCape', {
+          cape: isVanilla ? (cape as VanillaCape).name : capeId,
+        })}
+        disabled={isCurrentlyEquipping || !showModal || isDenied}
+        onClick={(e) => { e.preventDefault(); handleCapeClick(); }}
+        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2 disabled:cursor-default"
+      />
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
         {!isVanilla && !isNoCape && (
           <button
@@ -262,7 +283,7 @@ function CapeItemDisplay({
         </button>
       )}
 
-      <div className="flex flex-col items-center gap-3 relative z-10 w-full">
+      <div className="pointer-events-none flex flex-col items-center gap-3 relative z-10 w-full">
         <div
           className="relative flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-300 ease-out"
           style={{
@@ -296,7 +317,7 @@ function CapeItemDisplay({
           })()}
 
           {isEquipped && !isCurrentlyEquipping && (
-            <div className="absolute top-2 right-2 z-30">
+            <div className="pointer-events-auto absolute top-2 right-2 z-30">
               <Tooltip content={t('capes.currentlyEquipped')}>
                 <Icon
                   icon="solar:check-circle-bold"
@@ -329,7 +350,7 @@ function CapeItemDisplay({
             )}>
               {isDenied ? (
                 <Tooltip content={(cape as CosmeticCape).moderatorMessage}>
-                  <div className="flex items-center gap-1.5">
+                  <div className="pointer-events-auto flex items-center gap-1.5">
                     <Icon icon="solar:close-circle-bold" className="w-4 h-4 text-red-400" />
                     <span className="text-[11px] font-minecraft lowercase text-red-400">{t('capes.denied')}</span>
                   </div>
@@ -450,6 +471,17 @@ export function CapeList({
 
   const favoriteCapeIds = useCapeFavoritesStore((s) => s.favoriteCapeIds);
   const [favoriteCapesFetched, setFavoriteCapesFetched] = useState<Map<string, CosmeticCape>>(new Map());
+  const [favoriteReadFailed, setFavoriteReadFailed] = useState(false);
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
+  const favoriteReadPendingRef = useRef(false);
+  const favoriteReadMountedRef = useRef(true);
+  const attemptedFavoriteIdsRef = useRef(new Set<string>());
+  const failedFavoriteIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    favoriteReadMountedRef.current = true;
+    return () => { favoriteReadMountedRef.current = false; };
+  }, []);
 
   const favoriteCapes = useMemo(() => {
     if (isVanilla) return []; // Vanilla capes don't have favorites
@@ -473,22 +505,42 @@ export function CapeList({
     return favoriteCapeIds.filter((id) => !presentIds.has(id) && !fetchedIds.has(id));
   }, [favoriteCapeIds, capes, favoriteCapesFetched]);
 
-  useEffect(() => {
-    const idsToFetch = missingFavoriteIds.filter((id) => !favoriteCapesFetched.has(id));
+  const loadMissingFavorites = useCallback(async (manualRetry = false) => {
+    if (isVanilla || favoriteReadPendingRef.current) return;
+    const idsToFetch = missingFavoriteIds.filter((id) => manualRetry
+      ? failedFavoriteIdsRef.current.has(id)
+      : !attemptedFavoriteIdsRef.current.has(id));
     if (idsToFetch.length === 0) return;
     const chunk = idsToFetch.slice(0, 100);
-    getCapesByHashes(chunk)
-      .then((capes) => {
+    chunk.forEach((id) => attemptedFavoriteIdsRef.current.add(id));
+    favoriteReadPendingRef.current = true;
+    setIsLoadingFavorites(true);
+    try {
+      const capes = await getCapesByHashes(chunk);
+      if (favoriteReadMountedRef.current) {
         setFavoriteCapesFetched((prev) => {
           const next = new Map(prev);
           capes.forEach((c) => next.set(c._id, c));
           return next;
         });
-      })
-      .catch((e) => {
-        console.warn("[CapeList] Failed to fetch favorite capes by hashes:", e);
-      });
-  }, [missingFavoriteIds, favoriteCapesFetched]);
+        chunk.forEach((id) => failedFavoriteIdsRef.current.delete(id));
+        setFavoriteReadFailed(failedFavoriteIdsRef.current.size > 0);
+      }
+    } catch (error) {
+      if (favoriteReadMountedRef.current) {
+        console.warn("[CapeList] Failed to fetch favorite capes by hashes:", error);
+        chunk.forEach((id) => failedFavoriteIdsRef.current.add(id));
+        setFavoriteReadFailed(true);
+      }
+    } finally {
+      favoriteReadPendingRef.current = false;
+      if (favoriteReadMountedRef.current) setIsLoadingFavorites(false);
+    }
+  }, [missingFavoriteIds, isVanilla]);
+
+  useEffect(() => {
+    void loadMissingFavorites();
+  }, [loadMissingFavorites, isLoadingFavorites]);
 
   // Separate state for stable favorites display - completely independent of capes loading
   const [stableFavoriteCapes, setStableFavoriteCapes] = useState<CosmeticCape[]>([]);
@@ -719,6 +771,18 @@ export function CapeList({
       )}
     >
       <div className="flex-1 min-h-0 flex flex-col">
+        {favoriteReadFailed && !isVanilla && favoriteCapeIds.some((id) => failedFavoriteIdsRef.current.has(id)) && (
+          <div className="mx-4 mb-4 rounded-md border border-red-400/30 bg-red-950/20 p-3">
+            <p role="alert" className="font-minecraft text-sm text-red-300 break-words">
+              {t('capes.favorites')}: {t('capes.failedToLoadCapes')}
+            </p>
+            {favoriteCapesFetched.size > 0 && <p className="mt-2 font-minecraft text-xs text-white/70">{t('capes.loadedDataMayBeStale')}</p>}
+            <Button variant="flat-secondary" size="sm" className="mt-3" onClick={() => loadMissingFavorites(true)}
+              disabled={isLoadingFavorites} aria-busy={isLoadingFavorites || undefined}>
+              {isLoadingFavorites ? t('common.loading') : t('common.try_again')}
+            </Button>
+          </div>
+        )}
         {/* Render favorites separately above native grid to prevent flickering */}
         {groupFavoritesInHeader && stableFavoriteCapes.length > 0 && !showFavoritesOnly && !isVanilla && (
           <div
@@ -737,7 +801,7 @@ export function CapeList({
                   cape={cape}
                   imageUrl={imageUrl}
                   isCurrentlyEquipping={isEquippingCapeId === cape._id}
-                  isEquipped={false}
+                  isEquipped={equippedCapeId === cape._id}
                   onEquipCape={onEquipCape}
                   canDelete={canDelete}
                   onDeleteCapeClick={handleDeleteClickInternal}
@@ -852,12 +916,30 @@ function Cape3DPreviewWithToggle({
   skinVariant?: SkinVariant;
   capeUrl?: string;
   capeId: string;
-  onEquipCape: () => void;
+  onEquipCape: () => void | Promise<void>;
   isEquipped?: boolean;
   isExperimental?: boolean;
 }) {
   const { t } = useTranslation();
   const [showElytra, setShowElytra] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [failure, setFailure] = useState<"request" | "busy" | null>(null);
+  const applyingRef = useRef(false);
+
+  const applyCape = async () => {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
+    setIsApplying(true);
+    setFailure(null);
+    try {
+      await onEquipCape();
+    } catch (error) {
+      setFailure((error as { capeOperationPending?: boolean } | null)?.capeOperationPending ? "busy" : "request");
+    } finally {
+      applyingRef.current = false;
+      setIsApplying(false);
+    }
+  };
 
   const finalCapeUrl = capeUrl || getCapeImageUrl(capeId, isExperimental);
 
@@ -897,14 +979,19 @@ function Cape3DPreviewWithToggle({
 
       <div className="flex justify-center mt-4">
         <Button
-          onClick={onEquipCape}
+          onClick={applyCape}
+          disabled={isApplying}
+          aria-busy={isApplying || undefined}
           variant="flat"
           size="lg"
           className="px-8"
         >
-          {isEquipped ? t('capes.unequipCape') : t('capes.selectCape')}
+          {isApplying ? t('capes.equipping') : failure ? t('common.try_again') : isEquipped ? t('capes.unequipCape') : t('capes.selectCape')}
         </Button>
       </div>
+      <p role={failure ? "alert" : undefined} className="min-h-6 mt-2 text-center font-minecraft text-sm text-red-300 break-words">
+        {failure ? t(failure === "busy" ? 'capes.operationInProgress' : 'capes.failedToEquipCape') : null}
+      </p>
     </div>
   );
 }

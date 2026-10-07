@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import type { UnifiedVersion } from "../../../../types/unified";
 import { ThemedDropdown, ThemedDropdownHeader } from "./ThemedDropdown";
+import { useAnimationsEnabled } from "../../../../hooks/useEntranceAnimation";
 
 export interface VersionSelectDropdownProps {
   open: boolean;
@@ -42,6 +43,7 @@ export function VersionSelectDropdown({
 }: VersionSelectDropdownProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
+  const animationsEnabled = useAnimationsEnabled();
 
   return (
     <ThemedDropdown
@@ -51,6 +53,7 @@ export function VersionSelectDropdown({
       align={align}
       scrollable
       triggerRef={triggerRef}
+      ariaLabel={t("profiles.v3.versions.selectVersion")}
     >
       <ThemedDropdownHeader>
         {t("profiles.v3.versions.selectVersion")}
@@ -58,6 +61,11 @@ export function VersionSelectDropdown({
 
       {latestOption && (
         <button
+          type="button"
+          role="menuitemradio"
+          aria-checked={latestOption.selected}
+          data-popup-item
+          tabIndex={-1}
           onClick={(event) => {
             event.stopPropagation();
             if (!latestOption.selected) latestOption.onSelect();
@@ -71,7 +79,7 @@ export function VersionSelectDropdown({
             if (!latestOption.selected)
               event.currentTarget.style.backgroundColor = "transparent";
           }}
-          className={`w-full flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
+          className={`w-full flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs font-minecraft text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 focus-visible:bg-white/15 ${
             latestOption.selected
               ? "text-white/40 cursor-default"
               : "text-white/85 hover:text-white cursor-pointer"
@@ -102,14 +110,14 @@ export function VersionSelectDropdown({
       )}
 
       {loading && (
-        <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft gap-2">
-          <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
+        <div role="status" className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft gap-2">
+          <Icon aria-hidden="true" icon="solar:refresh-bold" className={`w-3.5 h-3.5 ${animationsEnabled ? "animate-spin" : ""}`} />
           {t("profiles.v3.versions.loading")}
         </div>
       )}
 
       {!loading && error && (
-        <div className="px-3 py-4 text-xs text-rose-300 font-minecraft">
+        <div role="alert" className="px-3 py-4 text-xs text-rose-300 font-minecraft [overflow-wrap:anywhere]">
           {error}
         </div>
       )}
@@ -128,6 +136,11 @@ export function VersionSelectDropdown({
           return (
             <button
               key={version.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={isCurrent}
+              data-popup-item
+              tabIndex={-1}
               onClick={(event) => {
                 event.stopPropagation();
                 if (!isCurrent) onSelect(version);
@@ -141,7 +154,7 @@ export function VersionSelectDropdown({
                 if (!isCurrent)
                   event.currentTarget.style.backgroundColor = "transparent";
               }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors ${
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 focus-visible:bg-white/15 ${
                 isCurrent
                   ? "text-white/40 cursor-default"
                   : "text-white/85 hover:text-white cursor-pointer"

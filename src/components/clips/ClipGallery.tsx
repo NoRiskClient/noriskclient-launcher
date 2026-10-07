@@ -10,6 +10,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { EmptyState } from "../ui/EmptyState";
+import { ErrorMessage } from "../ui/ErrorMessage";
 import { Modal } from "../ui/Modal";
 import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
@@ -55,7 +56,8 @@ export function ClipGallery({
   game = null,
   onGamesChange,
 }: ClipGalleryProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = resolveDateLocale(i18n.resolvedLanguage || i18n.language);
   const { confirm, confirmDialog } = useConfirmDialog();
 
   const [clips, setClips] = useState<ClipEntry[] | null>(null);
@@ -66,19 +68,50 @@ export function ClipGallery({
   const [busy, setBusy] = useState<string | null>(null);
   const [gifting, setGifting] = useState<string[]>([]);
   const gifs = useRef(new Set<string>());
+  const [readError, setReadError] = useState(false);
+  const [usageError, setUsageError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const readGeneration = useRef(0);
+  const mounted = useRef(true);
+  const retryBusy = useRef(false);
 
   const refresh = useCallback(async () => {
+    if (!mounted.current) return [];
+    const generation = ++readGeneration.current;
+    setRefreshing(true);
     try {
-      const [entries, storage] = await Promise.all([listClips(), getClipStorageUsage()]);
-      setClips(entries);
-      setUsage(storage);
-      return entries;
-    } catch (e) {
-      console.error("Could not read the clip folder", e);
-      setClips([]);
-      return [];
+      const [list, storage] = await Promise.allSettled([listClips(), getClipStorageUsage()]);
+      if (!mounted.current) return [];
+      const listValid = list.status === 'fulfilled' && Array.isArray(list.value);
+      const usageValid = storage.status === 'fulfilled' && storage.value != null &&
+        [storage.value.usedBytes, storage.value.limitBytes, storage.value.clipCount].every((value) => Number.isFinite(value) && value >= 0);
+      if (generation === readGeneration.current) {
+        setReadError(!listValid);
+        setUsageError(!usageValid);
+        if (listValid) setClips(list.value);
+        if (usageValid) setUsage(storage.value);
+        if (!listValid) console.error("Could not read the clip folder", list.status === 'rejected' ? list.reason : 'Invalid clip list response');
+        if (!usageValid) console.error("Could not read clip storage usage", storage.status === 'rejected' ? storage.reason : 'Invalid clip storage response');
+      }
+      // Preserve event/follow's real successful list result even when a newer
+      // read owns presentation. Never manufacture fresh entries on a failure.
+      return listValid ? list.value : [];
+    } finally {
+      if (mounted.current && generation === readGeneration.current) setRefreshing(false);
     }
   }, []);
+
+  const retry = useCallback(async () => {
+    if (!mounted.current || retryBusy.current) return;
+    retryBusy.current = true;
+    setRetrying(true);
+    try { await refresh(); }
+    finally {
+      retryBusy.current = false;
+      if (mounted.current) setRetrying(false);
+    }
+  }, [refresh]);
 
   const follow = useCallback(
     async (made: { path: string; source: string }) => {
@@ -90,7 +123,9 @@ export function ClipGallery({
   );
 
   useEffect(() => {
+    mounted.current = true;
     void refresh();
+    return () => { mounted.current = false; readGeneration.current += 1; retryBusy.current = false; };
   }, [refresh]);
 
   const games = useMemo(() => {
@@ -250,35 +285,53 @@ export function ClipGallery({
       } else {
         out.push({
           key,
-          label: when.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+          label: when.toLocaleDateString(dateLocale, { month: "long", year: "numeric" }),
           clips: [clip],
         });
       }
     }
     return out;
-  }, [shown, sort]);
+  }, [shown, sort, dateLocale]);
+
+  const feedback = (readError || usageError) && (
+    <div className="flex flex-col gap-3">
+      {readError && <ErrorMessage message={t('clips.gallery.load_failed')} />}
+      {readError && clips !== null && clips.length > 0 && <p className="font-minecraft text-sm text-white/70">{t('clips.gallery.previous_clips')}</p>}
+      {usageError && <ErrorMessage message={t('clips.gallery.storage_load_failed')} />}
+      {usageError && usage && <p className="font-minecraft text-sm text-white/70">{t('clips.gallery.previous_storage')}</p>}
+      {(refreshing || retrying) && <p role="status" className="font-smallcaps text-sm text-white/70">{t('clips.gallery.loading')}</p>}
+      <div><Button onClick={retry} variant="flat-secondary" size="sm" disabled={refreshing || retrying} aria-busy={refreshing || retrying || undefined}>{t('common.try_again')}</Button></div>
+    </div>
+  );
 
   if (clips === null || shown === null || months === null) {
     return (
-      <p className="text-white/70 font-smallcaps text-sm text-center py-4">
+      <div className="flex flex-col gap-4">
+        {feedback}
+        {!readError && <p role="status" className="text-white/70 font-smallcaps text-sm text-center py-4">
         {t("clips.gallery.loading")}
-      </p>
+        </p>}
+      </div>
     );
   }
 
-  if (clips.length === 0) {
+  if (clips.length === 0 && !readError) {
     return (
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {feedback}
       <EmptyState
         icon="solar:video-library-bold"
         message={t("clips.gallery.empty")}
         description={t("clips.gallery.empty_hint")}
         smallDescription
       />
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {feedback}
       {usage && (
         <StorageBar
           usage={usage}
@@ -289,7 +342,7 @@ export function ClipGallery({
         />
       )}
 
-      {shown.length === 0 && (
+      {clips.length > 0 && shown.length === 0 && (
         <EmptyState
           icon={search.trim() ? "solar:magnifer-bold" : "solar:star-bold"}
           message={
@@ -339,6 +392,7 @@ export function ClipGallery({
                 onVertical={() => setVertical(clip)}
                 onGif={() => void makeGif(clip)}
                 t={t}
+                dateLocale={dateLocale}
               />
             ))}
           </div>
@@ -352,6 +406,7 @@ export function ClipGallery({
           onClose={() => setSelected(null)}
           onVertical={() => setVertical(selected)}
           t={t}
+          dateLocale={dateLocale}
         />
       )}
 
@@ -396,6 +451,7 @@ function ClipCard({
   onVertical,
   onGif,
   t,
+  dateLocale,
 }: {
   clip: ClipEntry;
   index: number;
@@ -410,6 +466,7 @@ function ClipCard({
   onVertical: () => void;
   onGif: () => void;
   t: Translate;
+  dateLocale: string;
 }) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const animated = useThemeStore((state) => state.isBackgroundAnimationEnabled);
@@ -551,7 +608,7 @@ function ClipCard({
               <span className="w-px h-3 bg-white/30 shrink-0" />
             </>
           )}
-          <span className="truncate">{formatWhen(clip.createdAt, t)}</span>
+          <span className="truncate">{formatWhen(clip.createdAt, t, dateLocale)}</span>
           <span className="w-px h-3 bg-white/30 shrink-0" />
           <span className="shrink-0 text-white/50">{formatBytes(clip.sizeBytes)}</span>
         </div>
@@ -574,11 +631,13 @@ function ClipPlayer({
   onClose,
   onVertical,
   t,
+  dateLocale,
 }: {
   clip: ClipEntry;
   onClose: () => void;
   onVertical: () => void;
   t: Translate;
+  dateLocale: string;
 }) {
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
 
@@ -620,7 +679,7 @@ function ClipPlayer({
       titleIcon={<Icon icon="solar:videocamera-record-bold" className="w-5 h-5" />}
       titleSubtitle={
         <span className="font-minecraft text-xs text-white/60">
-          {formatWhen(clip.createdAt, t)} · {formatBytes(clip.sizeBytes)}
+          {formatWhen(clip.createdAt, t, dateLocale)} · {formatBytes(clip.sizeBytes)}
         </span>
       }
       onClose={onClose}
@@ -712,14 +771,22 @@ function formatBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-function formatWhen(unixSeconds: number, t: Translate): string {
+function resolveDateLocale(language: string | undefined): string {
+  try {
+    return Intl.DateTimeFormat.supportedLocalesOf(language || 'en')[0] || 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+function formatWhen(unixSeconds: number, t: Translate, dateLocale: string): string {
   const seconds = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
 
   if (seconds < 60) return t("clips.gallery.just_now");
   if (seconds < 3600) return t("clips.gallery.minutes_ago", { count: Math.floor(seconds / 60) });
   if (seconds < 86_400) return t("clips.gallery.hours_ago", { count: Math.floor(seconds / 3600) });
 
-  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+  return new Date(unixSeconds * 1000).toLocaleString(dateLocale, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

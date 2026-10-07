@@ -31,6 +31,8 @@ export function FloatingActionBar({
   const { t } = useTranslation();
   return (
     <div
+      ref={node => { if (node) node.inert = !visible; }}
+      aria-hidden={!visible || undefined}
       className={`absolute left-1/2 -translate-x-1/2 z-30 transition-[bottom] duration-200 ease-out ${
         visible ? "bottom-5 pointer-events-auto" : "bottom-1 pointer-events-none"
       }`}
@@ -62,6 +64,7 @@ export function FloatingActionBar({
               </span>
               {!allSelected && (
                 <button
+                  type="button"
                   onClick={onSelectAll}
                   className="h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-white/55 hover:text-white hover:bg-white/10 transition-colors"
                 >
@@ -81,11 +84,12 @@ export function FloatingActionBar({
         <div className="w-px h-5" style={{ backgroundColor: `${accent}33` }} />
 
         <button
+          type="button"
           onClick={onClear}
           className="h-11 w-11 hover:bg-white/5 text-white/55 hover:text-white flex items-center justify-center transition-colors"
           title={t("profiles.v3.fab.clearSelection")}
         >
-          <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+          <Icon aria-hidden="true" icon="solar:close-circle-linear" className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -98,11 +102,12 @@ const FabButton: React.FC<FABActionConfig> = ({ icon, label, tone, onClick, disa
     "text-white/80 hover:bg-white/10 hover:text-white";
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={`relative h-8 px-2.5 mx-0.5 rounded-md flex items-center gap-1.5 text-xs font-minecraft transition-colors disabled:opacity-50 ${toneClass}`}
     >
-      <Icon icon={icon} className="w-3.5 h-3.5" />
+      <Icon aria-hidden="true" icon={icon} className="w-3.5 h-3.5" />
       <span>{label}</span>
     </button>
   );

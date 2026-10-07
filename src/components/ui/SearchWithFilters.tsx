@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { StableIcon } from "./IconWrapper";
 import { CustomDropdown } from "./CustomDropdown";
 import type { DropdownOption } from "./CustomDropdown";
+import { useTranslation } from "react-i18next";
 
 export interface SearchWithFiltersProps {
   /** Placeholder text for the search input */
@@ -60,6 +61,7 @@ export function SearchWithFilters({
   dropdownSize = 'md',
   compact = false,
 }: SearchWithFiltersProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,7 +77,13 @@ export function SearchWithFilters({
   const handleClearSearch = () => {
     onSearchChange?.("");
     if (inputRef.current) {
-      inputRef.current.focus();
+      inputRef.current.focus({ preventScroll: true });
+    }
+  };
+
+  const handleSearchAreaClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target instanceof Element && !event.target.closest("button,input")) {
+      inputRef.current?.focus({ preventScroll: true });
     }
   };
 
@@ -87,30 +95,35 @@ export function SearchWithFilters({
     <div className={`flex items-center gap-4 ${className}`}>
       {/* Search with integrated filters */}
       <div
-        className={`flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 hover:border-white/20 transition-colors ${
+        className={`flex min-w-0 items-center gap-2 bg-black/50 rounded-lg border border-white/10 hover:border-white/20 transition-colors focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70 ${
           compact ? "px-3 py-2 w-full" : "px-4 py-3 flex-1 max-w-md"
         }`}
+        onClick={event => { if (event.target === event.currentTarget) handleSearchAreaClick(event); }}
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0" onClick={handleSearchAreaClick}>
           <StableIcon icon={searchIcon} className="w-4 h-4 text-white/50 shrink-0" />
           <input
             ref={inputRef}
             type="text"
+            role="searchbox"
+            aria-label={placeholder}
             placeholder={placeholder}
             value={searchValue}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
             className="bg-transparent text-white placeholder-white/50 font-minecraft text-sm flex-1 min-w-0 outline-none"
           />
-          {hasSearchValue && (
+          {hasSearchValue ? (
             <button
               type="button"
               onClick={handleClearSearch}
-              aria-label="Clear search"
-              className="text-white/60 hover:text-white transition-colors duration-200 shrink-0"
+              aria-label={t("common.clear_search")}
+              className="text-white/60 hover:text-white transition-colors duration-200 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
             >
               <Icon icon="lucide:x" className="w-4 h-4" />
             </button>
+          ) : (
+            <span aria-hidden="true" className="h-4 w-4 shrink-0" />
           )}
         </div>
         

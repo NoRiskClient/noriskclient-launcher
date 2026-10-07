@@ -10,7 +10,7 @@ import {
   getAccessibilityProps
 } from './design-system';
 
-interface ThemedSurfaceProps {
+interface ThemedSurfaceProps extends React.AriaAttributes {
   children: React.ReactNode;
   className?: string;
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -41,6 +41,7 @@ export function ThemedSurface({
   style: incomingStyle,
   role,
   ariaLabel,
+  ...ariaProps
 }: ThemedSurfaceProps) {
   const accentColorValue = useThemeStore((state) => state.accentColor.value);
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -118,11 +119,20 @@ export function ThemedSurface({
         ...combinedStyles,
         ...createRadiusStyle(borderRadius),
       }}
-      onClick={onClick}
+      onClick={event => {
+        if (ariaProps["aria-disabled"] !== true && ariaProps["aria-disabled"] !== "true") onClick?.(event);
+      }}
+      onKeyDown={event => {
+        if (event.target === event.currentTarget && onClick && (role === undefined || role === "button") &&
+            ariaProps["aria-disabled"] !== true && ariaProps["aria-disabled"] !== "true" && !event.repeat && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault(); event.currentTarget.click();
+        }
+      }}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsSurfaceHovered(true)}
       onMouseLeave={() => setIsSurfaceHovered(false)}
       {...accessibilityProps}
+      {...ariaProps}
     >
       {children}
     </div>

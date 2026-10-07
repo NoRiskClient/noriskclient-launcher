@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useLayoutEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
@@ -12,6 +12,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { toast } from "../ui/GlobalToaster";
 import { cn } from "../../lib/utils";
 import { Virtuoso } from "react-virtuoso";
+import { getTopDialogId } from "../ui/modal-focus";
 
 type FriendListRow =
   | { type: "header"; status: "online" | "offline"; count: number }
@@ -42,6 +43,60 @@ export function FriendsSidebar() {
   const { accentColor } = useThemeStore();
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const ownedFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  const settingsPanelRef = useRef<HTMLDivElement>(null);
+  const settingsOpenerRef = useRef<HTMLButtonElement>(null);
+  const settingsOwnedFocusRef = useRef<HTMLElement | null>(null);
+
+  const handleCloseSettings = () => {
+    const panel = settingsPanelRef.current, active = document.activeElement;
+    const owned = settingsOwnedFocusRef.current, opener = settingsOpenerRef.current;
+    if (isSidebarOpen && isSettingsOpen && !activeChatFriend && panel &&
+      active instanceof HTMLElement && active.isConnected &&
+      (panel.contains(active) || active === owned) && getTopDialogId() === null &&
+      opener?.isConnected && !panel.contains(opener) &&
+      !opener.matches(':disabled, [aria-disabled="true"]') &&
+      !opener.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      opener.getClientRects().length && getComputedStyle(opener).visibility !== "hidden") {
+      // Reserve only owned focus before SettingsPanel/its body portal unmount.
+      opener.focus({ preventScroll: true });
+    }
+    settingsOwnedFocusRef.current = null;
+    closeSettings();
+  };
+
+  const restoreSidebarFocus = () => {
+    const panel = sidebarRef.current, active = document.activeElement;
+    const owned = ownedFocusRef.current, opener = openerRef.current;
+    const lostOwned = owned && !owned.isConnected &&
+      (!active || active === document.body || active === document.documentElement || !active.isConnected);
+    if (!wasOpen.current || !panel || (!panel.contains(active) && (!owned || active !== owned) && !lostOwned) ||
+      getTopDialogId() !== null || !opener?.isConnected || panel.contains(opener) ||
+      opener.matches(':disabled, [aria-disabled="true"]') ||
+      opener.closest('[inert], [hidden], [aria-hidden="true"]') ||
+      !opener.getClientRects().length || getComputedStyle(opener).visibility === "hidden") return;
+    opener.focus({ preventScroll: true });
+  };
+
+  useLayoutEffect(() => {
+    const panel = sidebarRef.current;
+    if (!panel) return;
+    if (isSidebarOpen && !wasOpen.current) {
+      const active = document.activeElement;
+      openerRef.current = active instanceof HTMLElement && active !== document.body &&
+        active !== document.documentElement && !panel.contains(active) ? active : null;
+    } else if (!isSidebarOpen && wasOpen.current) {
+      // External store closes follow the same child/portal teardown as X.
+      restoreSidebarFocus();
+      closeChat(); closeSettings();
+      ownedFocusRef.current = null; openerRef.current = null;
+    }
+    wasOpen.current = isSidebarOpen;
+    panel.inert = !isSidebarOpen;
+  }, [isSidebarOpen, closeChat, closeSettings]);
 
   useEffect(() => {
     if (isSidebarOpen) {
@@ -51,6 +106,8 @@ export function FriendsSidebar() {
   }, [isSidebarOpen]);
 
   const handleClose = () => {
+    // Return before child removal or Chromium's inert-induced native blur.
+    restoreSidebarFocus();
     closeChat();
     closeSettings();
     closeSidebar();
@@ -90,7 +147,20 @@ export function FriendsSidebar() {
           isSidebarOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
+        {/* Keep closed inert separate from the modal manager's outer snapshots. */}
         <div
+          ref={sidebarRef}
+          data-friends-sidebar-scope=""
+          aria-hidden={!isSidebarOpen || undefined}
+          className="contents"
+          onFocusCapture={event => { if (isSidebarOpen) ownedFocusRef.current = event.target as HTMLElement; }}
+          onBlurCapture={() => { ownedFocusRef.current = null; }}
+        >
+        <div
+          ref={settingsPanelRef}
+          data-friends-settings-scope=""
+          onFocusCapture={event => { if (isSettingsOpen && !activeChatFriend) settingsOwnedFocusRef.current = event.target as HTMLElement; }}
+          onBlurCapture={() => { settingsOwnedFocusRef.current = null; }}
           className={cn(
             "h-full flex flex-col transition-all duration-300 ease-out overflow-hidden backdrop-blur-md",
             (activeChatFriend || isSettingsOpen) ? "w-[380px] opacity-100" : "w-0 opacity-0"
@@ -102,7 +172,7 @@ export function FriendsSidebar() {
           }}
         >
           {activeChatFriend && <ChatPanel friend={activeChatFriend} />}
-          {isSettingsOpen && !activeChatFriend && <SettingsPanel />}
+          {isSettingsOpen && !activeChatFriend && <SettingsPanel onClose={handleCloseSettings} />}
         </div>
 
         <div
@@ -117,6 +187,7 @@ export function FriendsSidebar() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <button
+                  ref={settingsOpenerRef}
                   onClick={openSettings}
                   className="p-2 rounded-full transition-all duration-200 hover:scale-105"
                   style={{
@@ -213,7 +284,7 @@ export function FriendsSidebar() {
 
             {activeTab === "friends" && (
               <div
-                className="flex items-center gap-3 px-4 py-3 rounded-xl mt-3"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl mt-3 focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70"
                 style={{
                   backgroundColor: `${accentColor.value}15`,
                   border: `1px solid ${accentColor.value}40`,
@@ -225,6 +296,7 @@ export function FriendsSidebar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('friends.search_placeholder')}
+                  aria-label={t('friends.search_placeholder')}
                   className="flex-1 bg-transparent text-white text-sm font-minecraft placeholder:text-white/30 focus:outline-none"
                 />
               </div>
@@ -248,6 +320,7 @@ export function FriendsSidebar() {
               />
             )}
           </div>
+        </div>
         </div>
       </div>
     </>

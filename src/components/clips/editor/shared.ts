@@ -223,11 +223,13 @@ export function laneWindow(
 }
 
 export function formatTime(seconds: number): string {
-  const whole = Math.floor(seconds);
+  // Round the displayed value once, like the fine ruler. Splitting the
+  // fractional seconds first can turn an exact 6.8-second cut into "6.7".
+  const tenths = Math.round(seconds * 10);
+  const whole = Math.floor(tenths / 10);
   const minutes = Math.floor(whole / 60);
   const rest = whole % 60;
-  const tenths = Math.floor((seconds - whole) * 10);
-  return `${minutes}:${String(rest).padStart(2, "0")}.${tenths}`;
+  return `${minutes}:${String(rest).padStart(2, "0")}.${tenths % 10}`;
 }
 
 export function formatTick(seconds: number, step: number): string {

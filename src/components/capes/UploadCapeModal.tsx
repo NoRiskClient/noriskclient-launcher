@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
@@ -13,6 +13,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { uploadCape } from "../../services/cape-service";
 import { humanizeTimestamps } from "../../utils/time-utils";
 import { toast } from "react-hot-toast";
+import { getCapeUploadRecovery, type CapeUploadRecovery } from "./cape-upload-policy";
 
 const padCapeToPreviewSize = (imageUrl: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -69,9 +70,17 @@ export function UploadCapeModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const uploadingRef = useRef(false);
+  const [recovery, setRecovery] = useState<CapeUploadRecovery>("retry");
   const [showElytraPreview, setShowElytraPreview] = useState(false);
 
+  const guardedDismiss = () => {
+    if (!uploadingRef.current) onCancelUpload();
+  };
+
   const handleConfirmUpload = async () => {
+    if (uploadingRef.current || uploadWarning || (uploadError && recovery === "blocked")) return;
+    uploadingRef.current = true;
     setIsUploading(true);
     setUploadError(null);
     setUploadWarning(null);
@@ -85,8 +94,10 @@ export function UploadCapeModal({
     } catch (err: any) {
       console.error("Error uploading cape:", err);
       const formattedError = humanizeTimestamps(formatErrorMessage(err));
+      const nextRecovery = isWarningMessage(err) ? "review" : getCapeUploadRecovery(err);
+      setRecovery(nextRecovery);
 
-      if (isWarningMessage(err)) {
+      if (nextRecovery === "review") {
         setUploadWarning(formattedError);
         setUploadError(null);
       } else {
@@ -94,6 +105,7 @@ export function UploadCapeModal({
         setUploadWarning(null);
       }
     } finally {
+      uploadingRef.current = false;
       setIsUploading(false);
     }
   };
@@ -101,10 +113,25 @@ export function UploadCapeModal({
   return (
     <Modal
       title={t('capes.previewAndUploadCape')}
-      onClose={onCancelUpload}
-      closeOnClickOutside={true}
+      onClose={guardedDismiss}
+      canClose={() => !uploadingRef.current}
+      closeOnClickOutside={!isUploading}
+      closeOnEscape={!isUploading}
+      hideCloseButton={isUploading}
+      reserveCloseButtonSpace
       width="md"
       variant="flat"
+      footer={
+        <div className="flex justify-center gap-4">
+          <Button onClick={handleConfirmUpload} variant="flat"
+            disabled={isUploading || !!uploadWarning || (!!uploadError && recovery === "blocked")} size="lg">
+            {isUploading ? t('capes.uploading') : uploadError && recovery === "retry" ? t('common.try_again') : t('capes.uploadCape')}
+          </Button>
+          <Button onClick={guardedDismiss} variant="flat-secondary" disabled={isUploading} size="lg">
+            {uploadWarning ? t('common.close') : t('common.cancel')}
+          </Button>
+        </div>
+      }
     >
       <div className="p-4">
         <p className="text-white/80 mb-4 text-center font-minecraft">
@@ -112,14 +139,14 @@ export function UploadCapeModal({
         </p>
         {uploadError && (
           <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-md">
-            <p className="text-red-400 text-sm font-minecraft text-center">
+            <p role="alert" className="text-red-400 text-sm font-minecraft text-center break-words">
               {uploadError}
             </p>
           </div>
         )}
         {uploadWarning && (
           <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-md">
-            <p className="text-yellow-400 text-sm font-minecraft text-center">
+            <p role="status" className="text-yellow-400 text-sm font-minecraft text-center break-words">
               {uploadWarning}
             </p>
             <p className="text-yellow-300/70 text-xs font-minecraft text-center mt-2">
@@ -170,24 +197,6 @@ export function UploadCapeModal({
               title={showElytraPreview ? t('capes.showAsCape') : t('capes.showAsElytra')}
             />
           )}
-        </div>
-        <div className="flex justify-center gap-4">
-          <Button
-            onClick={handleConfirmUpload}
-            variant="flat"
-            disabled={isUploading || !!uploadError || !!uploadWarning}
-            size="lg"
-          >
-            {isUploading ? t('capes.uploading') : t('capes.uploadCape')}
-          </Button>
-          <Button
-            onClick={onCancelUpload}
-            variant="flat-secondary"
-            disabled={isUploading}
-            size="lg"
-          >
-            {t('common.cancel')}
-          </Button>
         </div>
       </div>
     </Modal>

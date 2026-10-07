@@ -20,12 +20,13 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { ThemedDropdown } from "../shared/ThemedDropdown";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface EditableChipV3Props {
   icon?: string;
   children: React.ReactNode;
   renderEditor: (ctx: { close: () => void; commit: () => void }) => React.ReactNode;
-  onSave?: () => void;
+  onSave?: () => void | boolean | Promise<void | boolean>;
   onCancel?: () => void;
   onOpen?: () => void;
   disabled?: boolean;
@@ -50,6 +51,9 @@ export function EditableChipV3({
 }: EditableChipV3Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savingRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const accent = useThemeStore((s) => s.accentColor);
 
@@ -59,12 +63,23 @@ export function EditableChipV3({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const commit = () => {
-    onSave?.();
-    setOpen(false);
+  const commit = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      if (await onSave?.() !== false) setOpen(false);
+    } catch (error) {
+      setSaveError(t('profiles.settings.saveError', { error: parseErrorMessage(error) }));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const close = () => {
+    if (savingRef.current) return;
     setOpen(false);
     onCancel?.();
   };
@@ -74,7 +89,8 @@ export function EditableChipV3({
       <button
         ref={triggerRef}
         type="button"
-        disabled={disabled}
+        disabled={disabled || saving}
+        aria-busy={saving}
         onClick={() => !disabled && setOpen((v) => !v)}
         title={disabled ? disabledReason : undefined}
         className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors
@@ -106,18 +122,22 @@ export function EditableChipV3({
         triggerRef={triggerRef}
       >
         {renderEditor({ close, commit })}
+        {saveError && <p role="alert" className="px-3 py-2 text-xs text-red-200 font-minecraft break-words">{saveError}</p>}
         {withSaveCancel && (
           <>
             <div className="my-1 border-t border-white/10" />
             <div className="flex items-center justify-end gap-1 px-2 py-1">
               <button
                 onClick={close}
+                disabled={saving}
                 className="px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-minecraft text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {t("profiles.v3.chips.cancel")}
               </button>
               <button
-                onClick={commit}
+                onClick={() => void commit()}
+                disabled={saving}
+                aria-busy={saving}
                 style={{
                   backgroundColor: `${accent.value}40`,
                   borderColor: `${accent.value}80`,
@@ -127,7 +147,7 @@ export function EditableChipV3({
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `${accent.value}40`; }}
                 className="px-2.5 py-1 rounded border text-[10px] uppercase tracking-wider font-minecraft transition-colors"
               >
-                {t("profiles.v3.chips.save")}
+                {saving ? t('common.saving', { defaultValue: 'Saving...' }) : t("profiles.v3.chips.save")}
               </button>
             </div>
           </>

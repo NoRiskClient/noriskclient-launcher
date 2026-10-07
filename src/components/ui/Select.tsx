@@ -1,7 +1,9 @@
 "use client";
 
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
+
 import type React from "react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -10,6 +12,7 @@ import { Dropdown } from "./dropdown/Dropdown.tsx";
 import { DropdownItem } from "./dropdown/DropdownItem.tsx";
 import { gsap } from "gsap";
 import { ThemedSurface } from "./ThemedSurface";
+import { useSettingControl } from "./settings/SettingControlContext";
 
 export interface SelectOption {
   value: string;
@@ -17,7 +20,7 @@ export interface SelectOption {
   icon?: React.ReactNode;
 }
 
-interface SelectProps {
+interface SelectProps extends React.AriaAttributes {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -37,16 +40,18 @@ export function Select({
   disabled = false,
   size = "md",
   variant = "default",
+  ...ariaProps
 }: SelectProps) {
+  const popupId = useId();
+  const row = useSettingControl();
+  const accessibility = { "aria-labelledby": row.labelId, "aria-describedby": row.descriptionId, ...ariaProps };
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);  const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
+  const isBackgroundAnimationEnabled = useAnimationsEnabled();
   const shouldAnimate =
     isBackgroundAnimationEnabled && variant !== "themed-surface";
 
@@ -97,6 +102,7 @@ export function Select({
   const handleOptionSelect = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
   };  const sizeStyles = {
     sm: {
       container: "h-[42px]",
@@ -181,8 +187,10 @@ export function Select({
         className={cn("relative w-full", className)}
         aria-disabled={disabled}
       >
-        <div
-          ref={containerRef}
+        <button
+          type="button"
+          ref={triggerRef}
+          disabled={disabled}
           onClick={disabled ? undefined : handleClick}
           className={cn(
             "w-full h-full flex items-center justify-between",
@@ -191,18 +199,23 @@ export function Select({
             sizeStyles[size].container,
             sizeStyles[size].padding,
             sizeStyles[size].text,
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70",
           )}
           onMouseEnter={() => !disabled && setIsHovered(true)}
           onMouseLeave={() => !disabled && setIsHovered(false)}
-          role="button"
-          tabIndex={disabled ? -1 : 0}
+          {...accessibility}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
+          aria-controls={isOpen ? popupId : undefined}
+          onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setIsOpen(true); } }}
         >
           {buttonContent}
-        </div>
+        </button>
         <Dropdown
           isOpen={isOpen}
+          id={popupId}
+          role="listbox"
+          ariaLabel={ariaProps["aria-label"]}
           onClose={() => setIsOpen(false)}
           triggerRef={triggerRef}
           width={triggerRef.current?.offsetWidth || 300}
@@ -241,7 +254,7 @@ export function Select({
           "text-shadow-sm",
           getBorderClasses(),
           getRadiusClasses(borderRadius, "input"),
-          "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
+          "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-white/80 focus-visible:outline-offset-2",
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
           sizeStyles[size].container,
           sizeStyles[size].padding,
@@ -259,6 +272,11 @@ export function Select({
           ...createRadiusStyle(borderRadius),
         }}
         disabled={disabled}
+        {...accessibility}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? popupId : undefined}
+        onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setIsOpen(true); } }}
       >        {variant === "3d" && (
           <span
             className="absolute inset-x-0 top-0 h-[2px] transition-colors duration-200"
@@ -276,6 +294,9 @@ export function Select({
 
       <Dropdown
         isOpen={isOpen}
+        id={popupId}
+        role="listbox"
+        ariaLabel={ariaProps["aria-label"]}
         onClose={() => setIsOpen(false)}
         triggerRef={triggerRef}
         width={triggerRef.current?.offsetWidth || 300}

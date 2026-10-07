@@ -19,10 +19,11 @@ import { useThemeStore } from "../../../../store/useThemeStore";
 import { ThemedDropdown } from "../shared/ThemedDropdown";
 import { LoaderPickerV3 } from "./LoaderPickerV3";
 import type { LoaderKey } from "./useHeroChipEditors";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface LoaderBadgeV3Props {
   loader: string | null | undefined;
-  onChange: (loader: LoaderKey) => void;
+  onChange: (loader: LoaderKey) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
   disabledReason?: string;
 }
@@ -30,18 +31,37 @@ interface LoaderBadgeV3Props {
 export function LoaderBadgeV3({ loader, onChange, disabled, disabledReason }: LoaderBadgeV3Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savingRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const accent = useThemeStore((s) => s.accentColor);
 
   const icon = loaderIconSrc(loader);
   const label = loader ?? "vanilla";
 
+  const select = async (value: LoaderKey) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      if (await onChange(value) !== false) setOpen(false);
+    } catch (error) {
+      setSaveError(t('profiles.settings.saveError', { error: parseErrorMessage(error) }));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <button
         ref={triggerRef}
         type="button"
-        disabled={disabled}
+        disabled={disabled || saving}
+        aria-busy={saving}
         onClick={() => !disabled && setOpen((v) => !v)}
         title={disabled ? disabledReason : t("profiles.v3.chips.loader.changeTitle")}
         className={`absolute -bottom-1 -right-1 p-0.5 flex items-center justify-center transition-transform
@@ -74,18 +94,16 @@ export function LoaderBadgeV3({ loader, onChange, disabled, disabledReason }: Lo
 
       <ThemedDropdown
         open={open && !disabled}
-        onClose={() => setOpen(false)}
+        onClose={() => { if (!savingRef.current) setOpen(false); }}
         width="w-56"
         align="left"
         triggerRef={triggerRef}
       >
-        <LoaderPickerV3
-          currentLoader={loader}
-          onSelect={(l) => {
-            onChange(l);
-            setOpen(false);
-          }}
-        />
+        <fieldset disabled={saving} aria-busy={saving} className="min-w-0 border-0 p-0 m-0">
+          <LoaderPickerV3 currentLoader={loader} onSelect={(l) => void select(l)} />
+        </fieldset>
+        {saving && <p role="status" className="px-3 py-2 text-xs text-white/80 font-minecraft">{t('common.saving', { defaultValue: 'Saving...' })}</p>}
+        {saveError && <p role="alert" className="px-3 py-2 text-xs text-red-200 font-minecraft break-words">{saveError}</p>}
       </ThemedDropdown>
     </>
   );

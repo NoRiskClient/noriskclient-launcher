@@ -19,6 +19,9 @@ interface GameVersionPickerV3Props {
   currentVersion: string;
   versions: MinecraftVersion[] | null;
   isLoading: boolean;
+  error?: string | null;
+  isSaving?: boolean;
+  onRetry?: () => void;
   onSelect: (version: string) => void;
 }
 
@@ -26,6 +29,9 @@ export function GameVersionPickerV3({
   currentVersion,
   versions,
   isLoading,
+  error,
+  isSaving,
+  onRetry,
   onSelect,
 }: GameVersionPickerV3Props) {
   const { t } = useTranslation();
@@ -56,7 +62,8 @@ export function GameVersionPickerV3({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("profiles.v3.chips.gameVersion.search")}
-            className="w-full h-7 pl-7 pr-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft"
+            aria-label={t("profiles.v3.chips.gameVersion.search")}
+            className="w-full h-7 pl-7 pr-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none focus:outline focus:outline-2 focus:[outline-style:solid] focus:-outline-offset-2 focus:outline-white/70 text-xs text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
       </div>
@@ -89,6 +96,7 @@ export function GameVersionPickerV3({
       </div>
 
       <div className="border-t border-white/10" />
+      {isSaving && <p role="status" className="px-3 py-2 text-xs text-white/80 font-minecraft">{t('common.saving', { defaultValue: 'Saving...' })}</p>}
 
       {/* List */}
       <div className="max-h-[220px] overflow-y-auto py-1 custom-scrollbar">
@@ -96,6 +104,14 @@ export function GameVersionPickerV3({
           <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-white/40 font-minecraft">
             <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5" />
             {t("profiles.v3.chips.gameVersion.loading")}
+          </div>
+        ) : error ? (
+          <div className="px-3 py-4 text-center text-xs font-minecraft">
+            <p role="alert" className="text-red-200 break-words">{error}</p>
+            {onRetry && <button type="button" onClick={onRetry}
+              className="mt-2 px-2 py-1 rounded text-white/90 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+              {t('common.retry', { defaultValue: 'Retry' })}
+            </button>}
           </div>
         ) : filtered.length === 0 ? (
           <div className="px-3 py-6 text-center text-xs text-white/30 font-minecraft">
@@ -107,6 +123,7 @@ export function GameVersionPickerV3({
             return (
               <button
                 key={v.id}
+                disabled={isSaving}
                 onClick={() => onSelect(v.id)}
                 style={isCurrent ? { backgroundColor: `${accent.value}33` } : undefined}
                 onMouseEnter={(e) => {
@@ -115,7 +132,7 @@ export function GameVersionPickerV3({
                 onMouseLeave={(e) => {
                   if (!isCurrent) e.currentTarget.style.backgroundColor = "transparent";
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors disabled:opacity-50"
               >
                 <span className={`flex-1 text-xs font-minecraft ${isCurrent ? "text-white" : "text-white/80"}`}>
                   {v.id}

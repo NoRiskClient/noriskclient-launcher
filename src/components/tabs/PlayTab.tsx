@@ -70,7 +70,7 @@ export function PlayTab() {
 
   return (
     <div className="flex h-full relative">
-      <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
+      <div className="flex-grow min-w-0 flex flex-col items-center justify-center p-8 relative z-15">
         {/* Only show RetroGrid effect if no theme background is active and effects are not hidden */}
         {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && shouldShowEffects && !(isThemeActive && selectedTheme?.backgroundImage) && (
           <RetroGridEffect
@@ -80,22 +80,22 @@ export function PlayTab() {
           />
         )}
 
-        {/* Referral Banner - Top Left */}
-        <div className="absolute top-3 left-3 z-20">
-          <ReferralBanner />
-        </div>
-
-        {/* Watch Ad + 3D Render Toggle - Top Right */}
-        <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-3">
-          <ApplixirAdButton />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
-            <ToggleSwitch
-              checked={cosmeticRenderer3d && webglOk}
-              onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
-              disabled={!webglOk}
-              size="sm"
-            />
+        {/* Shared top row reserves real space for both interactive consumers. */}
+        <div className="absolute top-3 inset-x-3 z-20 flex flex-wrap items-start gap-3">
+          <div className="flex-1 min-w-[12rem]">
+            <ReferralBanner />
+          </div>
+          <div className="ml-auto max-w-full flex shrink-0 flex-col items-end gap-3 pt-3 pr-3">
+            <ApplixirAdButton />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-white/70 font-minecraft">{t("settings.background.skin_animation")}</span>
+              <ToggleSwitch
+                checked={cosmeticRenderer3d && webglOk}
+                onChange={() => setCosmeticRenderer3d(!cosmeticRenderer3d)}
+                disabled={!webglOk}
+                size="sm"
+              />
+            </div>
           </div>
         </div>
 
@@ -121,6 +121,7 @@ export function PlayTab() {
             }
             onLaunchVersionChange={handleVersionChange}
             launchButtonVersions={versions}
+            profilesEmpty={!loading && !profilesError && profiles.length === 0}
             className=""
             outline={outline}
           />

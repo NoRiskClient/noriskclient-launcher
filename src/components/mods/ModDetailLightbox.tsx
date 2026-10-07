@@ -4,6 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import type { UnifiedGalleryImage } from "../../types/unified";
+import { Modal } from "../ui/Modal";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
+
+function boundedIndex(index: number, length: number): number {
+  return Math.max(0, Math.min(Number.isFinite(index) ? Math.trunc(index) : 0, Math.max(0, length - 1)));
+}
 
 interface ModDetailLightboxProps {
   images: UnifiedGalleryImage[];
@@ -19,73 +25,59 @@ export function ModDetailLightbox({
   onClose,
 }: ModDetailLightboxProps) {
   const { t } = useTranslation();
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const animationsEnabled = useAnimationsEnabled();
+  const [currentIndex, setCurrentIndex] = useState(() => boundedIndex(initialIndex, images.length));
   const [isZoomed, setIsZoomed] = useState(false);
 
   // Reset index when opening
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(initialIndex);
+      setCurrentIndex(boundedIndex(initialIndex, images.length));
       setIsZoomed(false);
     }
-  }, [isOpen, initialIndex]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "Escape":
-          onClose();
-          break;
-        case "ArrowLeft":
-          goToPrevious();
-          break;
-        case "ArrowRight":
-          goToNext();
-          break;
-        case " ": // Space to toggle zoom
-          e.preventDefault();
-          setIsZoomed((prev) => !prev);
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, initialIndex, images.length]);
 
   const goToPrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+    setCurrentIndex((prev) => (boundedIndex(prev, images.length) + images.length - 1) % images.length);
     setIsZoomed(false);
   }, [images.length]);
 
   const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+    setCurrentIndex((prev) => (boundedIndex(prev, images.length) + 1) % images.length);
     setIsZoomed(false);
   }, [images.length]);
 
   if (!isOpen || images.length === 0) return null;
 
-  const currentImage = images[currentIndex];
+  const visibleIndex = boundedIndex(currentIndex, images.length);
+  const currentImage = images[visibleIndex];
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center"
-      onClick={onClose}
+    <Modal
+      title={t('lightbox.title')}
+      onClose={onClose}
+      width="full"
+      contentClassName="relative"
     >
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+      {/* Only focused descendants of this dialog navigate images. Escape and
+          focus restoration belong to the shared topmost-dialog contract. */}
+      <div
+        className="relative"
+        onKeyDown={(event) => {
+          if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            event.stopPropagation();
+            if (images.length > 1) (event.key === 'ArrowLeft' ? goToPrevious : goToNext)();
+          }
+        }}
       >
-        <Icon icon="solar:close-circle-bold" className="w-8 h-8" />
-      </button>
-
+      <div className="relative h-[55vh]" data-lightbox-image-viewport="true">
       {/* Navigation - Previous */}
       {images.length > 1 && (
         <button
+          type="button"
+          aria-label={t('lightbox.previous')}
           onClick={(e) => {
             e.stopPropagation();
             goToPrevious();
@@ -99,6 +91,8 @@ export function ModDetailLightbox({
       {/* Navigation - Next */}
       {images.length > 1 && (
         <button
+          type="button"
+          aria-label={t('lightbox.next')}
           onClick={(e) => {
             e.stopPropagation();
             goToNext();
@@ -110,32 +104,35 @@ export function ModDetailLightbox({
       )}
 
       {/* Image Container */}
-      <div
-        className="relative w-[80vw] h-[60vh]"
-        onClick={(e) => e.stopPropagation()}
+      <button
+        type="button"
+        aria-label={t(isZoomed ? 'lightbox.zoom_out' : 'lightbox.zoom_in')}
+        aria-pressed={isZoomed}
+        className="relative block mx-auto w-[80vw] max-w-full h-full overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+        onClick={() => setIsZoomed((prev) => !prev)}
       >
         <img
           src={currentImage.url}
-          alt={currentImage.title || `Image ${currentIndex + 1}`}
+          alt={currentImage.title || t('mod_detail.gallery_image', { index: visibleIndex + 1 })}
           className={`
             w-full h-full object-contain
-            transition-transform duration-300 cursor-pointer
+            ${animationsEnabled ? "transition-transform duration-300" : ""} cursor-pointer
             ${isZoomed ? "scale-150" : "scale-100"}
           `}
-          onClick={() => setIsZoomed((prev) => !prev)}
         />
+      </button>
       </div>
 
       {/* Bottom Info Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+      <div className="bg-gradient-to-t from-black/80 to-transparent p-6 [overflow-wrap:anywhere]">
         <div className="max-w-4xl mx-auto">
           {/* Counter */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <span className="text-white/70 font-minecraft text-sm">
-              {t('lightbox.counter', { current: currentIndex + 1, total: images.length })}
+              {t('lightbox.counter', { current: visibleIndex + 1, total: images.length })}
             </span>
-            <div className="flex items-center gap-2 text-white/50 text-xs font-minecraft">
-              <span>{t('lightbox.press_space_zoom')}</span>
+            <div className="flex flex-wrap items-center gap-2 text-white/50 text-xs font-minecraft">
+              <span>{t('lightbox.zoom_hint')}</span>
               <span>|</span>
               <span>{t('lightbox.arrow_keys_navigate')}</span>
               <span>|</span>
@@ -161,10 +158,13 @@ export function ModDetailLightbox({
 
           {/* Thumbnail Navigation */}
           {images.length > 1 && (
-            <div className="flex gap-2 mt-4 overflow-x-auto pb-2 justify-center">
+            <div className="flex w-fit max-w-full mx-auto gap-2 mt-4 overflow-x-auto pb-2">
               {images.map((image, index) => (
                 <button
                   key={image.url}
+                  type="button"
+                  aria-label={t('lightbox.show_image', { index: index + 1 })}
+                  aria-pressed={index === visibleIndex}
                   onClick={(e) => {
                     e.stopPropagation();
                     setCurrentIndex(index);
@@ -172,12 +172,12 @@ export function ModDetailLightbox({
                   }}
                   className={`
                     flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-all
-                    ${index === currentIndex ? "border-white" : "border-transparent opacity-50 hover:opacity-100"}
+                    ${index === visibleIndex ? "border-white" : "border-transparent opacity-50 hover:opacity-100"}
                   `}
                 >
                   <img
                     src={image.thumbnail_url || image.url}
-                    alt={`Thumbnail ${index + 1}`}
+                    alt=""
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -186,6 +186,7 @@ export function ModDetailLightbox({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </Modal>
   );
 }
