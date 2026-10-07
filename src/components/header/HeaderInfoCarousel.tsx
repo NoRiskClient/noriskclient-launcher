@@ -91,6 +91,8 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
       className="relative inline-flex items-center h-3 min-w-[3.5rem]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
     >
       <span
         className={`${TEXT_CLASSES} absolute inset-0 flex items-center whitespace-nowrap transition-opacity duration-300 ease-out ${
@@ -108,6 +110,7 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
               playerSlideActive ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
             aria-hidden={!playerSlideActive}
+            tabIndex={playerSlideActive ? 0 : -1}
           >
             <span
               className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 align-middle"

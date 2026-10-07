@@ -111,13 +111,15 @@ export function AppearanceTab() {
               min="0"
               max="2"
               step="1"
+              aria-label={t("settings.background.quality")}
+              aria-valuetext={t(`settings.background.quality_${qualityLevel}`)}
               value={qualityLevel === "low" ? 0 : qualityLevel === "medium" ? 1 : 2}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
                 const levels = ["low", "medium", "high"] as const;
                 setQualityLevel(levels[value] || "medium");
               }}
-              className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
+              className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
               disabled={saving}
             />
             <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_high")}</span>
@@ -185,53 +187,58 @@ export function AppearanceTab() {
           <>
             <SettingRow label={t("settings.custom_background.opacity")} searchKeywords={kw("settings.custom_background.opacity", "opacity", "transparenz", "sichtbarkeit")}>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-white/60 font-minecraft-ten">0%</span>
+                <span className="text-xs text-white/60 font-minecraft">0%</span>
                 <input
                   type="range"
                   min="0"
                   max="100"
                   step="1"
+                  aria-label={t("settings.custom_background.opacity")}
+                  aria-valuetext={`${Math.round(customMediaOpacity * 100)}%`}
                   value={Math.round(customMediaOpacity * 100)}
                   onChange={(e) => setCustomMediaOpacity(parseInt(e.target.value) / 100)}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 />
-                <span className="text-xs text-white/60 font-minecraft-ten">100%</span>
+                <span className="text-xs text-white/60 font-minecraft">100%</span>
               </div>
             </SettingRow>
 
             <SettingRow label={t("settings.custom_background.blur")} searchKeywords={kw("settings.custom_background.blur", "blur", "unscharf", "weichzeichnen")}>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-white/60 font-minecraft-ten">0</span>
+                <span className="text-xs text-white/60 font-minecraft">0</span>
                 <input
                   type="range"
                   min="0"
                   max="20"
                   step="1"
+                  aria-label={t("settings.custom_background.blur")}
                   value={customMediaBlur}
                   onChange={(e) => setCustomMediaBlur(parseInt(e.target.value))}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 />
-                <span className="text-xs text-white/60 font-minecraft-ten">20</span>
+                <span className="text-xs text-white/60 font-minecraft">20</span>
               </div>
             </SettingRow>
 
             <SettingRow label={t("settings.background.quality")} searchKeywords={kw("settings.background.quality", "quality", "qualität", "performance", "leistung", "fps")}>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_low")}</span>
+                <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_low")}</span>
                 <input
                   type="range"
                   min="0"
                   max="2"
                   step="1"
+                  aria-label={t("settings.background.quality")}
+                  aria-valuetext={t(`settings.background.quality_${customMediaQuality}`)}
                   value={customMediaQuality === "low" ? 0 : customMediaQuality === "medium" ? 1 : 2}
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
                     const levels = ["low", "medium", "high"] as const;
                     setCustomMediaQuality(levels[value] || "medium");
                   }}
-                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors"
+                  className="w-24 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white hover:accent-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 />
-                <span className="text-xs text-white/60 font-minecraft-ten">{t("settings.background.quality_high")}</span>
+                <span className="text-xs text-white/60 font-minecraft">{t("settings.background.quality_high")}</span>
               </div>
             </SettingRow>
 

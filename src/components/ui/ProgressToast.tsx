@@ -1,4 +1,5 @@
 import { useThemeStore } from "../../store/useThemeStore";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 import {
   getBorderRadiusClass,
   getToastBaseStyles,
@@ -14,7 +15,8 @@ interface ProgressToastProps {
 export function ProgressToast({ message, progress, action }: ProgressToastProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
-  const clampedProgress = Math.min(100, Math.max(0, progress));
+  const animationsEnabled = useAnimationsEnabled();
+  const clampedProgress = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : undefined;
 
   const borderRadiusClass = getBorderRadiusClass(borderRadius);
   const baseStyles = getToastBaseStyles({ accentColor: accentColor.value, borderRadius });
@@ -29,7 +31,8 @@ export function ProgressToast({ message, progress, action }: ProgressToastProps)
         <div className="flex items-center gap-3">
           {/* Spinning loader icon like loading toast */}
           <svg
-            className="animate-spin h-5 w-5 flex-shrink-0"
+            aria-hidden="true"
+            className={`${animationsEnabled ? "animate-spin " : ""}h-5 w-5 flex-shrink-0`}
             style={{ color: accentColor.value }}
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -50,17 +53,18 @@ export function ProgressToast({ message, progress, action }: ProgressToastProps)
             />
           </svg>
           <span className="flex-1">{message}</span>
-          <span style={{ color: accentColor.value }}>
+          {clampedProgress !== undefined && <span style={{ color: accentColor.value }}>
             {Math.round(clampedProgress)}%
-          </span>
+          </span>}
           {action}
         </div>
         {/* Progress bar */}
-        <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+        <div role="progressbar" aria-label={message} aria-valuemin={0} aria-valuemax={100} aria-valuenow={clampedProgress}
+          className="h-1 bg-white/20 rounded-full overflow-hidden">
           <div
-            className="h-full transition-all duration-300 ease-out rounded-full"
+            className={`h-full ${animationsEnabled ? "transition-all duration-300 ease-out " : ""}rounded-full`}
             style={{
-              width: `${clampedProgress}%`,
+              width: clampedProgress !== undefined ? `${clampedProgress}%` : "30%",
               backgroundColor: accentColor.value,
             }}
           />

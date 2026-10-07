@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { setDiscordState } from '../../../utils/discordRpc';
 import { logInfo } from '../../../utils/logging-utils';
 import { findBestVersionForProfile, statusForNewInstall } from '../../../utils/content-status';
@@ -12,6 +12,7 @@ import {
   resolveVersionFiles,
   selectVersion,
 } from '../../../utils/mod-install';
+import { createProfileInstallContinuation } from '../../../utils/profile-install-continuation';
 import UnifiedService from '../../../services/unified-service';
 import { ModrinthService } from '../../../services/modrinth-service';
 import { CurseForgeService } from '../../../services/curseforge-service';
@@ -134,12 +135,44 @@ const ALL_MODRINTH_PROJECT_TYPES: ModrinthProjectType[] = ['modpack', 'mod', 're
 // Define the order for known headers, others will be alphabetical
 const PREFERRED_HEADER_ORDER = ["resolutions", "performance impact", "features", "categories"];
 
+interface SearchFooterContext {
+  loading: boolean;
+  error: string | null;
+  hasResults: boolean;
+  hasMore: boolean;
+}
+
+// Keep the component identity and its minimum block size stable across search
+// updates. Replacing the footer component during item measurement can briefly
+// put the end marker above the list before Virtuoso knows its item heights.
+function SearchResultsFooter({ context }: { context?: SearchFooterContext }) {
+  const { t } = useTranslation();
+  const message = !context?.hasResults ? null
+    : context.loading ? t("content.search.loading_more")
+    : context.error ? t("content.search.error", { error: context.error })
+    : !context.hasMore ? t("content.search.no_more_results")
+    : null;
+  return (
+    <div role={message ? "status" : undefined} className="min-h-[3.125rem] p-4 text-center font-minecraft text-sm text-white/50">
+      {message}
+    </div>
+  );
+}
+
 interface UIDynamicFilterGroup {
   accordionTitle: string;
   headerValue: string;
   options: ModrinthCategory[];
 }
 
+
+const PROJECT_TYPE_LABEL_KEYS: Record<ModrinthProjectType, string> = {
+  mod: 'profiles.content.mods',
+  modpack: 'modrinth.project_types.modpacks',
+  resourcepack: 'profiles.content.resourcePacks',
+  shader: 'profiles.content.shaderPacks',
+  datapack: 'profiles.content.dataPacks',
+};
 
 export function ModrinthSearchV2({
   profiles: initialProfiles,
@@ -160,6 +193,28 @@ export function ModrinthSearchV2({
   const navigate = useNavigate();
   const { showModal, hideModal } = useGlobalModal();
   const searchResultsAreaRef = useRef<HTMLDivElement>(null); // Ref for the scrollable area
+  useLayoutEffect(() => {
+    const area = searchResultsAreaRef.current;
+    if (!area) return;
+    const updateHeight = () => {
+      area.style.setProperty("--catalogue-results-height", area.clientHeight + "px");
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
+
+  const reserveVersionsFocus = (trigger: Element) => {
+    const sink = searchResultsAreaRef.current;
+    if (document.activeElement !== trigger
+        || !trigger.isConnected
+        || !sink?.isConnected
+        || !sink.contains(trigger)
+        || trigger.closest("[inert]")
+        || sink.closest("[inert]")) return;
+    sink.focus({ preventScroll: true });
+  };
 
   const {
     searchTerm, setSearchTerm,
@@ -189,7 +244,7 @@ export function ModrinthSearchV2({
     }
   }, []);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(searchResults.length === 0);
   const [error, setError] = useState<string | null>(null);
   const limit = 20;
 
@@ -217,6 +272,11 @@ export function ModrinthSearchV2({
 
   // New state for expanded versions
   const [expandedVersions, setExpandedVersions] = useState<Record<string, UnifiedVersion[] | null | 'loading'>>({});
+  const [versionReadErrors, setVersionReadErrors] = useState<Record<string, string>>({});
+  const versionReadsMountedRef = useRef(false);
+  const versionRequestsRef = useRef(new Map<string, symbol>());
+  const versionProjectRefsRef = useRef(new Map<string, UnifiedModSearchResult>());
+  const versionReadScopeRef = useRef<object | null>(null);
 
   // New state for managing how many versions are displayed per project
   const [numDisplayedVersions, setNumDisplayedVersions] = useState<Record<string, number>>({});
@@ -248,7 +308,9 @@ export function ModrinthSearchV2({
   const [isSidebarVisible, setIsSidebarVisible] = useState(initialSidebarVisible);
 
   // Add state for currently selected profile
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(
+    () => selectedProfileId ? initialProfiles.find(profile => profile.id === selectedProfileId) ?? null : null
+  );
 
   // Get mod source from theme store (persistent)
   const { modSource, setModSource } = useThemeStore();
@@ -265,14 +327,11 @@ export function ModrinthSearchV2({
   const searchVersionRef = useRef(0);
   const debouncedSearchTerm = useDebounce(searchTerm, 250);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setInternalProfiles(initialProfiles);
     // If a selectedProfileId is passed as a prop, find and set it.
-    if (selectedProfileId && initialProfiles.length > 0) {
-      const initiallySelectedProfile = initialProfiles.find(p => p.id === selectedProfileId);
-      if (initiallySelectedProfile) {
-        setSelectedProfile(initiallySelectedProfile);
-      }
+    if (selectedProfileId !== undefined) {
+      setSelectedProfile(initialProfiles.find(profile => profile.id === selectedProfileId) ?? null);
     }
   }, [initialProfiles, selectedProfileId]);
 
@@ -283,6 +342,58 @@ export function ModrinthSearchV2({
   const currentSelectedLoaders = useMemo(() => {
     return selectedLoadersByProjectType[projectType] || [];
   }, [selectedLoadersByProjectType, projectType]);
+
+  // Project-local reads have their own ownership; search/install flows do not.
+  const versionReadScope = useMemo(() => ({ source: modSource }), [
+    debouncedSearchTerm, projectType, sortOrder, modSource,
+    currentSelectedCategories, selectedGameVersions, currentSelectedLoaders,
+    filterClientRequired, filterServerRequired,
+  ]);
+  const versionReadLiveKey = JSON.stringify([
+    modSource, searchTerm, projectType, sortOrder, currentSelectedCategories,
+    selectedGameVersions, currentSelectedLoaders, filterClientRequired, filterServerRequired,
+  ]);
+  useLayoutEffect(() => {
+    versionReadsMountedRef.current = true;
+    versionReadScopeRef.current = versionReadScope;
+    versionRequestsRef.current.clear();
+    setExpandedVersions({});
+    setVersionReadErrors({});
+    setNumDisplayedVersions({});
+    setVersionFilters({});
+    setVersionDropdownUIState({});
+    setOpenVersionDropdowns({});
+    return () => {
+      versionReadsMountedRef.current = false;
+      versionReadScopeRef.current = null;
+      versionRequestsRef.current.clear();
+      versionProjectRefsRef.current.clear();
+    };
+  }, [versionReadScope]);
+
+  useLayoutEffect(() => {
+    const projects = new Map(searchResults
+      .filter(hit => hit.source === versionReadScope.source)
+      .map(hit => [hit.project_id, hit] as const));
+    const invalidated = new Set<string>();
+    for (const [id, previous] of versionProjectRefsRef.current) {
+      if (projects.get(id) !== previous) invalidated.add(id);
+    }
+    versionProjectRefsRef.current = projects;
+    if (!invalidated.size) return;
+
+    // Appending a page preserves existing row objects and their local cache.
+    // Removed/replaced rows lose only their own records and request ownership.
+    for (const id of invalidated) versionRequestsRef.current.delete(id);
+    const retainCurrentProjects = <T,>(previous: Record<string, T>): Record<string, T> =>
+      Object.fromEntries(Object.entries(previous).filter(([id]) => !invalidated.has(id)));
+    setExpandedVersions(retainCurrentProjects);
+    setVersionReadErrors(retainCurrentProjects);
+    setNumDisplayedVersions(retainCurrentProjects);
+    setVersionFilters(retainCurrentProjects);
+    setVersionDropdownUIState(retainCurrentProjects);
+    setOpenVersionDropdowns(retainCurrentProjects);
+  }, [searchResults, versionReadScope]);
 
   useEffect(() => {
     traceMark(traceScope, 'search: component mounted');
@@ -533,11 +644,6 @@ export function ModrinthSearchV2({
     }
     setScrollPosition(0);
 
-    // Reset expanded versions when filter changes
-    setExpandedVersions({});
-    setNumDisplayedVersions({});
-    setVersionFilters({});
-
     performSearch(true);
   }, [
     debouncedSearchTerm, projectType, sortOrder, modSource,
@@ -679,11 +785,35 @@ export function ModrinthSearchV2({
     setFilterServerRequired(false); // Reset new filter
   };
 
-  const toggleProjectVersions = async (projectId: string) => {
-    if (expandedVersions[projectId] === 'loading') return;
+  const isVersionReadContextCurrent = (projectId: string) => {
+    if (!versionReadsMountedRef.current || versionReadScopeRef.current !== versionReadScope) return false;
+    const current = useModSearchStore.getState();
+    const source = useThemeStore.getState().modSource;
+    const liveKey = JSON.stringify([
+      source, current.searchTerm, current.projectType, current.sortOrder,
+      current.selectedCategoriesByProjectType[current.projectType] || [],
+      current.selectedGameVersions, current.selectedLoadersByProjectType[current.projectType] || [],
+      current.filterClientRequired, current.filterServerRequired,
+    ]);
+    const renderedProject = searchResults.find(
+      hit => hit.project_id === projectId && hit.source === versionReadScope.source,
+    );
+    return liveKey === versionReadLiveKey && renderedProject !== undefined
+      && current.searchResults.find(
+        hit => hit.project_id === projectId && hit.source === versionReadScope.source,
+      ) === renderedProject;
+  };
 
-    if (expandedVersions[projectId]) { 
+  const toggleProjectVersions = async (projectId: string) => {
+    if (!isVersionReadContextCurrent(projectId) || versionRequestsRef.current.has(projectId)) return;
+
+    if (expandedVersions[projectId] || versionReadErrors[projectId] !== undefined) {
       setExpandedVersions(prev => ({ ...prev, [projectId]: null }));
+      setVersionReadErrors(prev => {
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      });
       // Reset the display count when versions are hidden
       setNumDisplayedVersions(prev => {
         const newState = { ...prev };
@@ -708,6 +838,16 @@ export function ModrinthSearchV2({
   };
 
   const loadProjectVersions = async (projectId: string) => {
+    if (!isVersionReadContextCurrent(projectId) || versionRequestsRef.current.has(projectId)) return;
+    const request = Symbol(projectId);
+    versionRequestsRef.current.set(projectId, request);
+    const isCurrent = () => isVersionReadContextCurrent(projectId)
+      && versionRequestsRef.current.get(projectId) === request;
+    setVersionReadErrors(prev => {
+      const next = { ...prev };
+      delete next[projectId];
+      return next;
+    });
     setExpandedVersions(prev => ({ ...prev, [projectId]: 'loading' }));
     try {
       console.log(`Fetching versions for project: ${projectId}`);
@@ -715,6 +855,7 @@ export function ModrinthSearchV2({
         source: modSource,
         project_id: projectId
       });
+      if (!isCurrent()) return;
       
       // Add NoRisk status to each version
       const versionsWithNoRiskStatus = response.versions.map(version => {
@@ -755,8 +896,10 @@ export function ModrinthSearchV2({
 
       // No longer checking installation status for all versions here
     } catch (err) {
+      if (!isCurrent()) return;
       console.error(`Failed to load versions for project ${projectId}:`, err);
       setExpandedVersions(prev => ({ ...prev, [projectId]: null }));
+      setVersionReadErrors(prev => ({ ...prev, [projectId]: parseErrorMessage(err) }));
       setNumDisplayedVersions(prev => {
         const newState = { ...prev };
         delete newState[projectId];
@@ -768,6 +911,11 @@ export function ModrinthSearchV2({
         delete newState[projectId];
         return newState;
       });
+    } finally {
+      // An older completion must never clear a replacement request's guard.
+      if (versionRequestsRef.current.get(projectId) === request) {
+        versionRequestsRef.current.delete(projectId);
+      }
     }
   };
   
@@ -1445,12 +1593,10 @@ export function ModrinthSearchV2({
   };
 
   // Find the selected profile when the component mounts or selectedProfileId changes
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (selectedProfileId && internalProfiles.length > 0) {
       const profile = internalProfiles.find(p => p.id === selectedProfileId);
-      if (profile) {
-        setSelectedProfile(profile);
-      }
+      setSelectedProfile(profile ?? null);
     } else if (selectedProfileId === '') {
       // Explicit empty selection - set to null
       setSelectedProfile(null);
@@ -1465,7 +1611,7 @@ export function ModrinthSearchV2({
   }, [selectedProfileId, internalProfiles, selectedProfile]);
 
   // Reset profile selection if explicit empty option was requested
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (selectedProfileId === '') {
       setSelectedProfile(null);
       // Reset filters related to profile
@@ -1478,22 +1624,23 @@ export function ModrinthSearchV2({
   }, [selectedProfileId, projectType]);
 
   // Apply profile filters when selected profile changes - only set relevant filters based on project type
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (selectedProfile) {
       // Set game version filter from profile - applicable to all project types
-      if (selectedProfile.game_version) {
-        setSelectedGameVersions([selectedProfile.game_version]);
-      }
+      setSelectedGameVersions(selectedProfile.game_version ? [selectedProfile.game_version] : []);
       
       // Set loader filter from profile - only for project types that use loaders
-      if (selectedProfile.loader && ['mod', 'modpack'].includes(projectType)) {
-        setSelectedLoadersByProjectType(prev => ({
-          ...prev,
-          [projectType]: [selectedProfile.loader]
-        }));
-      }
+      setSelectedLoadersByProjectType(prev => ({
+        ...prev,
+        [projectType]: selectedProfile.loader && ['mod', 'modpack'].includes(projectType) ? [selectedProfile.loader] : []
+      }));
+    } else if (selectedProfileId !== undefined) {
+      // A pending/missing explicit profile must not inherit another profile's
+      // game/loader filters while its own DTO has not arrived.
+      setSelectedGameVersions([]);
+      setSelectedLoadersByProjectType(prev => ({ ...prev, [projectType]: [] }));
     }
-  }, [selectedProfile, projectType]);
+  }, [selectedProfile, projectType, selectedProfileId]);
 
   // New state for quick install modal
   const [quickInstallModalOpen, setQuickInstallModalOpen] = useState(false);
@@ -2531,122 +2678,107 @@ export function ModrinthSearchV2({
   ): Promise<void> => {
 
     try {
-      let newProfileId: string;
+      const profileNameToCreate = profileName.trim();
+      if (!profileNameToCreate) throw new Error("Profile name must not be empty");
+      const projectSnapshot = { ...project };
+      if (projectSnapshot.project_type === 'modpack' || projectSnapshot.project_type === 'Modpack') {
+        throw new Error("Modpacks should be installed as new profiles, not as content to an existing one.");
+      }
+      // Same lower-case/UnifiedProjectType tokens as the shared mapper, without
+      // its error toast: these two awaiting callers own their visible failure.
+      const contentType = new Map<string, NrContentType>([
+        ['mod', NrContentType.Mod], ['Mod', NrContentType.Mod],
+        ['resourcepack', NrContentType.ResourcePack], ['ResourcePack', NrContentType.ResourcePack],
+        ['shader', NrContentType.ShaderPack], ['Shader', NrContentType.ShaderPack],
+        ['datapack', NrContentType.DataPack], ['Datapack', NrContentType.DataPack],
+      ]).get(projectSnapshot.project_type);
+      if (!contentType) throw new Error(`Unsupported project type for installation: ${projectSnapshot.project_type}`);
+      const snapshotVersion = (selected: UnifiedVersion): UnifiedVersion => ({
+        ...selected,
+        game_versions: [...(selected.game_versions || [])],
+        loaders: [...(selected.loaders || [])],
+        files: (selected.files || []).map(file => ({ ...file, hashes: { ...file.hashes } })),
+        dependencies: [...(selected.dependencies || [])],
+      });
+      const explicitVersion = version !== null && version !== undefined;
+      let versionToInstall: UnifiedVersion | null = version ? snapshotVersion(version) : null;
       let gameVersion = '';
       let loader = 'fabric';
-      let versionToInstall: UnifiedVersion | null = null;
+      let copiedStandardProfile = false;
 
-      // Handle profile creation
+      // Validate reads and the exact selection before creating/copying anything.
       if (sourceProfileIdToCopy) {
-        // Get the source profile from the store
-        console.log('🔍 Looking for source profile:', sourceProfileIdToCopy);
         const allProfiles = await ProfileService.getAllProfilesAndLastPlayed();
-        console.log('📋 Available profiles:', allProfiles.all_profiles.map(p => ({ id: p.id, name: p.name })));
-
         const sourceProfile = allProfiles.all_profiles.find(p => p.id === sourceProfileIdToCopy);
-        console.log('🎯 Found source profile:', sourceProfile);
-
         if (!sourceProfile) {
           throw new Error(`Source profile with ID ${sourceProfileIdToCopy} not found`);
         }
-
-        const sourceProfileName = sourceProfile.name;
-
-        // Copy profile using the service directly
-        const copyParams = {
-          source_profile_id: sourceProfileIdToCopy,
-          new_profile_name: profileName,
-          include_files: undefined, // Let the backend handle includeAll
-        };
-
-        console.log('🔄 Copying profile with params:', copyParams);
-        newProfileId = await ProfileService.copyProfile(copyParams);
-        console.log('✅ Profile copied successfully, new ID:', newProfileId);
-
-        // If the source profile is a standard version, update the new profile to be custom
-        if (sourceProfile?.is_standard_version) {
-          await ProfileService.updateProfile(newProfileId, {
-            group: "CUSTOM",
-          });
-        }
-
-        // Get game version from the source profile for compatibility filtering
-        if (sourceProfile) {
-          gameVersion = sourceProfile.game_version;
-          loader = sourceProfile.loader || 'vanilla';
-        }
+        gameVersion = sourceProfile.game_version;
+        loader = sourceProfile.loader || 'vanilla';
+        copiedStandardProfile = !!sourceProfile.is_standard_version;
+        versionToInstall ??= selectVersion(await fetchVersions(projectSnapshot), {
+          gameVersions: [gameVersion], loaders: [loader],
+        });
       } else {
-        versionToInstall =
-          version ??
-          selectVersion(await fetchVersions(project), {
+        versionToInstall ??= selectVersion(await fetchVersions(projectSnapshot), {
             gameVersions: selectedGameVersions,
             loaders: currentSelectedLoaders,
           });
-
         if (!versionToInstall) {
-          throw new Error(`No versions available for ${project.title}`);
+          throw new Error(`No versions available for ${projectSnapshot.title}`);
         }
-
         ({ gameVersion, loader } = profileTargetFor(versionToInstall));
-
-        newProfileId = await ProfileService.createProfile({
-          name: profileName,
-          game_version: gameVersion,
-          loader: loader,
-        });
       }
-
-      const contentType = mapUnifiedProjectTypeToNrContentType(project.project_type);
-      if (!contentType) {
-        throw new Error(`Unsupported project type for installation: ${project.project_type}`);
-      }
-      if (project.project_type === 'modpack') {
-        throw new Error("Modpacks should be installed as new profiles, not as content to an existing one.");
-      }
-
       if (!versionToInstall) {
-        versionToInstall = selectVersion(await fetchVersions(project), {
-          gameVersions: [gameVersion],
-          loaders: [loader],
-        });
-        if (!versionToInstall) {
-          throw new Error(`No versions available for ${project.title}`);
-        }
+        throw new Error(`No versions available for ${projectSnapshot.title}`);
       }
-
-      const resolved = await resolveVersionFiles(project, versionToInstall, { gameVersion, loader });
+      if (versionToInstall.project_id !== projectSnapshot.project_id || versionToInstall.source !== projectSnapshot.source) {
+        throw new Error("Selected version does not belong to this project and provider");
+      }
+      const resolved = await resolveVersionFiles(projectSnapshot, versionToInstall, { gameVersion, loader });
       if (!resolved) {
-        throw new Error(`No downloadable file found for ${project.title} ${versionToInstall.version_number}`);
+        throw new Error(`No downloadable file found for ${projectSnapshot.title} ${versionToInstall.version_number}`);
       }
-
-      const payload = buildInstallPayload(newProfileId, project, resolved, contentType);
-      logInfo(`[new-profile] '${profileName}' mc=${gameVersion} loader=${loader} installing ${payload.file_name} (version=${payload.version_id})`);
-      await installContentToProfile(payload);
-
-      // Update the store and local state to reflect changes
-      const updatedProfiles = await ProfileService.getAllProfilesAndLastPlayed();
-      setInternalProfiles(updatedProfiles.all_profiles);
-
-      // Update the global profile store properly
-      useProfileStore.setState({
-        profiles: updatedProfiles.all_profiles,
-        lastPlayedProfileId: updatedProfiles.last_played_profile_id,
-        loading: false,
+      if (resolved.project_id !== projectSnapshot.project_id || resolved.source !== projectSnapshot.source ||
+          (explicitVersion && resolved.id !== versionToInstall.id)) {
+        throw new Error("The selected version has no downloadable file; another version was not installed");
+      }
+      const resolvedSnapshot = snapshotVersion(resolved);
+      let payload: InstallContentPayload | null = null;
+      const run = createProfileInstallContinuation({
+        profileName: profileNameToCreate, projectTitle: projectSnapshot.title,
+        projectId: projectSnapshot.project_id, source: projectSnapshot.source,
+        versionId: resolvedSnapshot.id, versionNumber: resolvedSnapshot.version_number,
+        sourceProfileId: sourceProfileIdToCopy || null,
+      }, {
+        create: () => sourceProfileIdToCopy
+          ? ProfileService.copyProfile({ source_profile_id: sourceProfileIdToCopy, new_profile_name: profileNameToCreate, include_files: undefined })
+          : ProfileService.createProfile({ name: profileNameToCreate, game_version: gameVersion, loader }),
+        setup: copiedStandardProfile ? id => ProfileService.updateProfile(id, { group: "CUSTOM" }) : undefined,
+        install: async id => {
+          payload ??= buildInstallPayload(id, projectSnapshot, resolvedSnapshot, contentType);
+          logInfo(`[new-profile] '${profileNameToCreate}' mc=${gameVersion} loader=${loader} installing ${payload.file_name} (version=${payload.version_id})`);
+          await installContentToProfile(payload);
+        },
+        refresh: async () => {
+          const updatedProfiles = await ProfileService.getAllProfilesAndLastPlayed();
+          setInternalProfiles(updatedProfiles.all_profiles);
+          useProfileStore.setState({ profiles: updatedProfiles.all_profiles, lastPlayedProfileId: updatedProfiles.last_played_profile_id, loading: false });
+        },
+        complete: async id => {
+          await navigate(`/profilesv2/${id}`);
+          if (onInstallSuccess) {
+            justInstalledOrToggledRef.current = true;
+            await onInstallSuccess();
+          }
+        },
       });
-
-      // Navigate to the newly created profile
-      console.log('🚀 Navigating to new profile:', newProfileId);
-      navigate(`/profilesv2/${newProfileId}`);
-
-      // Call onInstallSuccess if it exists and the installed content was not a modpack
-      if (project.project_type !== 'modpack' && onInstallSuccess) {
-        justInstalledOrToggledRef.current = true;
-        onInstallSuccess();
-      }
-
+      await run();
     } catch (error) {
       console.error("Error in handleInstallToNewProfile:", error);
-      toast.error(t('content.install.create_profile_failed', { error: error instanceof Error ? error.message : 'Unknown error' }));
+      // Both public modal consumers await this operation and render their own
+      // error. Resolving here would falsely report creation/install success.
+      throw error;
     }
   };
 
@@ -2992,7 +3124,7 @@ export function ModrinthSearchV2({
     // Overall container: now flex-row to place left content and sidebar side-by-side
     <div className={`modrinth-search-v2 flex flex-row h-full gap-3 ${className}`}> {/* Added gap-3 */} 
       {/* Left Content Area: Takes up most space, contains search bar and results */} 
-      <div className="left-content-area flex flex-col flex-1 overflow-hidden">
+      <div className="left-content-area flex min-h-0 min-w-0 flex-col flex-1 overflow-hidden">
         {/* Search controls are now in a separate component */}
         <ModrinthSearchControlsV2
           searchTerm={searchTerm}
@@ -3002,6 +3134,7 @@ export function ModrinthSearchV2({
           allProjectTypes={allowedProjectTypes || ALL_MODRINTH_PROJECT_TYPES} // Use filtered list
           profiles={internalProfiles}
           selectedProfile={selectedProfile}
+          reserveProfileFilterRow={Boolean(selectedProfileId || selectedProfile)}
           onSelectedProfileChange={(profile) => {
             if (profile === null) {
               setSelectedProfile(null);
@@ -3033,8 +3166,21 @@ export function ModrinthSearchV2({
         />
 
         {/* Search Results Area (scrollable within the left content area) */}
-        <div ref={searchResultsAreaRef} onScroll={handleScrollSave} className="search-results-area flex-1 overflow-y-auto"> {/* Removed p-4 */}
-          {/* {loading && searchResults.length === 0 && <p className="p-4 text-center">Loading initial results...</p>} REMOVED */}
+        <div
+          ref={searchResultsAreaRef}
+          onScroll={handleScrollSave}
+          aria-busy={loading}
+          tabIndex={-1}
+          role="region"
+          aria-label={t('content.search.resultsRegionLabel', { type: t(PROJECT_TYPE_LABEL_KEYS[projectType]) })}
+          className="search-results-area relative min-h-0 min-w-0 flex-1 overflow-y-auto scroll-py-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+        >
+          {loading && searchResults.length === 0 && (
+            <div role="status" className="absolute inset-0 flex items-center justify-center gap-3 p-4 font-minecraft text-sm text-white/50">
+              <Icon icon="svg-spinners:ring-resize" aria-hidden="true" className="h-5 w-5 shrink-0" />
+              {t("content.search.loading")}
+            </div>
+          )}
           {searchResults.length === 0 && !loading && error && (
             <p className="p-4 text-red-500 text-center">{t('content.search.error', { error })}</p>
           )}
@@ -3070,8 +3216,12 @@ export function ModrinthSearchV2({
                       onInstallModpackAsProfileClick={handleInstallModpackAsProfile}
                       onInstallModpackVersionAsProfileClick={handleInstallModpackVersionAsProfile}
                       onToggleVersionsClick={toggleProjectVersions}
-                      isExpanded={Array.isArray(projectVersions) && projectVersions.length > 0}
+                      onReserveVersionsFocus={reserveVersionsFocus}
+                      isExpanded={Array.isArray(projectVersions) || versionReadErrors[hit.project_id] !== undefined}
                       isLoadingVersions={projectVersions === 'loading'}
+                      versionsReadError={versionReadErrors[hit.project_id]}
+                      versionsReadDisabled={hit.source !== modSource}
+                      onRetryVersionsClick={loadProjectVersions}
                       projectVersions={projectVersions}
                       displayedCount={displayedCount}
                       versionFilters={currentVersionFilters}
@@ -3116,26 +3266,16 @@ export function ModrinthSearchV2({
                   </div>
                 )}
 
-                {/* Loading indicator */}
-                {loading && searchResults.length > 0 && (
-                  <div className="p-4 text-center">
-                    {t('content.search.loading_more')}
-                  </div>
-                )}
-
-                {/* End of results */}
-                {!loading && searchResults.length > 0 && searchResults.length >= totalHits && (
-                  <div className="p-4 text-center text-sm text-gray-400">
-                    {t('content.search.no_more_results')}
-                  </div>
-                )}
+                <SearchResultsFooter context={{ loading, error, hasResults: true, hasMore: searchResults.length < totalHits }} />
               </div>
             ) : (
               // Virtualized list (original implementation)
               <Virtuoso
                 style={{ height: '100%' }}
+                initialItemCount={Math.min(searchResults.length, limit)}
                 initialScrollTop={restoredScrollTop.current}
                 data={searchResults}
+                context={{ loading, error, hasResults: true, hasMore: searchResults.length < totalHits }}
                 endReached={loadMoreResults}
                 onScroll={(e) => {
                   if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
@@ -3167,8 +3307,12 @@ export function ModrinthSearchV2({
                       onInstallModpackAsProfileClick={handleInstallModpackAsProfile}
                       onInstallModpackVersionAsProfileClick={handleInstallModpackVersionAsProfile}
                       onToggleVersionsClick={toggleProjectVersions}
-                      isExpanded={Array.isArray(projectVersions) && projectVersions.length > 0}
+                      onReserveVersionsFocus={reserveVersionsFocus}
+                      isExpanded={Array.isArray(projectVersions) || versionReadErrors[hit.project_id] !== undefined}
                       isLoadingVersions={projectVersions === 'loading'}
+                      versionsReadError={versionReadErrors[hit.project_id]}
+                      versionsReadDisabled={hit.source !== modSource}
+                      onRetryVersionsClick={loadProjectVersions}
                       projectVersions={projectVersions}
                       displayedCount={displayedCount}
                       versionFilters={currentVersionFilters}
@@ -3201,23 +3345,7 @@ export function ModrinthSearchV2({
                   );
                 }}
                 components={{
-                  Footer: () => {
-                    if (loading && searchResults.length > 0) {
-                      return (
-                        <div className="p-4 text-center">
-                          {t('content.search.loading_more')}
-                        </div>
-                      );
-                    }
-                    if (!loading && searchResults.length > 0 && searchResults.length >= totalHits) {
-                       return (
-                        <div className="p-4 text-center text-sm text-gray-400">
-                          {t('content.search.no_more_results')}
-                        </div>
-                      );
-                    }
-                    return null;
-                  },
+                  Footer: SearchResultsFooter,
                 }}
               />
             )
@@ -3281,4 +3409,4 @@ export function ModrinthSearchV2({
 
     </div>
   );
-} 
+}

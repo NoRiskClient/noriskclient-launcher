@@ -95,14 +95,9 @@ export async function abort(profileId: string): Promise<void> {
  */
 export async function getRunningProcesses(): Promise<ProcessMetadata[]> {
   console.debug("[ProcessService] Fetching running processes");
-  try {
-    // Assuming the Rust command returns Vec<ProcessMetadata>
-    const processes = await invoke<ProcessMetadata[]>("get_processes");
-    return processes || []; // Return empty array if null/undefined
-  } catch (error) {
-    console.error("[ProcessService] Failed to get running processes:", error);
-    return []; // Return empty on error
-  }
+  // A failed read is not evidence that no process exists. Callers decide
+  // how to present unavailable/stale data and may retry the rejection.
+  return invoke<ProcessMetadata[]>("get_processes");
 }
 
 /**
@@ -135,12 +130,8 @@ export async function openLogWindow(processId: string): Promise<void> {
 }
 
 export async function getProcess(processId: string): Promise<ProcessMetadata | null> {
-  try {
-    return await invoke<ProcessMetadata | null>("get_process", { processId });
-  } catch (error) {
-    console.error(`[ProcessService] Failed to get process ${processId}:`, error);
-    return null;
-  }
+  // A successful null means not found; an IPC failure must remain a rejection.
+  return invoke<ProcessMetadata | null>("get_process", { processId });
 }
 
 export interface ProcessLogCursor {

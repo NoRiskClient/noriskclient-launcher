@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type AriaAttributes } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
+import { useAnimationsEnabled, useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 import { gsap } from "gsap";
+import { useSettingControl } from "./settings/SettingControlContext";
 
-interface ToggleSwitchProps {
+interface ToggleSwitchProps extends AriaAttributes {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
@@ -22,8 +23,12 @@ export function ToggleSwitch({
   disabled = false,
   size = "md",
   className,
+  ...ariaProps
 }: ToggleSwitchProps) {
+  const labelId = useId();
+  const row = useSettingControl();
   const accentColor = useThemeStore((state) => state.accentColor);
+  const animationsEnabled = useAnimationsEnabled();
   const [isHovered, setIsHovered] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLDivElement>(null);
@@ -63,7 +68,8 @@ export function ToggleSwitch({
     { opacity: 1, scale: 1, duration: 0.4, ease: "power2.out" },
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const context = gsap.context(() => {
     if (knobRef.current) {
       gsap.to(knobRef.current, {
         x: checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0,
@@ -71,7 +77,7 @@ export function ToggleSwitch({
         boxShadow: checked
           ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
           : "0 1px 3px rgba(0,0,0,0.3)",
-        duration: 0.3,
+        duration: animationsEnabled ? 0.3 : 0,
         ease: "power2.inOut",
       });
     }
@@ -84,17 +90,27 @@ export function ToggleSwitch({
         borderColor: checked
           ? `${accentColor.value}CC`
           : `${accentColor.value}50`,
-        duration: 0.3,
+        duration: animationsEnabled ? 0.3 : 0,
         ease: "power2.inOut",
       });
     }
-  }, [checked, accentColor.value, size]);
+    });
+    return () => context.revert();
+  }, [checked, accentColor.value, size, animationsEnabled]);
+
+  useEffect(() => {
+    if (!animationsEnabled && knobRef.current) {
+      gsap.killTweensOf(knobRef.current, "scale");
+      gsap.set(knobRef.current, { scale: 1 });
+    }
+    return () => { if (knobRef.current) gsap.killTweensOf(knobRef.current, "scale"); };
+  }, [animationsEnabled]);
 
   const handleMouseEnter = () => {
     if (disabled) return;
     setIsHovered(true);
 
-    if (knobRef.current) {
+    if (animationsEnabled && knobRef.current) {
       gsap.to(knobRef.current, {
         scale: 1.15,
         duration: 0.2,
@@ -107,7 +123,7 @@ export function ToggleSwitch({
     if (disabled) return;
     setIsHovered(false);
 
-    if (knobRef.current) {
+    if (animationsEnabled && knobRef.current) {
       gsap.to(knobRef.current, {
         scale: 1,
         duration: 0.2,
@@ -117,7 +133,7 @@ export function ToggleSwitch({
   };
 
   const handleClick = () => {
-    if (disabled) return;
+    if (disabled || !animationsEnabled) return;
 
     if (knobRef.current) {
       gsap.to(knobRef.current, {
@@ -139,7 +155,7 @@ export function ToggleSwitch({
     <label
       ref={containerRef}
       className={cn(
-        "flex items-center gap-3",
+        "relative flex items-center gap-3 group",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
         className,
       )}
@@ -150,7 +166,8 @@ export function ToggleSwitch({
         <div
           ref={trackRef}
           className={cn(
-            "rounded-full transition-colors duration-200",
+            "rounded-full group-focus-within:[outline-style:solid] group-focus-within:outline-2 group-focus-within:outline-white/80 group-focus-within:outline-offset-2",
+            animationsEnabled && "transition-colors duration-200",
             sizeConfig.track,
           )}
           style={{
@@ -179,7 +196,7 @@ export function ToggleSwitch({
               boxShadow: checked
                 ? `0 1px 3px rgba(0,0,0,0.3), 0 0 0 2px ${accentColor.value}40`
                 : "0 1px 3px rgba(0,0,0,0.3)",
-              transform: `translate(${checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0}px, -50%) scale(${isHovered ? 1.15 : 1})`,
+              transform: `translate(${checked ? (size === "sm" ? 16 : size === "lg" ? 28 : 20) : 0}px, -50%) scale(${isHovered && animationsEnabled ? 1.15 : 1})`,
             }}
           />
         </div>
@@ -187,6 +204,7 @@ export function ToggleSwitch({
 
       {label && (
         <span
+          id={labelId}
           className={cn(
             "font-smallcaps text-white",
             sizeConfig.label,
@@ -198,10 +216,14 @@ export function ToggleSwitch({
 
       <input
         type="checkbox"
-        className="hidden"
+        role="switch"
+        className="sr-only absolute left-0 top-1/2"
         checked={checked}
-        onChange={() => !disabled && onChange(!checked)}
+        onChange={event => !disabled && onChange(event.currentTarget.checked)}
         disabled={disabled}
+        aria-labelledby={label ? labelId : row.labelId}
+        aria-describedby={row.descriptionId}
+        {...ariaProps}
       />
     </label>
   );

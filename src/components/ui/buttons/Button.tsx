@@ -1,7 +1,9 @@
 "use client";
 
+import { useAnimationsEnabled } from "../../../hooks/useEntranceAnimation";
+
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useId, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -54,12 +56,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
+    const descriptionId = useId();
     const buttonRef = useRef<HTMLButtonElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
     const borderRadius = useThemeStore((state) => state.borderRadius);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+    const isBackgroundAnimationEnabled = useAnimationsEnabled();
     const [isPressed, setIsPressed] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
 
@@ -148,6 +149,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const accessibilityProps = getAccessibilityProps({
       label,
       description,
+      descriptionId,
       disabled
     });    const getBackgroundColor = () => {
       if (variant === "ghost") {
@@ -262,6 +264,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
           }}>{icon}</span>
         )}
+        {description && <span id={descriptionId} className="sr-only">{description}</span>}
       </button>
     );
   },

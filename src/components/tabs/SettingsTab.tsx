@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";
 import type { LauncherConfig } from "../../types/launcherConfig";
@@ -25,6 +25,7 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
 import { isMacOS, supportsClips } from "../../utils/platform";
+import { isApplixirEnabled } from "../../services/flagsmith-service";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
 
@@ -38,6 +39,61 @@ const SETTINGS_TAB_IDS: SettingsTabId[] = [
 
 interface SettingsTabProps {
   onClose: () => void;
+}
+
+type SettingsSectionDefinition = { id: string; label: string };
+
+function getOwnedSettingsSections(root: HTMLElement, defs: SettingsSectionDefinition[]): HTMLElement[] {
+  const ids = new Set(defs.map(({ id }) => `settings-section-${id}`));
+  return Array.from(root.querySelectorAll<HTMLElement>('section[id^="settings-section-"]'))
+    .filter(section => ids.has(section.id));
+}
+
+function readActiveSettingsSection(root: HTMLElement, sections: HTMLElement[]): string | null {
+  if (!sections.length) return null;
+  // A short final section cannot always align with the upper scrollspy line.
+  const atEnd = root.scrollHeight > root.clientHeight + 1 &&
+    root.scrollTop + root.clientHeight >= root.scrollHeight - 1;
+  const rootTop = root.getBoundingClientRect().top;
+  let current: HTMLElement | null = atEnd ? sections[sections.length - 1] : null;
+  if (!atEnd) {
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top - rootTop <= 80) current = section;
+    }
+  }
+  return current ? current.id.slice("settings-section-".length) : null;
+}
+
+function scrollOwnedSettingsElement(root: HTMLElement | null, element: Element, block: "nearest" | "start", behavior: ScrollBehavior = "auto") {
+  if (!root || !root.contains(element)) return;
+  const rootRect = root.getBoundingClientRect();
+  if (root.clientHeight <= 0 || rootRect.height <= 0) return;
+  // Rects share the launcher's entrance transform; scroll offsets are local CSS pixels.
+  const scaleY = root.offsetHeight > 0 ? rootRect.height / root.offsetHeight : 1;
+  const style = getComputedStyle(element);
+  const rootStyle = getComputedStyle(root);
+  const paddingTop = parseFloat(rootStyle.scrollPaddingTop) || 0;
+  const paddingBottom = parseFloat(rootStyle.scrollPaddingBottom) || 0;
+  const rect = element.getBoundingClientRect();
+  const top = root.scrollTop + (rect.top - rootRect.top) / scaleY - root.clientTop -
+    (parseFloat(style.scrollMarginTop) || 0);
+  const bottom = root.scrollTop + (rect.bottom - rootRect.top) / scaleY - root.clientTop +
+    (parseFloat(style.scrollMarginBottom) || 0);
+  let next = top - paddingTop;
+  if (block === "nearest") {
+    const viewTop = root.scrollTop + paddingTop;
+    const viewBottom = root.scrollTop + root.clientHeight - paddingBottom;
+    if (top >= viewTop && bottom <= viewBottom || top <= viewTop && bottom >= viewBottom) return;
+    const fits = bottom - top <= viewBottom - viewTop;
+    next = top < viewTop
+      ? fits ? top - paddingTop : bottom - root.clientHeight + paddingBottom
+      : fits ? bottom - root.clientHeight + paddingBottom : top - paddingTop;
+  }
+  root.scrollTo({
+    top: Math.max(0, Math.min(Math.max(0, root.scrollHeight - root.clientHeight), next)),
+    left: root.scrollLeft,
+    behavior,
+  });
 }
 
 export function SettingsTab({ onClose }: SettingsTabProps) {
@@ -69,15 +125,50 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     return () => clearTimeout(id);
   }, [sidebarSearch]);
   const sidebarQuery = debouncedSearch.trim().toLowerCase();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const sidebarListRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const spySuppressRef = useRef(false);
+  const spyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spyProbeRef = useRef<(() => void) | null>(null);
+  const cancelSpySuppression = useCallback(() => {
+    if (spyTimeoutRef.current !== null) clearTimeout(spyTimeoutRef.current);
+    spyTimeoutRef.current = null;
+    spySuppressRef.current = false;
+  }, []);
+  const [adsEnabled, setAdsEnabled] = useState(false);
+  const rendersAdvanced = Boolean(config && tempConfig && !loading && !error) &&
+    (activeTab === "advanced" || Boolean(sidebarQuery && !onlyTab));
+  useEffect(() => {
+    if (!rendersAdvanced) return;
+    let alive = true;
+    isApplixirEnabled()
+      .then(enabled => { if (alive) setAdsEnabled(enabled); })
+      .catch(() => { if (alive) setAdsEnabled(false); });
+    return () => { alive = false; };
+  }, [rendersAdvanced]);
+  const [searchHasResults, setSearchHasResults] = useState(true);
+  useEffect(() => {
+    const node = contentRef.current;
+    if (!sidebarQuery || !node || loading || error) { setSearchHasResults(true); return; }
+    const check = () => setSearchHasResults(!!node.querySelector('section[id^="settings-section-"]'));
+    check();
+    const observer = new MutationObserver(check); observer.observe(node, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [sidebarQuery, loading, error]);
 
   useEffect(() => { setDiscordState("Configuring Settings"); }, []);
 
   useEffect(() => {
+    cancelSpySuppression();
+    setActiveSection(null);
     if (contentRef.current) contentRef.current.scrollTop = 0;
-  }, [activeTab, sidebarQuery]);
+  }, [activeTab, sidebarQuery, cancelSpySuppression]);
+
+  useEffect(() => cancelSpySuppression, [cancelSpySuppression]);
 
 
-  const sectionDefs: Record<SettingsTabId, { id: string; label: string }[]> = {
+  const sectionDefs = useMemo<Record<SettingsTabId, SettingsSectionDefinition[]>>(() => ({
     general: [
       { id: "language", label: t("settings.language") },
       { id: "accent", label: t("settings.accent_color.title") },
@@ -99,16 +190,18 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
           { id: "clips-quality", label: t("settings.clips.quality.title") },
           { id: "clips-audio", label: t("settings.clips.audio.title") },
           { id: "clips-storage", label: t("settings.clips.storage.title") },
+          { id: "clips-library", label: t("settings.clips.library.title") },
         ]
       : [],
     advanced: [
+      ...(adsEnabled ? [{ id: "ads", label: t("settings.sections.ads") }] : []),
       { id: "login_cache", label: t("settings.sections.login_cache") },
       { id: "gamedir", label: t("settings.game_data_dir.title") },
       { id: "hooks", label: t("settings.hooks.title") },
       { id: "licenses", label: t("settings.licenses.title") },
     ],
-    debug: getDebugTabs(t),
-  };
+    debug: [{ id: "log-level", label: t("debug.log_level.title") }, ...getDebugTabs(t)],
+  }), [t, adsEnabled]);
 
   const allTabs: {
     id: SettingsTabId;
@@ -128,59 +221,70 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   const tabConfig = onlyTab ? allTabs.filter((tab) => tab.id === onlyTab) : allTabs;
 
   const selectTab = (id: SettingsTabId) => {
+    cancelSpySuppression();
+    setActiveSection(null);
     setSidebarSearch("");
     setActiveTab(id);
   };
-  const contentRef = useRef<HTMLDivElement>(null);
-  const sidebarListRef = useRef<HTMLDivElement>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!activeSection) return;
-    const el = sidebarListRef.current?.querySelector(`[data-section-id="${activeSection}"]`);
-    el?.scrollIntoView({ block: "nearest" });
+    const root = sidebarListRef.current;
+    const el = root?.querySelector(`[data-section-id="${activeSection}"]`);
+    if (root && el) scrollOwnedSettingsElement(root, el, "nearest");
   }, [activeSection]);
 
-  const spySuppressRef = useRef(false);
-  const spyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const scrollToSection = (id: string) => {
-    const el = document.getElementById(`settings-section-${id}`);
+    const root = contentRef.current;
+    const el = root && getOwnedSettingsSections(root, sectionDefs[activeTab])
+      .find(section => section.id === `settings-section-${id}`);
     if (!el) return;
+    cancelSpySuppression();
     spySuppressRef.current = true;
     setActiveSection(id);
-    if (spyTimeoutRef.current) clearTimeout(spyTimeoutRef.current);
     spyTimeoutRef.current = setTimeout(() => {
+      spyTimeoutRef.current = null;
       spySuppressRef.current = false;
+      spyProbeRef.current?.();
     }, 500);
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollOwnedSettingsElement(root, el, "start", "smooth");
   };
 
   useEffect(() => {
-    if (sidebarQuery) return;
     const root = contentRef.current;
     const defs = sectionDefs[activeTab];
-    if (!root || !defs?.length) {
+    if (sidebarQuery || loading || error || !config || !tempConfig || !root || !defs.length) {
       setActiveSection(null);
       return;
     }
-    const onScroll = () => {
-      if (spySuppressRef.current) return;
-      const rootTop = root.getBoundingClientRect().top;
-      const line = 80;
-      let current = defs[0].id;
-      for (const d of defs) {
-        const el = document.getElementById(`settings-section-${d.id}`);
-        if (!el) continue;
-        if (el.getBoundingClientRect().top - rootTop <= line) current = d.id;
-      }
-      setActiveSection(current);
+    let alive = true;
+    let sections: HTMLElement[] = [];
+    const probe = () => {
+      if (!alive || spySuppressRef.current) return;
+      setActiveSection(readActiveSettingsSection(root, sections));
     };
-    onScroll();
-    root.addEventListener("scroll", onScroll, { passive: true });
-    return () => root.removeEventListener("scroll", onScroll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, sidebarQuery, config, tempConfig]);
+    const resizeObserver = new ResizeObserver(probe);
+    const refreshSections = () => {
+      if (!alive) return;
+      sections = getOwnedSettingsSections(root, defs);
+      resizeObserver.disconnect();
+      resizeObserver.observe(root);
+      sections.forEach(section => resizeObserver.observe(section));
+      probe();
+    };
+    spyProbeRef.current = probe;
+    refreshSections();
+    const mutationObserver = new MutationObserver(refreshSections);
+    mutationObserver.observe(root, { childList: true, subtree: true });
+    root.addEventListener("scroll", probe, { passive: true });
+    return () => {
+      alive = false;
+      root.removeEventListener("scroll", probe);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      if (spyProbeRef.current === probe) spyProbeRef.current = null;
+    };
+  }, [activeTab, sidebarQuery, config, tempConfig, loading, error, sectionDefs]);
 
   const isResettingRef = useRef<boolean>(false);
   const { accentColor } = useThemeStore();
@@ -312,7 +416,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       general: <GeneralTab />,
       appearance: <AppearanceTab />,
       clips: <ClipsTab />,
-      advanced: <AdvancedTab />,
+      advanced: <AdvancedTab adsEnabled={adsEnabled} />,
     };
 
     if (sidebarQuery && !onlyTab) {
@@ -344,7 +448,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       }
       onClose={onClose}
       width="xl"
-      className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
+      className="nrc-settings-panel !max-w-6xl h-[85vh] flex flex-col"
       headerActions={
         <ActionButton
           id="open-directory"
@@ -383,8 +487,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
               return (
                 <div key={tab.id}>
                   <button
+                    type="button"
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "w-full text-left px-3 py-2.5 rounded-lg transition-colors border-0 outline-none flex items-center gap-3",
+                      "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70",
                       isActive
                         ? "text-white"
                         : "bg-transparent text-white/60 hover:bg-white/5 hover:text-white/90",
@@ -413,10 +520,13 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
                         const childActive = activeSection === child.id;
                         return (
                           <button
+                            type="button"
+                            aria-current={childActive ? "location" : undefined}
                             key={child.id}
                             data-section-id={child.id}
                             className={cn(
                               "w-full text-left pl-4 pr-2 py-1.5 -ml-px border-l-2 outline-none font-smallcaps text-base transition-[color,border-color] duration-150",
+                              "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70",
                               childActive
                                 ? "text-white"
                                 : "border-transparent text-white/40 hover:text-white/75",
@@ -448,6 +558,11 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
             <SettingsConfigProvider value={{ config, tempConfig, setTempConfig, saving }}>
               <SettingsSearchContext.Provider value={sidebarQuery}>
                 {renderTabContent()}
+                {sidebarQuery && !searchHasResults && !loading && !error && (
+                  <p role="status" className="py-8 text-center font-minecraft text-sm text-white/70 break-words">
+                    {t("settings.search.no_results", { query: debouncedSearch.trim() })}
+                  </p>
+                )}
               </SettingsSearchContext.Provider>
             </SettingsConfigProvider>
           </div>

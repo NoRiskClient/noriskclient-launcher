@@ -538,6 +538,7 @@ pub struct ConfigManager {
     config: Arc<RwLock<LauncherConfig>>,
     config_path: PathBuf,
     save_lock: Mutex<()>,
+    discord_effect_lock: Mutex<()>,
 }
 
 impl ConfigManager {
@@ -552,14 +553,41 @@ impl ConfigManager {
             config: Arc::new(RwLock::new(LauncherConfig::default())),
             config_path,
             save_lock: Mutex::new(()),
+            discord_effect_lock: Mutex::new(()),
         })
     }
 
     async fn load_config_internal(&self) -> Result<()> {
+        self.load_config_with(
+            Self::write_config_file,
+            Self::apply_loaded_config_effects,
+            LauncherConfig::default,
+        )
+        .await
+    }
+
+    // The same load paths run in production and tests. Only I/O/effects/default
+    // construction are supplied; migration and publication stay here.
+    async fn load_config_with<W, WFut, F, B>(
+        &self,
+        write: W,
+        after_load: F,
+        defaults: B,
+    ) -> Result<()>
+    where
+        W: FnOnce(PathBuf, String) -> WFut,
+        WFut: std::future::Future<Output = Result<()>>,
+        F: FnOnce(&LauncherConfig),
+        B: FnOnce() -> LauncherConfig,
+    {
+        let _save_guard = self.save_lock.lock().await;
         if !self.config_path.exists() {
             info!("Config file not found, using default configuration");
-            // Save the default config
-            self.save_config().await?;
+            // Preserve the existing fallback: the current memory snapshot,
+            // which is the default only during normal startup.
+            let snapshot = self.get_config().await;
+            self.persist_snapshot_with(&snapshot, write).await?;
+            after_load(&snapshot);
             return Ok(());
         }
 
@@ -576,12 +604,12 @@ impl ConfigManager {
 
                 loaded_config.clips.normalize();
 
-                // Update the stored config
-                let mut config = self.config.write().await;
-                *config = loaded_config.clone();
-
-                // Update cache
-                update_custom_game_dir(loaded_config.custom_game_directory);
+                // Existing valid files still normalize in memory without a rewrite.
+                {
+                    let mut config = self.config.write().await;
+                    *config = loaded_config.clone();
+                }
+                after_load(&loaded_config);
             }
             Err(e) => {
                 error!("Failed to parse config file: {}", e);
@@ -601,7 +629,7 @@ impl ConfigManager {
                         }
 
                         // Start with default config and try to migrate settings
-                        let mut migrated_config = LauncherConfig::default();
+                        let mut migrated_config = defaults();
 
                         // Migrate known fields that might exist
                         if let Some(obj) = json_value.as_object() {
@@ -677,15 +705,13 @@ impl ConfigManager {
                         }
 
                         info!("Migration completed, saving migrated configuration");
-                        let mut config = self.config.write().await;
-                        *config = migrated_config.clone();
-                        drop(config); // Release lock before save
-
-                        // Save the migrated config
-                        self.save_config().await?;
-
-                        // Update cache
-                        update_custom_game_dir(migrated_config.custom_game_directory);
+                        // Publish only after the staged migration was persisted.
+                        self.persist_snapshot_with(&migrated_config, write).await?;
+                        {
+                            let mut config = self.config.write().await;
+                            *config = migrated_config.clone();
+                        }
+                        after_load(&migrated_config);
                     }
                     Err(json_err) => {
                         error!("Config file is not valid JSON: {}", json_err);
@@ -699,8 +725,10 @@ impl ConfigManager {
                             info!("Backed up corrupted config to: {:?}", backup_path);
                         }
 
-                        // Use default config and save it
-                        self.save_config().await?;
+                        // Preserve the current-memory fallback, not fresh defaults.
+                        let snapshot = self.get_config().await;
+                        self.persist_snapshot_with(&snapshot, write).await?;
+                        after_load(&snapshot);
                     }
                 }
             }
@@ -710,26 +738,46 @@ impl ConfigManager {
     }
 
     pub async fn save_config(&self) -> Result<()> {
-        let _guard = self.save_lock.lock().await;
-        debug!("Acquired save lock, proceeding to save config...");
+        self.save_config_with(Self::write_config_file).await
+    }
 
-        // Ensure directory exists
+    async fn save_config_with<W, WFut>(&self, write: W) -> Result<()>
+    where
+        W: FnOnce(PathBuf, String) -> WFut,
+        WFut: std::future::Future<Output = Result<()>>,
+    {
+        let _save_guard = self.save_lock.lock().await;
+        let snapshot = self.get_config().await;
+        self.persist_snapshot_with(&snapshot, write).await
+    }
+
+    // The caller owns SaveMutex; taking it again here would deadlock load/set.
+    // No Configguard is held across directory creation or the atomic writer.
+    async fn persist_snapshot_with<W, WFut>(
+        &self,
+        snapshot: &LauncherConfig,
+        write: W,
+    ) -> Result<()>
+    where
+        W: FnOnce(PathBuf, String) -> WFut,
+        WFut: std::future::Future<Output = Result<()>>,
+    {
         if let Some(parent_dir) = self.config_path.parent() {
             if !parent_dir.exists() {
                 fs::create_dir_all(parent_dir).await?;
             }
         }
-
-        let config = self.config.read().await;
-        let config_data = serde_json::to_string_pretty(&*config)?;
-
-        fs::write(&self.config_path, config_data).await?;
+        let serialized = serde_json::to_string_pretty(snapshot)?;
+        write(self.config_path.clone(), serialized).await?;
         info!(
             "Successfully saved launcher configuration to: {:?}",
             self.config_path
         );
-
         Ok(())
+    }
+
+    async fn write_config_file(path: PathBuf, serialized: String) -> Result<()> {
+        crate::utils::file_utils::write_atomic(path, serialized).await
     }
 
     // Public methods for accessing and modifying configuration
@@ -742,183 +790,211 @@ impl ConfigManager {
         self.config.read().await.is_experimental
     }
 
-    pub async fn set_config(&self, new_config: LauncherConfig) -> Result<()> {
-        let should_save = {
-            let mut config = self.config.write().await;
-            let current = &*config;
-            if !differs_ignoring_version(current, &new_config) {
-                debug!("No config changes detected, skipping save");
-                false
-            } else {
-                // Preserve version during replacement
-                let version = config.version;
+    pub async fn set_config(&self, new_config: LauncherConfig) -> Result<LauncherConfig> {
+        self.set_config_with(
+            new_config,
+            Self::write_config_file,
+            Self::apply_config_change_effects,
+            Self::update_discord_presence,
+        )
+        .await
+    }
 
-                // Log changes
-                if current.is_experimental != new_config.is_experimental {
-                    info!(
-                        "Changing experimental mode: {} -> {}",
-                        current.is_experimental, new_config.is_experimental
-                    );
-                }
-                if current.auto_check_updates != new_config.auto_check_updates {
-                    info!(
-                        "Changing auto check updates: {} -> {}",
-                        current.auto_check_updates, new_config.auto_check_updates
-                    );
-                }
-                if current.concurrent_downloads != new_config.concurrent_downloads {
-                    info!(
-                        "Changing concurrent downloads: {} -> {}",
-                        current.concurrent_downloads, new_config.concurrent_downloads
-                    );
-                }
-                if current.enable_discord_presence != new_config.enable_discord_presence {
-                    info!(
-                        "Changing Discord Rich Presence: {} -> {}",
-                        current.enable_discord_presence, new_config.enable_discord_presence
-                    );
-                }
-                if current.check_beta_channel != new_config.check_beta_channel {
-                    info!(
-                        "Changing beta channel check: {} -> {}",
-                        current.check_beta_channel, new_config.check_beta_channel
-                    );
+    // One transaction implementation for the real writer and controlled tests.
+    async fn set_config_with<W, WFut, F, D, DFut>(
+        &self,
+        mut candidate: LauncherConfig,
+        write: W,
+        after_commit: F,
+        update_discord: D,
+    ) -> Result<LauncherConfig>
+    where
+        W: FnOnce(PathBuf, String) -> WFut,
+        WFut: std::future::Future<Output = Result<()>>,
+        F: FnOnce(&LauncherConfig, &LauncherConfig),
+        D: FnOnce(bool) -> DFut,
+        DFut: std::future::Future<Output = Result<()>>,
+    {
+        let save_guard = self.save_lock.lock().await;
+        let current = self.get_config().await;
+        candidate.version = current.version;
+        candidate.clips.normalize();
 
-                    let mut props = std::collections::HashMap::new();
-                    props.insert("enabled".to_string(), serde_json::Value::Bool(new_config.check_beta_channel));
-                    crate::commands::analytics_command::track_event("beta_update_toggled", props);
-                }
-                if current.clips.enabled != new_config.clips.enabled {
-                    crate::commands::analytics_command::track(
-                        "clips_toggled",
-                        serde_json::json!({ "enabled": new_config.clips.enabled }),
-                    );
-                }
-                if current.profile_grouping_criterion != new_config.profile_grouping_criterion {
-                    info!(
-                        "Changing profile grouping criterion: {:?} -> {:?}",
-                        current.profile_grouping_criterion, new_config.profile_grouping_criterion
-                    );
-                }
-                if current.open_logs_after_starting != new_config.open_logs_after_starting {
-                    info!(
-                        "Changing open logs after starting: {} -> {}",
-                        current.open_logs_after_starting, new_config.open_logs_after_starting
-                    );
-                }
-                if current.concurrent_io_limit != new_config.concurrent_io_limit {
-                    info!(
-                        "Changing concurrent IO limit: {} -> {}",
-                        current.concurrent_io_limit, new_config.concurrent_io_limit
-                    );
-                }
-                if current.last_played_profile != new_config.last_played_profile {
-                    info!(
-                        "Changing last played profile: {:?} -> {:?}",
-                        current.last_played_profile, new_config.last_played_profile
-                    );
-                }
-                if current.hooks != new_config.hooks {
-                    info!(
-                        "Changing hooks: {:?} -> {:?}",
-                        current.hooks, new_config.hooks
-                    );
-                }
-                if current.hide_on_process_start != new_config.hide_on_process_start {
-                    info!(
-                        "Changing hide on process start: {} -> {}",
-                        current.hide_on_process_start, new_config.hide_on_process_start
-                    );
-                }
-                if current.global_memory_settings.min != new_config.global_memory_settings.min
-                    || current.global_memory_settings.max != new_config.global_memory_settings.max {
-                    info!(
-                        "Changing global memory settings: {}MB-{}MB -> {}MB-{}MB",
-                        current.global_memory_settings.min, current.global_memory_settings.max,
-                        new_config.global_memory_settings.min, new_config.global_memory_settings.max
-                    );
-                }
-                if current.global_custom_jvm_args != new_config.global_custom_jvm_args {
-                    info!(
-                        "Changing global custom JVM args: {:?} -> {:?}",
-                        current.global_custom_jvm_args, new_config.global_custom_jvm_args
-                    );
-                }
-                if current.custom_game_directory != new_config.custom_game_directory {
-                    info!(
-                        "Changing custom game directory: {:?} -> {:?}",
-                        current.custom_game_directory, new_config.custom_game_directory
-                    );
-                }
-                if current.enable_analytics != new_config.enable_analytics {
-                    info!(
-                        "Changing analytics: {} -> {}",
-                        current.enable_analytics, new_config.enable_analytics
-                    );
-                }
-                if current.use_browser_based_login != new_config.use_browser_based_login {
-                    info!(
-                        "Changing use browser based login: {} -> {}",
-                        current.use_browser_based_login, new_config.use_browser_based_login
-                    );
-                }
-
-                // Update config while preserving version
-                *config = LauncherConfig {
-                    version,
-                    is_experimental: new_config.is_experimental,
-                    auto_check_updates: new_config.auto_check_updates,
-                    concurrent_downloads: new_config.concurrent_downloads,
-                    enable_discord_presence: new_config.enable_discord_presence,
-                    check_beta_channel: new_config.check_beta_channel,
-                    profile_grouping_criterion: new_config.profile_grouping_criterion.clone(),
-                    open_logs_after_starting: new_config.open_logs_after_starting,
-                    concurrent_io_limit: new_config.concurrent_io_limit,
-                    last_played_profile: new_config.last_played_profile,
-                    hooks: new_config.hooks,
-                    hide_on_process_start: new_config.hide_on_process_start,
-                    global_memory_settings: new_config.global_memory_settings,
-                    global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
-                    custom_game_directory: new_config.custom_game_directory.clone(),
-                    enable_analytics: new_config.enable_analytics,
-                    use_browser_based_login: new_config.use_browser_based_login,
-                    cache_natives_extraction: new_config.cache_natives_extraction,
-                    referral_state: new_config.referral_state.clone(),
-                    pack_rollout_override: new_config.pack_rollout_override.clone(),
-                    clips: {
-                        let mut clips = new_config.clips.clone();
-                        clips.normalize();
-                        clips
-                    },
-                    log_level: new_config.log_level,
-                };
-
-                true
-            }
-        };
-
-        // Save the updated config if needed
-        if should_save {
-            self.save_config().await?;
-            apply_log_level(new_config.log_level);
-
-            // Update cache
-            update_custom_game_dir(new_config.custom_game_directory.clone());
-
-            // Update Discord status if it changed
-            if let Ok(state) = crate::state::State::get().await {
-                // Check if Discord status changed
-                let discord_enabled = new_config.enable_discord_presence;
-                if let Err(e) = state.discord_manager.set_enabled(discord_enabled).await {
-                    warn!(
-                        "Error updating Discord after config change: {}, continuing anyway",
-                        e
-                    );
-                }
-            }
+        if !differs_ignoring_version(&current, &candidate) {
+            debug!("No config changes detected, skipping save");
+            return Ok(current);
         }
 
+        // No memory/effects publication on a normally returned persistence error.
+        self.persist_snapshot_with(&candidate, write).await?;
+        {
+            let mut config = self.config.write().await;
+            *config = candidate.clone();
+        }
+        after_commit(&current, &candidate);
+        drop(save_guard);
+
+        // IPC may wait indefinitely. Never keep SaveMutex or a Configguard here.
+        if let Err(e) = self.reconcile_discord_with(update_discord).await {
+            warn!(
+                "Error updating Discord after config change: {}, continuing anyway",
+                e
+            );
+        }
+
+        // Return this operation's commit, not a possibly newer concurrent Get.
+        Ok(candidate)
+    }
+
+    async fn reconcile_discord_with<D, DFut>(&self, update: D) -> Result<()>
+    where
+        D: FnOnce(bool) -> DFut,
+        DFut: std::future::Future<Output = Result<()>>,
+    {
+        let _effect_guard = self.discord_effect_lock.lock().await;
+        let enabled = {
+            let config = self.config.read().await;
+            config.enable_discord_presence
+        };
+        update(enabled).await
+    }
+
+    async fn update_discord_presence(enabled: bool) -> Result<()> {
+        if let Ok(state) = crate::state::State::get().await {
+            state.discord_manager.set_enabled(enabled).await?;
+        }
         Ok(())
+    }
+
+    fn apply_loaded_config_effects(config: &LauncherConfig) {
+        apply_log_level(config.log_level);
+        update_custom_game_dir(config.custom_game_directory.clone());
+    }
+
+    fn apply_config_change_effects(current: &LauncherConfig, next: &LauncherConfig) {
+        let (beta_changed, clips_changed) = Self::toggle_changes(current, next);
+        // Log changes
+        if current.is_experimental != next.is_experimental {
+            info!(
+                "Changing experimental mode: {} -> {}",
+                current.is_experimental, next.is_experimental
+            );
+        }
+        if current.auto_check_updates != next.auto_check_updates {
+            info!(
+                "Changing auto check updates: {} -> {}",
+                current.auto_check_updates, next.auto_check_updates
+            );
+        }
+        if current.concurrent_downloads != next.concurrent_downloads {
+            info!(
+                "Changing concurrent downloads: {} -> {}",
+                current.concurrent_downloads, next.concurrent_downloads
+            );
+        }
+        if current.enable_discord_presence != next.enable_discord_presence {
+            info!(
+                "Changing Discord Rich Presence: {} -> {}",
+                current.enable_discord_presence, next.enable_discord_presence
+            );
+        }
+        if let Some(enabled) = beta_changed {
+            info!(
+                "Changing beta channel check: {} -> {}",
+                current.check_beta_channel, next.check_beta_channel
+            );
+
+            let mut props = std::collections::HashMap::new();
+            props.insert("enabled".to_string(), serde_json::Value::Bool(enabled));
+            crate::commands::analytics_command::track_event("beta_update_toggled", props);
+        }
+        if let Some(enabled) = clips_changed {
+            crate::commands::analytics_command::track(
+                "clips_toggled",
+                serde_json::json!({ "enabled": enabled }),
+            );
+        }
+        if current.profile_grouping_criterion != next.profile_grouping_criterion {
+            info!(
+                "Changing profile grouping criterion: {:?} -> {:?}",
+                current.profile_grouping_criterion, next.profile_grouping_criterion
+            );
+        }
+        if current.open_logs_after_starting != next.open_logs_after_starting {
+            info!(
+                "Changing open logs after starting: {} -> {}",
+                current.open_logs_after_starting, next.open_logs_after_starting
+            );
+        }
+        if current.concurrent_io_limit != next.concurrent_io_limit {
+            info!(
+                "Changing concurrent IO limit: {} -> {}",
+                current.concurrent_io_limit, next.concurrent_io_limit
+            );
+        }
+        if current.last_played_profile != next.last_played_profile {
+            info!(
+                "Changing last played profile: {:?} -> {:?}",
+                current.last_played_profile, next.last_played_profile
+            );
+        }
+        if current.hooks != next.hooks {
+            info!(
+                "Changing hooks: {:?} -> {:?}",
+                current.hooks, next.hooks
+            );
+        }
+        if current.hide_on_process_start != next.hide_on_process_start {
+            info!(
+                "Changing hide on process start: {} -> {}",
+                current.hide_on_process_start, next.hide_on_process_start
+            );
+        }
+        if current.global_memory_settings.min != next.global_memory_settings.min
+            || current.global_memory_settings.max != next.global_memory_settings.max {
+            info!(
+                "Changing global memory settings: {}MB-{}MB -> {}MB-{}MB",
+                current.global_memory_settings.min, current.global_memory_settings.max,
+                next.global_memory_settings.min, next.global_memory_settings.max
+            );
+        }
+        if current.global_custom_jvm_args != next.global_custom_jvm_args {
+            info!(
+                "Changing global custom JVM args: {:?} -> {:?}",
+                current.global_custom_jvm_args, next.global_custom_jvm_args
+            );
+        }
+        if current.custom_game_directory != next.custom_game_directory {
+            info!(
+                "Changing custom game directory: {:?} -> {:?}",
+                current.custom_game_directory, next.custom_game_directory
+            );
+        }
+        if current.enable_analytics != next.enable_analytics {
+            info!(
+                "Changing analytics: {} -> {}",
+                current.enable_analytics, next.enable_analytics
+            );
+        }
+        if current.use_browser_based_login != next.use_browser_based_login {
+            info!(
+                "Changing use browser based login: {} -> {}",
+                current.use_browser_based_login, next.use_browser_based_login
+            );
+        }
+
+        Self::apply_loaded_config_effects(next);
+    }
+
+    fn toggle_changes(
+        current: &LauncherConfig,
+        next: &LauncherConfig,
+    ) -> (Option<bool>, Option<bool>) {
+        (
+            (current.check_beta_channel != next.check_beta_channel)
+                .then_some(next.check_beta_channel),
+            (current.clips.enabled != next.clips.enabled).then_some(next.clips.enabled),
+        )
     }
 }
 
@@ -927,7 +1003,6 @@ impl PostInitializationHandler for ConfigManager {
     async fn on_state_ready(&self, _app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         trace!("ConfigManager: on_state_ready called. Loading configuration...");
         self.load_config_internal().await?;
-        apply_log_level(self.config.read().await.log_level);
         trace!("ConfigManager: Successfully loaded configuration in on_state_ready.");
         Ok(())
     }

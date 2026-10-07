@@ -21,6 +21,7 @@ export function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
   const [loginStatus, setLoginStatus] = useState<string>(t('auth.startingLoginProcess'));
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const showStatus = !error || (loginStatus.trim().length > 0 && loginStatus.trim() !== error.trim());
 
   useEffect(() => {
     const unlisten = listen<EventPayload>("state_event", (event: TauriEvent<EventPayload>) => {
@@ -84,18 +85,18 @@ export function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
           <div className="bg-red-500/20 backdrop-blur-md border border-red-500/40 p-4 rounded-md">
             <div className="flex items-start gap-2">
               <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-red-200 font-minecraft">
+              <div className="min-w-0 text-sm text-red-200 font-minecraft" role="alert">
                 <p className="font-semibold mb-1">{t('auth.loginError')}</p>
-                <p className="text-red-300">{error}</p>
+                <p className="text-red-300 break-words [overflow-wrap:anywhere]">{error}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Progress Bar */}
-        <div className="space-y-2">
+        {showStatus && <div className="space-y-2">
           <div className="flex justify-between items-center text-sm">
-            <span className={`font-minecraft ${error ? 'text-red-300' : 'text-white/80'}`}>
+            <span className={`min-w-0 break-words [overflow-wrap:anywhere] font-minecraft ${error ? 'text-red-300' : 'text-white/80'}`}>
               {loginStatus}
             </span>
             {!error && (
@@ -110,7 +111,7 @@ export function BrowserLoginModal({ onCancel }: BrowserLoginModalProps) {
               />
             </div>
           )}
-        </div>
+        </div>}
 
         <div className="flex justify-end gap-3 pt-4">
           <Button

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -24,6 +24,7 @@ import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 import { TagBadge } from "../ui/TagBadge";
 import { Select, type SelectOption } from "../ui/Select";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface ModDetailVersionsProps {
   project: UnifiedProjectDetails;
@@ -79,9 +80,18 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   const hideModal = useGlobalModalStore(state => state.closeModal);
   const { accentColor } = useThemeStore();
 
-  const [versions, setVersions] = useState<UnifiedVersion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const readKey = `${project.source}:${project.id}`;
+  const [readState, setReadState] = useState<{ key: string; versions: UnifiedVersion[]; isLoading: boolean; error: string | null }>(
+    () => ({ key: readKey, versions: [], isLoading: true, error: null })
+  );
+  const [retryVersion, setRetryVersion] = useState(0);
+  const readRequest = useRef<{ key: string; pending: boolean; active: boolean } | null>(null);
+  const currentKey = useRef(readKey);
+  currentKey.current = readKey;
+  const installRequests = useRef(new Set<string>());
+  const versions = readState.key === readKey ? readState.versions : [];
+  const isLoading = readState.key !== readKey || readState.isLoading;
+  const error = readState.key === readKey ? readState.error : null;
   const [installingVersions, setInstallingVersions] = useState<Record<string, boolean>>({});
   const [installingModpackVersions, setInstallingModpackVersions] = useState<Record<string, boolean>>({});
   const [installingProfiles, setInstallingProfiles] = useState<Record<string, boolean>>({});
@@ -101,10 +111,24 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
 
   // Fetch versions on mount
   useEffect(() => {
+    const previousKey = readRequest.current?.key;
+    const request = { key: readKey, pending: true, active: true };
+    readRequest.current = request;
+    const isCurrent = () => request.active && readRequest.current === request;
+    setReadState(previous => ({ key: readKey, versions: previous.key === readKey ? previous.versions : [], isLoading: true, error: null }));
+    if (previousKey !== readKey) {
+      setVersionTypeFilter('all');
+      setGameVersionFilter('all');
+      setLoaderFilter('all');
+      setDisplayedCount(10);
+      setInstallingProfiles({});
+      setInstallingVersions({});
+      setInstallStatus({});
+      if (installModalVersion) hideModal(`install-version-${installModalVersion.id}`);
+      setInstallModalSearchHit(null);
+      setInstallModalVersion(null);
+    }
     async function loadVersions() {
-      setIsLoading(true);
-      setError(null);
-
       try {
         const response = await UnifiedService.getModVersions({
           source: project.source,
@@ -112,21 +136,29 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         });
 
         // Sort by date, newest first
-        const sorted = response.versions.sort((a, b) =>
+        const sorted = [...response.versions].sort((a, b) =>
           new Date(b.date_published).getTime() - new Date(a.date_published).getTime()
         );
 
-        setVersions(sorted);
+        if (isCurrent()) setReadState(previous => ({ ...previous, versions: sorted, error: null }));
       } catch (err) {
         console.error("Failed to load versions:", err);
-        setError(err instanceof Error ? err.message : "Failed to load versions");
+        if (isCurrent()) setReadState(previous => ({ ...previous, error: parseErrorMessage(err) || t('mod_detail.load_versions_failed') }));
       } finally {
-        setIsLoading(false);
+        request.pending = false;
+        if (isCurrent()) setReadState(previous => ({ ...previous, isLoading: false }));
       }
     }
 
-    loadVersions();
-  }, [project.source, project.id]);
+    void loadVersions();
+    return () => { request.active = false; };
+  }, [project.source, project.id, retryVersion]);
+
+  const retryRead = () => {
+    if (readRequest.current?.key !== readKey || readRequest.current.pending) return;
+    readRequest.current.pending = true;
+    setRetryVersion(value => value + 1);
+  };
 
   // Get unique game versions and loaders for filters
   const availableGameVersions = useMemo(() => {
@@ -264,12 +296,17 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   };
 
   const installVersionToProfile = async (profile: Profile, version: UnifiedVersion) => {
+    const requestId = `${readKey}:${profile.id}`;
+    const isCurrent = () => currentKey.current === readKey && readRequest.current?.active;
+    if (!isCurrent() || installRequests.current.has(requestId)) return;
     if (!version.files?.length) {
       toast.error(t('mod_detail.no_files_available'));
       return;
     }
 
+    installRequests.current.add(requestId);
     setInstallingProfiles(prev => ({ ...prev, [profile.id]: true }));
+    setInstallingVersions(prev => ({ ...prev, [version.id]: true }));
 
     try {
       const primaryFile = version.files.find(f => f.primary) || version.files[0];
@@ -297,14 +334,19 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
       };
 
       await installContentToTarget(payload, installTarget, { pinVersion: true });
+      if (!isCurrent()) return;
       const versionNumber = version.version_number ?? '';
       toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
-      toast.error(t('mod_detail.install_failed', { error }));
+      if (isCurrent()) toast.error(t('mod_detail.install_failed', { error: parseErrorMessage(error) }));
     } finally {
-      setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
+      installRequests.current.delete(requestId);
+      if (isCurrent()) {
+        setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
+        setInstallingVersions(prev => ({ ...prev, [version.id]: false }));
+      }
     }
   };
 
@@ -319,17 +361,22 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
 
   useEffect(() => {
     if (!installModalSearchHit || !installModalVersion) return;
+    if (installModalSearchHit.project_id !== project.id || installModalVersion.project_id !== project.id || installModalVersion.source !== project.source) return;
 
     const searchHit = installModalSearchHit;
     const version = installModalVersion;
     const modalId = `install-version-${version.id}`;
 
     const handleProfileSelect = async (_: any, profile: Profile) => {
+      const requestId = `${readKey}:${profile.id}`;
+      const isCurrent = () => currentKey.current === readKey && readRequest.current?.active;
+      if (!isCurrent() || installRequests.current.has(requestId)) return;
       if (!version.files?.length) {
         toast.error(t('mod_detail.no_files_available'));
         return;
       }
 
+      installRequests.current.add(requestId);
       setInstallingProfiles(prev => ({ ...prev, [profile.id]: true }));
 
       try {
@@ -358,13 +405,15 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         };
 
         await installContentToProfile(payload);
+        if (!isCurrent()) return;
         toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: version.version_number ?? '', profile: profile.name }));
         setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
-        toast.error(t('mod_detail.install_failed', { error }));
+        if (isCurrent()) toast.error(t('mod_detail.install_failed', { error: parseErrorMessage(error) }));
       } finally {
-        setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
+        installRequests.current.delete(requestId);
+        if (isCurrent()) setInstallingProfiles(prev => ({ ...prev, [profile.id]: false }));
       }
     };
 
@@ -372,6 +421,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
       modalId,
       <ModrinthQuickInstallProfilesModal
         project={searchHit as any}
+        version={version}
         profiles={profiles}
         onProfileSelect={handleProfileSelect}
         onClose={() => {
@@ -387,10 +437,10 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
       1200
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [installModalSearchHit, installModalVersion, installingProfiles, installStatus, profiles, project.id]);
+  }, [installModalSearchHit, installModalVersion, installingProfiles, installStatus, profiles, project.id, project.source]);
 
   // Loading state
-  if (isLoading) {
+  if (isLoading && versions.length === 0 && !error) {
     return (
       <div className="flex items-center justify-center py-12">
         <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white/50" />
@@ -400,17 +450,18 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   }
 
   // Error state
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-red-400 font-minecraft text-sm">{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="p-3">
+      {(error || isLoading) && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3">
+          <p className="min-w-0 flex-1 max-h-32 overflow-y-auto [overflow-wrap:anywhere] text-white/70" role={error ? 'alert' : 'status'}>
+            {error || t('modrinth.loading_versions')}
+          </p>
+          <button type="button" onClick={retryRead} disabled={isLoading} className="rounded-lg px-3 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-50">
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
       {/* Filter Bar */}
       <div
         className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
@@ -426,7 +477,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             onChange={setVersionTypeFilter}
             options={versionTypeOptions}
             size="sm"
-            className="w-32"
+            className="flex-1 min-w-[min(100%,15ch)]"
+            aria-label={t('mod_detail.type')}
           />
 
           {/* Game Version */}
@@ -435,7 +487,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             onChange={setGameVersionFilter}
             options={gameVersionOptions}
             size="sm"
-            className="w-44"
+            className="flex-1 min-w-[min(100%,23ch)]"
+            aria-label={t('mod_detail.versions.all_game_versions')}
           />
 
           {/* Loader */}
@@ -445,7 +498,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
               onChange={setLoaderFilter}
               options={loaderOptions}
               size="sm"
-              className="w-36"
+              className="flex-1 min-w-[min(100%,18ch)]"
+              aria-label={t('mod_detail.versions.all_loaders')}
             />
           )}
 
@@ -479,6 +533,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                   <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
                     {t('mod_detail.type')}: {versionTypeFilter}
                     <button
+                      type="button"
+                      aria-label={`${t('common.delete')}: ${t('mod_detail.type')} ${versionTypeFilter}`}
                       onClick={() => setVersionTypeFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
@@ -491,6 +547,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                   <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
                     {gameVersionFilter}
                     <button
+                      type="button"
+                      aria-label={`${t('common.delete')}: ${gameVersionFilter}`}
                       onClick={() => setGameVersionFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
@@ -503,6 +561,8 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                   <TagBadge variant="filter" className="inline-flex whitespace-nowrap">
                     {loaderFilter}
                     <button
+                      type="button"
+                      aria-label={`${t('common.delete')}: ${loaderFilter}`}
                       onClick={() => setLoaderFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
@@ -548,11 +608,11 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                 color: accentColor.value,
               }}
             >
-              Load More ({filteredVersions.length - displayedCount} more)
+              {t('mod_detail.versions.load_more', { count: filteredVersions.length - displayedCount })}
             </button>
           )}
         </div>
-      ) : (
+      ) : !error && !isLoading ? (
         <div
           className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border-2 border-b-4 backdrop-blur-md"
           style={{
@@ -561,9 +621,9 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             backgroundColor: `${accentColor.value}15`,
           }}
         >
-          No versions match the selected filters.
+          {t(versions.length === 0 ? 'mod_detail.versions.empty' : 'mod_detail.versions.no_match')}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

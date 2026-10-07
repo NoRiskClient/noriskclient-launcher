@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -10,11 +10,14 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { openExternalUrl } from "../../../services/tauri-service";
-import { isApplixirEnabled } from "../../../services/flagsmith-service";
 import { showApplixirAd } from "../../../services/nrc-service";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
-export function AdvancedTab() {
+interface AdvancedTabProps {
+  adsEnabled: boolean;
+}
+
+export function AdvancedTab({ adsEnabled }: AdvancedTabProps) {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
@@ -24,11 +27,6 @@ export function AdvancedTab() {
   const [isPreLaunchEditEnabled, setIsPreLaunchEditEnabled] = useState(false);
   const [isWrapperEditEnabled, setIsWrapperEditEnabled] = useState(false);
   const [isPostExitEditEnabled, setIsPostExitEditEnabled] = useState(false);
-  const [adsEnabled, setAdsEnabled] = useState(false);
-
-  useEffect(() => {
-    isApplixirEnabled().then(setAdsEnabled).catch(() => setAdsEnabled(false));
-  }, []);
 
   return (
     <div className="space-y-6">

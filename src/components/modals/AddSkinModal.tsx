@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -35,7 +35,7 @@ interface AddSkinModalProps {
 }
 
 export const AddSkinModal = memo(
-  ({ skin, onSave, onSaveAndApply, onAdd, isLoading }: AddSkinModalProps) => {
+  ({ skin, onSave, onSaveAndApply, onAdd, isLoading: isFetching }: AddSkinModalProps) => {
     const { t } = useTranslation();
     const [name, setName] = useState<string>(skin?.name ?? "");
     const [isSlimVariant, setIsSlimVariant] = useState<boolean>(
@@ -50,6 +50,9 @@ export const AddSkinModal = memo(
     );
     const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false);
     const [previewSkinName, setPreviewSkinName] = useState<string>(skin?.name ?? "");
+    const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
+    const isLoading = isFetching || isSaving;
 
     const variant: SkinVariant = isSlimVariant ? "slim" : "classic";
     const accentColor = useThemeStore((state) => state.accentColor);
@@ -57,6 +60,7 @@ export const AddSkinModal = memo(
     const idleEmote = useIdleEmote();
 
     const handleClose = () => {
+      if (savingRef.current) return;
       hideModal('add-skin-modal');
       // Reset states when closing
       setIsPreviewMode(!!skin);
@@ -229,6 +233,30 @@ export const AddSkinModal = memo(
       }
     };
 
+    const runSave = async (operation: () => Promise<void>, apply = false) => {
+      if (isFetching || savingRef.current) return;
+      savingRef.current = true;
+      setIsSaving(true);
+      try {
+        await toast.promise(operation(), {
+          loading: skin ? t('skins.updatingSkin') : t('skins.addingSkin'),
+          success: () => {
+            const skinName = previewSkinName || skin?.name;
+            return apply ? t('skins.appliedSkinSuccess', { name: skinName, variant }) :
+              skin ? t('skins.skinUpdatedSuccess', { name: skinName }) : t('skins.skinAddedSuccess', { name: skinName });
+          },
+          error: (err) => parseErrorMessage(err) || t('skins.failedToSaveSkin'),
+        });
+        savingRef.current = false;
+        handleClose();
+      } catch {
+        // toast.promise already reports the rejection; preserve editable inputs.
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    };
+
     const handleSave = async () => {
       const saveOperation = async () => {
         if (skin) {
@@ -306,18 +334,7 @@ export const AddSkinModal = memo(
         }
       };
 
-      // Use Promise Toast for better UX
-      toast.promise(saveOperation(), {
-        loading: skin ? t('skins.updatingSkin') : t('skins.addingSkin'),
-        success: (result) => {
-          const skinName = skin ? (previewSkinName || skin.name) : previewSkinName;
-          return skin ? t('skins.skinUpdatedSuccess', { name: skinName }) : t('skins.skinAddedSuccess', { name: skinName });
-        },
-        error: (err) => {
-          console.error("Save error:", err);
-          return err instanceof Error ? err.message : t('skins.failedToSaveSkin');
-        },
-      });
+      await runSave(saveOperation);
     };
 
     const handleSaveAndApply = async () => {
@@ -328,14 +345,16 @@ export const AddSkinModal = memo(
         variant,
       };
 
-      void onSaveAndApply(updated);
-      handleClose();
+      await runSave(() => onSaveAndApply(updated), true);
     };
 
     return (
       <Modal
         title={skin ? t('skins.editSkinProperties') : (isPreviewMode ? t('skins.addSkinPreview') : t('skins.addSkin'))}
         onClose={handleClose}
+        closeOnClickOutside={!isSaving}
+        closeOnEscape={!isSaving}
+        hideCloseButton={isSaving}
         variant="flat"
         footer={
           <div className="flex gap-3 justify-center">
@@ -527,7 +546,7 @@ export const AddSkinModal = memo(
 
             {!skin && (
               <div className="space-y-2">
-                <label className="block font-smallcaps text-lg text-white/80">
+                <label htmlFor="skinInputField" className="block font-smallcaps text-lg text-white/80">
                   {t('skins.skin')}
                 </label>
                 <div className="flex gap-2">

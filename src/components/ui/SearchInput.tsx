@@ -1,7 +1,9 @@
 "use client";
 
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
+
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
@@ -15,8 +17,9 @@ import {
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
+import { useSettingControl } from "./settings/SettingControlContext";
 
-interface SearchInputProps {
+interface SearchInputProps extends React.AriaAttributes {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -46,9 +49,13 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       label,
       description,
       error,
+      ...ariaProps
     },
     ref,
   ) => {
+    const stableId = useId();
+    const row = useSettingControl();
+    const descriptionId = `${stableId}-description`, errorId = `${stableId}-error`;
     const { t } = useTranslation();
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
@@ -56,15 +63,30 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+    const isBackgroundAnimationEnabled = useAnimationsEnabled();
     const sizeClasses = getSizeClasses(size, "input");
     const radiusClass = getBorderRadiusClass();
     const accessibilityProps = getAccessibilityProps({
       label,
       description,
+      descriptionId,
       error,
+      errorId,
       disabled
-    });    const mergedRef = (node: HTMLInputElement) => {
+    });
+    const accessibility = {
+      ...accessibilityProps,
+      "aria-label": label || (!row.labelId ? placeholder : undefined),
+      "aria-labelledby": label ? undefined : row.labelId,
+      "aria-describedby": [row.descriptionId, accessibilityProps["aria-describedby"]].filter(Boolean).join(" ") || undefined,
+      "aria-busy": loading || undefined,
+      ...ariaProps,
+    };
+    const details = <>
+      {description && <p id={descriptionId} className="mt-1 text-xs font-minecraft text-white/60">{description}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-sm font-minecraft text-red-400">{error}</p>}
+    </>;
+    const mergedRef = (node: HTMLInputElement) => {
       if (ref) {
         if (typeof ref === "function") {
           ref(node);
@@ -239,6 +261,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
           <input
             ref={mergedRef}
+            role="searchbox"
+            {...accessibility}
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -282,7 +306,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
     if (variant === "themed-surface") {
       return (
-        <ThemedSurface className={cn("w-full", className)}>
+        <div className="w-full"><ThemedSurface className={cn("w-full focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70", className)}>
           <div
             className={cn(
               "flex items-center w-full h-full",
@@ -311,6 +335,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
                 <input
                   ref={mergedRef}
+                  role="searchbox"
+                  {...accessibility}
                   type="text"
                   value={value}
                   onChange={(e) => onChange(e.target.value)}
@@ -347,10 +373,10 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               )}
             </div>
           </div>
-        </ThemedSurface>
+        </ThemedSurface>{details}</div>
       );
     }    return (
-      <div
+      <div className="w-full"><div
         ref={containerRef}
         className={cn(
           "font-smallcaps relative overflow-hidden backdrop-blur-md",
@@ -358,7 +384,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           "flex items-center justify-center w-full",
           "text-shadow-sm",
           getBorderClasses(),
-          "focus-within:outline-none focus-within:ring-2 focus-within:ring-white/30 focus-within:ring-offset-1 focus-within:ring-offset-black/20",
+          "focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70",
           disabled && "opacity-50 cursor-not-allowed",
           sizeStyles[size].container,
           sizeStyles[size].padding,
@@ -386,7 +412,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         onMouseLeave={handleMouseLeave}
       >
         {standardInputContent}
-      </div>
+      </div>{details}</div>
     );
   },
 );

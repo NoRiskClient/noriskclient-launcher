@@ -84,11 +84,12 @@ export function SyncModTile({
         isSelected ? "" : "bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30"
       }`}
     >
-      <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected || menuOpen || versionPicker.open ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}>
         <CheckboxV2
           size="sm"
           checked={isSelected}
           onChange={() => sync.toggleSelected(entry)}
+          aria-label={`${isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}: ${entry.display_name}`}
           tooltip={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
         />
       </div>
@@ -115,6 +116,7 @@ export function SyncModTile({
         <div className={`flex items-center gap-1.5 ${dim}`}>
           {onNameClick ? (
             <button
+              type="button"
               onClick={onNameClick}
               className={`${nameClass} underline-offset-2 ${live ? "hover:underline decoration-white/40" : ""}`}
               style={nameStyle}
@@ -135,6 +137,7 @@ export function SyncModTile({
           {!isJar && (
             <div className="relative min-w-0">
               <button
+                type="button"
                 ref={versionButtonRef}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -205,6 +208,7 @@ export function SyncModTile({
       >
         <div>
           <ToggleSwitch
+            aria-label={`${lockedByPack ? t("profiles.v3.syncMods.toggle.locked") : t(onHere ? "profiles.v3.syncMods.toggle.turnOff" : "profiles.v3.syncMods.toggle.turnOn")}: ${entry.display_name}`}
             checked={onHere}
             onChange={() => void sync.setHere([entry], !onHere)}
             disabled={busy || lockedByPack}
@@ -215,13 +219,17 @@ export function SyncModTile({
 
       <div className="relative flex-shrink-0">
         <button
+          type="button"
           ref={menuButtonRef}
+          aria-label={`${t("common.more")}: ${entry.display_name}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
           onClick={(e) => {
             e.stopPropagation();
             onMenuToggle(!menuOpen);
           }}
-          className={`p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity ${
-            menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          className={`p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 focus-visible:text-white focus-visible:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 transition-opacity ${
+            menuOpen || versionPicker.open ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           }`}
         >
           <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />

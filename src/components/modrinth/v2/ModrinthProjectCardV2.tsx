@@ -101,8 +101,12 @@ export interface ModrinthProjectCardV2Props
     version: UnifiedVersion,
   ) => void;
   onToggleVersionsClick: (projectId: string) => void;
+  onReserveVersionsFocus: (trigger: Element) => void;
   isExpanded: boolean;
   isLoadingVersions: boolean;
+  versionsReadError?: string;
+  versionsReadDisabled?: boolean;
+  onRetryVersionsClick?: (projectId: string) => void;
   isBlocked?: boolean; // Deprecated, use projectNoRiskStatus instead
   projectNoRiskStatus?: 'blocked' | 'warning' | null;
   projectVersions: UnifiedVersion[] | null | "loading";
@@ -182,8 +186,12 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     onInstallModpackAsProfileClick,
     onInstallModpackVersionAsProfileClick,
     onToggleVersionsClick,
+    onReserveVersionsFocus,
     isExpanded,
     isLoadingVersions,
+    versionsReadError,
+    versionsReadDisabled = false,
+    onRetryVersionsClick,
     projectVersions,
     displayedCount,
     versionFilters,
@@ -239,9 +247,8 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
       <div>
         {/* Main Card */}
         <div
-          onClick={handleTitleClick}
           className={cn(
-            "relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
+            "group relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
           installStatus?.is_installed &&
             !installStatus?.is_included_in_norisk_pack &&
             "border-l-green-500",
@@ -253,6 +260,14 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             "border-l-blue-500",
         )}
       >
+        {/* A native primary trigger covers the card, without nesting the
+            independent author/install/version actions inside a button. */}
+        <button
+          type="button"
+          aria-label={t('content.view_project', { title: hit.title })}
+          onClick={handleTitleClick}
+          className="absolute inset-0 rounded-lg cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2"
+        />
         {/* Blocked Mod Warning Icon - Top Left */}
         {projectNoRiskStatus === 'blocked' && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
@@ -293,7 +308,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         )}
 
         {/* Stats - absolute oben rechts */}
-        <div className="absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft">
+        <div className="pointer-events-none absolute top-3 right-3 flex items-center space-x-2 text-xs text-gray-400 font-minecraft">
           {/* Downloads */}
           <div className="text-white/50 flex items-center gap-0.5">
             <svg
@@ -310,7 +325,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
 
         {/* Project Icon */}
         <div
-          className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden border"
+          className="pointer-events-none relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden border"
           style={{
             borderColor: `${accentColor.value}30`,
             backgroundColor: `${accentColor.value}10`,
@@ -330,11 +345,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         </div>
 
         {/* Project Info */}
-        <div className="flex-1 min-w-0">
+        <div className="pointer-events-none relative flex-1 min-w-0">
           <div className="flex flex-row items-baseline space-x-1.5 mb-1">
             <span
-              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case hover:underline hover:text-accent cursor-pointer text-left transition-colors"
-              title={`View ${hit.title} details`}
+              className="text-white font-minecraft text-lg whitespace-nowrap overflow-hidden text-ellipsis normal-case group-hover:underline group-hover:text-accent group-focus-within:underline text-left transition-colors"
+              title={t('content.view_project', { title: hit.title })}
             >
               {hit.title}
             </span>
@@ -347,6 +362,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                 }
                 onClick={async (e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   try {
                     await openExternalUrl(
                       hit.source === 'Modrinth'
@@ -360,10 +376,10 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                 }}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-gray-400 truncate font-minecraft flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
-                title={`Open ${hit.author}'s profile on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
+                className="pointer-events-auto relative z-[1] text-xs text-gray-400 truncate font-minecraft flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
+                title={t('content.view_creator_profile', { creator: hit.author, provider: hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge' })}
               >
-                by {hit.author}
+                {t('content.by_creator', { creator: hit.author })}
               </a>
             )}
           </div>
@@ -373,13 +389,20 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             {hit.description}
           </p>
 
-          <div className="flex items-center gap-1 text-sm font-minecraft">
+          <div onClick={handleTitleClick} className="pointer-events-auto relative z-[1] flex items-center gap-1 min-h-6 overflow-x-auto whitespace-nowrap text-sm font-minecraft">
+            {/* Categories have a stable leading position while asynchronous
+                installed/NoRisk status is still being resolved. */}
+            {hit.categories && hit.categories.slice(0, 3).map((category) => (
+              <TagBadge key={category} size="sm" className="flex-shrink-0">
+                {category.replace(/-/g, " ")}
+              </TagBadge>
+            ))}
             {/* Status badges */}
             {installStatus && (
               <>
                 {installStatus.is_installed && (
-                  <TagBadge variant="success" size="sm">
-                    Installed
+                  <TagBadge variant="success" size="sm" className="flex-shrink-0">
+                    {t('common.installed')}
                   </TagBadge>
                 )}
                 {installStatus.is_included_in_norisk_pack && (
@@ -390,6 +413,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                         : "info"
                     }
                     size="sm"
+                    className="flex-shrink-0"
                   >
                     NoRisk Pack
                   </TagBadge>
@@ -397,26 +421,16 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               </>
             )}
 
-            {/* Categories */}
-            {hit.categories &&
-              hit.categories.length > 0 &&
-              hit.categories
-                .slice(0, 3)
-                .map((category) => (
-                  <TagBadge key={category} size="sm">
-                    {category.replace(/-/g, " ")}
-                  </TagBadge>
-                ))}
           </div>
         </div>
 
 
 
         {/* Action Buttons */}
-        <div className="flex items-center space-x-1">
+        <div className="relative z-[1] flex items-center space-x-1">
           {hit.project_type === "modpack" ? (
             <ActionButton
-              label={isInstallingModpackAsProfile ? "Installing..." : "Install"}
+              label={t(isInstallingModpackAsProfile ? 'modrinth.installing' : 'modrinth.install')}
               icon={isInstallingModpackAsProfile ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
               iconClassName={isInstallingModpackAsProfile ? "animate-spin-slow" : ""}
               variant={isInstallingModpackAsProfile ? "secondary" : "primary"}
@@ -436,7 +450,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             />
           ) : (
             <ActionButton
-              label={isQuickInstalling ? "Installing..." : "Install"}
+              label={t(isQuickInstalling ? 'modrinth.installing' : 'modrinth.install')}
               icon={
                 isQuickInstalling 
                   ? "solar:refresh-bold" 
@@ -464,10 +478,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             }
             iconClassName={isLoadingVersions ? "animate-spin-fast" : ""}
             variant="icon-only"
-            disabled={isLoadingVersions}
-            tooltip={isExpanded ? "Hide Versions" : "Show Versions"}
+            disabled={isLoadingVersions || versionsReadDisabled}
+            tooltip={t(isExpanded ? 'content.hide_versions' : 'content.show_versions')}
             onClick={(e) => {
               e.stopPropagation();
+              if (!isExpanded) onReserveVersionsFocus(e.currentTarget);
               onToggleVersionsClick(hit.project_id);
             }}
             size="sm"
@@ -477,10 +492,51 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         </div>
 
         {/* Version List - Below Card */}
+        {(isLoadingVersions || isExpanded) && (
+          <div
+            role="region"
+            aria-label={t('modrinth.available_versions') + ' ' + hit.title}
+            aria-busy={isLoadingVersions}
+            tabIndex={0}
+            className="mt-4 min-h-0 min-w-0 overflow-y-auto custom-scrollbar [scrollbar-gutter:stable] focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+            style={{ height: "min(24rem, calc(var(--catalogue-results-height, 0px) * 0.8))" }}
+          >
+        {isLoadingVersions && (
+          <div role="status" aria-busy="true" className="min-h-12 flex items-center gap-2 p-3 font-minecraft text-sm text-white/60">
+            <Icon icon="solar:refresh-bold" aria-hidden="true" className="h-4 w-4 shrink-0" />
+            {t('content.versions.loading')}
+          </div>
+        )}
+        {isExpanded && versionsReadError !== undefined && !isLoadingVersions && (
+          <div className="min-w-0 p-3 font-minecraft text-sm">
+            <div role="alert" className="min-w-0 [overflow-wrap:anywhere] text-red-400">
+              <p>{t('content.versions.load_failed', { title: hit.title })}</p>
+              <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere] text-xs">{versionsReadError}</p>
+            </div>
+            <button
+              type="button"
+              aria-label={t('content.versions.retry', { title: hit.title })}
+              disabled={versionsReadDisabled || !onRetryVersionsClick}
+              className="mt-2 rounded border border-white/20 px-3 py-2 text-white/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRetryVersionsClick) onReserveVersionsFocus(e.currentTarget);
+                onRetryVersionsClick?.(hit.project_id);
+              }}
+            >
+              {t('common.try_again')}
+            </button>
+          </div>
+        )}
+        {isExpanded && !isLoadingVersions && versionsReadError === undefined && Array.isArray(projectVersions) && projectVersions.length === 0 && (
+          <div role="status" className="min-h-12 p-3 font-minecraft text-sm text-white/60">
+            {t('modrinth.no_versions_found')}
+          </div>
+        )}
         {isExpanded &&
           Array.isArray(projectVersions) &&
           projectVersions.length > 0 && (
-            <div className="mt-4">
+            <div>
               <ModrinthVersionListV2
               projectId={hit.project_id}
               project={hit}
@@ -516,6 +572,8 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               />
             </div>
           )}
+          </div>
+        )}
       </div>
     );
   },

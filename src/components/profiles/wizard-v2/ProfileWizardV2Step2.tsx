@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { ModLoader } from "../../../types/profile";
 import { invoke } from "@tauri-apps/api/core";
@@ -36,12 +36,32 @@ interface LoaderVersionInfo {
   };
 }
 
+async function readLoaderVersions(loader: Exclude<ModLoader, "vanilla">, minecraftVersion: string): Promise<string[]> {
+  if (loader === "fabric" || loader === "quilt") {
+    const versions = await invoke<LoaderVersionInfo[]>(
+      loader === "fabric" ? "get_fabric_loader_versions" : "get_quilt_loader_versions",
+      { minecraftVersion },
+    );
+    // The installers explicitly accept this stable-version annotation.
+    return versions.map(v => `${v.loader.version}${v.loader.stable ? " (stable)" : ""}`);
+  }
+  return invoke<string[]>(loader === "forge" ? "get_forge_versions" : "get_neoforge_versions", { minecraftVersion });
+}
+
+function isNoVersionsError(error: unknown): boolean {
+  const message = parseErrorMessage(error);
+  const kind = typeof error === "object" && error !== null && "kind" in error ? String(error.kind) : "";
+  return [message, kind].some(value => value.includes("Status 400") || value.includes("Status 404"));
+}
+
 interface ProfileWizardV2Step2Props {
   onClose: () => void;
   onNext: (selectedLoader: ModLoader, selectedLoaderVersion: string | null) => void;
   onBack: () => void;
   selectedMinecraftVersion: string;
   nrcCompatibility: NrcCompatibilityData | null;
+  initialLoader?: ModLoader;
+  initialLoaderVersion?: string | null;
 }
 
 export function ProfileWizardV2Step2({
@@ -49,16 +69,21 @@ export function ProfileWizardV2Step2({
   onNext,
   onBack,
   selectedMinecraftVersion,
-  nrcCompatibility
+  nrcCompatibility,
+  initialLoader = "fabric",
+  initialLoaderVersion = null,
 }: ProfileWizardV2Step2Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLoader, setSelectedLoader] = useState<ModLoader>("fabric");
-  const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<string | null>(null);
+  const [selectedLoader, setSelectedLoader] = useState<ModLoader>(initialLoader);
+  const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<string | null>(initialLoaderVersion);
+  const selectedLoaderRef = useRef(selectedLoader);
+  selectedLoaderRef.current = selectedLoader;
+  const [readAttempt, setReadAttempt] = useState(0);
   const [loaderVersions, setLoaderVersions] = useState<string[]>([]);
-  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [loadingVersions, setLoadingVersions] = useState(initialLoader !== "vanilla");
+  const versionsPendingRef = useRef(initialLoader !== "vanilla");
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
   const [showNoVersionsFound, setShowNoVersionsFound] = useState(false);
   const [unavailableLoaders, setUnavailableLoaders] = useState<Set<ModLoader>>(new Set());
@@ -71,245 +96,111 @@ export function ProfileWizardV2Step2({
     { key: "quilt", label: "Quilt", icon: "solar:widget-bold", backgroundImage: "/icons/quilt.png" },
   ];
 
-  // Check all mod loaders availability when Minecraft version changes
+  // Availability probes never turn a transport failure into "not available".
   useEffect(() => {
-    const checkAllLoaders = async () => {
-      setUnavailableLoaders(new Set());
-      
-      // Check all mod loaders in parallel
-      const modLoaderKeys: Exclude<ModLoader, "vanilla">[] = ["fabric", "forge", "neoforge", "quilt"];
-      
-      const checkPromises = modLoaderKeys.map(async (loaderKey) => {
-        try {
-          let versions: string[] = [];
-          
-          switch (loaderKey) {
-            case "fabric":
-              const fabricVersions = await invoke<LoaderVersionInfo[]>(
-                "get_fabric_loader_versions",
-                { minecraftVersion: selectedMinecraftVersion }
-              );
-              versions = fabricVersions.map(v => 
-                `${v.loader.version}${v.loader.stable ? " (stable)" : ""}`
-              );
-              break;
-              
-            case "forge":
-              versions = await invoke<string[]>("get_forge_versions", {
-                minecraftVersion: selectedMinecraftVersion,
-              });
-              break;
-              
-            case "neoforge":
-              versions = await invoke<string[]>("get_neoforge_versions", {
-                minecraftVersion: selectedMinecraftVersion,
-              });
-              break;
-              
-            case "quilt":
-              const quiltVersions = await invoke<LoaderVersionInfo[]>(
-                "get_quilt_loader_versions",
-                { minecraftVersion: selectedMinecraftVersion }
-              );
-              versions = quiltVersions.map(v => 
-                `${v.loader.version}${v.loader.stable ? " (stable)" : ""}`
-              );
-              break;
-          }
-          
-          // If no versions available, mark as unavailable
-          if (versions.length === 0) {
-            return loaderKey;
-          }
-          return null;
-        } catch (err) {
-          // Check if error is a 400/404 (no versions available) vs real error
-          const errorMessage = err instanceof Error 
-            ? err.message 
-            : typeof err === 'object' && err !== null && 'message' in err
-            ? String((err as any).message)
-            : parseErrorMessage(err);
-          const errorKind = typeof err === 'object' && err !== null && 'kind' in err
-            ? String((err as any).kind)
-            : '';
-          const isNoVersionsError = 
-            errorMessage.includes("Status 400") || 
-            errorMessage.includes("Status 404") ||
-            errorKind.includes("Status 400") ||
-            errorKind.includes("Status 404");
-          
-          if (isNoVersionsError) {
-            return loaderKey;
-          }
-          // Real error - don't mark as unavailable, let user see the error
-          return null;
-        }
-      });
-      
-      const unavailableResults = await Promise.all(checkPromises);
-      const unavailable = unavailableResults.filter((loader): loader is Exclude<ModLoader, "vanilla"> => loader !== null);
-      
-      if (unavailable.length > 0) {
-        setUnavailableLoaders(new Set(unavailable));
-        
-        // If currently selected loader becomes unavailable, switch to vanilla
-        if (unavailable.includes(selectedLoader as Exclude<ModLoader, "vanilla">)) {
+    let cancelled = false;
+    setUnavailableLoaders(new Set());
+    const loaders: Exclude<ModLoader, "vanilla">[] = ["fabric", "forge", "neoforge", "quilt"];
+    void Promise.all(loaders.map(async loader => {
+      try {
+        return (await readLoaderVersions(loader, selectedMinecraftVersion)).length === 0 ? loader : null;
+      } catch (err) {
+        return isNoVersionsError(err) ? loader : null;
+      }
+    })).then(results => {
+      if (cancelled) return;
+      const unavailable = new Set(results.filter((loader): loader is Exclude<ModLoader, "vanilla"> => loader !== null));
+      setUnavailableLoaders(unavailable);
+      if (unavailable.has(selectedLoaderRef.current as Exclude<ModLoader, "vanilla">)) {
+        selectedLoaderRef.current = "vanilla";
+        setSelectedLoader("vanilla");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [selectedMinecraftVersion, readAttempt]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    setLoaderVersions([]);
+    setShowLoadingIndicator(false);
+    setShowNoVersionsFound(false);
+    if (selectedLoader === "vanilla") {
+      versionsPendingRef.current = false;
+      setSelectedLoaderVersion(null);
+      setLoadingVersions(false);
+      return;
+    }
+
+    setLoadingVersions(true);
+    versionsPendingRef.current = true;
+    const loadingTimeout = setTimeout(() => {
+      if (!cancelled) setShowLoadingIndicator(true);
+    }, 800);
+    void (async () => {
+      try {
+        const versions = await readLoaderVersions(selectedLoader, selectedMinecraftVersion);
+        if (cancelled) return;
+        setLoaderVersions(versions);
+        setSelectedLoaderVersion(current => current && versions.includes(current) ? current : versions[0] ?? null);
+        if (versions.length === 0) {
+          setUnavailableLoaders(current => new Set(current).add(selectedLoader));
+          selectedLoaderRef.current = "vanilla";
           setSelectedLoader("vanilla");
         }
-      }
-    };
-    
-    checkAllLoaders();
-  }, [selectedMinecraftVersion]);
-
-  // Fetch versions when loader changes
-  useEffect(() => {
-    const fetchVersions = async () => {
-      if (selectedLoader === "vanilla") {
-        setLoaderVersions([]);
-        setSelectedLoaderVersion(null);
-        setShowLoadingIndicator(false);
-        setShowNoVersionsFound(false);
-        return;
-      }
-
-      setLoadingVersions(true);
-      setShowLoadingIndicator(false);
-      setShowNoVersionsFound(false);
-      setError(null);
-
-      // Show loading indicator only after 800ms delay
-      const loadingTimeout = setTimeout(() => {
-        if (loadingVersions) {
-          setShowLoadingIndicator(true);
-        }
-      }, 800);
-
-      // Show "no versions found" only after 800ms delay
-      const noVersionsTimeout = setTimeout(() => {
-        if (!loadingVersions && loaderVersions.length === 0 && !error) {
-          setShowNoVersionsFound(true);
-        }
-      }, 800);
-
-      try {
-        let versions: string[] = [];
-
-        switch (selectedLoader) {
-          case "fabric":
-            const fabricVersions = await invoke<LoaderVersionInfo[]>(
-              "get_fabric_loader_versions",
-              { minecraftVersion: selectedMinecraftVersion }
-            );
-            versions = fabricVersions.map(v => 
-              `${v.loader.version}${v.loader.stable ? " (stable)" : ""}`
-            );
-            break;
-
-          case "forge":
-            versions = await invoke<string[]>("get_forge_versions", {
-              minecraftVersion: selectedMinecraftVersion,
-            });
-            break;
-
-          case "neoforge":
-            versions = await invoke<string[]>("get_neoforge_versions", {
-              minecraftVersion: selectedMinecraftVersion,
-            });
-            break;
-
-          case "quilt":
-            const quiltVersions = await invoke<LoaderVersionInfo[]>(
-              "get_quilt_loader_versions",
-              { minecraftVersion: selectedMinecraftVersion }
-            );
-            versions = quiltVersions.map(v => 
-              `${v.loader.version}${v.loader.stable ? " (stable)" : ""}`
-            );
-            break;
-        }
-
-        setLoaderVersions(versions);
-        // Auto-select latest (first) version
-        if (versions.length > 0) {
-          setSelectedLoaderVersion(versions[0]);
-          setShowNoVersionsFound(false);
-        } else {
-          // No versions available - mark loader as unavailable
-          if (selectedLoader === "fabric" || selectedLoader === "forge" || selectedLoader === "neoforge" || selectedLoader === "quilt") {
-            setUnavailableLoaders(prev => new Set(prev).add(selectedLoader));
-            setSelectedLoader("vanilla");
-          }
-          setSelectedLoaderVersion(null);
-          setShowNoVersionsFound(false);
-        }
       } catch (err) {
-        console.error(`Failed to fetch ${selectedLoader} versions:`, err);
-        
-        // Check if error is a 400/404 (no versions available) vs real error
-        const errorMessage = err instanceof Error 
-          ? err.message 
-          : typeof err === 'object' && err !== null && 'message' in err
-          ? String((err as any).message)
-          : parseErrorMessage(err);
-        const errorKind = typeof err === 'object' && err !== null && 'kind' in err
-          ? String((err as any).kind)
-          : '';
-        const isNoVersionsError = 
-          errorMessage.includes("Status 400") || 
-          errorMessage.includes("Status 404") ||
-          errorKind.includes("Status 400") ||
-          errorKind.includes("Status 404");
-        
-        if (isNoVersionsError) {
-          // No versions available - mark loader as unavailable, don't show error
-          // Only mark mod loaders as unavailable (not vanilla)
-          if (selectedLoader === "fabric" || selectedLoader === "forge" || selectedLoader === "neoforge" || selectedLoader === "quilt") {
-            setUnavailableLoaders(prev => new Set(prev).add(selectedLoader));
-            setSelectedLoader("vanilla");
-          }
-          setLoaderVersions([]);
-          setSelectedLoaderVersion(null);
-          setShowNoVersionsFound(false);
-          setError(null);
+        if (cancelled) return;
+        setSelectedLoaderVersion(null);
+        if (isNoVersionsError(err)) {
+          setUnavailableLoaders(current => new Set(current).add(selectedLoader));
+          selectedLoaderRef.current = "vanilla";
+          setSelectedLoader("vanilla");
         } else {
-          // Real error - show error message
+          console.error(`Failed to fetch ${selectedLoader} versions:`, err);
           setError(t('profiles.wizard.loadLoaderVersionsError', { loader: selectedLoader }));
-          setLoaderVersions([]);
-          setSelectedLoaderVersion(null);
-          setShowNoVersionsFound(false);
         }
       } finally {
         clearTimeout(loadingTimeout);
-        clearTimeout(noVersionsTimeout);
-        setLoadingVersions(false);
-        setShowLoadingIndicator(false);
+        if (!cancelled) {
+          versionsPendingRef.current = false;
+          setLoadingVersions(false);
+          setShowLoadingIndicator(false);
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
+      clearTimeout(loadingTimeout);
     };
-
-    fetchVersions();
-  }, [selectedLoader, selectedMinecraftVersion]);
+  }, [selectedLoader, selectedMinecraftVersion, readAttempt, t]);
 
   const handleNext = () => {
+    if (selectedLoaderRef.current !== selectedLoader || versionsPendingRef.current || loadingVersions || error || (selectedLoader !== "vanilla" && !selectedLoaderVersion)) return;
     onNext(selectedLoader, selectedLoaderVersion);
   };
 
+  const selectLoader = (loader: ModLoader) => {
+    if (loader === selectedLoader || unavailableLoaders.has(loader)) return;
+    selectedLoaderRef.current = loader;
+    versionsPendingRef.current = loader !== "vanilla";
+    setLoadingVersions(loader !== "vanilla");
+    setError(null);
+    setLoaderVersions([]);
+    setSelectedLoaderVersion(null);
+    setSelectedLoader(loader);
+  };
+
   const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
-          <p className="text-sm font-smallcaps text-white">{t('profiles.wizard.loading')}</p>
-        </div>
-      );
-    }
-
-    if (error) {
-      return <StatusMessage type="error" message={error} />;
-    }
-
     return (
-      <div className="h-[380px] flex flex-col space-y-6">
+      <div className="min-h-[380px] flex flex-col space-y-6">
+        {error && (
+          <div className="space-y-3">
+            <StatusMessage type="error" message={error} />
+            <Button size="sm" variant="secondary" onClick={() => setReadAttempt(attempt => attempt + 1)} disabled={loadingVersions}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
         {/* Mod Loader Selection */}
         <div className="grid grid-cols-2 gap-3 flex-shrink-0">
           {modLoaders.map(loader => {
@@ -321,9 +212,13 @@ export function ProfileWizardV2Step2({
               ?.has(loader.key) ?? false;
 
             return (
-              <div
+              <button
+                type="button"
+                aria-pressed={selectedLoader === loader.key}
+                aria-label={loader.label}
+                disabled={isDisabled}
                 key={loader.key}
-                className={`relative p-4 h-28 transition-all duration-200 rounded-lg overflow-hidden ${
+                className={`relative p-4 h-28 transition-all duration-200 rounded-lg overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
                   isDisabled
                     ? "opacity-50 cursor-not-allowed pointer-events-none border-0"
                     : selectedLoader === loader.key
@@ -341,7 +236,7 @@ export function ProfileWizardV2Step2({
                     color: accentColor.value
                   } : {})
                 }}
-                onClick={() => !isDisabled && setSelectedLoader(loader.key)}
+                onClick={() => !isDisabled && selectLoader(loader.key)}
               >
                 {/* NRC Compatibility Star */}
                 {isNrcCompatible && !isDisabled && (
@@ -373,7 +268,7 @@ export function ProfileWizardV2Step2({
                     </p>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -393,6 +288,7 @@ export function ProfileWizardV2Step2({
             </div>
           ) : loaderVersions.length > 0 ? (
             <Select
+              aria-label={t('profiles.wizard.selectLoaderVersion', { loader: modLoaders.find(l => l.key === selectedLoader)?.label })}
               value={selectedLoaderVersion || ""}
               onChange={setSelectedLoaderVersion}
               options={loaderVersions.map(version => ({
@@ -417,11 +313,10 @@ export function ProfileWizardV2Step2({
   };
 
   const renderFooter = () => (
-    <div className="flex justify-between items-center">
+    <div className="flex flex-wrap gap-3 justify-between items-center">
       <Button
         variant="secondary"
         onClick={onBack}
-        disabled={loading || loadingVersions}
         size="md"
         className="text-sm"
         icon={<Icon icon="solar:arrow-left-bold" className="w-5 h-5" />}
@@ -433,7 +328,7 @@ export function ProfileWizardV2Step2({
       <Button
         variant="default"
         onClick={handleNext}
-        disabled={loading || loadingVersions || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
+        disabled={loadingVersions || Boolean(error) || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
         size="md"
         className="min-w-[180px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
@@ -451,9 +346,9 @@ export function ProfileWizardV2Step2({
       width="lg"
       footer={renderFooter()}
     >
-      <div className="min-h-[500px] p-6 overflow-hidden">
+      <div className="min-h-[500px] p-6">
         {renderContent()}
       </div>
     </Modal>
   );
-} 
+}

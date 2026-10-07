@@ -51,10 +51,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
               <div className="min-h-[3rem] flex flex-col justify-center">
                 <div className="flex items-baseline gap-2">
                   <span className="text-base font-smallcaps text-white tracking-wider">
-                    Deadmake
+                    Maggus
                   </span>
                   <span className="text-white/50 font-smallcaps text-xs">
-                    aka Maggus
+                    aka Deadmake
                   </span>
                 </div>
               </div>
@@ -112,10 +112,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
           <div className="flex justify-center pt-4">
             <Button
               variant="ghost"
+              icon={<Icon aria-hidden="true" icon="solar:arrow-right-up-bold" className="w-5 h-5 shrink-0" />}
               className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
               onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
             >
-              <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
               <span className="font-smallcaps text-xs">{t('credits_modal.view_licenses')}</span>
             </Button>
           </div>

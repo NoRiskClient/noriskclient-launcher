@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ModrinthGameVersion,
@@ -125,7 +125,10 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const showFilters =
+    filters.gameVersions.length > 0 ||
+    filters.loaders.length > 0 ||
+    filters.versionType !== "all";
   const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
 
   // Create Select options for version type
@@ -154,15 +157,6 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
       });
     }
   }, [isAnimationEnabled]);
-
-  // Update showFilters state when filters change
-  useEffect(() => {
-    setShowFilters(
-      filters.gameVersions.length > 0 ||
-        filters.loaders.length > 0 ||
-        filters.versionType !== "all",
-    );
-  }, [filters]);
 
   // --- Helper function to get filtered versions (moved from parent) ---
   const getFilteredVersions = (
@@ -391,11 +385,11 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
             >
               <div className="flex items-center gap-1.5 p-2">
                 <TagBadge
-                  variant="destructive"
+                  variant="default"
                   className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
                   onClick={handleClearAllFilters}
                 >
-                  <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
+                  <Icon icon="solar:refresh-bold" aria-hidden="true" className="w-3 h-3 mr-1.5" />
                   <span>{t('content.filters.clear_all')}</span>
                 </TagBadge>
 

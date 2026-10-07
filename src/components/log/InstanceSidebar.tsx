@@ -12,6 +12,8 @@ import * as ProcessService from "../../services/process-service";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { requireMinecraftAccount } from "../../lib/require-account";
 import { handleIconImgLoad } from "../profiles/IconPicker";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { getTopDialogId } from "../ui/modal-focus";
 
 type InstanceStatus = "running" | "idle" | "crashed" | "starting" | "stopping";
 
@@ -150,17 +152,26 @@ function InstanceItem({
         borderColor: isSelected ? `${accentColor.value}60` : undefined,
         backgroundColor: isSelected ? `${accentColor.value}10` : undefined,
       }}
-      onClick={onSelect}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
     >
+      <button
+        type="button"
+        aria-label={`${t("logs.select_instance")}: ${instance.name}`}
+        aria-pressed={isSelected}
+        onClick={onSelect}
+        className="absolute inset-0 z-10 rounded-lg border-0 bg-transparent p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
+      />
+
       {/* Settings Icon - top right */}
       <button
+        type="button"
+        aria-label={`${t("logs.open_profile")}: ${instance.name}`}
         onClick={(e) => {
           e.stopPropagation();
           onOpenProfile();
         }}
-        className="absolute top-2 right-2 p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors"
+        className="absolute top-2 right-2 z-20 p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80"
         title={t('logs.open_profile')}
       >
         <Icon icon="solar:settings-bold" className="w-3.5 h-3.5" />
@@ -195,7 +206,7 @@ function InstanceItem({
         <div className="flex-1 min-w-0">
           {/* Row 1: Name */}
           <span
-            className="block font-minecraft text-white text-sm whitespace-nowrap overflow-hidden text-ellipsis mb-1"
+            className="block pr-7 font-minecraft text-white text-sm whitespace-nowrap overflow-hidden text-ellipsis mb-1"
             style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
             title={instance.name}
           >
@@ -203,9 +214,9 @@ function InstanceItem({
           </span>
 
           {/* Row 2: Account + Time */}
-          <div className="flex items-center gap-2 text-[11px] font-minecraft">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-minecraft">
             {instance.accountName && (
-              <div className="flex items-center gap-1.5 text-white/60">
+              <div className="flex min-w-0 items-center gap-1.5 text-white/60">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -216,7 +227,7 @@ function InstanceItem({
                 ) : (
                   <Icon icon="solar:user-bold" className="w-3 h-3" />
                 )}
-                <span>{instance.accountName}</span>
+                <span className="truncate" title={instance.accountName}>{instance.accountName}</span>
               </div>
             )}
             {instance.accountName && <span className="text-white/30">•</span>}
@@ -261,11 +272,53 @@ export function InstanceSidebar({
   const accentColor = useThemeStore((state) => state.accentColor);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  // Track processes user has requested to stop - show START immediately
+  // A stop request is not an exit; retain its marker until the backend changes state.
   const [stoppingProcessIds, setStoppingProcessIds] = useState<Set<string>>(new Set());
+  const stoppingIdsRef = useRef(new Set<string>());
+  const stopRequestsRef = useRef(new Map<string, symbol>());
+  const mountedRef = useRef(true);
+  const actionVersionRef = useRef(0);
+  const [actionError, setActionError] = useState<{
+    instanceId: string;
+    name: string;
+    message: string;
+    retryStop: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      actionVersionRef.current++;
+      stopRequestsRef.current.clear();
+      stoppingIdsRef.current.clear();
+    };
+  }, []);
 
   // Get processes from store
-  const { processes, stoppedProcesses, processEndTimes, metrics, fetchProcesses, stopProcess, isLoading } = useProcessStore();
+  const { processes, stoppedProcesses, processEndTimes, metrics, fetchProcesses, stopProcess, isLoading, error } = useProcessStore();
+  const instanceListRef = useRef<HTMLDivElement>(null);
+  const handleRetryProcesses = (event: { currentTarget: HTMLButtonElement }) => {
+    if (isLoading) return;
+    const trigger = event.currentTarget;
+    const owner = instanceListRef.current;
+    // Reserve our steady owner before native disable/removal, never on read completion.
+    const topDialogId = getTopDialogId();
+    const ownerScope = owner?.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const triggerScope = trigger.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const ownerDialogId = ownerScope?.dataset.modalOwner ?? ownerScope?.dataset.modalId;
+    const triggerDialogId = triggerScope?.dataset.modalOwner ?? triggerScope?.dataset.modalId;
+    if (document.activeElement === trigger && trigger.isConnected && !trigger.disabled &&
+      owner?.isConnected && owner.contains(trigger) &&
+      !trigger.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !owner.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      owner.getClientRects().length > 0 && getComputedStyle(owner).visibility !== "hidden" &&
+      getComputedStyle(owner).visibility !== "collapse" &&
+      (!topDialogId || (ownerDialogId === topDialogId && triggerDialogId === topDialogId))) {
+      owner.focus({ preventScroll: true });
+    }
+    void fetchProcesses();
+  };
 
   // Get launch state store for launch feedback
   const { getProfileState, initiateButtonLaunch, finalizeButtonLaunch } = useLaunchStateStore();
@@ -354,11 +407,15 @@ export function InstanceSidebar({
   // Clean up stoppingProcessIds when process is no longer running
   useEffect(() => {
     if (stoppingProcessIds.size > 0) {
-      const runningIds = new Set(processes.map(p => p.id));
+      const runningIds = new Set(processes.filter(p => {
+        const status = getProcessStatus(p.state);
+        return status === "running" || status === "starting" || status === "stopping";
+      }).map(p => p.id));
       const stillStopping = new Set(
         [...stoppingProcessIds].filter(id => runningIds.has(id))
       );
       if (stillStopping.size !== stoppingProcessIds.size) {
+        stoppingIdsRef.current = new Set(stillStopping);
         setStoppingProcessIds(stillStopping);
       }
     }
@@ -374,21 +431,60 @@ export function InstanceSidebar({
   // Get selected instance
   const selectedInstance = instances.find((i) => i.id === selectedInstanceId);
 
-  const handleStopProcess = (processId: string) => {
-    // Mark as stopping immediately - UI will show START button right away
-    setStoppingProcessIds(prev => new Set(prev).add(processId));
-
-    // Fire and forget - don't wait for process to stop
-    stopProcess(processId).catch((error) => {
+  const handleStopProcess = async (instance: InstanceData) => {
+    const processId = instance.id;
+    if (!mountedRef.current || stoppingIdsRef.current.has(processId) || stopRequestsRef.current.has(processId)) return;
+    const request = Symbol(processId);
+    stopRequestsRef.current.set(processId, request);
+    actionVersionRef.current++;
+    stoppingIdsRef.current.add(processId);
+    setStoppingProcessIds(new Set(stoppingIdsRef.current));
+    setActionError(null);
+    try {
+      await stopProcess(processId);
+      // Acceptance is not process exit. Only a later backend state removes the marker.
+    } catch (error) {
+      if (!mountedRef.current || stopRequestsRef.current.get(processId) !== request) return;
       console.error("Failed to stop process:", error);
-    });
+      stoppingIdsRef.current.delete(processId);
+      setStoppingProcessIds(new Set(stoppingIdsRef.current));
+      setActionError({ instanceId: processId, name: instance.name, retryStop: true,
+        message: t("instances.stop_failed", { error: parseErrorMessage(error) }) });
+    } finally {
+      if (stopRequestsRef.current.get(processId) === request) stopRequestsRef.current.delete(processId);
+    }
   };
 
-  const handleOpenFolder = async (profileId: string) => {
+  const handleOpenFolder = async (instance: InstanceData) => {
+    if (!mountedRef.current) return;
+    const version = ++actionVersionRef.current;
+    setActionError(null);
     try {
-      await invoke("open_profile_folder", { profileId });
+      await invoke("open_profile_folder", { profileId: instance.profileId });
     } catch (error) {
+      if (!mountedRef.current || version !== actionVersionRef.current) return;
       console.error("Failed to open folder:", error);
+      setActionError({ instanceId: instance.id, name: instance.name, retryStop: false,
+        message: t("instances.folder_open_failed", { error: parseErrorMessage(error) }) });
+    }
+  };
+
+  const handleOpenProfile = async (instance: InstanceData) => {
+    if (!mountedRef.current) return;
+    const version = ++actionVersionRef.current;
+    setActionError(null);
+    let navigationAccepted = false;
+    try {
+      await emitTo("main", "navigate-to-profile", { profileId: instance.profileId });
+      if (!mountedRef.current || version !== actionVersionRef.current) return;
+      navigationAccepted = true;
+      await invoke("focus_main_window");
+    } catch (error) {
+      if (!mountedRef.current || version !== actionVersionRef.current) return;
+      console.error("Failed to open profile in main window:", error);
+      setActionError({ instanceId: instance.id, name: instance.name, retryStop: false,
+        message: t(navigationAccepted ? "instances.main_focus_failed" : "instances.profile_navigation_failed",
+          { error: parseErrorMessage(error) }) });
     }
   };
 
@@ -433,7 +529,7 @@ export function InstanceSidebar({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 min-w-0 flex flex-col">
       {/* Header */}
       <div className="px-4 py-3">
         <span
@@ -446,13 +542,27 @@ export function InstanceSidebar({
       </div>
 
       {/* Instance List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+      <div ref={instanceListRef} tabIndex={-1} role="region" aria-label={t("instances.title")} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 custom-scrollbar rounded focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70">
+        {actionError && <div role="alert" className="rounded border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-100 [overflow-wrap:anywhere]">
+          <p className="font-minecraft">{actionError.name}</p>
+          <p className="mt-1">{actionError.message}</p>
+          {actionError.retryStop && (() => {
+            const instance = instances.find(i => i.id === actionError.instanceId);
+            if (!instance || (instance.status !== "running" && instance.status !== "starting" && instance.status !== "stopping")) return null;
+            return <button type="button" onClick={() => void handleStopProcess(instance)} disabled={stoppingProcessIds.has(instance.id)} className="mt-2 rounded px-2 py-1 hover:bg-white/10 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80">{t("common.retry")}</button>;
+          })()}
+        </div>}
+        {error && <div role="alert" className="rounded border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-100">
+          <p>{t("instances.fetch_failed")}</p>
+          <p className="mt-1 [overflow-wrap:anywhere]">{error}</p>
+          <button type="button" onClick={handleRetryProcesses} disabled={isLoading} className="mt-2 rounded px-2 py-1 hover:bg-white/10 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70">{t("common.retry")}</button>
+        </div>}
         {isLoading && instances.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft">
             <Icon icon="svg-spinners:pulse-3" className="w-6 h-6 mr-2" />
             {t('instances.loading')}
           </div>
-        ) : instances.length === 0 ? (
+        ) : instances.length === 0 && !error ? (
           <div className="flex flex-col items-center justify-center py-8 text-white/50 text-sm font-minecraft text-center">
             <Icon icon="solar:gamepad-no-charge-bold" className="w-8 h-8 mb-2 opacity-50" />
             {t('instances.no_active')}
@@ -468,16 +578,7 @@ export function InstanceSidebar({
               accentColor={accentColor}
               onSelect={() => onSelectInstance?.(instance.id)}
               onHover={(hovered) => setHoveredId(hovered ? instance.id : null)}
-              onOpenProfile={async () => {
-                try {
-                  // Emit event to main window for navigation
-                  await emitTo("main", "navigate-to-profile", { profileId: instance.profileId });
-                  // Focus the main window
-                  await invoke("focus_main_window");
-                } catch (error) {
-                  console.error("Failed to open profile in main window:", error);
-                }
-              }}
+              onOpenProfile={() => void handleOpenProfile(instance)}
             />
           ))
         )}
@@ -551,16 +652,20 @@ export function InstanceSidebar({
 
           <div className="flex items-center gap-1.5">
             {/* Stop/Restart Toggle */}
-            {(selectedInstance.status === "running" || selectedInstance.status === "starting") &&
-             !stoppingProcessIds.has(selectedInstance.id) ? (
+            {stoppingProcessIds.has(selectedInstance.id) || selectedInstance.status === "stopping" ? (
+              <button type="button" disabled aria-busy="true" className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft bg-red-500/20 text-red-400 opacity-60 cursor-not-allowed">
+                <Icon icon="solar:stop-bold" aria-hidden="true" className="w-3.5 h-3.5" />
+                {t("instances.stopping")}
+              </button>
+            ) : selectedInstance.status === "running" || selectedInstance.status === "starting" ? (
               <button
-                onClick={() => handleStopProcess(selectedInstance.id)}
+                onClick={() => void handleStopProcess(selectedInstance)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
               >
                 <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
                 {t('instances.stop')}
               </button>
-            ) : (selectedInstance.status === "crashed" || selectedInstance.status === "idle" || stoppingProcessIds.has(selectedInstance.id)) && (() => {
+            ) : (selectedInstance.status === "crashed" || selectedInstance.status === "idle") && (() => {
               const launchState = getProfileState(selectedInstance.profileId);
               const isLaunching = launchState.isButtonLaunching;
 
@@ -593,7 +698,7 @@ export function InstanceSidebar({
 
             {/* Open Folder Button */}
             <button
-              onClick={() => handleOpenFolder(selectedInstance.profileId)}
+              onClick={() => void handleOpenFolder(selectedInstance)}
               className="px-2 py-1.5 rounded text-xs font-minecraft bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
               title={t('logs.open_folder')}
             >
@@ -626,7 +731,7 @@ export function InstanceSidebar({
 
       {/* Status Footer */}
       <div className="px-4 py-2 text-xs font-minecraft text-white/50">
-        {instances.filter((i) => i.status === "running").length} {t('instances.running')}
+        {error ? t("instances.unavailable") : <>{instances.filter((i) => i.status === "running").length} {t('instances.running')}</>}
       </div>
     </div>
   );

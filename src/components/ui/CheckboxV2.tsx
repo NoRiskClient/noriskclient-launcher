@@ -3,8 +3,9 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useSettingControl } from "./settings/SettingControlContext";
 
-export interface CheckboxV2Props {
+export interface CheckboxV2Props extends React.AriaAttributes {
   /** Whether the checkbox is checked */
   checked: boolean;
   /** Change handler */
@@ -35,7 +36,10 @@ export function CheckboxV2({
   size = "md",
   className = "",
   onClick,
+  ...ariaProps
 }: CheckboxV2Props) {
+  const labelId = React.useId();
+  const row = useSettingControl();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -120,7 +124,7 @@ export function CheckboxV2({
     <div className={`flex items-center gap-2 ${className}`}>
       <div
         onClick={handleClick}
-        className={`${checkboxStyles.className} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`${checkboxStyles.className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         style={!isDisabled ? checkboxStyles.style : { ...checkboxStyles.style, opacity: 0.5 }}
         onMouseEnter={!isDisabled ? checkboxStyles.onMouseEnter : undefined}
         onMouseLeave={!isDisabled ? checkboxStyles.onMouseLeave : undefined}
@@ -128,6 +132,9 @@ export function CheckboxV2({
         role="checkbox"
         aria-checked={indeterminate ? "mixed" : checked}
         aria-disabled={disabled}
+        aria-labelledby={label ? labelId : row.labelId}
+        aria-describedby={row.descriptionId}
+        {...ariaProps}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === " ") && !disabled) {
@@ -145,14 +152,15 @@ export function CheckboxV2({
       </div>
 
       {label && (
-        <label
+        <span
+          id={labelId}
           onClick={!disabled ? handleClick : undefined}
           className={`font-smallcaps text-white cursor-pointer select-none ${getLabelSize()} ${
             disabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-white/80'
           }`}
         >
           {label}
-        </label>
+        </span>
       )}
     </div>
   );

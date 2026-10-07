@@ -1,20 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { Button } from "../ui/buttons/Button";
-import type { UnifiedModpackVersionsResponse, UnifiedVersion, ModpackSwitchRequest } from "../../types/unified";
+import type { UnifiedModpackVersionsResponse, UnifiedVersion } from "../../types/unified";
 import { UnifiedVersionType } from "../../types/unified";
-import type { ModPackSource } from "../../types/profile";
 import UnifiedService from "../../services/unified-service";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
+import { useModalScope } from "../ui/ModalScope";
+import { isTopDialog } from "../ui/modal-focus";
 
 interface ModpackVersionsModalProps {
   isOpen: boolean;
@@ -22,8 +23,8 @@ interface ModpackVersionsModalProps {
   versions: UnifiedModpackVersionsResponse | null;
   modpackName: string;
   profileId?: string;
-  onVersionSwitch?: (version: UnifiedVersion) => void;
-  onSwitchComplete?: () => void;
+  onVersionSwitch?: (version: UnifiedVersion) => void | Promise<void>;
+  onSwitchComplete?: () => void | Promise<void>;
   isSwitching?: boolean;
 }
 
@@ -53,8 +54,8 @@ function getVersionTypeIcon(type: UnifiedVersionType): string {
   }
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
+function formatDate(dateString: string, language: string): string {
+  return new Date(dateString).toLocaleDateString(language, {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
@@ -75,45 +76,81 @@ function VersionItem({
   version,
   isInstalled,
   isSelected,
+  isDisabled = false,
   onSelect
 }: {
   version: UnifiedVersion;
   isInstalled: boolean;
   isSelected: boolean;
+  isDisabled?: boolean;
   onSelect: (version: UnifiedVersion) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [curseforgeChangelog, setCurseforgeChangelog] = useState<string | null>(null);
   const [isLoadingChangelog, setIsLoadingChangelog] = useState(false);
+  const [changelogError, setChangelogError] = useState<string | null>(null);
+  const modalOwner = useModalScope();
+  const changelogPendingRef = useRef(false);
+  const changelogMountedRef = useRef(true);
+
+  React.useEffect(() => {
+    changelogMountedRef.current = true;
+    return () => { changelogMountedRef.current = false; };
+  }, []);
 
   const handleClick = () => {
-    if (!isInstalled) {
+    if (!isInstalled && !isDisabled) {
       onSelect(version);
     }
   };
 
-  const toggleExpanded = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const reserveChangelogFocus = (trigger: HTMLButtonElement) => {
+    const panel = trigger.closest<HTMLElement>("[data-modal-id]");
+    if (trigger.ownerDocument.activeElement !== trigger || !trigger.isConnected ||
+      !panel?.isConnected || !modalOwner || panel.dataset.modalId !== modalOwner ||
+      !isTopDialog(panel) || trigger.closest('[inert], [hidden], [aria-hidden="true"]') ||
+      panel.closest('[inert], [hidden], [aria-hidden="true"]')) return;
+    // The real panel survives native disable and Retry removal. Completion
+    // never overrides a connected focus destination chosen elsewhere.
+    panel.focus({ preventScroll: true });
+  };
 
-    // If expanding and it's a CurseForge version without changelog loaded, load it
-    if (!isExpanded && version.source === "CurseForge" && !version.changelog && !curseforgeChangelog) {
-      setIsLoadingChangelog(true);
-      try {
-        const changelog = await UnifiedService.getCurseForgeFileChangelog(
-          parseInt(version.project_id),
-          parseInt(version.id)
-        );
-        setCurseforgeChangelog(changelog);
-      } catch (error) {
+  const loadCurseforgeChangelog = async (trigger: HTMLButtonElement) => {
+    if (changelogPendingRef.current || version.source !== "CurseForge" ||
+      version.changelog || curseforgeChangelog !== null) return;
+    changelogPendingRef.current = true;
+    reserveChangelogFocus(trigger);
+    setIsLoadingChangelog(true);
+    setChangelogError(null);
+    try {
+      const changelog = await UnifiedService.getCurseForgeFileChangelog(
+        parseInt(version.project_id),
+        parseInt(version.id)
+      );
+      if (changelogMountedRef.current) setCurseforgeChangelog(changelog);
+    } catch (error) {
+      if (changelogMountedRef.current) {
         console.error("Failed to load CurseForge changelog:", error);
-        setCurseforgeChangelog(""); // Empty string to prevent retrying
-      } finally {
-        setIsLoadingChangelog(false);
+        setChangelogError(parseErrorMessage(error));
       }
+    } finally {
+      changelogPendingRef.current = false;
+      if (changelogMountedRef.current) setIsLoadingChangelog(false);
     }
+  };
 
+  const toggleExpanded = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (changelogPendingRef.current) return;
     setIsExpanded(!isExpanded);
+    // A rejected GET stays rejected until the explicit Retry is activated.
+    if (!isExpanded && changelogError === null) void loadCurseforgeChangelog(e.currentTarget);
+  };
+
+  const retryChangelog = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    void loadCurseforgeChangelog(e.currentTarget);
   };
 
   // Determine which changelog to show
@@ -137,7 +174,7 @@ function VersionItem({
       {/* Stats - oben rechts */}
       <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-white/50 font-minecraft">
         <span>{formatDownloads(version.downloads)}</span>
-        <span>{formatDate(version.date_published)}</span>
+        <span>{formatDate(version.date_published, i18n.resolvedLanguage || i18n.language)}</span>
       </div>
 
       {/* Hauptinhalt */}
@@ -145,9 +182,16 @@ function VersionItem({
         <div className="flex-1 min-w-0">
           {/* Name und Version in einer Zeile */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-white font-minecraft text-sm font-medium truncate">
+            <button
+              type="button"
+              className="text-white font-minecraft text-sm font-medium truncate focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+              aria-label={t('modpack_versions.select_version', { name: version.name, version: version.version_number })}
+              aria-pressed={isSelected && !isInstalled}
+              disabled={isInstalled || isDisabled}
+              onClick={(e) => { e.stopPropagation(); handleClick(); }}
+            >
               {version.version_number}
-            </span>
+            </button>
             {isInstalled && (
               <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft uppercase">
                 {t('modpack_versions.current')}
@@ -164,9 +208,12 @@ function VersionItem({
           {/* Changelog Button */}
           {(version.changelog || version.source === "CurseForge") && (
             <button
+              type="button"
               onClick={toggleExpanded}
-              className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20"
-              title={isExpanded ? "Hide changelog" : "Show changelog"}
+              className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+              title={isExpanded ? t('modpack_versions.hide_changelog') : t('modpack_versions.show_changelog')}
+              aria-expanded={isExpanded}
+              aria-busy={isLoadingChangelog}
               disabled={isLoadingChangelog}
             >
               {isLoadingChangelog ? (
@@ -186,16 +233,28 @@ function VersionItem({
       </div>
 
       {/* Changelog Bereich */}
-      {isExpanded && displayChangelog && (
+      {isExpanded && (
         <div className="mt-3 pt-3 border-t border-white/10">
           <div className="text-xs font-minecraft text-white/70 mb-2 uppercase">
             {t('modpack_versions.changelog')}
           </div>
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {isLoadingChangelog ? (
-              <div className="flex items-center justify-center py-4">
-                <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" />
+              <div role="status" className="flex items-center justify-center py-4">
+                <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" aria-hidden="true" />
                 <span className="ml-2 text-sm text-white/50 font-minecraft">{t('modpack_versions.loading_changelog')}</span>
+              </div>
+            ) : changelogError !== null ? (
+              <div role="alert" className="text-sm text-red-300 font-minecraft break-words">
+                <p>{t('modpack_versions.load_changelog_error', { error: changelogError })}</p>
+                <button
+                  type="button"
+                  onClick={retryChangelog}
+                  disabled={isLoadingChangelog}
+                  className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-xs text-white/80 hover:bg-white/10 transition-colors font-minecraft border border-white/20 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+                >
+                  {t('modpack_versions.retry_changelog')}
+                </button>
               </div>
             ) : displayChangelog ? (
               version.source === "CurseForge" ? (
@@ -262,63 +321,19 @@ export function ModpackVersionsModal({
   isSwitching = false,
 }: ModpackVersionsModalProps) {
   const { t } = useTranslation();
-  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
-    // DEBUG: Add mock changelogs to initial versions for testing with Markdown (only for Modrinth)
-    if (initialVersions && initialVersions.all_versions.length > 0) {
-      initialVersions.all_versions.forEach((version, index) => {
-        if (!version.changelog && version.source === "Modrinth") {
-          const mockChangelogs = [
-            `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-            `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-            `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-          ];
-          version.changelog = mockChangelogs[index % mockChangelogs.length];
-        }
-      });
-    }
-    return initialVersions;
-  });
+  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(initialVersions);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<UnifiedVersion | null>(null);
+  const [isSwitchingLocally, setIsSwitchingLocally] = useState(false);
+  const switchingRef = useRef(false);
+  const isBusy = isSwitching || isSwitchingLocally;
 
   // Load fresh versions when modal opens by loading the current profile
   React.useEffect(() => {
+    let cancelled = false;
     if (isOpen && profileId) {
       setIsLoadingVersions(true);
+      setSelectedVersion(null);
 
       console.log("Loading modpack versions for profile:", profileId);
       console.log("Initial versions:", initialVersions);
@@ -326,6 +341,7 @@ This release focuses on stability and performance improvements.
       // Load the current profile to get the latest modpack source
       ProfileService.getProfile(profileId)
         .then(profile => {
+          if (cancelled) return null;
           if (profile.modpack_info?.source) {
             return UnifiedService.getModpackVersions(profile.modpack_info.source);
           } else {
@@ -333,66 +349,24 @@ This release focuses on stability and performance improvements.
           }
         })
         .then(versions => {
+          if (cancelled || !versions) return;
           console.log("Loaded modpack versions:", versions);
           console.log("First version has changelog:", versions.all_versions[0]?.changelog);
 
-          // Only add mock changelogs for Modrinth versions (CurseForge will be lazy loaded)
-          if (versions && versions.all_versions.length > 0) {
-            versions.all_versions.forEach((version, index) => {
-              if (!version.changelog && version.source === "Modrinth") {
-                const mockChangelogs = [
-                  `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-                  `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-                  `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-                ];
-                version.changelog = mockChangelogs[index % mockChangelogs.length];
-              }
-            });
-          }
+          // Keep provider changelogs unchanged; absent backend data stays absent.
 
           setVersions(versions);
         })
         .catch(err => {
+          if (cancelled) return;
           console.error("Failed to load fresh modpack versions:", err);
           setVersions(initialVersions); // fallback to initial versions
         })
-        .finally(() => setIsLoadingVersions(false));
+        .finally(() => { if (!cancelled) setIsLoadingVersions(false); });
+    } else {
+      setIsLoadingVersions(false);
     }
+    return () => { cancelled = true; };
   }, [isOpen, profileId, initialVersions]);
 
   // Reset when modal closes
@@ -402,6 +376,19 @@ This release focuses on stability and performance improvements.
       setSelectedVersion(null);
     }
   }, [isOpen, initialVersions]);
+
+  // A refreshed list may no longer contain the selection, or may mark it installed.
+  React.useEffect(() => {
+    setSelectedVersion(current => {
+      if (!current || !versions) return null;
+      const next = versions.all_versions.find(v =>
+        v.id === current.id && v.project_id === current.project_id && v.source === current.source,
+      );
+      const installed = versions.installed_version;
+      return !next || (installed?.id === next.id && installed.project_id === next.project_id && installed.source === next.source)
+        ? null : next;
+    });
+  }, [versions]);
 
   if (!isOpen || !versions) {
     return null;
@@ -413,110 +400,86 @@ This release focuses on stability and performance improvements.
   );
 
   const installedVersionId = versions.installed_version?.id;
-  const [selectedVersion, setSelectedVersion] = useState<UnifiedVersion | null>(null);
 
   const handleVersionSelect = (version: UnifiedVersion) => {
+    if (switchingRef.current || isBusy || isLoadingVersions) return;
     // Don't allow selecting already installed version
     if (version.id === installedVersionId) return;
     setSelectedVersion(version);
   };
 
   const handleSwitchVersion = async () => {
-    if (!selectedVersion) return;
-
-    // Check if we have all required information for the new modpack switching
-    if (profileId && selectedVersion.files.length > 0) {
-      try {
-        // Find the primary file
-        const primaryFile = selectedVersion.files.find(f => f.primary) || selectedVersion.files[0];
-
-        // Create new ModPackSource based on selected version
-        let newModpackSource: ModPackSource;
-        if (selectedVersion.source === "Modrinth") {
-          newModpackSource = {
-            source: "modrinth",
-            project_id: selectedVersion.project_id,
-            version_id: selectedVersion.id,
-          };
-        } else if (selectedVersion.source === "CurseForge") {
-          // For CurseForge, we need the file_id from the primary file
-          const fileId = primaryFile.fingerprint; // CurseForge uses fingerprint as file_id
-          if (!fileId) {
-            throw new Error("CurseForge file fingerprint (file_id) not found");
-          }
-          newModpackSource = {
-            source: "curse_forge",
-            project_id: parseInt(selectedVersion.project_id), // CurseForge project_id is number
-            file_id: fileId,
-          };
-        } else {
-          throw new Error(`Unsupported modpack source: ${selectedVersion.source}`);
-        }
-
-        const request: ModpackSwitchRequest = {
-          download_url: primaryFile.url,
-          modpack_source: newModpackSource,
-          profile_id: profileId,
-        };
-
-        // Show loading toast
-        const loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: selectedVersion.version_number }));
-
+    if (!selectedVersion || switchingRef.current || isBusy || isLoadingVersions) return;
+    switchingRef.current = true;
+    setIsSwitchingLocally(true);
+    let loadingToast: string | undefined;
+    try {
+      const version = versions.all_versions.find(v =>
+        v.id === selectedVersion.id && v.project_id === selectedVersion.project_id && v.source === selectedVersion.source,
+      );
+      if (!version || version.id === installedVersionId) throw new Error("Selected modpack version is no longer available");
+      if (profileId) {
+        // A known profile always uses the native contract; missing files are errors, not legacy fallbacks.
+        const request = UnifiedService.buildModpackSwitchRequest(profileId, version);
+        loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: version.version_number }));
         await UnifiedService.switchModpackVersion(request);
-
-        // Dismiss loading toast and show success
+        setSelectedVersion(null);
+        setVersions(current => current ? { ...current, installed_version: version } : current);
         toast.dismiss(loadingToast);
-        toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: selectedVersion.version_number }));
-
-        // Don't refresh here - let parent components handle the refresh
-
-        // Call completion callback if provided (wait for parent components to update their state)
+        loadingToast = undefined;
+        toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: version.version_number }));
+        // Installation succeeded. A refresh failure must not invite a second installation.
         if (onSwitchComplete) {
-          await onSwitchComplete();
+          try { await onSwitchComplete(); }
+          catch (error) {
+            toast.error(t('modpack_versions.toast.refresh_failed', { name: modpackName, version: version.version_number, error: parseErrorMessage(error) }));
+          }
         }
-
-        // Close modal after parent states are updated
         onClose();
-
-      } catch (error) {
-        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
+      } else if (onVersionSwitch) {
+        await onVersionSwitch(version);
+      } else {
+        throw new Error("No modpack switch handler available");
       }
-    } else if (onVersionSwitch) {
-      // Fallback to old method if we don't have all required info
-      onVersionSwitch(selectedVersion);
+    } catch (error) {
+      toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
+    } finally {
+      if (loadingToast !== undefined) toast.dismiss(loadingToast);
+      switchingRef.current = false;
+      setIsSwitchingLocally(false);
     }
   };
 
-  // Reset selection when modal closes
-  React.useEffect(() => {
-    if (!isOpen) {
-      setSelectedVersion(null);
-    }
-  }, [isOpen]);
+  const handleClose = () => {
+    if (!switchingRef.current && !isSwitching) onClose();
+  };
 
   return (
     <Modal
       title={t('modpack_versions.title', { name: modpackName })}
       titleIcon={<Icon icon="solar:archive-bold" className="w-6 h-6 text-blue-400" />}
-      onClose={onClose}
+      onClose={handleClose}
+      closeOnClickOutside={!isBusy}
+      closeOnEscape={!isBusy}
+      hideCloseButton={isBusy}
       width="lg"
       className="max-h-[80vh]"
       footer={
         <div className="flex justify-end items-center gap-3">
           <Button
             variant="secondary"
-            onClick={onClose}
-            disabled={isSwitching}
+            onClick={handleClose}
+            disabled={isBusy}
           >
             {t('common.cancel')}
           </Button>
           <Button
             variant="default"
             onClick={handleSwitchVersion}
-            disabled={!selectedVersion || isSwitching}
-            icon={isSwitching ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
+            disabled={!selectedVersion || isBusy || isLoadingVersions}
+            icon={isBusy ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
           >
-            {isSwitching ? t('modpack_versions.button.switching') : selectedVersion ? t('modpack_versions.button.switch_version') : t('modpack_versions.button.select_version')}
+            {isBusy ? t('modpack_versions.button.switching') : selectedVersion ? t('modpack_versions.button.switch_version') : t('modpack_versions.button.select_version')}
           </Button>
         </div>
       }
@@ -527,7 +490,7 @@ This release focuses on stability and performance improvements.
             t('modpack_versions.loading')
           ) : (
             <>
-              {versions.all_versions.length} version{versions.all_versions.length !== 1 ? 's' : ''} available
+              {t('modpack_versions.available', { count: versions.all_versions.length })}
               {versions.updates_available && (
                 <span className="ml-2 text-green-400">
                   {t('modpack_versions.updates_available')}
@@ -543,7 +506,7 @@ This release focuses on stability and performance improvements.
               className="text-xs font-minecraft text-center font-medium mb-1"
               style={{ color: `var(--accent)` }}
             >
-              Selected: {selectedVersion.name} ({selectedVersion.version_number})
+              {t('modpack_versions.selected', { name: selectedVersion.name, version: selectedVersion.version_number })}
             </div>
           </div>
         ) : (
@@ -559,6 +522,7 @@ This release focuses on stability and performance improvements.
               version={version}
               isInstalled={version.id === installedVersionId}
               isSelected={selectedVersion?.id === version.id}
+              isDisabled={isBusy || isLoadingVersions}
               onSelect={handleVersionSelect}
             />
           ))}

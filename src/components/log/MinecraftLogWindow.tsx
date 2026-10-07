@@ -21,7 +21,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
   const accentColor = useThemeStore((state) => state.accentColor);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
 
-  const { processes } = useProcessEvents({ autoFetch: true });
+  const { processes, isLoading: isLoadingProcesses, error: processError, fetchProcesses } = useProcessEvents({ autoFetch: true });
   const { logs: rawLogs } = useProcessLogs(selectedInstanceId);
 
   const {
@@ -87,7 +87,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     return { selectedProfileId: null, selectedSessionId: null };
   }, [selectedInstanceId, processes, stoppedProcesses]);
 
-  useProcessLogCursor(selectedSessionId, selectedInstanceId);
+  const cursor = useProcessLogCursor(selectedSessionId, selectedInstanceId);
 
   const launcherLogs = useMemo(() => {
     if (!selectedProfileId) return [];
@@ -118,25 +118,35 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
     <div
       className="h-screen flex flex-col"
       style={{
+        containerType: "inline-size",
+        containerName: "minecraft-log-window",
         background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
       }}
     >
       <LogWindowTitlebar />
+      <style>{`@container minecraft-log-window (max-width: 559px) {
+        .minecraft-log-panels { flex-direction: column; }
+        .minecraft-log-sidebar { min-width: 0; max-width: none; flex: none; height: min(40%, 280px); }
+      }`}</style>
 
-      <div className="flex-1 flex min-h-0 p-3 gap-3">
-        <div className="flex-[7] flex flex-col min-w-0">
+      <div className="minecraft-log-panels flex-1 flex min-h-0 min-w-0 p-3 gap-3">
+        <div className="flex-[7] flex flex-col min-w-0 min-h-0">
           {!selectedInstanceId ? (
             <div className="flex-1 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm text-white/30">
               <div className="text-center">
                 <Icon icon="solar:monitor-smartphone-bold" className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="font-minecraft">{t('logs.select_instance')}</p>
-                <p className="text-xs mt-1 font-sans">{t('logs.select_instance_hint')}</p>
+                <p className="font-minecraft">{processError ? t("instances.fetch_failed") : isLoadingProcesses ? t("instances.loading") : t('logs.select_instance')}</p>
+                {!processError && !isLoadingProcesses && <p className="text-xs mt-1 font-sans">{t('logs.select_instance_hint')}</p>}
               </div>
             </div>
           ) : (
             <LogViewerCore
               logs={displayLogs}
+              selectionIdentity={selectedInstanceId}
               onClear={handleClear}
+              isLoading={cursor.isLoading}
+              error={cursor.error ? t("logs.read_failed", { error: cursor.error }) : processError ? t("instances.fetch_failed") : null}
+              onRetry={() => cursor.error ? cursor.retry() : void fetchProcesses()}
               noLogsIcon="solar:document-text-bold"
               noLogsTitle={t('logs.no_logs_yet')}
               noLogsSubtitle={t('logs.waiting_for_output')}
@@ -144,7 +154,7 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
           )}
         </div>
 
-        <div className="flex-[3] min-w-[280px] max-w-[350px]">
+        <div className="minecraft-log-sidebar flex-[3] min-w-[280px] max-w-[350px] min-h-0">
           <InstanceSidebar
             selectedInstanceId={selectedInstanceId || undefined}
             onSelectInstance={handleSelectInstance}

@@ -117,13 +117,17 @@ export function SyncPackVersionRow({
           wrapperClassName="max-w-full"
         >
         <button
+          type="button"
           ref={triggerRef}
+          aria-haspopup="menu"
+          aria-expanded={dropdownOpen}
+          aria-busy={loadingVersions || resolving}
           onClick={(event) => {
             event.stopPropagation();
             if (canSwitch) onOpenDropdown();
           }}
           disabled={!canSwitch}
-          className={`inline-flex h-5 max-w-full items-center gap-1 truncate rounded px-1.5 font-minecraft text-xs transition-colors ${
+          className={`inline-flex h-5 max-w-full items-center gap-1 truncate rounded px-1.5 font-minecraft text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10 ${
             canSwitch ? "cursor-pointer hover:bg-white/5" : "cursor-default"
           }`}
           style={{
@@ -180,6 +184,7 @@ export function SyncPackVersionRow({
         <div className="flex-shrink-0">
           <ToggleSwitch
             checked={mode !== "off"}
+            aria-label={`${row.mc_version} ${loaderLabel(row.loader)}: ${t(mode === "off" ? "syncPacks.entries.enableForVersion" : "syncPacks.entries.disableForVersion")}`}
             onChange={(next) => (next ? onEnable() : onDisable())}
             size="sm"
           />

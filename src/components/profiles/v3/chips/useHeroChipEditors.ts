@@ -56,16 +56,19 @@ interface UseHeroChipEditorsResult {
 
   mcVersions: MinecraftVersion[] | null;
   mcLoading: boolean;
+  mcError: string | null;
   loadMinecraftVersions: () => Promise<void>;
 
   loaderVersions: string[] | null;
   loaderLoading: boolean;
+  loaderError: string | null;
   loadLoaderVersions: (loader: string, mcVersion: string) => Promise<void>;
 
-  saveGroup: (group: string | null) => Promise<void>;
-  saveGameVersion: (version: string) => Promise<void>;
-  saveLoader: (loader: LoaderKey) => Promise<void>;
-  saveLoaderVersion: (version: string) => Promise<void>;
+  isSaving: boolean;
+  saveGroup: (group: string | null) => Promise<boolean>;
+  saveGameVersion: (version: string) => Promise<boolean>;
+  saveLoader: (loader: LoaderKey) => Promise<boolean>;
+  saveLoaderVersion: (version: string) => Promise<boolean>;
 }
 
 export function useHeroChipEditors(
@@ -81,12 +84,14 @@ export function useHeroChipEditors(
   // ── MC versions cache ────────────────────────────────────────────────────
   const [mcVersions, setMcVersions] = useState<MinecraftVersion[] | null>(null);
   const [mcLoading, setMcLoading] = useState(false);
+  const [mcError, setMcError] = useState<string | null>(null);
   const mcLoadedRef = useRef(false);
 
   const loadMinecraftVersions = useCallback(async () => {
     if (mcLoadedRef.current || mcLoading) return;
     mcLoadedRef.current = true;
     setMcLoading(true);
+    setMcError(null);
     try {
       const result = await invoke<{ versions: MinecraftVersion[] }>(
         "get_minecraft_versions",
@@ -94,29 +99,43 @@ export function useHeroChipEditors(
       setMcVersions(result.versions);
     } catch (err) {
       console.error("[HeroChips] Failed to fetch Minecraft versions:", err);
+      setMcError(t('profiles.v3.chips.loadError', {
+        defaultValue: 'Could not load versions: {{error}}', error: parseErrorMessage(err),
+      }));
       // Allow retry on next open
       mcLoadedRef.current = false;
     } finally {
       setMcLoading(false);
     }
-  }, [mcLoading]);
+  }, [mcLoading, t]);
 
   // ── Loader versions cache (keyed on `${loader}|${mcVersion}`) ────────────
   const [loaderVersions, setLoaderVersions] = useState<string[] | null>(null);
   const [loaderLoading, setLoaderLoading] = useState(false);
+  const [loaderError, setLoaderError] = useState<string | null>(null);
   const loaderKeyRef = useRef<string | null>(null);
+  const loaderRequestRef = useRef(0);
+  const loaderPendingKeyRef = useRef<string | null>(null);
 
   const loadLoaderVersions = useCallback(
     async (loader: string, mcVersion: string) => {
       if (!loader || loader === "vanilla" || !mcVersion) {
+        loaderRequestRef.current++;
         setLoaderVersions([]);
+        setLoaderLoading(false);
+        setLoaderError(null);
+        loaderPendingKeyRef.current = null;
         loaderKeyRef.current = null;
         return;
       }
       const key = `${loader}|${mcVersion}`;
+      if (loaderPendingKeyRef.current === key) return;
       if (loaderKeyRef.current === key && loaderVersions !== null) return;
+      const request = ++loaderRequestRef.current;
+      loaderPendingKeyRef.current = key;
       loaderKeyRef.current = key;
       setLoaderLoading(true);
+      setLoaderError(null);
       try {
         let versions: string[] = [];
         switch (loader) {
@@ -147,22 +166,33 @@ export function useHeroChipEditors(
             });
             break;
         }
-        setLoaderVersions(versions);
+        if (request === loaderRequestRef.current) setLoaderVersions(versions);
       } catch (err) {
         console.error(`[HeroChips] Failed to fetch ${loader} versions:`, err);
-        setLoaderVersions([]);
-        // Allow retry on next open by clearing the key
-        loaderKeyRef.current = null;
+        if (request === loaderRequestRef.current) {
+          setLoaderError(t('profiles.v3.chips.loadError', {
+            defaultValue: 'Could not load versions: {{error}}', error: parseErrorMessage(err),
+          }));
+          loaderKeyRef.current = null;
+        }
       } finally {
-        setLoaderLoading(false);
+        if (request === loaderRequestRef.current) {
+          loaderPendingKeyRef.current = null;
+          setLoaderLoading(false);
+        }
       }
     },
-    [loaderVersions],
+    [loaderVersions, t],
   );
 
   // ── Shared save helper ───────────────────────────────────────────────────
+  const savingRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
   const save = useCallback(
-    async (params: UpdateProfileParams): Promise<void> => {
+    async (params: UpdateProfileParams): Promise<boolean> => {
+      if (isLocked || savingRef.current) return false;
+      savingRef.current = true;
+      setIsSaving(true);
       try {
         await ProfileService.updateProfile(profile.id, params);
         await fetchProfiles();
@@ -171,13 +201,19 @@ export function useHeroChipEditors(
           .profiles.find((p) => p.id === profile.id);
         if (fresh) onProfileUpdated(fresh);
         toast.success(t("profiles.settings.saveSuccess"));
+        return true;
       } catch (err) {
         const msg = parseErrorMessage(err);
         toast.error(t("profiles.settings.saveError", { error: msg }));
-        throw err;
+        // This hook is the UI mutation boundary: report failure without
+        // leaking a rejected promise from a void event callback.
+        return false;
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
       }
     },
-    [profile.id, fetchProfiles, onProfileUpdated, t],
+    [profile.id, fetchProfiles, onProfileUpdated, t, isLocked],
   );
 
   // ── Mutations ────────────────────────────────────────────────────────────
@@ -185,11 +221,11 @@ export function useHeroChipEditors(
     async (group: string | null) => {
       const trimmed = group?.trim() ?? "";
       const current = profile.group ?? "";
-      if (trimmed === current) return;
+      if (trimmed === current) return true;
       if (trimmed) {
-        await save({ group: trimmed });
+        return save({ group: trimmed });
       } else {
-        await save({ clear_group: true });
+        return save({ clear_group: true });
       }
     },
     [profile.group, save],
@@ -197,8 +233,8 @@ export function useHeroChipEditors(
 
   const saveGameVersion = useCallback(
     async (version: string) => {
-      if (version === profile.game_version) return;
-      await save({ game_version: version });
+      if (version === profile.game_version) return true;
+      return save({ game_version: version });
     },
     [profile.game_version, save],
   );
@@ -206,12 +242,7 @@ export function useHeroChipEditors(
   const saveLoader = useCallback(
     async (loader: LoaderKey) => {
       const current = profile.loader ?? "vanilla";
-      if (loader === current) return;
-      // Invalidate our loader-versions cache — next picker-open refetches
-      // against the new loader type.
-      loaderKeyRef.current = null;
-      setLoaderVersions(null);
-
+      if (loader === current) return true;
       const settings = profile.settings;
       const existingMap = settings.overwrite_loader_versions ?? {};
 
@@ -241,7 +272,7 @@ export function useHeroChipEditors(
       // Backend has no `clear_loader_version` API, so we send the empty
       // string: the resolve at mod.rs:140 explicitly treats "" as "no value"
       // and falls through to NotResolved → chip renders "latest".
-      await save({
+      const saved = await save({
         loader,
         loader_version: "",
         settings: {
@@ -251,6 +282,17 @@ export function useHeroChipEditors(
           overwrite_loader_versions: preservedMap,
         },
       });
+      if (saved) {
+        // Only a confirmed switch invalidates the old loader's cache. Late
+        // provider responses must not repopulate it for the new loader.
+        loaderRequestRef.current++;
+        loaderPendingKeyRef.current = null;
+        loaderKeyRef.current = null;
+        setLoaderVersions(null);
+        setLoaderLoading(false);
+        setLoaderError(null);
+      }
+      return saved;
     },
     [profile.loader, profile.settings, save],
   );
@@ -263,16 +305,16 @@ export function useHeroChipEditors(
       // with the master toggle flipped on. Legacy field is also nulled so it
       // can't leak across loader switches via the backend's handler-sync.
       const loaderKey = profile.loader;
-      if (!loaderKey || loaderKey === "vanilla") return;
+      if (!loaderKey || loaderKey === "vanilla") return true;
 
       const settings = profile.settings;
       const existingMap = settings.overwrite_loader_versions ?? {};
       const alreadyActive =
         !!settings.use_overwrite_loader_version &&
         existingMap[loaderKey] === version;
-      if (alreadyActive) return;
+      if (alreadyActive) return true;
 
-      await save({
+      return save({
         settings: {
           ...settings,
           use_overwrite_loader_version: true,
@@ -289,10 +331,13 @@ export function useHeroChipEditors(
     lockReason,
     mcVersions,
     mcLoading,
+    mcError,
     loadMinecraftVersions,
     loaderVersions,
     loaderLoading,
+    loaderError,
     loadLoaderVersions,
+    isSaving,
     saveGroup,
     saveGameVersion,
     saveLoader,

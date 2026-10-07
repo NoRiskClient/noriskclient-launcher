@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
@@ -84,6 +84,11 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
+function validChannel(value: string) {
+  const number = Number(value);
+  return value.trim() !== "" && Number.isInteger(number) && number >= 0 && number <= 255;
+}
+
 export function ColorPickerModal({
   onClose,
   onColorSelected,
@@ -98,6 +103,11 @@ export function ColorPickerModal({
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
   });
   const [hex, setHex] = useState(seed);
+  const [rgbDraft, setRgbDraft] = useState(() => {
+    const rgb = hexToRgb(seed);
+    return { r: String(rgb.r), g: String(rgb.g), b: String(rgb.b) };
+  });
+  const fieldId = useId();
   const [isDraggingSaturation, setIsDraggingSaturation] = useState(false);
   const [isDraggingHue, setIsDraggingHue] = useState(false);
 
@@ -117,6 +127,7 @@ export function ColorPickerModal({
     const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
     const newHex = rgbToHex(rgb.r, rgb.g, rgb.b);
     setHex(newHex);
+    setRgbDraft({ r: String(rgb.r), g: String(rgb.g), b: String(rgb.b) });
   }, [hsv]);
 
   // Handle mouse events for dragging
@@ -161,7 +172,9 @@ export function ColorPickerModal({
   }, []);
 
   const handleApply = () => {
-    if (/^#[0-9A-F]{6}$/i.test(hex)) {
+    if (!Object.values(rgbDraft).every(validChannel)) {
+      toast.error(t("color_picker.invalid_rgb", { defaultValue: "Use whole RGB values from 0 to 255." }));
+    } else if (/^#[0-9A-F]{6}$/i.test(hex)) {
       onColorSelected?.(hex);
       if (applyToTheme) {
         setCustomAccentColor(hex);
@@ -174,6 +187,18 @@ export function ColorPickerModal({
   };
 
   const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+  const validHex = /^#[0-9A-F]{6}$/i.test(hex);
+  const validRgb = Object.values(rgbDraft).every(validChannel);
+  const selectedHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+  const handleRgbChange = (channel: "r" | "g" | "b", value: string) => {
+    const draft = { ...rgbDraft, [channel]: value };
+    setRgbDraft(draft);
+    // Keep an invalid draft visible for correction; never feed out-of-range
+    // or incomplete numbers to the conversion or apply them to a consumer.
+    if (Object.values(draft).every(validChannel)) {
+      setHsv(rgbToHsv(Number(draft.r), Number(draft.g), Number(draft.b)));
+    }
+  };
 
   return (
     <Modal
@@ -218,7 +243,7 @@ export function ColorPickerModal({
                 style={{
                   left: `${hsv.s * 100}%`,
                   top: `${(1 - hsv.v) * 100}%`,
-                  backgroundColor: hex
+                  backgroundColor: selectedHex
                 }}
               />
             </div>
@@ -257,9 +282,12 @@ export function ColorPickerModal({
         {/* Color Values */}
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.hex')}</label>
+            <label htmlFor={`${fieldId}-hex`} className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.hex')}</label>
             <input
+              id={`${fieldId}-hex`}
               type="text"
+              aria-invalid={!validHex}
+              aria-describedby={!validHex ? `${fieldId}-hex-error` : undefined}
               value={hex}
               onChange={(e) => handleHexChange(e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
@@ -267,62 +295,76 @@ export function ColorPickerModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.r')}</label>
+            <label htmlFor={`${fieldId}-r`} className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.r')}</label>
             <input
+              id={`${fieldId}-r`}
               type="number"
-              value={rgb.r}
-              onChange={(e) => {
-                const newRgb = { ...rgb, r: parseInt(e.target.value) || 0 };
-                setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
-              }}
+              value={rgbDraft.r}
+              aria-invalid={!validChannel(rgbDraft.r)}
+              aria-describedby={!validChannel(rgbDraft.r) ? `${fieldId}-rgb-error` : undefined}
+              onChange={(e) => handleRgbChange("r", e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
+              step="1"
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.g')}</label>
+            <label htmlFor={`${fieldId}-g`} className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.g')}</label>
             <input
+              id={`${fieldId}-g`}
               type="number"
-              value={rgb.g}
-              onChange={(e) => {
-                const newRgb = { ...rgb, g: parseInt(e.target.value) || 0 };
-                setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
-              }}
+              value={rgbDraft.g}
+              aria-invalid={!validChannel(rgbDraft.g)}
+              aria-describedby={!validChannel(rgbDraft.g) ? `${fieldId}-rgb-error` : undefined}
+              onChange={(e) => handleRgbChange("g", e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
+              step="1"
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.b')}</label>
+            <label htmlFor={`${fieldId}-b`} className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.b')}</label>
             <input
+              id={`${fieldId}-b`}
               type="number"
-              value={rgb.b}
-              onChange={(e) => {
-                const newRgb = { ...rgb, b: parseInt(e.target.value) || 0 };
-                setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
-              }}
+              value={rgbDraft.b}
+              aria-invalid={!validChannel(rgbDraft.b)}
+              aria-describedby={!validChannel(rgbDraft.b) ? `${fieldId}-rgb-error` : undefined}
+              onChange={(e) => handleRgbChange("b", e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
+              step="1"
             />
           </div>
         </div>
+
+        {!validHex && (
+          <p id={`${fieldId}-hex-error`} role="status" className="font-minecraft text-xs text-red-300">
+            {t("color_picker.toast.invalid_hex")}
+          </p>
+        )}
+        {!validRgb && (
+          <p id={`${fieldId}-rgb-error`} role="status" className="font-minecraft text-xs text-red-300">
+            {t("color_picker.invalid_rgb", { defaultValue: "Use whole RGB values from 0 to 255." })}
+          </p>
+        )}
 
         {/* Current Color Display */}
         <div className="flex items-center justify-between p-4 rounded-lg border border-[#ffffff20] bg-black/20">
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-lg border-2 border-white/20 shadow-lg"
-              style={{ backgroundColor: hex }}
+              style={{ backgroundColor: selectedHex }}
             />
             <div>
               <h5 className="font-smallcaps text-xs text-white">
                 {t('color_picker.selected_color')}
               </h5>
               <p className="text-sm text-white/70 font-minecraft">
-                {hex}
+                {selectedHex}
               </p>
             </div>
           </div>

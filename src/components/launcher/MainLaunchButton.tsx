@@ -52,7 +52,7 @@ export function MainLaunchButton({
   const navigate = useNavigate();
 
   // Use the profile launch hook for launch logic
-  const { handleLaunch: hookHandleLaunch, isLaunching, statusMessage, launchState } = useProfileLaunch({
+  const { handleLaunch: hookHandleLaunch, isLaunching, isPreparing, isBusy, statusMessage, launchState } = useProfileLaunch({
     profileId: selectedVersion,
     onLaunchSuccess: () => {
       setTransientSuccessActive(true);
@@ -107,12 +107,12 @@ export function MainLaunchButton({
 
 
   const handleLaunch = async () => {
-    if (!selectedVersion) return;
+    if (!selectedVersion || isPreparing) return;
     await hookHandleLaunch();
   };
 
   const handleVersionChange = (version: string) => {
-    if (isButtonLaunching) return;
+    if (isBusy) return;
     if (onVersionChange) {
       onVersionChange(version);
     }
@@ -120,7 +120,7 @@ export function MainLaunchButton({
 
   const handleOpenModal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isButtonLaunching) return;
+    if (isBusy) return;
 
     // Navigate to profiles tab instead of opening modal
     navigate("/profiles");
@@ -134,7 +134,7 @@ export function MainLaunchButton({
   };
 
   const renderLaunchButtonContent = () => {
-    const actionText = isButtonLaunching ? "Stop" : "Launch";
+    const actionText = isPreparing ? t('launch.preparing_short') : isButtonLaunching ? t('profiles.stop') : t('profiles.play');
 
     let statusSubText: string | null | undefined = null;
     let statusColorClass = "opacity-85";
@@ -142,8 +142,8 @@ export function MainLaunchButton({
     if (transientSuccessActive && buttonStatusMessage === t('launch.starting')) {
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
-    } else if (isButtonLaunching) {
-      statusSubText = buttonStatusMessage || "Launching...";
+    } else if (isBusy) {
+      statusSubText = buttonStatusMessage || t('launch.launching');
       statusColorClass =
         buttonStatusMessage
           ? "opacity-90 text-white"
@@ -164,10 +164,10 @@ export function MainLaunchButton({
           <span
             className={cn(
               "text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
-              isButtonLaunching ? "max-w-64" : "",
+              isBusy ? "max-w-64" : "",
               statusColorClass
             )}
-            style={isButtonLaunching ? { maxWidth: "16rem" } : undefined}
+            style={isBusy ? { maxWidth: "16rem" } : undefined}
             title={
               typeof displaySubText === "string" ? displaySubText : undefined
             }
@@ -196,9 +196,10 @@ export function MainLaunchButton({
           <Button
             onClick={handleLaunch}
             disabled={
-              !selectedVersion ||
+              isPreparing || !selectedVersion ||
               (versions && versions.length === 0 && !selectedVersion)
             }
+            aria-busy={isBusy}
             size="xl"
             icon={undefined}
             variant={getButtonVariant()}
@@ -210,7 +211,7 @@ export function MainLaunchButton({
 
           <IconButton
             onClick={handleOpenModal}
-            disabled={isButtonLaunching || !versions || versions.length === 0}
+            disabled={isBusy || !versions || versions.length === 0}
             size="xl"
             className={cn("rounded-l-none border-l-0", mainButtonHeight)}
             icon={

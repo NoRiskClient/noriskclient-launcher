@@ -1,7 +1,9 @@
 "use client";
 
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
+
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useId, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
 import { ThemedSurface } from "./ThemedSurface";
@@ -43,9 +45,10 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
     },
     ref,
   ) => {
+    const descriptionId = useId();
     const badgeRef = useRef<HTMLElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
+    const isBackgroundAnimationEnabled = useAnimationsEnabled();
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const isClickable = !!onClick && !disabled;
@@ -118,6 +121,7 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
     const accessibilityProps = getAccessibilityProps({
       label: label || (typeof children === "string" ? children : undefined),
       description,
+      descriptionId,
       disabled
     });
     const getTextSizeClass = () => {

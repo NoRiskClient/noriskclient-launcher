@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type {
   ModrinthSearchHit,
   ModrinthVersion,
@@ -16,6 +16,8 @@ import { ModrinthQuickProfile } from './ModrinthQuickProfile'; // New import
 // import type { Profile } from '../../../types/profile';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { parseErrorMessage } from '../../../utils/error-utils';
+import { ProfileInstallContinuationError } from '../../../utils/profile-install-continuation';
 
 interface ModrinthQuickInstallModalV2Props {
   isOpen: boolean;
@@ -67,6 +69,32 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
   const [creationResult, setCreationResult] = useState<'success' | 'error' | null>(null); // New state
   const [lastCreationErrorMessage, setLastCreationErrorMessage] = useState<string | null>(null); // New state for creation error
   const [sourceProfileToCopyId, setSourceProfileToCopyId] = useState<string | null>(null); // New state for copy
+  const [continuationState, setContinuationState] = useState<{ context: string; generation: number; error: ProfileInstallContinuationError } | null>(null);
+  const continuationRef = useRef(continuationState);
+  continuationRef.current = continuationState;
+  const creatingRef = useRef(false);
+  const mounted = useRef(true);
+  const openRef = useRef(isOpen);
+  openRef.current = isOpen;
+  const contextKey = `${(project as (ModrinthSearchHit & { source?: string }) | null)?.source ?? 'Modrinth'}:${project?.project_id ?? 'none'}:${versions?.[0]?.id ?? 'none'}`;
+  const currentContext = useRef(contextKey);
+  currentContext.current = contextKey;
+  const contextGeneration = useRef({ key: contextKey, open: isOpen, value: 0 });
+  if (contextGeneration.current.key !== contextKey || contextGeneration.current.open !== isOpen) {
+    contextGeneration.current = { key: contextKey, open: isOpen, value: contextGeneration.current.value + 1 };
+  }
+  const generation = contextGeneration.current.value;
+  const continuation = continuationState?.context === contextKey && continuationState.generation === generation ? continuationState.error : null;
+  const isCurrent = () => mounted.current && openRef.current && currentContext.current === contextKey && contextGeneration.current.value === generation;
+  const canDismiss = () => !creatingRef.current;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    continuationRef.current = null;
+    setContinuationState(null);
+    setCreationResult(null);
+    setLastCreationErrorMessage(null);
+    setQuickProfileError(null);
+  }, [contextKey]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -77,12 +105,15 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
       setCreationResult(null); // Reset on close
       setLastCreationErrorMessage(null); // Reset on close
       setSourceProfileToCopyId(null); // Reset on close
+      continuationRef.current = null;
+      setContinuationState(null);
     }
   }, [isOpen]);
 
   if (!isOpen || !project) return null;
 
   const switchToQuickProfileView = () => {
+    if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
     setQuickProfileName(''); // Ensure name is empty when switching
     setQuickProfileError(null);
     setCreationResult(null); // Clear previous result
@@ -91,6 +122,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
   };
 
   const switchToProfileListView = () => {
+    if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
     setShowQuickProfileView(false);
     setQuickProfileName('');
     setQuickProfileError(null);
@@ -98,12 +130,14 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
   };
 
   const handleCreateAndInstallProfile = async () => {
+    const activeContinuation = continuationRef.current?.context === contextKey && continuationRef.current.generation === generation ? continuationRef.current.error : null;
+    if (!isCurrent() || !canDismiss() || (activeContinuation && !activeContinuation.canResume)) return;
     if (!quickProfileName.trim()) {
       setQuickProfileError(t('modrinth.profile_name_empty'));
       return;
     }
     setQuickProfileError(null);
-    setLastCreationErrorMessage(null);
+    if (!activeContinuation) setLastCreationErrorMessage(null);
 
     if (!project || !versions || versions.length === 0) { // Guard clause
         toast.error(t('modrinth.errors.missing_data'));
@@ -119,16 +153,28 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
         return;
     }
 
+    creatingRef.current = true;
     setIsCreatingProfile(true);
     try {
-      await onInstallToNewProfile(quickProfileName.trim(), project, versionToInstall, sourceProfileToCopyId);
-      setCreationResult('success');
+      await (activeContinuation ? activeContinuation.resume() : onInstallToNewProfile(quickProfileName.trim(), project, versionToInstall, sourceProfileToCopyId));
+      if (isCurrent()) {
+        continuationRef.current = null;
+        setContinuationState(null);
+        setCreationResult('success');
+      }
     } catch (err: any) {
       console.error("Error in handleCreateAndInstallProfile (quick install):", err);
-      setCreationResult('error');
-      setLastCreationErrorMessage(err?.message || t('modrinth.unknown_error'));
+      if (isCurrent()) {
+        setCreationResult('error');
+        setLastCreationErrorMessage(parseErrorMessage(err));
+        if (err instanceof ProfileInstallContinuationError) {
+          continuationRef.current = { context: contextKey, generation, error: err };
+          setContinuationState(continuationRef.current);
+        }
+      }
     } finally {
-      setIsCreatingProfile(false);
+      creatingRef.current = false;
+      if (mounted.current && openRef.current) setIsCreatingProfile(false);
     }
   };
 
@@ -142,13 +188,14 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
             versionNumber={versions && versions.length > 0 ? versions[0].version_number : undefined}
             profileName={quickProfileName}
             onProfileNameChange={(name) => {
+              if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
               setQuickProfileName(name);
               if (quickProfileError && name.trim()) setQuickProfileError(null);
             }}
             error={quickProfileError}
             isLoading={isCreatingProfile}
             selectedSourceProfileId={sourceProfileToCopyId}
-            onSourceProfileChange={setSourceProfileToCopyId}
+            onSourceProfileChange={id => { if (isCurrent() && canDismiss() && continuationRef.current?.context !== contextKey) setSourceProfileToCopyId(id); }}
           />
         </div>
       ) : isLoading ? (
@@ -326,6 +373,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
   );
 
   const handleModalClose = () => {
+    if (!isCurrent() || !canDismiss()) return;
     setShowQuickProfileView(false); 
     setIsCreatingProfile(false);
     setQuickProfileName('');
@@ -333,6 +381,8 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
     setCreationResult(null); // Reset creation result
     setLastCreationErrorMessage(null);
     setSourceProfileToCopyId(null);
+    continuationRef.current = null;
+    setContinuationState(null);
     onClose();
   };
 
@@ -358,10 +408,15 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
     );
   } else if (creationResult === 'error') {
     modalContentLayout = (
-      <div className="p-4 text-center space-y-3">
+      <div className="p-4 text-center space-y-3" data-profile-install-phase={continuation?.phase} data-profile-install-accepted={continuation?.installationAccepted}>
         <Icon icon="solar:close-circle-bold" className="w-16 h-16 text-red-500 mx-auto" />
-        <h3 className="text-sm font-semibold text-gray-100">{t('modrinth.operation_failed')}</h3>
-        <p className="text-sm text-red-400">
+        <h3 className="text-sm font-semibold text-gray-100">{t(continuation ? 'modrinth.profile_continue_title' : 'modrinth.operation_failed')}</h3>
+        {continuation && <>
+          <p className="text-sm text-white/90 [overflow-wrap:anywhere]">{t('modrinth.profile_continue_created', { name: continuation.intent.profileName })}</p>
+          <p className="text-sm text-white/70 [overflow-wrap:anywhere]">{continuation.intent.projectTitle} · {continuation.intent.versionNumber}</p>
+          <p className="text-sm text-amber-200/90">{t(continuation.phase === 'completion' ? 'modrinth.profile_continue_completion_failed' : continuation.phase === 'refresh' ? 'modrinth.profile_continue_refresh' : continuation.phase === 'setup' ? 'modrinth.profile_continue_setup' : 'modrinth.profile_continue_install')}</p>
+        </>}
+        <p role="alert" className="max-h-28 overflow-y-auto custom-scrollbar text-sm text-red-400 [overflow-wrap:anywhere]">
           {lastCreationErrorMessage || t('modrinth.error_creating_or_installing')}
         </p>
       </div>
@@ -373,7 +428,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
   return (
     <Modal
       title={
-        creationResult ?
+        continuation ? t('modrinth.profile_continue_title') : creationResult ?
           (creationResult === 'success' ? t('modrinth.operation_successful') : t('modrinth.operation_failed')) :
         showQuickProfileView ?
           (sourceProfileToCopyId ? t('modrinth.copy_profile_install_title', { title: project.title }) : t('modrinth.new_profile_for', { title: project.title })) :
@@ -387,14 +442,21 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
           <Icon icon="solar:bolt-bold-duotone" className="w-5 h-5" />
       }
       onClose={handleModalClose}
+      canClose={canDismiss}
+      closeOnClickOutside={!isCreatingProfile}
+      closeOnEscape={!isCreatingProfile}
+      hideCloseButton={isCreatingProfile}
       width="md"
       footer={
         <div className="flex justify-between items-center w-full">
           {creationResult ? (
-            <div className="w-full flex justify-end">
-              <Button onClick={handleModalClose} variant="secondary" shadowDepth="short">
+            <div className="w-full flex flex-wrap justify-end gap-3">
+              <Button disabled={isCreatingProfile} onClick={handleModalClose} variant="secondary" shadowDepth="short">
                 {t('common.close')}
               </Button>
+              {continuation?.canResume && <Button disabled={isCreatingProfile} onClick={handleCreateAndInstallProfile} variant="success" shadowDepth="short" size="sm" icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : undefined}>
+                {t(isCreatingProfile ? 'modrinth.profile_continue_pending' : 'modrinth.profile_continue_action')}
+              </Button>}
             </div>
           ) : showQuickProfileView ? (
             <>
@@ -453,4 +515,4 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
       </div>
     </Modal>
   );
-}; 
+};

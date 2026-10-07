@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 
@@ -52,6 +52,8 @@ export function SyncPackModRow({
   const accentColor = useThemeStore((state) => state.accentColor);
   const [isExpanded, setIsExpanded] = useState(false);
   const versionOptions = useVersionOptions();
+  const titleId = useId();
+  const matrixId = useId();
 
   const enabled = entry.enabled !== false;
 
@@ -82,6 +84,7 @@ export function SyncPackModRow({
         iconUrl={iconUrl}
         fallbackLetter={(entry.display_name ?? "?").trim().charAt(0)}
         title={entry.display_name ?? entry.id}
+        titleId={titleId}
         subtitle={[
           sourceLabel,
           enabled
@@ -106,6 +109,7 @@ export function SyncPackModRow({
               <div onClick={(event) => event.stopPropagation()}>
                 <ToggleSwitch
                   checked={enabled}
+                  aria-label={`${entry.display_name ?? entry.id}: ${t(enabled ? "syncPacks.entries.disableEverywhere" : "syncPacks.entries.enableEverywhere")}`}
                   onChange={onToggleEnabled}
                   size="sm"
                 />
@@ -120,16 +124,29 @@ export function SyncPackModRow({
           </>
         }
         trailing={
-          <Icon
-            icon="solar:alt-arrow-down-linear"
-            className="h-4 w-4 flex-shrink-0 text-white/15 transition-all group-hover/row:text-white/40"
-            style={{ transform: isExpanded ? "rotate(180deg)" : undefined }}
-          />
+          <button
+            type="button"
+            aria-labelledby={titleId}
+            aria-expanded={isExpanded}
+            aria-controls={matrixId}
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsExpanded((open) => !open);
+            }}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-white/35 transition-colors hover:bg-white/10 hover:text-white group-hover/row:text-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10 focus-visible:text-white"
+          >
+            <Icon
+              icon="solar:alt-arrow-down-linear"
+              aria-hidden="true"
+              className="h-4 w-4 transition-transform"
+              style={{ transform: isExpanded ? "rotate(180deg)" : undefined }}
+            />
+          </button>
         }
       />
 
       {isExpanded && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3">
+        <div id={matrixId} className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-minecraft text-[10px] uppercase tracking-wider text-white/35">
               {t("syncPacks.entries.overridesTitle")}

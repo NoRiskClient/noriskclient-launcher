@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { listen, TauriEvent } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { ClipTrimmer, WindowButton } from "./ClipTrimmer";
@@ -31,7 +31,13 @@ export function ClipEditorWindow() {
   const accent = useThemeStore((state) => state.accentColor.value);
   const [clip, setClip] = useState<EditorClip | null>(null);
   const [duration, setDuration] = useState(0);
-  const [details, setDetails] = useState<ClipDetails | null>(null);
+  const [metadata, setMetadata] = useState<{
+    path: string | null;
+    status: "loading" | "ready" | "error";
+    details: ClipDetails | null;
+  }>({ path: null, status: "loading", details: null });
+  const [detailsAttempt, setDetailsAttempt] = useState(0);
+  const [clipStatus, setClipStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saving, setSaving] = useState(false);
   const [broken, setBroken] = useState(false);
   const path = clip?.path ?? null;
@@ -41,6 +47,9 @@ export function ClipEditorWindow() {
   const switchTo = useRef<(next: EditorClip) => void>(() => {});
   const leave = useRef<() => void>(() => {});
   const asking = useRef(false);
+  const alive = useRef(true);
+  const readingClip = useRef(false);
+  const saveInFlight = useRef(false);
 
   useEffect(() => {
     const theme = useThemeStore.getState();
@@ -56,7 +65,7 @@ export function ClipEditorWindow() {
   useEffect(() => {
     switchTo.current = async (next: EditorClip) => {
       if (next.path === path) return;
-      if (saving || editor.current.busy) {
+      if (saveInFlight.current || saving || editor.current.busy) {
         toast.error(t("clips.editor.switch.busy"));
         return;
       }
@@ -77,6 +86,12 @@ export function ClipEditorWindow() {
 
     leave.current = async () => {
       if (asking.current) return;
+      if (saveInFlight.current || saving || editor.current.busy) {
+        toast.error(t("clips.editor.close.busy", {
+          defaultValue: "The clip is still being saved. Wait until the operation finishes before closing.",
+        }));
+        return;
+      }
       if (editor.current.dirty) {
         asking.current = true;
         const sure = await confirm({
@@ -91,6 +106,8 @@ export function ClipEditorWindow() {
         });
         if (!sure) return;
       }
+      // A save can begin while a discard confirmation is open.
+      if (saveInFlight.current || saving || editor.current.busy) return;
       closeNow();
     };
   });
@@ -99,19 +116,42 @@ export function ClipEditorWindow() {
     editor.current = state;
   }, []);
 
-  useEffect(() => {
-    const opened = listen<EditorClip>("clip_editor_open", (event) => switchTo.current(event.payload));
+  const readCurrentClip = useCallback(() => {
+    if (readingClip.current) return;
+    readingClip.current = true;
+    setClipStatus("loading");
     void getEditorClip()
       .then((current) => {
+        if (!alive.current) return;
         if (current) setClip((shown) => shown ?? current);
+        setClipStatus("ready");
       })
-      .catch((e) => console.error("Could not read which clip to edit", e));
-    return () => void opened.then((stop) => stop());
+      .catch((e) => {
+        console.error("Could not read which clip to edit", e);
+        if (alive.current) setClipStatus("error");
+      })
+      .finally(() => { readingClip.current = false; });
   }, []);
 
   useEffect(() => {
-    const requested = getCurrentWindow().listen(TauriEvent.WINDOW_CLOSE_REQUESTED, () => leave.current());
-    return () => void requested.then((stop) => stop());
+    alive.current = true;
+    const opened = listen<EditorClip>("clip_editor_open", (event) => switchTo.current(event.payload));
+    void opened.catch((e) => console.error("Could not listen for clip editor changes", e));
+    readCurrentClip();
+    return () => {
+      alive.current = false;
+      void opened.then((stop) => stop()).catch((e) => console.error("Could not clean up clip editor listener", e));
+    };
+  }, [readCurrentClip]);
+
+  useEffect(() => {
+    const requested = getCurrentWindow().onCloseRequested((event) => {
+      // We own the asynchronous dirty/busy decision and explicit close command.
+      event.preventDefault();
+      leave.current();
+    });
+    void requested.catch((e) => console.error("Could not listen for clip editor close", e));
+    return () => void requested.then((stop) => stop()).catch((e) => console.error("Could not clean up editor close listener", e));
   }, []);
 
   useEffect(() => {
@@ -142,20 +182,23 @@ export function ClipEditorWindow() {
   }, [src]);
 
   useEffect(() => {
-    setDetails(null);
+    setMetadata({ path, status: "loading", details: null });
     if (!path) return;
     let current = true;
     void getClipDetails(path)
       .then((loaded) => {
-        if (current) setDetails(loaded);
+        if (current) setMetadata({ path, status: "ready", details: loaded });
       })
       .catch((e) => {
         console.warn("Could not read the clip's details", e);
+        if (current) setMetadata({ path, status: "error", details: null });
       });
     return () => {
       current = false;
     };
-  }, [path]);
+  }, [path, detailsAttempt]);
+
+  const retryDetails = useCallback(() => setDetailsAttempt((attempt) => attempt + 1), []);
 
   const close = useCallback(() => leave.current(), []);
 
@@ -167,7 +210,8 @@ export function ClipEditorWindow() {
       videoStartSeconds: number | null,
       videoEndSeconds: number | null,
     ) => {
-      if (!path) return false;
+      if (!path || saveInFlight.current) return false;
+      saveInFlight.current = true;
       setSaving(true);
       try {
         await trimClip(path, startSeconds, endSeconds, levels, videoStartSeconds, videoEndSeconds);
@@ -177,6 +221,7 @@ export function ClipEditorWindow() {
         toast.error(t("clips.trim.failed"));
         return false;
       } finally {
+        saveInFlight.current = false;
         setSaving(false);
       }
     },
@@ -209,7 +254,22 @@ export function ClipEditorWindow() {
             data-tauri-drag-region
             className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
           >
-            {broken ? (
+            {!clip && clipStatus !== "loading" ? (
+              <>
+                <Icon icon="solar:videocamera-record-bold" className="pointer-events-none h-8 w-8 text-white/30" />
+                <p role="status" className="max-w-sm font-minecraft text-sm leading-relaxed text-white/70">
+                  {clipStatus === "error"
+                    ? t("clips.editor.current_failed", { defaultValue: "The current clip could not be read." })
+                    : t("clips.editor.no_clip", { defaultValue: "No clip is open. Open a clip from your gallery to edit it." })}
+                </p>
+                {clipStatus === "error" && (
+                  <Button variant="secondary" size="sm" onClick={readCurrentClip}>
+                    {t("common.retry", { defaultValue: "Retry" })}
+                  </Button>
+                )}
+                <Button variant="secondary" size="sm" onClick={closeNow}>{t("common.close")}</Button>
+              </>
+            ) : broken ? (
               <>
                 <Icon icon="solar:videocamera-record-bold" className="pointer-events-none h-8 w-8 text-white/30" />
                 <span className="pointer-events-none max-w-sm font-minecraft text-sm leading-relaxed text-white/70">
@@ -248,7 +308,9 @@ export function ClipEditorWindow() {
         duration={duration}
         busy={saving}
         paused={dialogOpen}
-        details={details}
+        details={metadata.path === path ? metadata.details : null}
+        detailsStatus={metadata.path === path ? metadata.status : "loading"}
+        onRetryDetails={retryDetails}
         onCancel={close}
         onStateChange={track}
         onSave={save}

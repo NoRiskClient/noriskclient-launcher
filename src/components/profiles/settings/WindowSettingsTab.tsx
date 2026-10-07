@@ -54,7 +54,7 @@ export function WindowSettingsTab({
   }, [isBackgroundAnimationEnabled]);
 
   const resolutionPresets = [
-    { width: 854, height: 480, label: "Default" },
+    { width: 854, height: 480, label: t('profiles.settings.resolutionDefault') },
     { width: 1280, height: 720, label: "720p" },
     { width: 1920, height: 1080, label: "1080p" },
     { width: 2560, height: 1440, label: "1440p" },

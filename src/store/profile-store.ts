@@ -18,13 +18,12 @@ interface ProfileState {
   lastPlayedProfileId: string | null;
   importingPaths: Set<string>;
 
-  fetchProfiles: () => Promise<void>;
+  fetchProfiles: (options?: { throwOnError?: boolean }) => Promise<void>;
   getProfile: (id: string) => Promise<Profile>;
   createProfile: (params: CreateProfileParams) => Promise<string>;
   updateProfile: (id: string, updates: UpdateProfileParams) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
   launchProfile: (id: string) => Promise<void>;
-  installProfile: (id: string) => Promise<void>;
   abortProfileLaunch: (id: string) => Promise<void>;
   isProfileLaunching: (id: string) => Promise<boolean>;
   copyProfile: (
@@ -55,7 +54,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   lastPlayedProfileId: null,
   importingPaths: new Set<string>(),
 
-  fetchProfiles: async () => {
+  fetchProfiles: async (options) => {
     try {
       set({ error: null });
       const response = await ProfileService.getAllProfilesAndLastPlayed();
@@ -76,6 +75,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (error) {
       console.error("Failed to fetch all profiles and last played:", error);
       set({ error: i18n.t('profiles.errors.load_failed'), loading: false });
+      if (options?.throwOnError) throw error;
     }
   },
 
@@ -146,16 +146,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       await ProfileService.launchProfile(id);
     } catch (error) {
       console.error(`Failed to launch profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  installProfile: async (id: string) => {
-    try {
-      //@ts-ignore
-      await ProfileService.installProfile(id);
-    } catch (error) {
-      console.error(`Failed to install profile ${id}:`, error);
       throw error;
     }
   },

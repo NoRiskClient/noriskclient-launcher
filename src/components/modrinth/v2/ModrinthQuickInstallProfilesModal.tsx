@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Icon } from '@iconify/react';
 import type { ModrinthSearchHit, ModrinthVersion } from '../../../types/modrinth';
@@ -15,6 +15,8 @@ import { ActionButton } from '../../ui/ActionButton';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { loaderIconSrc } from "../../../lib/loader-icons";
+import { parseErrorMessage } from '../../../utils/error-utils';
+import { ProfileInstallContinuationError } from '../../../utils/profile-install-continuation';
 
 /**
  * Universal Profiles Modal for Modrinth Installation
@@ -54,9 +56,9 @@ interface ModrinthQuickInstallProfilesModalProps {
   project: ModrinthSearchHit;
   profiles: Profile[];
   // Legacy format for quick install (without specific version)
-  onProfileSelect?: (project: ModrinthSearchHit, profile: Profile) => void;
+  onProfileSelect?: (project: ModrinthSearchHit, profile: Profile) => void | Promise<void>;
   // New format for specific version install (compatible with ModrinthInstallModalV2)
-  onInstallToProfile?: (profileId: string) => void;
+  onInstallToProfile?: (profileId: string) => void | Promise<void>;
   onUninstallClick?: (profileId: string, project: ModrinthSearchHit, version: UnifiedVersion) => Promise<void>;
   onInstallToNewProfile?: (
     profileName: string,
@@ -98,6 +100,30 @@ export function ModrinthQuickInstallProfilesModal({
   const [quickProfileError, setQuickProfileError] = useState<string | null>(null);
   const [selectedSourceProfileId, setSelectedSourceProfileId] = useState<string | null>(null);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [continuationState, setContinuationState] = useState<{ context: string; generation: number; error: ProfileInstallContinuationError } | null>(null);
+  const continuationRef = useRef(continuationState);
+  continuationRef.current = continuationState;
+  const [pendingActions, setPendingActions] = useState<Record<string, 'install' | 'uninstall'>>({});
+  const actionLocks = useRef(new Set<string>());
+  const creatingRef = useRef(false);
+  const busyProps = useRef({ installingProfiles, uninstallingProfiles });
+  busyProps.current = { installingProfiles, uninstallingProfiles };
+  const mounted = useRef(true);
+  const contextKey = `${(project as ModrinthSearchHit & { source?: string }).source ?? 'Modrinth'}:${project.project_id}:${version?.id ?? 'latest'}`;
+  const currentContext = useRef(contextKey);
+  currentContext.current = contextKey;
+  const contextGeneration = useRef({ key: contextKey, value: 0 });
+  if (contextGeneration.current.key !== contextKey) contextGeneration.current = { key: contextKey, value: contextGeneration.current.value + 1 };
+  const generation = contextGeneration.current.value;
+  const isCurrent = () => mounted.current && currentContext.current === contextKey && contextGeneration.current.value === generation;
+  const continuation = continuationState?.context === contextKey && continuationState.generation === generation ? continuationState.error : null;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { continuationRef.current = null; setContinuationState(null); setQuickProfileError(null); }, [contextKey]);
+  const canDismiss = () => !creatingRef.current && actionLocks.current.size === 0 &&
+    !Object.values(busyProps.current.installingProfiles).some(Boolean) && !Object.values(busyProps.current.uninstallingProfiles).some(Boolean);
+  const isBusy = isCreatingProfile || Object.keys(pendingActions).length > 0 ||
+    Object.values(installingProfiles).some(Boolean) || Object.values(uninstallingProfiles).some(Boolean);
+  const dismiss = () => { if (canDismiss()) onClose(); };
 
   // Debug logging
   console.log('🎯 Modal rendered with:', {
@@ -113,29 +139,39 @@ export function ModrinthQuickInstallProfilesModal({
 
   const handleProfileCardClick = (profile: Profile) => {
     // Navigate to profile page when clicking on the profile card
-    if (onProfileClick) {
+    if (onProfileClick && canDismiss()) {
       onProfileClick(profile);
     }
   };
 
-  const handleInstallClick = (profile: Profile) => {
-    if (onInstallToProfile) {
-      // New format: specific version install (compatible with ModrinthInstallModalV2)
-      onInstallToProfile(profile.id);
-    } else if (onProfileSelect) {
-      // Legacy format: quick install without specific version
-      onProfileSelect(project, profile);
+  const runProfileAction = async (profile: Profile, kind: 'install' | 'uninstall', action: () => void | Promise<void>) => {
+    const actionContext = contextKey;
+    if (creatingRef.current || actionLocks.current.has(profile.id) || busyProps.current.installingProfiles[profile.id] || busyProps.current.uninstallingProfiles[profile.id]) return;
+    actionLocks.current.add(profile.id);
+    setPendingActions(previous => ({ ...previous, [profile.id]: kind }));
+    try {
+      await action();
+    } catch (error) {
+      if (mounted.current && currentContext.current === actionContext) toast.error(`${t('common.error')}: ${parseErrorMessage(error)}`);
+    } finally {
+      actionLocks.current.delete(profile.id);
+      if (mounted.current) setPendingActions(previous => {
+        const next = { ...previous }; delete next[profile.id]; return next;
+      });
     }
   };
-
-  const handleUninstallClick = async (profile: Profile) => {
-    if (onUninstallClick && version) {
-      await onUninstallClick(profile.id, project, version);
-    }
+  const handleInstallClick = (profile: Profile) => {
+    if (installStatus[profile.id]) return;
+    if (onInstallToProfile) return runProfileAction(profile, 'install', () => onInstallToProfile(profile.id));
+    if (onProfileSelect) return runProfileAction(profile, 'install', () => onProfileSelect(project, profile));
+  };
+  const handleUninstallClick = (profile: Profile) => {
+    if (onUninstallClick && version && installStatus[profile.id]) return runProfileAction(profile, 'uninstall', () => onUninstallClick(profile.id, project, version));
   };
 
   // Navigation functions
   const switchToQuickProfileView = () => {
+    if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
     setQuickProfileName(''); // Set to empty string
     setQuickProfileError(null);
     setSelectedSourceProfileId(null);
@@ -143,6 +179,7 @@ export function ModrinthQuickInstallProfilesModal({
   };
 
   const switchToProfileListView = () => {
+    if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
     setShowQuickProfileView(false);
     setQuickProfileName('');
     setQuickProfileError(null);
@@ -151,39 +188,50 @@ export function ModrinthQuickInstallProfilesModal({
 
   // Handle profile creation with promise toast
   const handleCreateAndInstallProfile = async () => {
+    const activeContinuation = continuationRef.current?.context === contextKey && continuationRef.current.generation === generation ? continuationRef.current.error : null;
+    if (!isCurrent() || !canDismiss() || !onInstallToNewProfile || (activeContinuation && !activeContinuation.canResume)) return;
     if (!quickProfileName.trim()) {
       setQuickProfileError(t('modrinth.profile_name_empty'));
       return;
     }
-    setQuickProfileError(null);
-
+    if (!activeContinuation) setQuickProfileError(null);
+    creatingRef.current = true;
     setIsCreatingProfile(true);
 
     const profileNameToCreate = quickProfileName.trim();
-    const createPromise = onInstallToNewProfile!(profileNameToCreate, project, version, selectedSourceProfileId);
-
+    const actionContext = contextKey;
+    let created = false;
     try {
+      const createPromise = Promise.resolve().then(() => {
+        if (!isCurrent()) throw new Error("This installation dialog is no longer active");
+        return activeContinuation ? activeContinuation.resume()
+          : onInstallToNewProfile(profileNameToCreate, project, version, selectedSourceProfileId);
+      });
       await toast.promise(createPromise, {
-        loading: selectedSourceProfileId
+        loading: activeContinuation ? t('modrinth.profile_continue_pending') : selectedSourceProfileId
           ? t('modrinth.creating_profile_copying', { name: profileNameToCreate, title: project.title })
           : t('modrinth.creating_profile_installing', { name: profileNameToCreate, title: project.title }),
-        success: (result) => {
-          console.log('✅ New profile created successfully');
-          // Close the modal after successful profile creation
-          onClose();
-          return selectedSourceProfileId
+        success: () => selectedSourceProfileId
             ? t('modrinth.profile_copy_success', { name: profileNameToCreate, title: project.title })
-            : t('modrinth.profile_create_success', { name: profileNameToCreate, title: project.title });
-        },
-        error: (error) => {
-          console.error('❌ Failed to create new profile:', error);
-          setQuickProfileError(error instanceof Error ? error.message : t('modrinth.profile_create_failed'));
-          return t('modrinth.profile_create_error', { error: error instanceof Error ? error.message : t('modrinth.unknown_error') });
-        }
+            : t('modrinth.profile_create_success', { name: profileNameToCreate, title: project.title }),
+        error: (error) => error instanceof ProfileInstallContinuationError
+          ? `${t('common.error')}: ${parseErrorMessage(error)}`
+          : t('modrinth.profile_create_error', { error: parseErrorMessage(error) })
       });
+      created = true;
+    } catch (error) {
+      if (isCurrent()) {
+        setQuickProfileError(parseErrorMessage(error));
+        if (error instanceof ProfileInstallContinuationError) {
+          continuationRef.current = { context: actionContext, generation, error };
+          setContinuationState(continuationRef.current);
+        }
+      }
     } finally {
-      setIsCreatingProfile(false);
+      creatingRef.current = false;
+      if (mounted.current) setIsCreatingProfile(false);
     }
+    if (created && isCurrent()) onClose();
   };
 
   const handleSearchChange = (value: string) => {
@@ -296,16 +344,47 @@ export function ModrinthQuickInstallProfilesModal({
   return (
     <Modal
       title={
-        showQuickProfileView
+        continuation ? t('modrinth.profile_continue_title') : showQuickProfileView
           ? (isActuallyCopying ? t('modrinth.copy_and_install_title', { title: project.title }) : t('modrinth.new_profile_for', { title: project.title }))
           : (version ? t('modrinth.install_title_version', { title: project.title, version: version.version_number }) : t('modrinth.install_title', { title: project.title }))
       }
-      onClose={onClose}
+      onClose={dismiss}
+      canClose={canDismiss}
+      closeOnClickOutside={!isBusy}
+      closeOnEscape={!isBusy}
+      hideCloseButton={isBusy}
       width="md"
       variant="3d"
+      footer={continuation ? (
+        <div className="flex flex-wrap justify-end items-center gap-3">
+          <button type="button" disabled={isBusy} onClick={dismiss} className="px-4 py-2 text-white/70 hover:text-white text-base font-smallcaps disabled:opacity-50">{t('common.close')}</button>
+          {continuation.canResume && <ActionButton icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"} label={t(isCreatingProfile ? 'modrinth.profile_continue_pending' : 'modrinth.profile_continue_action')} variant="primary" size="md" iconClassName={isCreatingProfile ? "animate-spin" : ""} disabled={isBusy} onClick={() => { void handleCreateAndInstallProfile(); }} />}
+        </div>
+      ) : showQuickProfileView ? (
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <button type="button" disabled={isBusy} onClick={switchToProfileListView} className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-base font-smallcaps disabled:opacity-50">
+            <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+            <span>{t('modrinth.back_to_profiles')}</span>
+          </button>
+          <ActionButton icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"} label={isCreatingProfile ? t('modrinth.creating') : t('modrinth.create_and_install')} variant="primary" size="md" className="py-[0.29em]" iconClassName={isCreatingProfile ? "animate-spin" : ""} disabled={!quickProfileName.trim() || isBusy} onClick={() => { void handleCreateAndInstallProfile(); }} />
+        </div>
+      ) : (
+        <div className="flex justify-end items-center">
+          <button type="button" disabled={isBusy} onClick={dismiss} className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-xs font-smallcaps disabled:opacity-50">
+            <span>{t('common.close')}</span>
+          </button>
+        </div>
+      )}
     >
       <div className="p-6">
-        {showQuickProfileView ? (
+        {continuation ? (
+          <div className="space-y-3 font-minecraft text-sm" data-profile-install-phase={continuation.phase} data-profile-install-accepted={continuation.installationAccepted}>
+            <p className="text-white/90 [overflow-wrap:anywhere]">{t('modrinth.profile_continue_created', { name: continuation.intent.profileName })}</p>
+            <p className="text-white/70 [overflow-wrap:anywhere]">{continuation.intent.projectTitle} · {continuation.intent.versionNumber}</p>
+            <p className="text-amber-200/90">{t(continuation.phase === 'completion' ? 'modrinth.profile_continue_completion_failed' : continuation.phase === 'refresh' ? 'modrinth.profile_continue_refresh' : continuation.phase === 'setup' ? 'modrinth.profile_continue_setup' : 'modrinth.profile_continue_install')}</p>
+            <p role="alert" className="max-h-28 overflow-y-auto custom-scrollbar text-red-400 [overflow-wrap:anywhere]">{quickProfileError}</p>
+          </div>
+        ) : showQuickProfileView ? (
           // Quick Profile Creation View
           <div>
             <ModrinthQuickProfile
@@ -314,42 +393,16 @@ export function ModrinthQuickInstallProfilesModal({
               versionNumber={version?.version_number}
               profileName={quickProfileName}
               onProfileNameChange={(name) => {
+                if (!isCurrent() || !canDismiss() || continuationRef.current?.context === contextKey) return;
                 setQuickProfileName(name);
                 if (quickProfileError && name.trim()) setQuickProfileError(null);
               }}
               error={quickProfileError}
               isLoading={isCreatingProfile}
               selectedSourceProfileId={selectedSourceProfileId}
-              onSourceProfileChange={setSelectedSourceProfileId}
+              onSourceProfileChange={id => { if (isCurrent() && canDismiss() && continuationRef.current?.context !== contextKey) setSelectedSourceProfileId(id); }}
             />
 
-            {/* Footer buttons for quick profile view */}
-            <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/10">
-              <button
-                onClick={() => {
-                  console.log('⬅️ Switching back to profile list view');
-                  switchToProfileListView();
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-base font-smallcaps"
-              >
-                <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span>{t('modrinth.back_to_profiles')}</span>
-              </button>
-
-              <ActionButton
-                icon={isCreatingProfile ? "solar:refresh-bold" : "solar:play-bold-duotone"}
-                label={isCreatingProfile ? t('modrinth.creating') : t('modrinth.create_and_install')}
-                variant="primary"
-                size="md"
-                className="py-[0.29em]"
-                iconClassName={isCreatingProfile ? "animate-spin" : ""}
-                disabled={!quickProfileName.trim() || isCreatingProfile}
-                onClick={() => {
-                  console.log('✅ Creating profile and installing');
-                  handleCreateAndInstallProfile();
-                }}
-              />
-            </div>
           </div>
         ) : (
           <>
@@ -382,6 +435,7 @@ export function ModrinthQuickInstallProfilesModal({
                     variant="primary"
                     size="md"
                     className="py-[0.29em]"
+                    disabled={isBusy}
                     onClick={() => {
                       console.log('🆕 Switching to quick profile creation view');
                       switchToQuickProfileView();
@@ -408,13 +462,15 @@ export function ModrinthQuickInstallProfilesModal({
           <div className="min-h-[400px]">
             <div className="grid grid-cols-1 gap-3">
               {processedProfiles.map((profile) => (
-                <button
+                <div
                   key={profile.id}
-                  onClick={() => handleProfileCardClick(profile)}
-                  className="group relative flex items-center gap-4 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/30 transition-all duration-200 cursor-pointer"
+                  className="group relative flex items-center gap-4 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/30 transition-all duration-200"
                 >
+                {onProfileClick && (
+                  <button type="button" aria-label={profile.name} disabled={isBusy} onClick={() => handleProfileCardClick(profile)} className="absolute inset-0 rounded-lg cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2 disabled:cursor-default" />
+                )}
                 {/* Profile Icon */}
-                <div className="relative w-16 h-16 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200 group-hover:border-white/30"
+                <div className="pointer-events-none relative w-16 h-16 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200 group-hover:border-white/30"
                   style={{
                     borderColor: 'transparent',
                   }}
@@ -423,7 +479,7 @@ export function ModrinthQuickInstallProfilesModal({
                 </div>
 
                 {/* Profile Info */}
-                <div className="flex-grow min-w-0 mr-4 pr-2 max-w-[calc(100%-140px)]">
+                <div className="pointer-events-none relative flex-grow min-w-0 mr-4 pr-2 max-w-[calc(100%-140px)]">
                   <h4 className="font-minecraft text-white text-lg whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case group-hover:text-white mb-1 text-left"
                       title={profile.name}
                   >
@@ -470,8 +526,8 @@ export function ModrinthQuickInstallProfilesModal({
 
                 {/* Install/Uninstall Button */}
                 {(() => {
-                  const isInstalling = installingProfiles[profile.id];
-                  const isUninstalling = uninstallingProfiles[profile.id];
+                  const isInstalling = installingProfiles[profile.id] || pendingActions[profile.id] === 'install';
+                  const isUninstalling = uninstallingProfiles[profile.id] || pendingActions[profile.id] === 'uninstall';
                   const isInstalled = installStatus[profile.id];
                   const canUninstall = onUninstallClick && version && isInstalled && !isUninstalling && !isInstalling;
 
@@ -481,8 +537,9 @@ export function ModrinthQuickInstallProfilesModal({
                     // Show uninstalling button with spinner
                     return (
                       <button
+                        type="button"
                         disabled
-                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
+                        className="relative z-[1] flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 bg-red-900/30 text-red-300 cursor-wait border-red-700/30"
                       >
                         <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
                         <span>{t('modrinth.uninstalling')}</span>
@@ -492,13 +549,14 @@ export function ModrinthQuickInstallProfilesModal({
                     // Show uninstall button for installed content (compatible with ModrinthInstallModalV2)
                     return (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           console.log('🗑️ Starting uninstallation for:', profile.name);
-                          handleUninstallClick(profile);
+                          void handleUninstallClick(profile);
                         }}
-                        disabled={isInstalling || isUninstalling}
-                        className="flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
+                        disabled={isInstalling || isUninstalling || isCreatingProfile}
+                        className="relative z-[1] flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 hover:scale-105 flex items-center gap-2 bg-red-900/30 hover:bg-red-800/40 text-red-300 hover:text-red-200 border-red-700/30 hover:border-red-600/40"
                       >
                         <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
                         <span>{t('common.uninstall')}</span>
@@ -508,17 +566,18 @@ export function ModrinthQuickInstallProfilesModal({
                     // Show install button (original logic)
                     return (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!isInstalling && !isInstalled) {
                             console.log('🚀 Starting installation for:', profile.name);
-                            handleInstallClick(profile);
+                            void handleInstallClick(profile);
                           } else {
                             console.log('⏳ Cannot install - already installing or installed:', profile.name);
                           }
                         }}
-                        disabled={isInstalling || isInstalled}
-                        className={`flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 ${
+                        disabled={isInstalling || isUninstalling || isInstalled || isCreatingProfile || (!onInstallToProfile && !onProfileSelect)}
+                        className={`relative z-[1] flex-shrink-0 px-3 py-1 text-base font-smallcaps rounded-lg border transition-all duration-200 flex items-center gap-2 ${
                           isInstalled
                             ? 'cursor-default'
                             : isInstalling
@@ -567,24 +626,12 @@ export function ModrinthQuickInstallProfilesModal({
                     );
                   }
                 })()}
-              </button>
+              </div>
             ))}
             </div>
           </div>
             )}
 
-            {/* Footer buttons for profile list view */}
-            <div className="flex justify-end items-center mt-6 pt-4 border-t border-white/10">
-              <button
-                onClick={() => {
-                  console.log('❌ Closing modal');
-                  onClose();
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-white transition-colors duration-200 text-xs font-smallcaps"
-              >
-                <span>{t('common.close')}</span>
-              </button>
-            </div>
           </>
         )}
       </div>

@@ -6,6 +6,7 @@ import { cn } from "../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
 import { Icon } from "@iconify/react";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 
 interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
@@ -36,9 +37,7 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
   ) => {
     const spinnerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+    const isBackgroundAnimationEnabled = useAnimationsEnabled();
 
     const mergedRef = (node: HTMLDivElement) => {
       if (ref) {
@@ -166,12 +165,14 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         <div className="relative flex items-center justify-center">
           <Icon
             icon="solar:refresh-bold"
-            className={cn("animate-spin", sizeStyles.icon)}
+            aria-hidden="true"
+            className={cn(isBackgroundAnimationEnabled && "animate-spin", sizeStyles.icon)}
             style={{ color: colors.text }}
           />
 
           <div
-            className="absolute rounded-full animate-pulse"
+            aria-hidden="true"
+            className={cn("absolute rounded-full", isBackgroundAnimationEnabled && "animate-pulse")}
             style={{
               inset: "0",
               backgroundColor: "transparent",

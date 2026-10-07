@@ -20,11 +20,13 @@ export interface ColorTokens {
 
 export const designTokens = {
   spacing: {
-    xs: "0.5rem",
-    sm: "0.75rem", 
-    md: "1rem",
-    lg: "1.25rem",
-    xl: "1.5rem"
+    // Canonical rem values live in globals.css :root.
+    xs: "var(--spacing-xs)",
+    sm: "var(--spacing-sm)",
+    md: "var(--spacing-md)",
+    lg: "var(--spacing-lg)",
+    xl: "var(--spacing-xl)",
+    "2xl": "var(--spacing-2xl)"
   },
   typography: {
     xs: "0.75rem",
@@ -134,7 +136,9 @@ export const getSizeClasses = (size: ComponentSize, element: "button" | "input" 
 export const getAccessibilityProps = (props: {
   label?: string;
   description?: string;
+  descriptionId?: string;
   error?: string;
+  errorId?: string;
   required?: boolean;
   disabled?: boolean;
 }): Record<string, any> => {
@@ -144,13 +148,11 @@ export const getAccessibilityProps = (props: {
     accessibilityProps["aria-label"] = props.label;
   }
   
-  if (props.description) {
-    accessibilityProps["aria-describedby"] = `desc-${Math.random().toString(36).substr(2, 9)}`;
-  }
+  const descriptions = [props.description && props.descriptionId, props.error && props.errorId].filter(Boolean);
+  if (descriptions.length) accessibilityProps["aria-describedby"] = descriptions.join(" ");
   
   if (props.error) {
     accessibilityProps["aria-invalid"] = true;
-    accessibilityProps["aria-describedby"] = `error-${Math.random().toString(36).substr(2, 9)}`;
   }
   
   if (props.required) {
@@ -291,7 +293,9 @@ export const getToastBaseStyles = (config: ToastStyleConfig): React.CSSPropertie
     padding: "12px 20px",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    minWidth: "300px",
+    minWidth: "min(300px, calc(100vw - 32px))",
+    maxWidth: "min(350px, calc(100vw - 32px))",
+    overflowWrap: "anywhere",
     transition: "all 0.2s ease",
     fontWeight: "500",
     ...variantStyles,

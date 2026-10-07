@@ -12,7 +12,6 @@ export function ReferralBanner() {
     referrerInfo,
     isLoading,
     error,
-    pendingCode,
     setPendingCode,
     dismissBanner
   } = useReferralStore();
@@ -22,12 +21,12 @@ export function ReferralBanner() {
   // Check for referral state on mount
   // Show banner if code exists and not dismissed (regardless of redeemed status)
   useEffect(() => {
+    let disposed = false;
     const checkReferralCode = async () => {
       try {
         const config = await getLauncherConfig();
         // Use referral_state instead of pending_referral_code
-        if (config.referral_state?.code) {
-          console.log("[ReferralBanner] Found referral code:", config.referral_state.code);
+        if (!disposed && config.referral_state?.code) {
           setPendingCode(config.referral_state.code);
         }
       } catch (error) {
@@ -36,23 +35,11 @@ export function ReferralBanner() {
     };
 
     checkReferralCode();
+    return () => { disposed = true; };
   }, [setPendingCode]);
 
-  // DEBUG: Always show banner for testing
-  const DEBUG_MODE = false;
-  const debugReferrerInfo = {
-    referrerName: "nqrman",
-    referrerAvatar: null,
-    valid: true,
-    referralType: "friend",
-    translationKey: "referral.invited_by_friend",
-    fallbackMessage: "You were invited by",
-    customMessage: "Custom message",
-    rewardText: "You get 100 coins!",
-  };
-
-  // Show banner if: debug mode, has error, is loading, or has referrer info
-  const shouldShow = DEBUG_MODE || error || isLoading || (bannerVisible && referrerInfo);
+  // Every branch respects the same visibility/dismiss state.
+  const shouldShow = bannerVisible && (error || isLoading || referrerInfo);
 
   if (!shouldShow) {
     return null;
@@ -62,7 +49,7 @@ export function ReferralBanner() {
   if (error) {
     return (
       <div
-        className="animate-slide-up-fade-in rounded-full"
+        className="animate-slide-up-fade-in rounded-2xl w-full min-w-0"
         style={{
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
@@ -72,13 +59,13 @@ export function ReferralBanner() {
       >
         <div className="flex items-center gap-3 px-4 py-2">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <span className="font-minecraft text-sm text-white/80 tracking-wide">
+          <span role="alert" className="min-w-0 flex-1 break-words font-minecraft text-sm text-white/80 tracking-wide">
             <span className="text-red-400">{t('common.error')}:</span> {error}
           </span>
           <button
             type="button"
             onClick={dismissBanner}
-            className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
+            className="flex-shrink-0 ml-1 w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
             aria-label={t('common.close_banner')}
           >
             <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
@@ -92,7 +79,7 @@ export function ReferralBanner() {
   if (isLoading) {
     return (
       <div
-        className="animate-slide-up-fade-in rounded-full"
+        className="animate-slide-up-fade-in rounded-2xl w-full min-w-0"
         style={{
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
@@ -102,19 +89,23 @@ export function ReferralBanner() {
       >
         <div className="flex items-center gap-3 px-4 py-2">
           <Loader2 className="w-4 h-4 text-white/70 flex-shrink-0 animate-spin" />
-          <span className="font-minecraft text-sm text-white/80 tracking-wide">
+          <span role="status" className="min-w-0 flex-1 break-words font-minecraft text-sm text-white/80 tracking-wide">
             {t('referral.loading')}
           </span>
+          <button type="button" onClick={dismissBanner} aria-label={t('common.close_banner')}
+            className="flex-shrink-0 ml-1 w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70">
+            <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
+          </button>
         </div>
       </div>
     );
   }
 
-  const displayInfo = DEBUG_MODE ? debugReferrerInfo : referrerInfo;
+  const displayInfo = referrerInfo;
 
   return (
     <div
-      className="animate-slide-up-fade-in rounded-2xl"
+      className="animate-slide-up-fade-in rounded-2xl w-full min-w-0"
       style={{
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -136,9 +127,9 @@ export function ReferralBanner() {
         )}
 
         {/* Content */}
-        <div className="flex flex-col font-minecraft text-sm tracking-wide">
+        <div className="min-w-0 flex-1 break-words flex flex-col font-minecraft text-sm tracking-wide">
           <span className="text-white/80">
-            {displayInfo?.fallbackMessage || "You were invited by"}{" "}
+            {displayInfo?.fallbackMessage || t('referral.invited_by_friend')}{" "}
             <span style={{ color: accentColor.value }} className="font-semibold">
               {displayInfo?.referrerName}
             </span>
@@ -158,7 +149,7 @@ export function ReferralBanner() {
         <button
           type="button"
           onClick={dismissBanner}
-          className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
+          className="flex-shrink-0 ml-1 w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
           aria-label={t('common.close_banner')}
         >
           <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />

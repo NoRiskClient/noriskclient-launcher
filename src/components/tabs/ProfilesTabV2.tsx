@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
@@ -61,6 +61,53 @@ export function ProfilesTabV2() {
 
   // Local non-persistent state
   const [searchQuery, setSearchQuery] = useState("");
+  const retryingRef = useRef(false);
+  const retryErrorRef = useRef<string | null>(null);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  const retryFocusTargetRef = useRef<HTMLDivElement>(null);
+  const [retrying, setRetrying] = useState(false);
+  const retryProfiles = async () => {
+    if (retryingRef.current) return;
+    // Hand off owned focus before native disabled blurs the Retry button. The
+    // region survives initial/cached loading; completion never steals focus.
+    const target = retryFocusTargetRef.current;
+    if (target && retryButtonRef.current === target.ownerDocument.activeElement) {
+      target.focus({ preventScroll: true });
+    }
+    retryingRef.current = true;
+    retryErrorRef.current = error;
+    setRetrying(true);
+    try {
+      await fetchProfiles();
+    } catch (retryError) {
+      console.error("[ProfilesTabV2] Profile retry failed:", retryError);
+    } finally {
+      retryingRef.current = false;
+      setRetrying(false);
+    }
+  };
+  const visibleError = error || (retrying ? retryErrorRef.current : null);
+  const retryAction = (
+    <Button
+      ref={retryButtonRef}
+      onClick={() => void retryProfiles()}
+      disabled={retrying}
+      aria-busy={retrying || undefined}
+      variant="flat-secondary"
+      size="sm"
+      className="focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/30"
+    >
+      {t('common.try_again')}
+    </Button>
+  );
+  const retryFocusRegion = {
+    ref: retryFocusTargetRef,
+    tabIndex: -1,
+    role: "region",
+    "aria-label": t("nav.profiles"),
+    "data-profile-retry-focus": "",
+  };
+  const retryFocusClassName = "focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/30";
   
   // Use persistent values instead of local state
   const activeGroup = profilesTabActiveGroup;
@@ -146,7 +193,7 @@ export function ProfilesTabV2() {
   // Create groups array with default groups + dynamic groups
   const createGroups = (): GroupTab[] => {
     const defaultGroups: GroupTab[] = [
-      { id: "all", name: "All", count: getFilteredCountForGroup("all") },
+      { id: "all", name: t('profiles.v3.filter.all'), count: getFilteredCountForGroup("all") },
       { id: "nrc", name: "NRC", count: getFilteredCountForGroup("nrc") },
       { id: "server", name: "SERVER", count: getFilteredCountForGroup("server") },
       { id: "modpacks", name: "MODPACKS", count: getFilteredCountForGroup("modpacks") },
@@ -337,21 +384,27 @@ export function ProfilesTabV2() {
 
   const gridColsClass = columnCount === 3 ? "grid-cols-3" : columnCount === 2 ? "grid-cols-2" : "grid-cols-1";
 
-  if (loading) {
-    return <LoadingState message={t('profiles.loadingProfiles')} />;
+  if (loading && profiles.length === 0) {
+    return <div {...retryFocusRegion} className={"h-full min-h-0 " + retryFocusClassName}>
+      <LoadingState message={t('profiles.loadingProfiles')} />
+    </div>;
   }
 
-  if (error) {
+  if (visibleError && profiles.length === 0) {
     return (
+      <div {...retryFocusRegion} className={"h-full min-h-0 " + retryFocusClassName}>
       <EmptyState
         icon="solar:danger-triangle-bold"
-        message={error || ""}
+        message={visibleError}
+        action={retryAction}
       />
+      </div>
     );
   }
 
   if (profiles.length === 0) {
     return (
+      <div {...retryFocusRegion} className={"h-full min-h-0 " + retryFocusClassName}>
       <EmptyState
         icon="solar:widget-bold"
         message={t('profiles.noProfilesFound')}
@@ -366,11 +419,41 @@ export function ProfilesTabV2() {
           </Button>
         }
       />
+      </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden p-4 relative">
+    <div {...retryFocusRegion} className={"h-full flex flex-col overflow-hidden p-4 relative " + retryFocusClassName}>
+      <section aria-labelledby="profile-list-status-title" data-profile-status-header=""
+        className="shrink-0 mb-4 min-w-0 grid grid-rows-[28px_auto] gap-2">
+        <div className="min-w-0 flex items-center justify-between gap-3">
+          <h2 id="profile-list-status-title" className="font-smallcaps text-lg text-white">{t("nav.profiles")}</h2>
+          <p className="font-minecraft text-xs text-white/70">{t("profiles.status.count", { count: profiles.length })}</p>
+        </div>
+        <div data-profile-status-row="" className={"min-h-[42px] min-w-0 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border rounded-[var(--border-radius)] px-3 " +
+          (visibleError ? "border-red-700/50 bg-red-900/20" : "border-white/10 bg-black/20")}>
+          <div className="min-w-0 grid">
+            <div data-profile-status-reserve="error" aria-hidden="true" className="invisible col-start-1 row-start-1 min-w-0">
+              <p className="font-smallcaps text-xs leading-4 text-red-200">{visibleError || t("profiles.errors.load_failed")}</p>
+              <p className="font-minecraft text-xs leading-4 text-white/70">{t("profiles.errors.previous_data")}</p>
+            </div>
+            <p data-profile-status-reserve="ready" aria-hidden="true" className="invisible col-start-1 row-start-1 min-w-0 font-minecraft text-xs leading-4 text-white/70">{t("profiles.status.ready")}</p>
+            <div data-profile-status-live="" role={visibleError ? "alert" : "status"} className="col-start-1 row-start-1 min-w-0">
+              {visibleError ? (<>
+                <p className="font-smallcaps text-xs leading-4 text-red-200">{visibleError}</p>
+                <p className="font-minecraft text-xs leading-4 text-white/70">{t("profiles.errors.previous_data")}</p>
+              </>) : (
+                <p className="font-minecraft text-xs leading-4 text-white/70">{t("profiles.status.ready")}</p>
+              )}
+            </div>
+          </div>
+          <div data-profile-status-retry-slot="" aria-hidden={visibleError ? undefined : true}
+            style={{ visibility: visibleError ? "visible" : "hidden", pointerEvents: visibleError ? "auto" : "none" }}>
+            {retryAction}
+          </div>
+        </div>
+      </section>
       {/* Group Tabs */}
       <GroupTabs
         groups={groups}

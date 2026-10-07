@@ -1,23 +1,30 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "./buttons/IconButton";
+import { ModalScopeContext } from "./ModalScope";
+import { isTopDialog, registerDialog } from "./modal-focus";
 
 interface ModalProps {
   title: string;
   titleIcon?: React.ReactNode;
   titleSubtitle?: React.ReactNode;
   onClose: () => void;
+  /** Synchronous veto before this modal commits to closing (e.g. a pending write). */
+  canClose?: () => boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: "sm" | "md" | "lg" | "xl" | "full";
   closeOnClickOutside?: boolean;
+  closeOnEscape?: boolean;
   hideCloseButton?: boolean;
+  /** Keep header text wrapping stable when a temporarily busy dialog hides Close. */
+  reserveCloseButtonSpace?: boolean;
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
@@ -29,11 +36,14 @@ export function Modal({
   titleIcon,
   titleSubtitle,
   onClose,
+  canClose,
   children,
   footer,
   width = "md",
   closeOnClickOutside = true,
+  closeOnEscape,
   hideCloseButton = false,
+  reserveCloseButtonSpace = false,
   headerActions,
   variant = "default",
   className,
@@ -41,6 +51,12 @@ export function Modal({
 }: ModalProps) {
   const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dialogId = useId();
+  const titleId = `${dialogId}-title`;
+  const returnFocusRef = useRef<HTMLElement | null>(
+    typeof document === "undefined" ? null : document.activeElement as HTMLElement,
+  );
   const contentRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -50,21 +66,19 @@ export function Modal({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isClosing, setIsClosing] = useState(false);
+  const closingRef = useRef(false);
+  const policyRef = useRef({ onClose, canClose, canEscape: closeOnEscape ?? !hideCloseButton });
+  policyRef.current = { onClose, canClose, canEscape: closeOnEscape ?? !hideCloseButton };
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isClosing) {
-        handleClose();
-      }
-    };
-    
-    if (closeOnClickOutside !== false) {
-      window.addEventListener("keydown", handleEscape);
-    }
-
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-    };
-  }, [closeOnClickOutside, isClosing]);
+    if (!panelRef.current) return;
+    return registerDialog({
+      panel: panelRef.current,
+      id: dialogId,
+      returnFocus: returnFocusRef.current,
+      canEscape: () => policyRef.current.canEscape && !closingRef.current && (policyRef.current.canClose?.() ?? true),
+      close: () => handleClose(),
+    });
+  }, [dialogId]);
 
   useEffect(() => {
     const recordMouseDownTarget = (event: MouseEvent) => {
@@ -80,14 +94,16 @@ export function Modal({
   }, []);
 
   const handleClose = () => {
-    if (isClosing) return;
+    if (closingRef.current || !(policyRef.current.canClose?.() ?? true)) return;
+    closingRef.current = true;
     setIsClosing(true);
-    onClose();
+    policyRef.current.onClose();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (
       closeOnClickOutside &&
+      isTopDialog(panelRef.current) &&
       e.target === modalRef.current &&
       mouseDownTargetRef.current === modalRef.current &&
       !isClosing
@@ -119,14 +135,21 @@ export function Modal({
     return "none";
   };
   return (
+    <ModalScopeContext.Provider value={dialogId}>
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="nrc-modal-overlay fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
       onClick={handleBackdropClick}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        data-modal-id={dialogId}
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "nrc-modal-panel relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
@@ -154,31 +177,35 @@ export function Modal({
             backgroundColor: `${accentColor.value}30`,
           }}
         >
-          <div className="flex items-center space-x-3">
+          <div className="flex min-w-0 items-center space-x-3">
             {titleIcon && (
               <span className="text-white flex-shrink-0 flex items-center">
                 {titleIcon}
               </span>
             )}
-            <div className="flex flex-col">
-              <h2 className="text-lg font-smallcaps text-white">
+            <div className="flex min-w-0 flex-col">
+              <h2 id={titleId} className="text-lg font-smallcaps text-white break-words">
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-shrink-0 items-center space-x-2">
             {headerActions}
-            {!hideCloseButton && (
+            {(!hideCloseButton || reserveCloseButtonSpace) && (
               <IconButton
                 ref={closeButtonRef}
                 icon={<Icon icon="solar:close-circle-bold" />}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onClose();
+                  handleClose();
                 }}
                 variant="ghost"
                 size="sm"
+                disabled={hideCloseButton}
+                aria-hidden={hideCloseButton || undefined}
+                tabIndex={hideCloseButton ? -1 : undefined}
+                className={hideCloseButton ? "invisible pointer-events-none" : undefined}
                 aria-label={t('common.close_modal')}
               />
             )}
@@ -187,7 +214,7 @@ export function Modal({
 
         <div
           ref={contentRef}
-          className={cn("flex-1 overflow-y-auto custom-scrollbar", contentClassName)}
+          className={cn("min-h-0 flex-1 overflow-y-auto custom-scrollbar", contentClassName)}
         >
           {children}
         </div>
@@ -202,5 +229,6 @@ export function Modal({
         )}
       </div>
     </div>
+    </ModalScopeContext.Provider>
   );
 }

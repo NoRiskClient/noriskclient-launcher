@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 
@@ -74,6 +74,9 @@ export function SyncPackCard({
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(pack.name);
   const editingRef = useRef(false);
+  const titleId = useId();
+  const detailsId = useId();
+  const menuId = useId();
 
   const startRename = () => {
     setDraftName(pack.name);
@@ -121,6 +124,8 @@ export function SyncPackCard({
           wrapperClassName="flex-shrink-0"
         >
           <button
+            type="button"
+            aria-label={t("syncPacks.changeIcon")}
             onClick={(event) => {
               event.stopPropagation();
               const modalId = `sync-pack-icon-${pack.id}`;
@@ -132,7 +137,7 @@ export function SyncPackCard({
                 />,
               );
             }}
-            className="transition-transform hover:scale-105"
+            className="rounded transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           >
             <SyncPackIcon packId={pack.id} icon={pack.icon} />
           </button>
@@ -140,19 +145,27 @@ export function SyncPackCard({
 
         <div className="min-w-0 flex-1">
           {renaming ? (
-            <input
-              autoFocus
-              value={draftName}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) => setDraftName(event.target.value)}
-              onBlur={() => finishRename(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") finishRename(true);
-                if (event.key === "Escape") finishRename(false);
-              }}
-              className="w-full bg-transparent font-minecraft text-lg normal-case text-white outline-none placeholder:text-white/25"
-              style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
-            />
+            <>
+              <span id={titleId} className="sr-only">{pack.name}</span>
+              <input
+                autoFocus
+                aria-label={t("syncPacks.rename")}
+                aria-describedby={titleId}
+                value={draftName}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => setDraftName(event.target.value)}
+                onBlur={() => finishRename(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    finishRename(event.key === "Enter");
+                  }
+                }}
+                className="w-full rounded bg-transparent font-minecraft text-lg normal-case text-white outline-none placeholder:text-white/25 focus:bg-white/5 focus:ring-2 focus:ring-white/80"
+                style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
+              />
+            </>
           ) : (
           <Tooltip
             content={pack.name}
@@ -160,6 +173,7 @@ export function SyncPackCard({
             wrapperClassName="min-w-0 max-w-full"
           >
             <h3
+              id={titleId}
               className="w-full truncate font-minecraft text-lg normal-case text-white"
               style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
             >
@@ -181,6 +195,7 @@ export function SyncPackCard({
             <div onClick={(event) => event.stopPropagation()}>
               <ToggleSwitch
                 checked={inUse}
+                aria-label={`${pack.name}: ${t("syncPacks.activeForProfile", { profile: profile.name })}`}
                 onChange={(next) => togglePack(pack, next)}
                 disabled={showBusy}
                 size="sm"
@@ -194,16 +209,22 @@ export function SyncPackCard({
           onClick={(event) => event.stopPropagation()}
         >
           <button
+            type="button"
             ref={menuRef}
             onClick={() => setMenuOpen((open) => !open)}
             aria-label={t("common.actions")}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
             className={`flex h-6 w-6 items-center justify-center rounded text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white ${
-              menuOpen ? "opacity-100" : "opacity-0 group-hover/head:opacity-100"
-            }`}
+              menuOpen ? "opacity-100" : "opacity-0 group-hover/head:opacity-100 group-focus-within/head:opacity-100"
+            } focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10`}
           >
             <Icon icon="solar:menu-dots-bold" className="h-4 w-4" />
           </button>
           <ThemedDropdown
+            id={menuId}
+            ariaLabel={t("common.actions")}
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
             width="w-52"
@@ -241,15 +262,28 @@ export function SyncPackCard({
           </ThemedDropdown>
         </div>
 
-        <Icon
-          icon="solar:alt-arrow-down-linear"
-          className="h-4 w-4 flex-shrink-0 text-white/20 transition-all group-hover/head:text-white/50"
-          style={{ transform: isOpen ? "rotate(180deg)" : undefined }}
-        />
+        <button
+          type="button"
+          aria-labelledby={titleId}
+          aria-expanded={isOpen}
+          aria-controls={detailsId}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpandedPack(isOpen ? null : pack.id);
+          }}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-white/35 transition-colors hover:bg-white/10 hover:text-white group-hover/head:text-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10 focus-visible:text-white"
+        >
+          <Icon
+            icon="solar:alt-arrow-down-linear"
+            aria-hidden="true"
+            className="h-4 w-4 transition-transform"
+            style={{ transform: isOpen ? "rotate(180deg)" : undefined }}
+          />
+        </button>
       </div>
 
       {isOpen && (
-        <div className="border-t border-white/[0.07]">
+        <div id={detailsId} className="border-t border-white/[0.07]">
           {!isEmpty && (
             <div className="space-y-2 p-2">
               {pack.targets.map((target) => (

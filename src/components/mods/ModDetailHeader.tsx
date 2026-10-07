@@ -190,14 +190,14 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
         // Update toast with progress
         toast.custom(
-          () => <ProgressToast message={`Installing ${fileName}`} progress={progress} />,
+          () => <ProgressToast message={t('modrinth_installer.installing', { fileName })} progress={progress} />,
           { id: toastId, duration: Infinity }
         );
       });
 
       // Show initial progress toast
       toast.custom(
-        () => <ProgressToast message={`Installing ${fileName}`} progress={0} />,
+        () => <ProgressToast message={t('modrinth_installer.installing', { fileName })} progress={0} />,
         { id: toastId, duration: Infinity }
       );
 
@@ -438,23 +438,23 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       {/* Project Info */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Title Row */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-          <div>
+        <div className="flex min-w-0 flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-2">
+          <div className="min-w-0 max-w-full flex-1">
             <button
               onClick={handleOpenProjectPage}
-              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
+              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left max-w-full [overflow-wrap:anywhere]"
             >
               {project.title}
             </button>
             {project.author && (
-              <p className="text-sm text-gray-400 font-minecraft mt-1">
-                by {project.author}
+              <p className="text-sm text-gray-400 font-minecraft mt-1 max-w-full [overflow-wrap:anywhere]">
+                {t('content.by_creator', { creator: project.author })}
               </p>
             )}
           </div>
 
           {/* Stats + Install Button */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-4">
             <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft">
               <div className="flex items-center gap-1">
                 <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
@@ -467,9 +467,9 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             </div>
 
             {/* Install Button + Versions Toggle */}
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <ActionButton
-                label={isInstalling ? "Installing..." : "Install"}
+                label={t(isInstalling ? 'modrinth.installing' : 'modrinth.install')}
                 icon={isInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
                 iconClassName={isInstalling ? "animate-spin-slow" : ""}
                 variant={isInstalling ? "secondary" : "primary"}
@@ -480,7 +480,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
               <ActionButton
                 icon={showVersions ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
                 variant="icon-only"
-                tooltip={showVersions ? "Hide Versions" : "Show Versions"}
+                tooltip={t(showVersions ? 'content.hide_versions' : 'content.show_versions')}
                 onClick={onToggleVersions}
                 size="sm"
               />

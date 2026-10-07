@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 
 import { Tooltip } from "../ui/Tooltip";
@@ -89,10 +89,11 @@ export function RowAction({
 
   const button = icon ? (
     <button
+      type="button"
       onClick={handleClick}
       disabled={disabled}
       aria-label={label}
-      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 opacity-0 transition-all duration-200 hover:border-white/20 hover:bg-black/60 disabled:opacity-30 group-hover/row:opacity-100 ${
+      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 opacity-0 transition-all duration-200 hover:border-white/20 hover:bg-black/60 disabled:opacity-30 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10 ${
         danger ? "hover:!text-red-400" : "hover:!text-white"
       }`}
     >
@@ -100,9 +101,10 @@ export function RowAction({
     </button>
   ) : (
     <button
+      type="button"
       onClick={handleClick}
       disabled={disabled}
-      className={`flex-shrink-0 px-2 py-1 text-[10px] font-minecraft uppercase tracking-wider text-white/0 transition-colors group-hover/row:text-white/30 disabled:opacity-30 ${
+      className={`flex-shrink-0 rounded px-2 py-1 text-[10px] font-minecraft uppercase tracking-wider text-white/0 transition-colors group-hover/row:text-white/30 group-focus-within/row:text-white/70 focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:bg-white/10 disabled:opacity-30 ${
         danger ? "hover:!text-red-400" : "hover:!text-white"
       }`}
     >
@@ -122,6 +124,7 @@ export interface SyncPackRowProps {
   iconUrl?: string | null;
   fallbackLetter?: string;
   title: string;
+  titleId?: string;
   subtitle?: ReactNode;
   subtitleTitle?: string;
   actions?: ReactNode;
@@ -138,6 +141,7 @@ export function SyncPackRow({
   iconUrl,
   fallbackLetter,
   title,
+  titleId,
   subtitle,
   subtitleTitle,
   actions,
@@ -151,6 +155,8 @@ export function SyncPackRow({
   const accentColor = useThemeStore((state) => state.accentColor);
   const titleFit = useIsTruncated<HTMLDivElement>();
   const subtitleFit = useIsTruncated<HTMLDivElement>();
+  const generatedTitleId = useId();
+  const rowTitleId = titleId ?? generatedTitleId;
 
   return (
     <div
@@ -173,12 +179,13 @@ export function SyncPackRow({
         <div
           onClick={(event) => event.stopPropagation()}
           className={`flex-shrink-0 transition-opacity ${
-            selected ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"
+            selected ? "opacity-100" : "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100"
           }`}
         >
           <CheckboxV2
             size="sm"
             checked={selected ?? false}
+            aria-labelledby={rowTitleId}
             onChange={() => onToggleSelect?.()}
           />
         </div>
@@ -205,6 +212,7 @@ export function SyncPackRow({
       <div className="flex min-w-0 w-full flex-1 flex-col items-start">
         <MaybeTooltip content={title} truncated={titleFit.truncated}>
           <div
+            id={rowTitleId}
             ref={titleFit.ref}
             className={`w-full truncate text-sm font-minecraft normal-case text-white ${dimmed ? "line-through" : ""}`}
             style={

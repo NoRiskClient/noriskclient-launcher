@@ -524,7 +524,7 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       await invoke("stop_process", { processId });
     } catch (error) {
       console.error("Failed to stop process:", error);
-      set({ error: parseErrorMessage(error) });
+      throw error;
     }
   },
 }));

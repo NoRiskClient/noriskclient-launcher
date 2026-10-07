@@ -7,6 +7,8 @@ import { cn } from "../lib/utils";
 import { FONT_PRESETS } from "../config/fonts";
 import { CUSTOM_FONT_ID, useFontStore } from "../store/font-store";
 import { Combobox } from "./ui/Combobox";
+import { useTranslation } from "react-i18next";
+import { useAnimationsEnabled } from "../hooks/useEntranceAnimation";
 
 interface FontSelectorProps {
   disabled?: boolean;
@@ -20,24 +22,39 @@ const COMMON_FONTS = [
 ];
 
 export function FontSelector({ disabled }: FontSelectorProps) {
+  const { t } = useTranslation();
+  const animationsEnabled = useAnimationsEnabled();
   const { fontId, setFont, customFamily, setCustomFamily } = useFontStore();
   const presets = Object.values(FONT_PRESETS);
   const isCustom = fontId === CUSTOM_FONT_ID;
 
   const [fonts, setFonts] = useState<string[]>(COMMON_FONTS);
+  const [fontStatus, setFontStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (!isCustom) return;
+    let active = true;
+    setFontStatus("loading");
     invoke<string[]>("list_system_fonts")
       .then((list) => {
-        if (Array.isArray(list) && list.length) setFonts(list);
+        if (!active) return;
+        if (!Array.isArray(list) || list.some(font => typeof font !== "string")) throw new Error("Invalid system font response");
+        setFonts([...new Set(list.filter(font => font.trim()))]);
+        setFontStatus("ready");
       })
-      .catch((err) => console.warn("[FontSelector] list_system_fonts failed:", err));
-  }, [isCustom]);
+      .catch((err) => {
+        if (!active) return;
+        console.warn("[FontSelector] list_system_fonts failed:", err);
+        setFonts(COMMON_FONTS); setFontStatus("error");
+      });
+    return () => { active = false; };
+  }, [isCustom, retry]);
 
   const tileClass = (selected: boolean) =>
     cn(
-      "relative flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all duration-200",
+      "relative flex max-w-full items-center gap-3 pl-4 pr-10 py-3 rounded-lg border-2",
+      animationsEnabled ? "transition-all duration-200" : "transition-none",
       selected ? "border-white/60 bg-white/10" : "border-[#ffffff20] bg-black/20",
       disabled
         ? "opacity-40 cursor-not-allowed"
@@ -51,6 +68,8 @@ export function FontSelector({ disabled }: FontSelectorProps) {
           const isSelected = fontId === preset.id;
           return (
             <button
+              type="button"
+              aria-pressed={isSelected}
               key={preset.id}
               onClick={() => {
                 if (!disabled) setFont(preset.id);
@@ -60,7 +79,8 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             >
               <div
                 className={cn(
-                  "w-8 h-8 rounded-md border-2 border-white/20 flex items-center justify-center text-lg leading-none text-white transition-transform",
+                  "w-8 h-8 shrink-0 rounded-md border-2 border-white/20 flex items-center justify-center text-lg leading-none text-white",
+                  animationsEnabled ? "transition-transform" : "transition-none",
                   isSelected && "scale-105",
                 )}
                 style={{ fontFamily: preset.preview }}
@@ -68,7 +88,7 @@ export function FontSelector({ disabled }: FontSelectorProps) {
                 Aa
               </div>
               <span
-                className={cn("text-base transition-colors", isSelected ? "text-white" : "text-white/80")}
+                className={cn("min-w-0 whitespace-normal [overflow-wrap:anywhere] text-left text-base", animationsEnabled ? "transition-colors" : "transition-none", isSelected ? "text-white" : "text-white/80")}
                 style={{ fontFamily: preset.preview }}
               >
                 {preset.name}
@@ -81,6 +101,8 @@ export function FontSelector({ disabled }: FontSelectorProps) {
         })}
 
         <button
+          type="button"
+          aria-pressed={isCustom}
           onClick={() => {
             if (!disabled) setFont(CUSTOM_FONT_ID);
           }}
@@ -89,7 +111,8 @@ export function FontSelector({ disabled }: FontSelectorProps) {
         >
           <div
             className={cn(
-              "w-8 h-8 rounded-md border-2 border-white/20 flex items-center justify-center text-lg leading-none text-white transition-transform",
+              "w-8 h-8 shrink-0 rounded-md border-2 border-white/20 flex items-center justify-center text-lg leading-none text-white",
+              animationsEnabled ? "transition-transform" : "transition-none",
               isCustom && "scale-105",
             )}
             style={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
@@ -97,10 +120,10 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             <Icon icon="solar:pen-bold" className="w-4 h-4" />
           </div>
           <span
-            className={cn("text-base transition-colors", isCustom ? "text-white" : "text-white/80")}
+            className={cn("min-w-0 whitespace-normal [overflow-wrap:anywhere] text-left text-base", animationsEnabled ? "transition-colors" : "transition-none", isCustom ? "text-white" : "text-white/80")}
             style={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
           >
-            {customFamily?.trim() ? customFamily : "Custom"}
+            {customFamily?.trim() ? customFamily : t("settings.font.custom")}
           </span>
           {isCustom && (
             <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white absolute top-2 right-2" />
@@ -116,11 +139,27 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             options={fonts}
             disabled={disabled}
             allowClear
-            placeholder="Pick or type a font (e.g. Comic Sans MS, Inter)"
+            placeholder={t("settings.font.pick_or_type")}
+            aria-label={t("settings.font.custom_family")}
             inputStyle={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
             optionStyle={(f) => ({ fontFamily: `"${f}", sans-serif` })}
           />
-          <span className="text-xs text-white/40 font-minecraft">{fonts.length} fonts available</span>
+          <div className="grid min-h-[20px] text-xs text-white/60 font-minecraft" aria-live="polite">
+            <span aria-hidden={fontStatus !== "loading"} className={cn("col-start-1 row-start-1", fontStatus !== "loading" && "invisible")}>
+              {t("settings.font.loading")}
+            </span>
+            <span aria-hidden={fontStatus !== "ready"} className={cn("col-start-1 row-start-1", fontStatus !== "ready" && "invisible")}>
+              {t("settings.font.available", { count: fonts.length })}
+            </span>
+            <div role={fontStatus === "error" ? "alert" : undefined} aria-hidden={fontStatus !== "error"}
+              className={cn("col-start-1 row-start-1 flex items-start gap-2 text-amber-200/90", fontStatus !== "error" && "invisible")}>
+                <span className="min-w-0 flex-1">{t("settings.font.load_failed_suggestions", { count: COMMON_FONTS.length })}</span>
+                <button type="button" disabled={disabled || fontStatus !== "error"} onClick={() => setRetry(value => value + 1)}
+                  className="shrink-0 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded">
+                  {t("common.try_again")}
+                </button>
+              </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { gsap } from "gsap";
 import { cn } from "../../lib/utils";
@@ -21,7 +21,8 @@ interface UserProfileBarProps {
 
 export function UserProfileBar({ className }: UserProfileBarProps) {
   const { t } = useTranslation();
-  const profileButtonRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuId = useId();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const { initializeAccounts } = useMinecraftAuthStore();
@@ -59,10 +60,17 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
   }, [accountCount]);
 
   const toggleAccountDropdown = () => {
-    setIsAccountDropdownOpen(!isAccountDropdownOpen);
+    setIsAccountDropdownOpen(open => !open);
   };
 
   const handleCloseDropdown = () => {
+    // Return owned focus before the exiting portal becomes inert. Waiting for
+    // the shared layout-effect cleanup is too late after Chromium blurs it.
+    const trigger = profileButtonRef.current;
+    if (dropdownRef.current?.contains(document.activeElement) &&
+      trigger?.isConnected && !trigger.closest("[inert]")) {
+      trigger.focus({ preventScroll: true });
+    }
     setIsAccountDropdownOpen(false);
   };
 
@@ -72,8 +80,11 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
         <NotificationBell />
         <RunningInstancesIndicator />
 
-        <div ref={profileButtonRef}>
+        <div>
           <CurrentAccountDisplay
+            ref={profileButtonRef}
+            expanded={isAccountDropdownOpen}
+            menuId={accountMenuId}
             onClick={toggleAccountDropdown}
             className="h-10"
           />
@@ -102,6 +113,8 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
 
       <Dropdown
         ref={dropdownRef}
+        id={accountMenuId}
+        ariaLabel={t('auth.minecraftAccounts')}
         isOpen={isAccountDropdownOpen}
         onClose={handleCloseDropdown}
         triggerRef={profileButtonRef}

@@ -21,9 +21,11 @@ interface CardProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   role?: string;
   ariaLabel?: string;
+  disabled?: boolean;
+  selected?: boolean;
 }
 
-export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
+export const Card = forwardRef<HTMLDivElement | HTMLButtonElement, CardProps>(function Card(
   {
     children,
     className,
@@ -33,18 +35,22 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     onContextMenu,
     role,
     ariaLabel,
+    disabled = false,
+    selected,
   },
   ref,
 ) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement | HTMLButtonElement>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const showInteraction = (!onClick || !disabled) && (isHovered || (!!onClick && isFocused));
 
-  const mergedRef = (node: HTMLDivElement) => {
+  const mergedRef = (node: HTMLDivElement | HTMLButtonElement | null) => {
     if (ref) {
       if (typeof ref === "function") {
         ref(node);
@@ -56,7 +62,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   };
 
   const handleMouseEnter = () => {
-    setIsHovered(true);
+    if (!onClick || !disabled) setIsHovered(true);
   };
 
   const handleMouseLeave = () => {
@@ -66,7 +72,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   const colors = getVariantColors(variant, accentColor);
   const accessibilityProps = getAccessibilityProps({
     label: ariaLabel,
-    disabled: false
+    disabled: !!onClick && disabled
   });
 
   const getBoxShadow = () => {
@@ -126,36 +132,38 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     }
 
     if (variant === "flat-secondary") {
-      return isHovered ? "rgba(156, 163, 175, 1)" : "rgba(75, 85, 99, 1)";
+      return showInteraction ? "rgba(156, 163, 175, 1)" : "rgba(75, 85, 99, 1)";
     }
 
-    return isHovered ? colors.light : colors.main;
-  };  return (
-    <div
-      ref={mergedRef}
-      role={role || (onClick ? "button" : undefined)}
-      tabIndex={onClick ? 0 : undefined}
-      className={cn(
-        "relative backdrop-blur-md overflow-hidden",
-        getBorderRadiusClass(borderRadius),
-        getBorderStyle(),
-        onClick && "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2",
-        className,
-      )}
-      style={{
-        backgroundColor: getBackgroundColor(),
-        borderColor: getBorderColor(),
-        borderBottomColor: getBorderBottomColor(),
-        boxShadow: getBoxShadow(),
-        filter: isHovered ? "brightness(1.1)" : "brightness(1)",
-        ...createRadiusStyle(borderRadius, 1.2),
-      }}
-      onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onContextMenu={onContextMenu}
-      {...accessibilityProps}
-    >
+    return showInteraction ? colors.light : colors.main;
+  };
+
+  const sharedProps = {
+    ref: mergedRef,
+    role,
+    className: cn(
+      "relative backdrop-blur-md overflow-hidden",
+      getBorderRadiusClass(borderRadius),
+      getBorderStyle(),
+      onClick && "w-full appearance-none text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40",
+      onClick && (disabled ? "cursor-not-allowed" : "cursor-pointer"),
+      className,
+    ),
+    style: {
+      backgroundColor: getBackgroundColor(),
+      borderColor: getBorderColor(),
+      borderBottomColor: getBorderBottomColor(),
+      boxShadow: getBoxShadow(),
+      filter: showInteraction ? "brightness(1.1)" : "brightness(1)",
+      ...createRadiusStyle(borderRadius, 1.2),
+    },
+    onMouseEnter: handleMouseEnter,
+    onMouseLeave: handleMouseLeave,
+    onContextMenu,
+    ...accessibilityProps,
+  };
+  const content = (
+    <>
       {variant === "3d" && (
         <span
           className="absolute inset-x-0 top-0 h-[2px]"
@@ -172,8 +180,26 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
         />
       )}
       {children}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        {...sharedProps}
+        type="button"
+        disabled={disabled}
+        aria-pressed={selected}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        onClick={(event) => { if (!disabled) onClick(event); }}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div {...sharedProps}>{content}</div>;
 });
 
 Card.displayName = "Card";

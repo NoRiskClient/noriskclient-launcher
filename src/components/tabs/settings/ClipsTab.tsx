@@ -391,7 +391,7 @@ export function ClipsTab() {
                   }}
                   options={CUSTOM_RESOLUTIONS.map((r) => ({
                     value: `${r.width}x${r.height}`,
-                    label: `${r.label}  ·  ${r.width} × ${r.height}`,
+                    label: `${r.width} × ${r.height}`,
                   }))}
                   size="sm"
                   variant="flat"

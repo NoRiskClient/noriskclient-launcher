@@ -5,7 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { claimAfkDaily, getAfkDailyState, getAfkPointsBalance, mintApplixirSession } from "../../services/nrc-service";
-import type { DailyClaimState } from "../../types/afkpoints";
+import type { DailyClaimResult, DailyClaimState } from "../../types/afkpoints";
 import { Button } from "../ui/buttons/Button";
 import { Tooltip } from "../ui/Tooltip";
 import { AfkShop } from "./AfkShop";
@@ -185,14 +185,35 @@ const MOCK_STATE: DailyClaimState = {
   streakFreezes: 1,
 };
 
-type DailyPhase = "loading" | "locked" | "ready" | "claiming" | "claimed";
+function isDailyClaimState(value: unknown): value is DailyClaimState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<DailyClaimState>;
+  return typeof state.claimable === "boolean" &&
+    (state.alreadyClaimed === undefined || typeof state.alreadyClaimed === "boolean") &&
+    (state.adWatchedToday === undefined || typeof state.adWatchedToday === "boolean") &&
+    [state.streakDays, state.bonus, state.milestoneBonus, state.streakFreezes]
+      .every((number) => typeof number === "number" && Number.isSafeInteger(number)) &&
+    Number.isSafeInteger(state.bonus! + state.milestoneBonus!);
+}
+
+function isDailyClaimResult(value: unknown): value is DailyClaimResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<DailyClaimResult>;
+  return typeof result.granted === "boolean" &&
+    [result.streakDays, result.bonus, result.milestoneBonus, result.balance, result.frozenDays]
+      .every((number) => typeof number === "number" && Number.isSafeInteger(number)) &&
+    Number.isSafeInteger(result.bonus! + result.milestoneBonus!);
+}
+
+type DailyPhase = "loading" | "locked" | "ready" | "claiming" | "claimed" | "unavailable" | "unconfirmed";
 
 interface DailyClaim {
   daily: DailyClaimState | null;
   phase: DailyPhase;
-  days: number;
+  days: number | null;
   rewardTotal: number;
-  claim: () => void;
+  claim: () => Promise<void>;
+  retry: () => Promise<void>;
 }
 
 function useDailyClaim(
@@ -201,56 +222,136 @@ function useDailyClaim(
 ): DailyClaim {
   const [daily, setDaily] = useState<DailyClaimState | null>(null);
   const [phase, setPhase] = useState<DailyPhase>("loading");
-  const [days, setDays] = useState(0);
+  const [days, setDays] = useState<number | null>(null);
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
+  const phaseRef = useRef<DailyPhase>("loading");
+  const claimPendingRef = useRef(false);
+  const claimAllowedRef = useRef(false);
+  const unconfirmedRef = useRef(false);
+  const readRef = useRef<{ generation: number; manual: boolean; promise: Promise<void> } | null>(null);
+  const mockTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (phase === "claiming" || phase === "claimed") return;
+  const changePhase = (next: DailyPhase) => { phaseRef.current = next; setPhase(next); };
+  const clearMockTimer = () => {
+    if (mockTimerRef.current !== null) window.clearTimeout(mockTimerRef.current);
+    mockTimerRef.current = null;
+  };
+
+  const readStatus = (manual: boolean): Promise<void> => {
+    if (!mountedRef.current || claimPendingRef.current) return Promise.resolve();
+    if (manual && readRef.current?.generation === generationRef.current) return readRef.current.promise;
+    const generation = ++generationRef.current;
+    clearMockTimer();
+    claimAllowedRef.current = false;
+    setDaily(null);
+    setDays(null);
+    changePhase("loading");
     if (MOCK_DAILY_CLAIM) {
       setDaily(MOCK_STATE);
       setDays(MOCK_STATE.streakDays);
-      setPhase("locked");
-      const timer = window.setTimeout(() => setPhase("ready"), 2500);
-      return () => window.clearTimeout(timer);
+      changePhase("locked");
+      mockTimerRef.current = window.setTimeout(() => {
+        if (!mountedRef.current || generation !== generationRef.current) return;
+        claimAllowedRef.current = true;
+        changePhase("ready");
+      }, 2500);
+      return Promise.resolve();
     }
-    getAfkDailyState()
-      .then((s) => {
-        if (!s) {
-          setPhase("claimed");
+    const isCurrent = () => mountedRef.current && generation === generationRef.current;
+    const promise = (async () => {
+      try {
+        const result = await getAfkDailyState();
+        if (!isCurrent()) return;
+        if (!isDailyClaimState(result)) {
+          changePhase(unconfirmedRef.current ? "unconfirmed" : "unavailable");
           return;
         }
-        setDaily(s);
-        setDays(s.streakDays);
-        setPhase(s.claimable ? "ready" : s.alreadyClaimed ? "claimed" : "locked");
-      })
-      .catch((e) => {
+        unconfirmedRef.current = false;
+        setDaily(result);
+        setDays(result.streakDays);
+        claimAllowedRef.current = result.claimable;
+        changePhase(result.claimable ? "ready" : result.alreadyClaimed ? "claimed" : "locked");
+      } catch (e) {
+        if (!isCurrent()) return;
         log("error", `[useDailyClaim] state load failed: ${JSON.stringify(e)}`);
-        setPhase("claimed");
-      });
+        changePhase(unconfirmedRef.current ? "unconfirmed" : "unavailable");
+      } finally {
+        if (readRef.current?.generation === generation) readRef.current = null;
+      }
+    })();
+    readRef.current = { generation, manual, promise };
+    return promise;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current++;
+      claimAllowedRef.current = false;
+      readRef.current = null;
+      clearMockTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (claimPendingRef.current || phaseRef.current === "claimed") return;
+    // A refresh trigger may supersede an older GET; manual Retry only joins its
+    // own current pending read. Neither can release an unconfirmed claim.
+    if (unconfirmedRef.current) return;
+    void readStatus(false);
   }, [refreshKey]);
 
-  const claim = () => {
-    if (phase !== "ready") return;
-    setPhase("claiming");
+  const retry = () => {
+    if (!mountedRef.current || claimPendingRef.current) return Promise.resolve();
+    if (readRef.current?.manual && readRef.current.generation === generationRef.current) return readRef.current.promise;
+    if (phaseRef.current !== "unavailable" && phaseRef.current !== "unconfirmed") return Promise.resolve();
+    return readStatus(true);
+  };
+
+  const claim = async () => {
+    if (!mountedRef.current || claimPendingRef.current || readRef.current ||
+      phaseRef.current !== "ready" || !claimAllowedRef.current) return;
+    claimPendingRef.current = true;
+    claimAllowedRef.current = false;
+    const generation = ++generationRef.current;
+    changePhase("claiming");
+    const isCurrent = () => mountedRef.current && generation === generationRef.current;
+    const notConfirmed = () => {
+      unconfirmedRef.current = true;
+      setDaily(null);
+      setDays(null);
+      changePhase("unconfirmed");
+    };
     if (MOCK_DAILY_CLAIM) {
-      window.setTimeout(() => {
+      mockTimerRef.current = window.setTimeout(() => {
+        if (!isCurrent()) return;
         setDays(MOCK_STATE.streakDays);
+        changePhase("claimed");
+        claimPendingRef.current = false;
         onClaimed(MOCK_STATE.bonus + MOCK_STATE.milestoneBonus, 1337, MOCK_STATE.streakDays);
-        setPhase("claimed");
       }, 800);
       return;
     }
-    claimAfkDaily()
-      .then((r) => {
-        if (r.granted) {
-          setDays(r.streakDays);
-          onClaimed(r.bonus + r.milestoneBonus, r.balance, r.streakDays);
-        }
-        setPhase("claimed");
-      })
-      .catch((e) => {
+    try {
+      const result = await claimAfkDaily();
+      if (!isCurrent()) return;
+      if (!isDailyClaimResult(result) || !result.granted) { notConfirmed(); return; }
+      unconfirmedRef.current = false;
+      setDays(result.streakDays);
+      changePhase("claimed");
+      // A confirmed grant remains confirmed if an unrelated observer throws.
+      try { onClaimed(result.bonus + result.milestoneBonus, result.balance, result.streakDays); }
+      catch (e) { log("error", `[useDailyClaim] reward observer failed: ${JSON.stringify(e)}`); }
+    } catch (e) {
+      if (isCurrent()) {
         log("error", `[useDailyClaim] claim failed: ${JSON.stringify(e)}`);
-        setPhase("ready");
-      });
+        notConfirmed();
+      }
+    } finally {
+      if (generation === generationRef.current) claimPendingRef.current = false;
+    }
   };
 
   return {
@@ -259,6 +360,7 @@ function useDailyClaim(
     days,
     rewardTotal: (daily?.bonus ?? 0) + (daily?.milestoneBonus ?? 0),
     claim,
+    retry,
   };
 }
 
@@ -268,11 +370,11 @@ function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
   const bgColor = complementaryBackground(accentColor.value);
 
   const { phase, days } = claimState;
-  const pendingToday = phase === "locked" || phase === "ready" || phase === "claiming";
-  const filled = days === 0 ? 0 : ((days - 1) % 7) + 1;
+  const pendingToday = days !== null && (phase === "locked" || phase === "ready" || phase === "claiming");
+  const filled = days === null || days === 0 ? 0 : ((days - 1) % 7) + 1;
   const doneCount = pendingToday ? filled - 1 : filled;
   const progressPct = (Math.min(Math.max(doneCount, 0), 6) / 6) * 100;
-  const active = days > 0;
+  const active = days !== null && days > 0;
 
   return (
     <div className="shrink-0 mt-3 flex items-center gap-4 px-1">
@@ -289,7 +391,7 @@ function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
           className="font-minecraft text-xs tracking-wider whitespace-nowrap"
           style={{ color: active ? accentColor.value : accentColor.dark }}
         >
-          {days} {t("applixir.window.streak_days")}
+          {days === null ? t("common.unknown") : `${days} ${t("applixir.window.streak_days")}`}
         </span>
       </div>
 
@@ -342,78 +444,112 @@ function StreakClaimBar({ claimState }: { claimState: DailyClaim }) {
 function DailyClaimPanel({ claimState }: { claimState: DailyClaim }) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
-  const { phase, rewardTotal, claim } = claimState;
+  const { phase, rewardTotal, claim, retry } = claimState;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const claimRef = useRef<HTMLButtonElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  const focusOwnPanel = (action: HTMLButtonElement | null) => {
+    if (action && document.activeElement === action) panelRef.current?.focus({ preventScroll: true });
+  };
+  const handleClaim = () => { focusOwnPanel(claimRef.current); return claim(); };
+  const handleRetry = () => { focusOwnPanel(retryRef.current); return retry(); };
 
-  if (phase === "loading") {
-    return (
-      <div className="flex items-center justify-center px-3 py-3 rounded-lg border border-white/10 bg-black/30">
-        <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" style={{ color: accentColor.dark }} />
-      </div>
-    );
-  }
+  const renderPanel = () => {
+    if (phase === "loading") {
+      return (
+        <div role="status" className="flex items-center justify-center px-3 py-3 rounded-lg border border-white/10 bg-black/30">
+          <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" style={{ color: accentColor.dark }} />
+          <span className="sr-only">{t("common.loading")}</span>
+        </div>
+      );
+    }
 
-  if (phase === "locked") {
-    return (
-      <div className="flex flex-col gap-2 px-3 py-3 rounded-lg border border-white/10 bg-black/30">
-        <div className="flex items-center gap-2">
-          <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-4 h-4 text-white/40" />
-          <span className="font-minecraft text-xs text-white/40" style={{ transform: "translateY(-1px)" }}>
-            +{rewardTotal.toLocaleString()}
+    if (phase === "unavailable" || phase === "unconfirmed") {
+      return (
+        <div className="flex flex-col gap-3 px-3 py-3 rounded-lg border border-white/10 bg-black/30">
+          <p role="alert" className="font-minecraft text-xs text-white/80 leading-relaxed break-words">
+            {t(phase === "unconfirmed" ? "applixir.daily.claim_unconfirmed" : "applixir.daily.state_unavailable")}
+          </p>
+          <Button ref={retryRef} variant="flat" size="sm" widthClassName="w-full" onClick={handleRetry}>
+            <span className="whitespace-normal break-words">{t("applixir.daily.check_status")}</span>
+          </Button>
+        </div>
+      );
+    }
+
+    if (phase === "locked") {
+      return (
+        <div className="flex flex-col gap-2 px-3 py-3 rounded-lg border border-white/10 bg-black/30">
+          <div className="flex items-center gap-2">
+            <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-4 h-4 text-white/40" />
+            <span className="font-minecraft text-xs text-white/40" style={{ transform: "translateY(-1px)" }}>
+              +{rewardTotal.toLocaleString()}
+            </span>
+          </div>
+          <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
+            {t("applixir.daily.watch_first")}
           </span>
         </div>
-        <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
-          {t("applixir.daily.watch_first")}
-        </span>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (phase === "claimed") {
+    if (phase === "claimed") {
+      return (
+        <div
+          className="flex flex-col gap-1.5 px-3 py-3 rounded-lg border"
+          style={{ borderColor: `${accentColor.value}45`, backgroundColor: `${accentColor.value}12` }}
+        >
+          <div className="flex items-center gap-2">
+            <Icon
+              icon="solar:check-circle-bold"
+              className="w-4 h-4"
+              style={{ color: accentColor.value, filter: `drop-shadow(0 0 3px ${accentColor.shadowValue})` }}
+            />
+            <span
+              className="font-smallcaps text-sm tracking-wider"
+              style={{ color: `${accentColor.light}b0`, transform: "translateY(-1px)" }}
+            >
+              {t("applixir.daily.claimed_label")}
+            </span>
+          </div>
+          <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
+            {t("applixir.daily.claimed")}
+          </span>
+        </div>
+      );
+    }
+
     return (
-      <div
-        className="flex flex-col gap-1.5 px-3 py-3 rounded-lg border"
-        style={{ borderColor: `${accentColor.value}45`, backgroundColor: `${accentColor.value}12` }}
+      <button
+        ref={claimRef}
+        type="button"
+        onClick={handleClaim}
+        aria-busy={phase === "claiming" || undefined}
+        disabled={phase === "claiming"}
+        className="animate-claim-glow w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-minecraft text-xs tracking-wide cursor-pointer border"
+        style={{ color: accentColor.light, backgroundColor: `${accentColor.value}25` }}
       >
-        <div className="flex items-center gap-2">
+        {phase === "claiming" ? (
+          <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
+        ) : (
           <Icon
-            icon="solar:check-circle-bold"
-            className="w-4 h-4"
-            style={{ color: accentColor.value, filter: `drop-shadow(0 0 3px ${accentColor.shadowValue})` }}
+            icon="solar:gift-bold"
+            className="w-5 h-5"
+            style={{ color: accentColor.value, filter: `drop-shadow(0 0 5px ${accentColor.shadowValue})` }}
           />
-          <span
-            className="font-smallcaps text-sm tracking-wider"
-            style={{ color: `${accentColor.light}b0`, transform: "translateY(-1px)" }}
-          >
-            {t("applixir.daily.claimed_label")}
-          </span>
-        </div>
-        <span className="font-minecraft text-[10px] text-white/50 leading-relaxed">
-          {t("applixir.daily.claimed")}
+        )}
+        <span style={{ transform: "translateY(-1px)" }}>
+          {t("applixir.daily.claim")} +{rewardTotal.toLocaleString()}
         </span>
-      </div>
+      </button>
     );
-  }
+  };
 
   return (
-    <button
-      onClick={claim}
-      disabled={phase === "claiming"}
-      className="animate-claim-glow w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-minecraft text-xs tracking-wide cursor-pointer border"
-      style={{ color: accentColor.light, backgroundColor: `${accentColor.value}25` }}
-    >
-      {phase === "claiming" ? (
-        <Icon icon="svg-spinners:ring-resize" className="w-5 h-5" />
-      ) : (
-        <Icon
-          icon="solar:gift-bold"
-          className="w-5 h-5"
-          style={{ color: accentColor.value, filter: `drop-shadow(0 0 5px ${accentColor.shadowValue})` }}
-        />
-      )}
-      <span style={{ transform: "translateY(-1px)" }}>
-        {t("applixir.daily.claim")} +{rewardTotal.toLocaleString()}
-      </span>
-    </button>
+    <div ref={panelRef} role="group" aria-label={t("applixir.daily.claim")} tabIndex={-1}
+      className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80">
+      {renderPanel()}
+    </div>
   );
 }
 

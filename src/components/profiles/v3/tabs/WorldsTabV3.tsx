@@ -8,7 +8,7 @@
  * 1:1 switchen kann.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { Profile } from "../../../../types/profile";
 import type { WorldInfo, ServerInfo, ServerPingInfo } from "../../../../types/minecraft";
 import * as WorldService from "../../../../services/world-service";
+import { deleteProfileItems, removeDeletedSelection } from "../../../../services/profile-batch-delete";
 import { parseMotdToHtml } from "../../../../utils/motd-utils";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
@@ -30,6 +31,7 @@ import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { formatRelativeTime } from "../../../../utils/format-relative-time";
 import { Tooltip } from "../../../ui/Tooltip";
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
+import { ProfileBatchDeleteDialog } from "../../ProfileBatchDeleteDialog";
 import { CopyWorldDialog } from "../../../modals/CopyWorldDialog";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
@@ -61,6 +63,19 @@ const GAME_MODE_ICONS = [
   "solar:eye-bold",           // 3 Spectator
 ] as const;
 
+const GAME_MODE_LABEL_KEYS: Record<number, string> = {
+  0: 'worlds.game_mode.survival',
+  1: 'worlds.game_mode.creative',
+  2: 'worlds.game_mode.adventure',
+  3: 'worlds.game_mode.spectator',
+};
+const DIFFICULTY_LABEL_KEYS: Record<number, string> = {
+  0: 'worlds.difficulty.peaceful',
+  1: 'worlds.difficulty.easy',
+  2: 'worlds.difficulty.normal',
+  3: 'worlds.difficulty.hard',
+};
+
 export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchRequest }: WorldsTabV3Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -70,7 +85,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
   // useProfileLaunch teilt den State ueber den Zustand-Store pro profileId
   // → `isLaunching` hier ist identisch zu dem im Parent (Hero-Play-Button).
-  const { isLaunching, handleQuickPlayLaunch } = useProfileLaunch({
+  const { isLaunching, isPreparing, handleQuickPlayLaunch } = useProfileLaunch({
     profileId: profile.id,
     onLaunchSuccess: () => { /* noop */ },
     onLaunchError: (err) => console.error("[V3 Worlds] Launch error:", err),
@@ -90,6 +105,9 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const batchDeletingRef = useRef(false);
+  const batchDialogOpenRef = useRef(false);
+  const loadRequestRef = useRef(0);
 
   // `mounted` ref verhindert setState auf einem unmounted Component nachdem
   // async Pings zurueckkommen. Wird bei unmount/Profile-Wechsel zu false gesetzt.
@@ -102,6 +120,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   // ── Load worlds + servers ─────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
+    const request = ++loadRequestRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -109,7 +128,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         WorldService.getWorldsForProfile(profile.id),
         WorldService.getServersForProfile(profile.id),
       ]);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || request !== loadRequestRef.current) return;
       setWorlds(ws);
       setServers(svs);
 
@@ -132,9 +151,9 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       }
     } catch (err) {
       console.error("[V3 Worlds] Failed to load worlds/servers:", err);
-      if (mountedRef.current) setError(parseErrorMessage(err));
+      if (mountedRef.current && request === loadRequestRef.current) setError(parseErrorMessage(err));
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && request === loadRequestRef.current) setLoading(false);
     }
   }, [profile.id]);
 
@@ -317,36 +336,53 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   }, [profile.id, loadData, t]);
 
   const handleBatchDelete = useCallback(async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || batchDeletingRef.current || batchDialogOpenRef.current) return;
     const targets = worlds.filter(w => selectedIds.has(w.folder_name));
+    if (targets.length === 0) return;
     const modalId = "batch-delete-worlds";
     const doBatchDelete = async () => {
+      if (batchDeletingRef.current) return;
+      batchDeletingRef.current = true;
       setIsBatchDeleting(true);
       try {
-        for (const w of targets) {
-          try { await WorldService.deleteWorld(profile.id, w.folder_name); }
-          catch (err) { console.error("[V3 Worlds] Delete failed for", w.folder_name, err); }
+        const result = await deleteProfileItems(
+          targets.map(w => w.folder_name),
+          id => WorldService.deleteWorld(profile.id, id),
+        );
+        if (mountedRef.current) {
+          const deleted = new Set(result.succeeded);
+          setWorlds(prev => prev.filter(w => !deleted.has(w.folder_name)));
+          setSelectedIds(prev => removeDeletedSelection(prev, result.succeeded));
         }
-        toast.success(t("worlds.batch_delete_success", { count: targets.length }));
-        setSelectedIds(new Set());
-        await loadData();
+        if (result.failed.length > 0) {
+          const errors = result.failed.map(({ id, error }) =>
+            `${targets.find(w => w.folder_name === id)?.display_name ?? id}: ${parseErrorMessage(error)}`,
+          ).join("\n");
+          toast.error(`${t("content_manager.update_result.finished_partial", {
+            succeeded: result.succeeded.length, failed: result.failed.length,
+          })}\n${t("content_manager.errors.batch_delete_failed", { errors })}`);
+        } else if (result.succeeded.length > 0) {
+          toast.success(t("worlds.batch_delete_success", { count: result.succeeded.length }));
+        }
+        if (result.succeeded.length > 0 && mountedRef.current) await loadData();
       } finally {
-        setIsBatchDeleting(false);
+        batchDeletingRef.current = false;
+        batchDialogOpenRef.current = false;
+        if (mountedRef.current) setIsBatchDeleting(false);
         hideModal(modalId);
       }
     };
+    batchDialogOpenRef.current = true;
     showModal(modalId, (
-      <ConfirmDeleteDialog
-        isOpen={true}
+      <ProfileBatchDeleteDialog
         itemName={t("worlds.batch_delete_item_name", { count: targets.length })}
-        onClose={() => hideModal(modalId)}
+        onClose={() => { batchDialogOpenRef.current = false; hideModal(modalId); }}
         onConfirm={doBatchDelete}
-        isDeleting={isBatchDeleting}
         title={t("worlds.batch_delete_title")}
         message={<p className="text-white/80 font-minecraft">{t("worlds.batch_delete_confirm", { count: targets.length })}</p>}
       />
     ));
-  }, [selectedIds, worlds, profile.id, showModal, hideModal, loadData, isBatchDeleting, t]);
+  }, [selectedIds, worlds, profile.id, showModal, hideModal, loadData, t]);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
@@ -354,6 +390,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   }, [loadData, onRefresh]);
 
   const toggleSelection = (id: string) => {
+    if (batchDeletingRef.current) return;
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -367,7 +404,11 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   const hasSelection = selectedIds.size > 0;
   useEffect(() => {
     if (!hasSelection) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") clearSelectionRef.current(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !batchDialogOpenRef.current && !batchDeletingRef.current) {
+        clearSelectionRef.current();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [hasSelection]);
@@ -394,7 +435,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("worlds.search_placeholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
+            aria-label={t("worlds.search_placeholder")}
+            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none focus:outline focus:outline-2 focus:[outline-style:solid] focus:-outline-offset-2 focus:outline-white/70 text-sm text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
 
@@ -425,7 +467,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
         <button
           onClick={handleManualRefresh}
-          disabled={loading}
+          disabled={loading || isBatchDeleting}
           className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
           title={t("profiles.v3.toolbar.refresh")}
         >
@@ -484,6 +526,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
                 isSelected={selectedIds.has(world.folder_name)}
                 selectMode={selectedIds.size > 0}
                 isLaunching={isLaunching}
+                isPreparing={isPreparing}
                 onToggleSelection={() => toggleSelection(world.folder_name)}
                 onPlay={() => handlePlay(world)}
                 onCopy={() => handleCopy(world)}
@@ -502,6 +545,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
                   server={server}
                   pingState={pingState}
                   isLaunching={isLaunching}
+                  isPreparing={isPreparing}
                   menuOpen={hoverMenuId === `server:${address}`}
                   onMenuToggle={(open) => setHoverMenuId(open ? `server:${address}` : null)}
                   onJoin={() => handleJoin(server)}
@@ -519,8 +563,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         totalCount={visibleWorlds.length}
         accent={accentColor.value}
         allSelected={selectedIds.size === visibleWorlds.length && visibleWorlds.length > 0}
-        onSelectAll={() => setSelectedIds(new Set(visibleWorlds.map(w => w.folder_name)))}
-        onClear={() => setSelectedIds(new Set())}
+        onSelectAll={() => { if (!batchDeletingRef.current) setSelectedIds(new Set(visibleWorlds.map(w => w.folder_name))); }}
+        onClear={() => { if (!batchDeletingRef.current) setSelectedIds(new Set()); }}
         actions={fabActions}
         batchProgress={null}
       />
@@ -535,6 +579,7 @@ interface WorldTileProps {
   isSelected: boolean;
   selectMode: boolean;
   isLaunching: boolean;
+  isPreparing: boolean;
   onToggleSelection: () => void;
   onPlay: () => void;
   onCopy: () => void;
@@ -545,15 +590,15 @@ interface WorldTileProps {
 }
 
 const WorldTile: React.FC<WorldTileProps> = ({
-  world, accentColor, isSelected, selectMode, isLaunching, onToggleSelection,
+  world, accentColor, isSelected, selectMode, isLaunching, isPreparing, onToggleSelection,
   onPlay, onCopy, onOpenFolder, onDelete, menuOpen, onMenuToggle,
 }) => {
   const { t } = useTranslation();
   const displayName = world.display_name ?? world.folder_name;
   const lastPlayedIso = world.last_played ? new Date(world.last_played).toISOString() : null;
-  const gameMode = world.game_mode ?? 0;
-  const gameModeLabel = WorldService.getGameModeString(gameMode);
-  const difficultyLabel = WorldService.getDifficultyString(world.difficulty ?? 0);
+  const gameMode = world.game_mode;
+  const gameModeLabel = gameMode == null ? t('common.unknown') : t(GAME_MODE_LABEL_KEYS[gameMode] ?? 'worlds.unknown_value', { value: gameMode });
+  const difficultyLabel = world.difficulty == null ? t('common.unknown') : t(DIFFICULTY_LABEL_KEYS[world.difficulty] ?? 'worlds.unknown_value', { value: world.difficulty });
   const iconUrl = world.icon_path ? convertFileSrc(world.icon_path) : null;
 
   return (
@@ -615,7 +660,7 @@ const WorldTile: React.FC<WorldTileProps> = ({
 
         <div className="flex items-center gap-1.5 mt-1 text-[11px] font-minecraft">
           <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-white/70 bg-white/5">
-            <Icon icon={GAME_MODE_ICONS[gameMode]} className="w-3 h-3" />
+            <Icon icon={GAME_MODE_ICONS[gameMode ?? -1] ?? 'solar:info-circle-bold'} className="w-3 h-3" />
             {gameModeLabel}
           </span>
           <span className="text-white/40">·</span>
@@ -636,18 +681,19 @@ const WorldTile: React.FC<WorldTileProps> = ({
 
       <button
         onClick={onPlay}
-        disabled={isLaunching}
+        disabled={isLaunching || isPreparing}
+        aria-busy={isLaunching || isPreparing}
         className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
-          isLaunching
+          isLaunching || isPreparing
             ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
             : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
         }`}
       >
         <Icon
-          icon={isLaunching ? "solar:refresh-bold" : "solar:play-bold"}
-          className={`w-4 h-4 ${isLaunching ? "animate-spin" : ""}`}
+          icon={isLaunching || isPreparing ? "solar:refresh-bold" : "solar:play-bold"}
+          className={`w-4 h-4 ${isLaunching || isPreparing ? "animate-spin" : ""}`}
         />
-        {t("profiles.play")}
+        {isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : t("profiles.play")}
       </button>
 
       <div className="relative flex-shrink-0">
@@ -678,6 +724,7 @@ interface ServerTileProps {
   server: ServerInfo;
   pingState: ServerPingInfo | "pending" | "error" | undefined;
   isLaunching: boolean;
+  isPreparing: boolean;
   menuOpen: boolean;
   onMenuToggle: (open: boolean) => void;
   onJoin: () => void;
@@ -697,8 +744,10 @@ const latencyTextColor = (ms: number): string => {
   return "text-rose-400";
 };
 
-const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching, menuOpen, onMenuToggle, onJoin, onReping }) => {
+const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching, isPreparing, menuOpen, onMenuToggle, onJoin, onReping }) => {
   const { t } = useTranslation();
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuId = useId();
   const name = server.name ?? server.address ?? "—";
   const address = server.address ?? "";
   const isPending = pingState === "pending";
@@ -781,30 +830,36 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
 
       <button
         onClick={onJoin}
-        disabled={!!isError || isLaunching || !address}
+        disabled={!!isError || isLaunching || isPreparing || !address}
+        aria-busy={isLaunching || isPreparing}
         className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
           isError || !address
             ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
-            : isLaunching
+            : isLaunching || isPreparing
               ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
               : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
         }`}
       >
         <Icon
-          icon={isLaunching ? "solar:refresh-bold" : "solar:login-2-bold"}
-          className={`w-4 h-4 ${isLaunching ? "animate-spin" : ""}`}
+          icon={isLaunching || isPreparing ? "solar:refresh-bold" : "solar:login-2-bold"}
+          className={`w-4 h-4 ${isLaunching || isPreparing ? "animate-spin" : ""}`}
         />
-        {t("profiles.v3.servers.joinShort")}
+        {isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : t("profiles.v3.servers.joinShort")}
       </button>
 
       <div className="relative flex-shrink-0">
         <button
+          type="button"
+          ref={menuTriggerRef}
+          aria-label={`${t('profiles.moreOptions')}: ${name}`}
+          aria-expanded={menuOpen}
+          aria-controls={menuOpen ? menuId : undefined}
           onClick={(e) => { e.stopPropagation(); onMenuToggle(!menuOpen); }}
-          className="p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+          className={`p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`}
         >
-          <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
+          <Icon aria-hidden="true" icon="solar:menu-dots-bold" className="w-4 h-4" />
         </button>
-        <ThemedDropdown open={menuOpen} onClose={() => onMenuToggle(false)} width="w-52">
+        <ThemedDropdown open={menuOpen} onClose={() => onMenuToggle(false)} width="w-52" triggerRef={menuTriggerRef} id={menuId} ariaLabel={`${t('profiles.moreOptions')}: ${name}`}>
           <ThemedDropdownItem icon="solar:refresh-linear" onClick={() => { onReping(); onMenuToggle(false); }}>
             {t("profiles.v3.servers.reping")}
           </ThemedDropdownItem>

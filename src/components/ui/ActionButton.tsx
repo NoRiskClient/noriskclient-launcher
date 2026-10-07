@@ -3,6 +3,7 @@
 import React from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useAnimationsEnabled } from "../../hooks/useEntranceAnimation";
 
 export type ActionButtonVariant = "primary" | "secondary" | "icon-only" | "destructive" | "text" | "highlight";
 
@@ -19,6 +20,7 @@ export interface ActionButtonProps {
   tooltip?: string;
   /** Whether the button is disabled */
   disabled?: boolean;
+  loading?: boolean;
   /** Additional CSS classes */
   className?: string;
   /** Click handler */
@@ -36,19 +38,21 @@ export function ActionButton({
   variant = "secondary",
   tooltip,
   disabled = false,
+  loading = false,
   className = "",
   onClick,
   size = "md",
   iconClassName = "",
 }: ActionButtonProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
+  const animationsEnabled = useAnimationsEnabled();
 
   // Auto-detect icon-only if no label is provided (but preserve special variants)
   const effectiveVariant = !label && variant !== "icon-only" && variant !== "highlight" && variant !== "text" ? "icon-only" : variant;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!disabled && onClick) {
+    if (!disabled && !loading && onClick) {
       onClick(e);
     }
   };
@@ -181,13 +185,16 @@ export function ActionButton({
   };
 
   const buttonStyles = getButtonStyles();
-  const isDisabled = disabled;
+  const isDisabled = disabled || loading;
 
   return (
     <button
+      type="button"
       id={id}
+      aria-label={label || tooltip}
+      aria-busy={loading || undefined}
       onClick={handleClick}
-      className={`${buttonStyles.className} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={`${buttonStyles.className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
       style={!isDisabled ? buttonStyles.style : { ...buttonStyles.style, opacity: 0.5 }}
       onMouseEnter={!isDisabled ? buttonStyles.onMouseEnter : undefined}
       onMouseLeave={!isDisabled ? buttonStyles.onMouseLeave : undefined}
@@ -196,8 +203,9 @@ export function ActionButton({
     >
       <div className={effectiveVariant === "icon-only" ? `${getIconSize()} flex items-center justify-center` : `${getIconSize()} flex items-center justify-center`}>
         <Icon
-          icon={icon}
-          className={`${getIconSize()} ${iconClassName}`}
+          aria-hidden="true"
+          icon={loading ? "solar:refresh-bold" : icon}
+          className={`${getIconSize()} ${loading && animationsEnabled ? "animate-spin" : ""} ${iconClassName}`}
         />
       </div>
       {effectiveVariant !== "icon-only" && label && (

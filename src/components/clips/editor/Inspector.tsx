@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useId, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 
 import { SearchStyleInput } from "../../ui/Input";
@@ -141,6 +141,8 @@ function ShadeChoice({
 }) {
   const { showModal, hideModal } = useGlobalModal();
   const [typed, setTyped] = useState(toHex(value));
+  const errorId = useId();
+  const invalid = !/^[0-9a-fA-F]{6}$/.test(typed.trim().replace(/^#/, ""));
 
   useEffect(() => {
     setTyped(toHex(value));
@@ -180,7 +182,7 @@ function ShadeChoice({
           />
         </Tooltip>
 
-        <div className="min-w-0 flex-1" onBlur={() => setTyped(toHex(value))}>
+        <div className="min-w-0 flex-1">
           <SearchStyleInput
             icon="solar:hashtag-bold"
             value={typed.replace(/^#/, "")}
@@ -188,11 +190,21 @@ function ShadeChoice({
             maxLength={7}
             placeholder="ffffff"
             aria-label={t("clips.editor.overlay.colour.hex")}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? errorId : undefined}
             className="min-w-0 text-sm uppercase"
             onChange={(event) => accept(event.target.value)}
           />
         </div>
       </div>
+
+      {invalid && (
+        <p id={errorId} role="status" className="font-minecraft text-xs leading-relaxed text-red-300">
+          {t("clips.editor.overlay.colour.invalid", {
+            defaultValue: "Use six hexadecimal digits (0-9, A-F). The last valid colour is kept.",
+          })}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-1.5">
         {SWATCHES.map((preset) => (

@@ -77,6 +77,7 @@ export function useSyncPacks() {
   const browseProfile = profile ?? selectedProfile ?? profiles[0] ?? null;
 
   const [packs, setPacks] = useState<SyncPack[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [localJars, setLocalJars] = useState<Record<string, string[]>>({});
   const [matrix, setMatrix] = useState<Record<string, SyncPackModMatrix[]>>({});
@@ -100,20 +101,26 @@ export function useSyncPacks() {
   const expandedRef = useRef<string | null>(null);
   const profilesRequested = useRef(false);
   const busyRef = useRef(false);
+  const loadVersion = useRef(0);
   expandedRef.current = expandedPack;
-  busyRef.current = isBusy;
 
   const load = useCallback(async () => {
+    const version = ++loadVersion.current;
+    setLoadStatus("loading");
     const [loaded, detected] = await Promise.all([
       SyncPackService.getSyncPacks().catch((err) => {
-        toast.error(t("syncPacks.loadError", { error: parseErrorMessage(err) }));
+        if (version === loadVersion.current) {
+          toast.error(t("syncPacks.loadError", { error: parseErrorMessage(err) }));
+        }
         return null;
       }),
       profile
         ? SyncPackService.getProfileSyncConflicts(profile.id).catch(() => [])
         : Promise.resolve([]),
     ]);
+    if (version !== loadVersion.current) return;
     if (loaded) setPacks(loaded);
+    setLoadStatus(loaded ? "ready" : "error");
     setConflicts(detected);
   }, [profile, t]);
 
@@ -135,10 +142,12 @@ export function useSyncPacks() {
   }, [load, loadPackDetails]);
 
   const busy = useCallback(async (action: () => Promise<void>) => {
+    busyRef.current = true;
     setIsBusy(true);
     try {
       await action();
     } finally {
+      busyRef.current = false;
       setIsBusy(false);
     }
   }, []);
@@ -280,6 +289,8 @@ export function useSyncPacks() {
       preset: SyncTargetPreset,
       source: { seedFrom?: string | null; externalPath?: string | null },
     ) => {
+      if (busyRef.current) return false;
+      let added = false;
       await busy(async () => {
         try {
           await SyncPackService.addSyncPackTarget(
@@ -288,6 +299,7 @@ export function useSyncPacks() {
             defaultKindFor(preset.kindType),
             source,
           );
+          added = true;
           toast.success(
             t("syncPacks.targets.addSuccess", { path: preset.path }),
           );
@@ -301,16 +313,20 @@ export function useSyncPacks() {
           );
         }
       });
+      return added;
     },
     [busy, refresh, t],
   );
 
   const createPack = useCallback(
     async (name: string) => {
-      if (!name || isBusy) return;
+      const trimmed = name.trim();
+      if (!trimmed || busyRef.current) return false;
+      let succeeded = false;
       await busy(async () => {
         try {
-          const created = await SyncPackService.createSyncPack({ name });
+          const created = await SyncPackService.createSyncPack({ name: trimmed });
+          succeeded = true;
           await load();
           setExpandedPack(created.id);
         } catch (err) {
@@ -319,8 +335,9 @@ export function useSyncPacks() {
           );
         }
       });
+      return succeeded;
     },
-    [busy, isBusy, load, t],
+    [busy, load, t],
   );
 
   const applyToggle = useCallback(
@@ -664,6 +681,7 @@ export function useSyncPacks() {
 
   return {
     packs,
+    loadStatus,
     conflicts,
     localJars,
     matrix,

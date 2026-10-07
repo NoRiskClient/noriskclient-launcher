@@ -568,7 +568,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           </Tooltip>
         )}
 
-        <ContentActionButtons actions={toolbarActions} size="sm" />
+        <ContentActionButtons actions={toolbarActions} size="sm" className="[&>#refresh]:h-8 [&>#refresh]:min-w-[38px] [&>#refresh]:justify-center" />
       </div>
 
       <div

@@ -328,11 +328,12 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         >
           <div className="space-y-2">
             <div className="relative mb-2">
-              <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2 border border-white/10 hover:border-white/20 transition-colors mr-1">
+              <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2 border border-white/10 hover:border-white/20 transition-colors mr-1 focus-within:outline focus-within:outline-2 focus-within:[outline-style:solid] focus-within:-outline-offset-2 focus-within:outline-white/70">
                 <Icon icon="solar:magnifer-bold" className="w-3 h-3 text-white/50 flex-shrink-0" />
                 <input
                   type="text"
                   placeholder={t('placeholders.search_version')}
+                  aria-label={t('placeholders.search_version')}
                   value={gameVersionSearchTerm}
                   onChange={(e) => onGameVersionSearchTermChange(e.target.value)}
                   className="bg-transparent text-white placeholder-white/50 font-minecraft text-xs flex-1 outline-none min-w-0"
@@ -371,7 +372,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
         {projectType !== 'datapack' && (
           <AccordionItem
             key={categoriesGroup?.headerValue || "categories_filter_accordion"} // Use a fallback key
-            title={categoriesGroup?.accordionTitle || t('modrinth.categories')} // Use a fallback title
+            title={t('modrinth.categories')}
             defaultOpen={categoryActiveCount > 0}
             activeCount={categoryActiveCount}
           >
@@ -469,4 +470,4 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
       </div>
     </div>
   );
-}; 
+};

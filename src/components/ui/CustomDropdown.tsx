@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useId, useState, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
+import { usePopupNavigation } from "./dropdown/usePopupNavigation";
+import { useSettingControl } from "./settings/SettingControlContext";
 
 export interface DropdownOption {
   value: string;
@@ -34,39 +36,44 @@ export function CustomDropdown({
   const isSm = size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const row = useSettingControl();
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  usePopupNavigation(isOpen, panelRef, triggerRef, () => setIsOpen(false));
 
   const handleOptionClick = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
   };
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Label above (only if provided) */}
       {label && (
-        <label className="block text-white font-smallcaps text-lg mb-2">
+        <span id={`${id}-label`} className="block text-white font-smallcaps text-lg mb-2">
           {label}
-        </label>
+        </span>
       )}
 
       {/* Dropdown Button */}
       <button
+        type="button"
+        ref={triggerRef}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? id : undefined}
+        aria-labelledby={label ? `${id}-label` : row.labelId}
+        aria-label={!label && !row.labelId ? selectedOption?.label : undefined}
+        aria-describedby={row.descriptionId}
+        onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setIsOpen(true); } }}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 transition-all duration-200 focus:outline-none focus:ring-0 focus:border-transparent ${
+        className={`flex items-center gap-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40 ${
           variant === 'search'
             ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
             : label
@@ -112,7 +119,7 @@ export function CustomDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full mt-2 ${MENU_PANEL_CLASSES} ${
+        <div ref={panelRef} id={id} role="listbox" aria-label={label || selectedOption?.label} className={`absolute top-full mt-2 max-h-80 overflow-y-auto custom-scrollbar ${MENU_PANEL_CLASSES} ${
           variant === 'search' ? 'left-0 right-0' : label ? 'left-0 right-0' : 'left-0 w-56'
         }`}>
           <div className="py-2">
@@ -122,8 +129,13 @@ export function CustomDropdown({
                   <div className={menuSeparatorClasses(isSm)} />
                 )}
                 <button
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  data-popup-item
+                  tabIndex={-1}
                   onClick={() => handleOptionClick(option.value)}
-                  className={`${menuItemClasses(isSm)} ${
+                  className={`${menuItemClasses(isSm)} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70 ${
                     option.value === value
                       ? 'bg-white/10 text-white'
                       : 'text-white/80 hover:bg-white/5 hover:text-white'

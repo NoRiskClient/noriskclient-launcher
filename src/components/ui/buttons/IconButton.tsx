@@ -1,7 +1,9 @@
 "use client";
 
+import { useAnimationsEnabled } from "../../../hooks/useEntranceAnimation";
+
 import type React from "react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useId, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -50,12 +52,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     ref,
   ) => {
     const buttonRef = useRef<HTMLButtonElement>(null);
+    const descriptionId = useId();
     const [ripples, setRipples] = useState<RippleType[]>([]);
     const rippleCounter = useRef(0);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore(
-      (state) => state.isBackgroundAnimationEnabled,
-    );
+    const isBackgroundAnimationEnabled = useAnimationsEnabled();
     const [isPressed, setIsPressed] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
 
@@ -134,7 +135,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     const radiusClass = getBorderRadiusClass();
     const accessibilityProps = getAccessibilityProps({
       label,
-      description,
       disabled
     });    const getIconButtonSizeClasses = () => {
       switch (size) {
@@ -256,6 +256,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
 
     const buttonElement = (
       <button
+        type="button"
         ref={mergedRef}
         disabled={disabled}
         onClick={handleRipple}
@@ -270,7 +271,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           "text-shadow-sm",
           getBorderClasses(),
           getShadowClasses(),
-          "focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20",
+          "focus:outline-none focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           displayVariant !== "themed-surface" && sizeClasses,
           className,
@@ -283,6 +284,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           color: colors.text,
           filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
         }}
+        {...accessibilityProps}
+        aria-describedby={description ? descriptionId : undefined}
         {...props}
       >
         {variant !== "ghost" &&
@@ -310,6 +313,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         >
           {icon}
         </span>
+        {description && <span id={descriptionId} className="sr-only">{description}</span>}
       </button>
     );
 

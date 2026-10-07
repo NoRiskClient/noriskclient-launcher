@@ -66,7 +66,7 @@ export function PlayheadClock({ live, view, color }: { live: LiveTime; view: Tim
   const seconds = useLiveTime(live);
   return (
     <span
-      className="min-w-0 truncate font-minecraft text-lg tabular-nums leading-none"
+      className="shrink-0 whitespace-nowrap font-minecraft text-lg tabular-nums leading-none"
       style={{ color }}
     >
       {formatTime(view.toView(seconds))}

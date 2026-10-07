@@ -107,11 +107,12 @@ export function ContentTile({
           : `bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30 ${!enabled ? "opacity-55" : ""}`
       }`}
     >
-      <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected || menuOpen || versionDropdownOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}>
         <CheckboxV2
           size="sm"
           checked={isSelected}
           onChange={() => onToggleSelection()}
+          aria-label={`${isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}: ${displayName}`}
           tooltip={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
         />
       </div>
@@ -144,6 +145,7 @@ export function ContentTile({
         <div className="flex items-center gap-1.5">
           {onNameClick ? (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onNameClick(); }}
               className={`text-sm text-white font-minecraft truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
               style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
@@ -182,6 +184,7 @@ export function ContentTile({
         <div className="flex items-center gap-2 mt-1 text-xs font-minecraft">
           <div className="relative min-w-0">
             <button
+              type="button"
               ref={versionButtonRef}
               onClick={(e) => { e.stopPropagation(); if (isSwitchable && !isSwitchingVersion) onVersionClick(); }}
               disabled={!isSwitchable || isSwitchingVersion}
@@ -234,6 +237,8 @@ export function ContentTile({
       {onQuickUpdate && (
         <Tooltip content={isQuickUpdating ? t("profiles.v3.tile.updating") : (quickUpdateTooltip ?? t("profiles.v3.tile.updateToLatest"))}>
           <button
+            type="button"
+            aria-label={`${isQuickUpdating ? t("profiles.v3.tile.updating") : t("profiles.v3.tile.updateToLatest")}: ${displayName}`}
             onClick={(e) => { e.stopPropagation(); if (!quickUpdateDisabled && !isQuickUpdating) onQuickUpdate(); }}
             disabled={quickUpdateDisabled || isQuickUpdating}
             className={`h-8 w-8 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -257,6 +262,7 @@ export function ContentTile({
         title={enabled ? t("profiles.v3.tile.disable") : t("profiles.v3.tile.enable")}
       >
         <ToggleSwitch
+          aria-label={`${enabled ? t("profiles.v3.tile.disable") : t("profiles.v3.tile.enable")}: ${displayName}`}
           checked={enabled}
           onChange={() => onToggle()}
           disabled={busy}
@@ -266,9 +272,13 @@ export function ContentTile({
 
       <div className="relative flex-shrink-0">
         <button
+          type="button"
           ref={menuButtonRef}
+          aria-label={`${t("common.more")}: ${displayName}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
           onClick={(e) => { e.stopPropagation(); onMenuToggle(!menuOpen); }}
-          className="p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+          className={`p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 focus-visible:text-white focus-visible:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 transition-opacity ${menuOpen || versionDropdownOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}
         >
           <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
         </button>

@@ -8,14 +8,15 @@
  * focus. So the header uses the V3 profile-detail top-bar vocabulary
  * (h-11 toolbar, font-minecraft uppercase breadcrumb, thin accent
  * indicator on the docked edge) and the backdrop is lighter, signalling
- * "non-blocking side task" instead of "stop everything".
+ * a docked side task. Its modal focus contract still keeps keyboard input
+ * within the sheet and restores the invoking control when it closes.
  *
  * Mod detail is pushed onto a stacked layer inside the sheet (see the
  * `detail` state + `onProjectClick` path below) rather than routing
  * away, so the user never loses the current search or scroll position.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useCallback, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -28,6 +29,8 @@ import { ModrinthSearchV2 } from "../../modrinth/v2/ModrinthSearchV2";
 import { ModDetailPage } from "../../mods/ModDetailPage";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useModSearchStoreSnapshot } from "./useModSearchStoreSnapshot";
+import { ModalScopeContext } from "../../ui/ModalScope";
+import { isTopDialog, registerDialog } from "../../ui/modal-focus";
 
 export interface BrowseContentSideSheetV3Props {
   open: boolean;
@@ -74,13 +77,62 @@ export function BrowseContentSideSheetV3({
   // the sheet re-opens so a fresh open never lands inside a detail view
   // from a prior session.
   const [detail, setDetail] = useState<{ source: "modrinth" | "curseforge"; projectId: string } | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const dialogId = useId();
+  const backButtonRef = useRef<HTMLButtonElement | null>(null);
+  const searchLayerRef = useRef<HTMLDivElement | null>(null);
+  const detailReturnFocusRef = useRef<HTMLElement | null>(null);
+  const navigationFocusRef = useRef<{ direction: "push" | "pop"; from: HTMLElement | null } | null>(null);
+
+  const latest = useRef({ open, detail, onClose, t });
+  latest.current = { open, detail, onClose, t };
   useEffect(() => { if (!open) setDetail(null); }, [open]);
   const handleProjectClick = useCallback(
     (project: any, source: "modrinth" | "curseforge") => {
+      if (!latest.current.open) return;
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      // Only the real named project button owns exact-node restoration.
+      detailReturnFocusRef.current = active && active.tagName === "BUTTON" &&
+        searchLayerRef.current?.contains(active) &&
+        active.getAttribute("aria-label") === latest.current.t("content.view_project", { title: project.title })
+          ? active : null;
+      navigationFocusRef.current = { direction: "push", from: active };
       setDetail({ source, projectId: project.project_id });
     },
     [],
   );
+  const handleDetailBack = useCallback(() => {
+    if (!latest.current.open || !latest.current.detail) return;
+    const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    navigationFocusRef.current = { direction: "pop", from };
+    setDetail(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      navigationFocusRef.current = null;
+      detailReturnFocusRef.current = null;
+      return;
+    }
+    const panel = panelRef.current;
+    const transition = navigationFocusRef.current;
+    if (!panel || !transition || (transition.direction === "push") !== Boolean(detail)) return;
+    const target = detail ? backButtonRef.current : detailReturnFocusRef.current;
+    navigationFocusRef.current = null;
+    if (!detail) detailReturnFocusRef.current = null;
+    if (!isTopDialog(panel)) return;
+    const active = document.activeElement;
+    const lost = !active || active === document.body || active === document.documentElement || !active.isConnected;
+    const outgoingHidden = active === transition.from && active instanceof HTMLElement && active.getClientRects().length === 0;
+    // A connected visible action/owned portal (including newly incoming focus)
+    // keeps priority. This is one committed navigation, not generic recovery.
+    if (!lost && !outgoingHidden) return;
+    const usable = target?.isConnected && panel.contains(target) &&
+      !target.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !target.matches(':disabled, [aria-disabled="true"]') && target.getClientRects().length > 0;
+    const focusTarget = usable && target ? target : panel;
+    focusTarget.focus({ preventScroll: true });
+  }, [open, detail]);
 
   // Isolate the profile-scoped filters from the standalone /mods tab —
   // otherwise the game_version / loader auto-applied inside the sheet bleed
@@ -88,26 +140,30 @@ export function BrowseContentSideSheetV3({
   useModSearchStoreSnapshot(open);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      // Stack-aware: ESC pops the detail layer first if it's open, so the
-      // user doesn't accidentally blow away the whole sheet from a nested
-      // view. A second ESC then closes the sheet itself.
-      if (detail) {
-        setDetail(null);
-        return;
-      }
-      onClose();
-    };
-    window.addEventListener("keydown", onKey);
+    if (!open || !panelRef.current) return;
+    // Closed profile consumers stay mounted: capture the actual opener
+    // at this opening, not during their initial closed render.
+    const opener = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const release = registerDialog({
+      panel: panelRef.current,
+      id: dialogId,
+      returnFocus: opener,
+      canEscape: () => true,
+      close: () => {
+        // Local menus and higher dialogs consume Escape first. At this
+        // layer it pops the latest detail, then closes on a second Escape.
+        if (latest.current.detail) handleDetailBack();
+        else latest.current.onClose();
+      },
+    });
     return () => {
-      window.removeEventListener("keydown", onKey);
+      release();
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose, detail]);
+  }, [open, dialogId]);
 
   if (!open) return null;
 
@@ -120,12 +176,17 @@ export function BrowseContentSideSheetV3({
     t("profiles.content.addMods");
 
   return createPortal(
-    <>
+    <ModalScopeContext.Provider value={dialogId}>
       {/* Backdrop — lighter than the Modal spec so the sheet reads as
           "docked side task", not "blocking dialog". Blurred so focus lands
           on the sheet while the profile view behind stays readable. */}
       <div
-        onClick={onClose}
+        data-modal-owner={dialogId}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget || !isTopDialog(panelRef.current)) return;
+          event.stopPropagation();
+          latest.current.onClose();
+        }}
         aria-hidden="true"
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
       />
@@ -136,6 +197,9 @@ export function BrowseContentSideSheetV3({
           left-to-right gradient gives the surface depth (slightly lighter on
           the docked edge where the accent stripe sits). */}
       <aside
+        ref={panelRef}
+        tabIndex={-1}
+        data-modal-id={dialogId}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -190,7 +254,8 @@ export function BrowseContentSideSheetV3({
           <div className="flex items-center gap-2 min-w-0">
             {detail ? (
               <button
-                onClick={() => setDetail(null)}
+                ref={backButtonRef}
+                onClick={handleDetailBack}
                 className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
                 title={t("common.back")}
               >
@@ -244,7 +309,7 @@ export function BrowseContentSideSheetV3({
               state is persisted in the `useModSearchStore` zustand store,
               so the React component stays mounted and its data survives;
               only rendering is skipped. */}
-          <div className={`absolute inset-0 p-4 ${detail ? "hidden" : ""}`}>
+          <div ref={searchLayerRef} className={`absolute inset-0 p-4 ${detail ? "hidden" : ""}`}>
             <ModrinthSearchV2
               profiles={[profile]}
               selectedProfileId={profile.id}
@@ -280,7 +345,7 @@ export function BrowseContentSideSheetV3({
               <ModDetailPage
                 sourceOverride={detail.source}
                 projectIdOverride={detail.projectId}
-                onBack={() => setDetail(null)}
+                onBack={handleDetailBack}
                 hideBackButton
                 targetProfile={profile}
                 installTarget={installTarget}
@@ -289,7 +354,7 @@ export function BrowseContentSideSheetV3({
           )}
         </div>
       </aside>
-    </>,
+    </ModalScopeContext.Provider>,
     document.body,
   );
 }

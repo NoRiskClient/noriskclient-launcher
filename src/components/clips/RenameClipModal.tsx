@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +18,7 @@ export function RenameClipModal({ currentName, onClose, onConfirm }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState(currentName);
   const [saving, setSaving] = useState(false);
+  const nameId = useId();
 
   const wanted = name.trim();
   const unchanged = !wanted || wanted === currentName;
@@ -66,10 +67,11 @@ export function RenameClipModal({ currentName, onClose, onConfirm }: Props) {
         </p>
 
         <div>
-          <label className="mb-2 block font-smallcaps text-base text-white">
+          <label htmlFor={nameId} className="mb-2 block font-smallcaps text-base text-white">
             {t("clips.gallery.rename_label")}
           </label>
           <SearchStyleInput
+            id={nameId}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={currentName}

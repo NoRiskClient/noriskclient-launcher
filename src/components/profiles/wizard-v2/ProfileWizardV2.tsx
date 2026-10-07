@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { MinecraftVersion, VersionManifest } from "../../../types/minecraft";
-import type { ModLoader } from "../../../types/profile";
+import type { ModLoader, Profile, UpdateProfileParams } from "../../../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 import { Modal } from "../../ui/Modal";
 import { Button } from "../../ui/buttons/Button";
@@ -12,7 +12,7 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import { Card } from "../../ui/Card";
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import { ProfileWizardV2Step2 } from "./ProfileWizardV2Step2";
-import { ProfileWizardV2Step3 } from "./ProfileWizardV2Step3";
+import { ProfileWizardV2Step3, type ProfileWizardDetailsDraft } from "./ProfileWizardV2Step3";
 import { useProfileStore } from "../../../store/profile-store";
 import type { CreateProfileParams } from "../../../types/profile";
 import type { ChosenIcon } from "../IconPicker";
@@ -55,7 +55,7 @@ type WizardStep = 0 | 1 | 2 | 3 | "launcher" | "launcher-review";
 
 interface ProfileWizardV2Props {
   onClose: () => void;
-  onSave: (profile: any) => void;
+  onSave: (profile: Profile) => void | Promise<void>;
   onSource?: (source: Exclude<ProfileSource, "blank" | "launcher">) => void;
   onImported?: (profileIds: string[]) => void;
   startAtSource?: boolean;
@@ -79,6 +79,22 @@ export function ProfileWizardV2({
   const [loading, setLoading] = useState(true);
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const versionsReadRef = useRef(0);
+  const versionsPendingRef = useRef(true);
+  const acceptedProfileIdRef = useRef<string | null>(null);
+  const creationPromiseRef = useRef<Promise<Profile> | null>(null);
+  const iconAppliedRef = useRef<string | null>(null);
+  const [createdButIncomplete, setCreatedButIncomplete] = useState(false);
+  const [detailsDraft, setDetailsDraft] = useState<ProfileWizardDetailsDraft | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      versionsReadRef.current += 1;
+    };
+  }, []);
   
   // Step 1 data
   const [minecraftVersions, setMinecraftVersions] = useState<MinecraftVersion[]>([]);
@@ -93,51 +109,62 @@ export function ProfileWizardV2({
   // NRC compatibility data
   const [nrcCompatibility, setNrcCompatibility] = useState<NrcCompatibilityData | null>(null);
 
-  useEffect(() => {
-    const loadMinecraftVersions = async () => {
+  const loadMinecraftVersions = useCallback(async () => {
+      const read = ++versionsReadRef.current;
+      const isCurrent = () => mountedRef.current && read === versionsReadRef.current;
+      versionsPendingRef.current = true;
       setLoading(true);
+      setError(null);
       setShowLoadingIndicator(false);
       
       // Show loading indicator only after 800ms delay
       const loadingTimeout = setTimeout(() => {
-        if (loading) {
+        if (isCurrent()) {
           setShowLoadingIndicator(true);
         }
       }, 800);
 
       try {
         const manifest = await invoke<VersionManifest>("get_minecraft_versions");
+        if (!isCurrent()) return;
         setMinecraftVersions(manifest.versions);
         
         // Auto-select latest release
         const latestRelease = manifest.versions.find(v => v.type === "release");
         if (latestRelease) {
-          setSelectedVersion(latestRelease.id);
+          setSelectedVersion(current => manifest.versions.some(version => version.id === current) ? current : latestRelease.id);
         }
       } catch (err) {
-        setError(t('profiles.wizard.loadVersionsError'));
+        if (isCurrent()) setError(t('profiles.wizard.loadVersionsError'));
         console.error("Failed to load Minecraft versions:", err);
       } finally {
         clearTimeout(loadingTimeout);
-        setLoading(false);
-        setShowLoadingIndicator(false);
+        if (isCurrent()) {
+          versionsPendingRef.current = false;
+          setLoading(false);
+          setShowLoadingIndicator(false);
+        }
       }
-    };
+  }, [t]);
 
-    loadMinecraftVersions();
-  }, []);
+  useEffect(() => {
+    void loadMinecraftVersions();
+    return () => { versionsReadRef.current += 1; };
+  }, [loadMinecraftVersions]);
 
   // Load NRC compatibility data in parallel
   useEffect(() => {
+    let cancelled = false;
     const loadNrcCompatibility = async () => {
       try {
         const packsConfig: NoriskModpacksConfig = { packs: await loadPacks(), repositories: {} };
-        setNrcCompatibility(extractNrcCompatibility(packsConfig));
+        if (!cancelled) setNrcCompatibility(extractNrcCompatibility(packsConfig));
       } catch (err) {
         logError(`Failed to load NRC compatibility: ${err}`);
       }
     };
-    loadNrcCompatibility();
+    void loadNrcCompatibility();
+    return () => { cancelled = true; };
   }, []);
 
   const filteredVersions = minecraftVersions
@@ -157,7 +184,7 @@ export function ProfileWizardV2({
     });
 
   const handleStep1Next = () => {
-    if (selectedVersion) {
+    if (!versionsPendingRef.current && !loading && !error && selectedVersion) {
       setCurrentStep(2);
     }
   };
@@ -168,7 +195,7 @@ export function ProfileWizardV2({
     setCurrentStep(3);
   };
 
-  const handleStep3Create = async (profileData: {
+  const handleStep3Create = (profileData: {
     name: string;
     group: string | null;
     minecraftVersion: string;
@@ -178,8 +205,8 @@ export function ProfileWizardV2({
     selectedNoriskPackId: string | null;
     use_shared_minecraft_folder?: boolean;
     chosenIcon: ChosenIcon;
-  }) => {
-    const { createProfile } = useProfileStore.getState();
+  }): Promise<Profile> => {
+    if (creationPromiseRef.current) return creationPromiseRef.current;
 
     const createParams: CreateProfileParams = {
       name: profileData.name,
@@ -189,50 +216,76 @@ export function ProfileWizardV2({
       selected_norisk_pack_id: profileData.selectedNoriskPackId || undefined,
       use_shared_minecraft_folder: profileData.use_shared_minecraft_folder,
     };
+    const ensureMounted = () => {
+      // This does not cancel or roll back an already accepted backend create.
+      if (!mountedRef.current) throw new Error(t('profiles.wizard.createdButIncomplete'));
+    };
 
-    const creationPromise = async () => {
-      const profileId = await createProfile(createParams);
-
-      // Update profile with additional settings
-      const updateData: any = {};
-      
-      if (profileData.group) {
-        updateData.group = profileData.group;
+    const completeProfile = async (): Promise<Profile> => {
+      ensureMounted();
+      let profileId = acceptedProfileIdRef.current;
+      if (!profileId) {
+        profileId = await useProfileStore.getState().createProfile(createParams);
+        if (typeof profileId !== "string" || !profileId) throw new Error(t('profiles.wizard.createError', { error: "Missing profile ID" }));
+        acceptedProfileIdRef.current = profileId;
       }
+      ensureMounted();
 
-      // Set memory settings
-      updateData.settings = {
-        memory: {
-          min: 1024, // Default minimum
-          max: profileData.memoryMaxMb
-        }
+      // Retry completes this ID only. Merge the actual settings rather than
+      // replacing fields that may already have been persisted in an earlier attempt.
+      const existing = await useProfileStore.getState().getProfile(profileId);
+      ensureMounted();
+      const updateData: UpdateProfileParams = {
+        ...createParams,
+        group: profileData.group,
+        clear_group: !profileData.group,
+        clear_selected_norisk_pack: !profileData.selectedNoriskPackId,
+        settings: {
+          ...existing.settings,
+          memory: { min: 1024, max: profileData.memoryMaxMb },
+        },
       };
+      await useProfileStore.getState().updateProfile(profileId, updateData);
+      ensureMounted();
 
-      if (Object.keys(updateData).length > 0) {
-        await useProfileStore.getState().updateProfile(profileId, updateData);
+      // The selected icon remains best-effort, as before.
+      const icon = profileData.chosenIcon;
+      const iconKey = JSON.stringify(icon);
+      if (iconAppliedRef.current !== iconKey) {
+        try {
+          await uploadProfileImages({
+            profileId,
+            imageType: "icon",
+            ...("url" in icon ? { iconUrl: icon.url } : { path: icon.path }),
+          });
+          iconAppliedRef.current = iconKey;
+        } catch (iconErr) {
+          console.warn("Failed to apply profile icon:", iconErr);
+        }
       }
-
-      // Apply the chosen profile icon (best-effort — a download failure must not abort creation)
-      try {
-        const icon = profileData.chosenIcon;
-        await uploadProfileImages({
-          profileId,
-          imageType: "icon",
-          ...("url" in icon ? { iconUrl: icon.url } : { path: icon.path }),
-        });
-      } catch (iconErr) {
-        console.warn("Failed to apply profile icon:", iconErr);
-      }
-
+      ensureMounted();
       const createdProfile = await useProfileStore.getState().getProfile(profileId);
-      onSave(createdProfile);
+      ensureMounted();
+      await onSave(createdProfile);
+      if (mountedRef.current) setCreatedButIncomplete(false);
       return createdProfile;
     };
 
-    return toast.promise(creationPromise(), {
+    const pending = (async () => {
+      try {
+        return await completeProfile();
+      } catch (err) {
+        if (mountedRef.current) setCreatedButIncomplete(Boolean(acceptedProfileIdRef.current));
+        throw err;
+      } finally {
+        creationPromiseRef.current = null;
+      }
+    })();
+    creationPromiseRef.current = pending;
+    return toast.promise(pending, {
       loading: t('profiles.wizard.creatingProfile'),
-      success: (createdProfile) => t('profiles.wizard.createSuccess', { name: createdProfile.name }),
-      error: (err) => t('profiles.wizard.createError', { error: parseErrorMessage(err) }),
+      success: createdProfile => t('profiles.wizard.createSuccess', { name: createdProfile.name }),
+      error: err => t('profiles.wizard.createError', { error: parseErrorMessage(err) }),
     });
   };
 
@@ -240,7 +293,8 @@ export function ProfileWizardV2({
     setCurrentStep(1);
   };
 
-  const handleBackToStep2 = () => {
+  const handleBackToStep2 = (draft: ProfileWizardDetailsDraft) => {
+    setDetailsDraft(draft);
     setCurrentStep(2);
   };
 
@@ -254,12 +308,16 @@ export function ProfileWizardV2({
       );
     }
 
-    if (error) {
-      return <StatusMessage type="error" message={error} />;
-    }
-
     return (
       <div className="space-y-6">
+        {error && (
+          <div className="space-y-3">
+            <StatusMessage type="error" message={error} />
+            <Button size="sm" variant="secondary" onClick={() => void loadMinecraftVersions()} disabled={loading}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
         {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <SearchWithFilters
@@ -295,9 +353,12 @@ export function ProfileWizardV2({
             const isNrcCompatible = nrcCompatibility?.compatibleVersions.has(version.id);
 
             return (
-              <div
+              <button
+                type="button"
+                aria-pressed={selectedVersion === version.id}
+                aria-label={version.id}
                 key={version.id}
-                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 rounded-lg ${
+                className={`relative p-4 cursor-pointer transition-all duration-200 border-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
                   selectedVersion === version.id
                     ? "border-current bg-current/10 hover:bg-current/15"
                     : "border-transparent bg-black/20 hover:bg-black/30"
@@ -326,12 +387,12 @@ export function ProfileWizardV2({
                     {version.type}
                   </p>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
 
-        {filteredVersions.length === 0 && !loading && (
+        {filteredVersions.length === 0 && !loading && !error && (
           <div className="col-span-3 text-center py-8">
             <Icon icon="solar:magnifer-bold" className="w-12 h-12 text-white/50 mx-auto mb-2" />
             <p className="text-xs font-smallcaps text-white/70">{t('profiles.wizard.noVersionsFound')}</p>
@@ -342,7 +403,7 @@ export function ProfileWizardV2({
   };
 
   const renderFooter = () => (
-    <div className={`flex items-center ${startAtSource && onSource ? "justify-between" : "justify-end"}`}>
+    <div className={`flex flex-wrap gap-3 items-center ${startAtSource && onSource ? "justify-between" : "justify-end"}`}>
       {startAtSource && onSource && (
         <Button
           variant="ghost"
@@ -356,7 +417,7 @@ export function ProfileWizardV2({
       <Button
         variant="default"
         onClick={handleStep1Next}
-        disabled={loading || !selectedVersion}
+        disabled={loading || Boolean(error) || !selectedVersion}
         size="md"
         className="min-w-[120px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}
@@ -446,6 +507,8 @@ export function ProfileWizardV2({
         onBack={handleBackToStep1}
         selectedMinecraftVersion={selectedVersion}
         nrcCompatibility={nrcCompatibility}
+        initialLoader={selectedLoader}
+        initialLoaderVersion={selectedLoaderVersion}
       />
     );
   }
@@ -461,6 +524,8 @@ export function ProfileWizardV2({
         selectedLoader={selectedLoader}
         selectedLoaderVersion={selectedLoaderVersion}
         defaultGroup={defaultGroup}
+        initialDraft={detailsDraft}
+        createdButIncomplete={createdButIncomplete}
       />
     );
   }
@@ -478,4 +543,4 @@ export function ProfileWizardV2({
       </div>
     </Modal>
   );
-} 
+}

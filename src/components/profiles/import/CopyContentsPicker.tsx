@@ -60,7 +60,7 @@ export function CopyContentsPicker({
               onClick={() =>
                 !empty && onChange({ ...selection, [bucket.key]: !selection[bucket.key] })
               }
-              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+              className={`flex w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 empty
                   ? "border-white/5 bg-white/[0.01] opacity-50"
                   : "cursor-pointer border-white/10 bg-black/20 hover:border-white/20"
@@ -78,6 +78,7 @@ export function CopyContentsPicker({
                 size="sm"
                 checked={active}
                 disabled={empty}
+                aria-label={t(`profiles.launcherImport.confirm.kind_${bucket.key}`)}
                 onChange={(next) => onChange({ ...selection, [bucket.key]: next })}
               />
               <span className="min-w-0 flex-1 truncate font-minecraft text-sm text-white/90">

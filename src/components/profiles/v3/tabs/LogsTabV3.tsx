@@ -32,6 +32,7 @@ import { Tooltip } from "../../../ui/Tooltip";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { parseErrorMessage } from "../../../../utils/error-utils";
+import { getTopDialogId } from "../../../ui/modal-focus";
 
 interface LogsTabV3Props {
   profile: Profile;
@@ -69,7 +70,9 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   const [rawContent, setRawContent] = useState<string>("");
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const error = listError || contentError;
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,8 +84,33 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   const [atBottom, setAtBottom] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
+  const logContainerRef = useRef<HTMLDivElement>(null);
+  const handleResetFilters = (event: { currentTarget: HTMLButtonElement }) => {
+    const trigger = event.currentTarget;
+    const owner = logContainerRef.current;
+    // Reserve only this active Reset's steady owner before the no-match branch disappears.
+    const topDialogId = getTopDialogId();
+    const ownerScope = owner?.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const triggerScope = trigger.closest<HTMLElement>("[data-modal-owner], [data-modal-id]");
+    const ownerDialogId = ownerScope?.dataset.modalOwner ?? ownerScope?.dataset.modalId;
+    const triggerDialogId = triggerScope?.dataset.modalOwner ?? triggerScope?.dataset.modalId;
+    if (document.activeElement === trigger && trigger.isConnected && !trigger.disabled &&
+      owner?.isConnected && owner.contains(trigger) &&
+      !trigger.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      !owner.closest('[inert], [hidden], [aria-hidden="true"]') &&
+      owner.getClientRects().length > 0 && getComputedStyle(owner).visibility !== "hidden" &&
+      getComputedStyle(owner).visibility !== "collapse" &&
+      (!topDialogId || (ownerDialogId === topDialogId && triggerDialogId === topDialogId))) {
+      owner.focus({ preventScroll: true });
+    }
+    setSearchQuery(""); setEnabledLevels({ ERROR: true, WARN: true, INFO: true, DEBUG: true, TRACE: true });
+  };
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const mountedRef = useRef(true);
+  const listGeneration = useRef(0);
+  const contentGeneration = useRef(0);
+  const profileIdRef = useRef(profile.id);
+  profileIdRef.current = profile.id;
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
@@ -95,11 +123,13 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   // to paths[0] (usually `latest.log`).
   const loadFiles = useCallback(async () => {
     if (!profile?.id) return;
+    const generation = ++listGeneration.current;
+    const current = () => mountedRef.current && generation === listGeneration.current && profileIdRef.current === profile.id;
     setIsLoadingList(true);
-    setError(null);
+    setListError(null);
     try {
       const paths = await getProfileLogFiles(profile.id);
-      if (!mountedRef.current) return;
+      if (!current()) return;
       // latest.log pinned to top, rest sorted by filename descending (newer first).
       paths.sort((a, b) => {
         const aName = getFilename(a).toLowerCase();
@@ -113,36 +143,57 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
       onRefresh?.();
     } catch (err) {
       console.error("[V3 Logs] Failed to list:", err);
-      if (mountedRef.current) setError(parseErrorMessage(err));
+      if (current()) setListError(parseErrorMessage(err));
     } finally {
-      if (mountedRef.current) setIsLoadingList(false);
+      if (current()) setIsLoadingList(false);
     }
   }, [profile.id, onRefresh]);
+
+  useEffect(() => {
+    ++listGeneration.current;
+    ++contentGeneration.current;
+    setLogFiles([]);
+    setSelectedPath(null);
+    setRawContent("");
+    setListError(null);
+    setContentError(null);
+    setIsLoadingContent(false);
+  }, [profile.id]);
 
   useEffect(() => {
     if (isActive) void loadFiles();
   }, [isActive, loadFiles]);
 
   // ── Load content when file changes ────────────────────────────────────────
-  useEffect(() => {
+  const loadContent = useCallback(async () => {
+    const generation = ++contentGeneration.current;
+    const current = () => mountedRef.current && generation === contentGeneration.current && profileIdRef.current === profile.id;
     if (!selectedPath) {
       setRawContent("");
+      setIsLoadingContent(false);
       return;
     }
     setIsLoadingContent(true);
-    setError(null);
-    (async () => {
+    setContentError(null);
       try {
         const content = await getLogFileContent(selectedPath);
-        if (mountedRef.current) setRawContent(content);
+        if (current()) setRawContent(content);
       } catch (err) {
         console.error("[V3 Logs] Failed to load content:", err);
-        if (mountedRef.current) setError(parseErrorMessage(err));
+        if (current()) setContentError(parseErrorMessage(err));
       } finally {
-        if (mountedRef.current) setIsLoadingContent(false);
+        if (current()) setIsLoadingContent(false);
       }
-    })();
-  }, [selectedPath]);
+  }, [selectedPath, profile.id]);
+
+  useEffect(() => {
+    // Never display one file's text under another file's name; retrying the same
+    // file does retain its last successfully read content.
+    setRawContent("");
+    setContentError(null);
+    void loadContent();
+    return () => { ++contentGeneration.current; };
+  }, [loadContent]);
 
   // Parse — memoized so we don't re-parse the full string on every render.
   const parsedLines = useMemo<ParsedLogLine[]>(() => {
@@ -200,6 +251,8 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         await navigator.clipboard.writeText(url);
         toast.success(t("profiles.v3.logs.urlCopied"));
       } catch { /* clipboard blocked — fine */ }
+    } catch {
+      // toast.promise already reports the upload failure; consume its rejection.
     } finally {
       if (mountedRef.current) setIsUploading(false);
     }
@@ -214,26 +267,29 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   const selectedFilename = selectedPath ? getFilename(selectedPath) : t("profiles.v3.logs.noFile");
 
   return (
-    <div className="flex flex-col min-h-0 flex-1 relative">
+    <div className="flex flex-col min-h-0 min-w-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
-        <div className="relative w-64 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-5 py-2 min-h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+        <div className="relative flex-[1_1_256px] min-w-0 max-w-64">
           <Icon icon="solar:magnifer-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("profiles.v3.logs.searchPlaceholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
+            aria-label={t("profiles.v3.logs.searchPlaceholder")}
+            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none focus:outline focus:outline-2 focus:[outline-style:solid] focus:-outline-offset-2 focus:outline-white/70 text-sm text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {LOG_LEVELS.map((lvl) => {
             const cfg = LEVEL_CONFIG[lvl];
             const active = enabledLevels[lvl];
             return (
               <button
                 key={lvl}
+                type="button"
+                aria-pressed={active}
                 onClick={() => toggleLevel(lvl)}
                 className={`h-8 px-2 rounded-md border text-[10px] font-minecraft uppercase tracking-wider transition-colors ${
                   active
@@ -248,14 +304,14 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
           })}
         </div>
 
-        <div className="flex-1" />
-
         {/* File-Picker */}
-        <div className="relative">
+        <div className="relative ml-auto min-w-0 w-[220px] max-w-full">
           <button
             onClick={() => setFileMenuOpen(v => !v)}
+            type="button"
+            aria-expanded={fileMenuOpen}
             disabled={logFiles.length === 0}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/80 flex items-center gap-1.5 max-w-[220px] disabled:opacity-50"
+            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/80 flex items-center gap-1.5 min-w-0 max-w-full disabled:opacity-50"
           >
             <Icon icon="solar:file-text-bold" className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{selectedFilename}</span>
@@ -281,6 +337,8 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         <Tooltip content={t("profiles.v3.logs.uploadTitle")}>
           <button
             onClick={handleUpload}
+            type="button"
+            aria-label={t("profiles.v3.logs.uploadTitle")}
             disabled={!rawContent || isUploading}
             className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center justify-center transition-colors"
           >
@@ -290,6 +348,8 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         <Tooltip content={t("profiles.v3.logs.openFolderTitle")}>
           <button
             onClick={handleOpenFolder}
+            type="button"
+            aria-label={t("profiles.v3.logs.openFolderTitle")}
             disabled={!selectedPath}
             className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center justify-center transition-colors"
           >
@@ -301,6 +361,9 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         <div className="relative">
           <button
             onClick={() => setSettingsOpen(v => !v)}
+            type="button"
+            aria-label={t("profiles.v3.logs.settingsTitle")}
+            aria-expanded={settingsOpen}
             className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
             title={t("profiles.v3.logs.settingsTitle")}
           >
@@ -327,13 +390,15 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
       {/* py-3 gives the first/last line breathing room from the toolbar and
           jump-to-bottom button. Virtuoso needs `flex: 1 + minHeight: 0`, the
           default would clamp it to ~400px. */}
-      <div className="flex-1 min-h-0 relative flex flex-col py-3">
+      <div ref={logContainerRef} tabIndex={-1} role="region" aria-label={t("logs.viewer_region")} className="flex-1 min-h-0 min-w-0 relative flex flex-col py-3 rounded focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70">
         {error && (
-          <div className="absolute top-3 left-3 right-3 z-20 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
+          <div role="alert" className="shrink-0 max-h-32 overflow-y-auto mx-3 mb-3 flex flex-wrap items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
+            <div className="flex-[1_1_160px] min-w-0 text-xs font-minecraft text-rose-100 [overflow-wrap:anywhere]">{error}</div>
             <button
-              onClick={loadFiles}
+              type="button"
+              disabled={isLoadingList || isLoadingContent}
+              onClick={() => listError ? void loadFiles() : void loadContent()}
               className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
@@ -346,7 +411,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
             {t("profiles.v3.content.loading")}
           </div>
-        ) : logFiles.length === 0 && !isLoadingList ? (
+        ) : error && parsedLines.length === 0 ? null : logFiles.length === 0 && !isLoadingList ? (
           <EmptyStateV3
             icon="solar:clipboard-text-bold-duotone"
             title={t("profiles.v3.logs.emptyFiles")}
@@ -359,8 +424,10 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
               {t("profiles.v3.content.loading")}
             </div>
           ) : null
+        ) : parsedLines.length === 0 ? (
+          <EmptyStateV3 icon="solar:document-text-linear" title={t("logs.empty_file")} />
         ) : visibleLines.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center justify-center h-full">
             <EmptyStateV3
               icon="solar:magnifer-linear"
               title={searchQuery
@@ -368,6 +435,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
                 : t("profiles.v3.logs.noMatchFilter")}
               hint={searchQuery ? undefined : t("profiles.v3.logs.noMatchFilterHint")}
             />
+            <button type="button" className="rounded px-3 py-2 hover:bg-white/10 text-white/70 font-minecraft text-xs focus-visible:outline focus-visible:outline-2 focus-visible:[outline-style:solid] focus-visible:-outline-offset-2 focus-visible:outline-white/70" onClick={handleResetFilters}>{t("logs.reset_filters")}</button>
           </div>
         ) : (
           <Virtuoso
@@ -378,7 +446,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             data={visibleLines}
             atBottomStateChange={setAtBottom}
             className="font-mono text-xs select-text px-3"
-            style={{ flex: 1, minHeight: 0 }}
+            style={{ flex: 1, minHeight: 0, minWidth: 0, width: "100%" }}
             itemContent={(_idx, line) => (
               <LogLine line={line} showThreadPrefix={showThreadPrefix} wordWrap={wordWrap} />
             )}
@@ -419,7 +487,7 @@ interface LogLineProps {
 
 const LogLine: React.FC<LogLineProps> = ({ line, showThreadPrefix, wordWrap }) => {
   const cfg = line.level ? LEVEL_CONFIG[line.level] : null;
-  const wrapClass = wordWrap ? "break-words whitespace-pre-wrap" : "whitespace-pre overflow-x-auto";
+  const wrapClass = wordWrap ? "[overflow-wrap:anywhere] whitespace-pre-wrap" : "whitespace-pre overflow-x-auto";
   // Message colour: ERROR/WARN stand out; other levels stay in neutral white/90.
   const isEmphasizedLevel = line.level === "ERROR" || line.level === "WARN";
   const messageColor = isEmphasizedLevel && cfg ? cfg.text : "text-white/90";
@@ -428,7 +496,7 @@ const LogLine: React.FC<LogLineProps> = ({ line, showThreadPrefix, wordWrap }) =
     <div className="flex flex-nowrap items-start py-0.5 hover:bg-white/5 px-2 -mx-2 rounded">
       {line.timestamp ? (
         <>
-          <span className={`pr-2 select-none ${cfg?.text ?? "text-white/70"}`}>
+          <span className={`pr-2 select-none min-w-0 max-w-[50%] whitespace-pre-wrap [overflow-wrap:anywhere] ${cfg?.text ?? "text-white/70"}`}>
             <span className="opacity-80">[{line.timestamp}]</span>
             {showThreadPrefix && line.thread && (
               <span className="opacity-80 ml-1">
@@ -450,6 +518,9 @@ const SettingsToggle: React.FC<{ label: string; checked: boolean; onChange: () =
   label, checked, onChange, accent,
 }) => (
   <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
     onClick={onChange}
     className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs font-minecraft text-white/80 hover:text-white hover:bg-white/5 transition-colors"
   >

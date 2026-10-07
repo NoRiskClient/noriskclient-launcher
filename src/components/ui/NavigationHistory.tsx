@@ -27,12 +27,13 @@ function NavIconButton({
 }: NavIconButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
       className={cn(
         "flex items-center justify-center h-8 w-8 rounded duration-150",
-        "focus:outline-none focus:ring-0 active:bg-transparent",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 active:bg-transparent",
         disabled
           ? "opacity-30 cursor-not-allowed"
           : "text-white/100 hover:text-white hover:bg-white/5 active:bg-transparent",

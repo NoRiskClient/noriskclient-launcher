@@ -43,6 +43,7 @@ export function SyncPacksPage() {
 
   const {
     packs,
+    loadStatus,
     conflicts,
     profile,
     browseProfile,
@@ -68,10 +69,12 @@ export function SyncPacksPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
-    if (isCreating) inputRef.current?.focus();
-  }, [isCreating]);
+    if (isCreating && !isSubmitting) inputRef.current?.focus();
+  }, [isCreating, isSubmitting]);
 
   const iconRefs: ProjectIconRef[] = packs.flatMap<ProjectIconRef>((pack) =>
     pack.mods.flatMap<ProjectIconRef>((entry) =>
@@ -88,13 +91,27 @@ export function SyncPacksPage() {
       : null;
 
   const closeDraft = () => {
+    if (submittingRef.current) return;
     setIsCreating(false);
     setDraftName("");
   };
 
   const submitDraft = async () => {
-    await createPack(draftName.trim());
-    closeDraft();
+    const name = draftName.trim();
+    if (!name || submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      if (await createPack(name)) {
+        setIsCreating(false);
+        setDraftName("");
+      }
+    } catch (err) {
+      toast.error(t("syncPacks.createError", { error: parseErrorMessage(err) }));
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const [selection, setSelection] = useState<Set<string>>(new Set());
@@ -265,6 +282,31 @@ export function SyncPacksPage() {
         )}
 
         <div className="space-y-2">
+          {loadStatus === "loading" && packs.length === 0 && (
+            <p role="status" className="py-8 text-center font-minecraft text-sm text-white/50">
+              {t("common.loading")}
+            </p>
+          )}
+          {loadStatus === "error" && (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <p role="status" className="font-minecraft text-sm text-red-300">
+                {t("syncPacks.listUnavailable")}
+              </p>
+              <button onClick={() => void refresh()} className="rounded border border-white/20 px-3 py-2 font-minecraft text-xs text-white/80 transition-colors hover:bg-white/10">
+                {t("common.retry", { defaultValue: "Retry" })}
+              </button>
+            </div>
+          )}
+          {loadStatus === "ready" && packs.length === 0 && !isCreating && (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <p role="status" className="font-minecraft text-base text-white/75">
+                {t("syncPacks.emptyTitle")}
+              </p>
+              <p className="max-w-md font-minecraft text-sm leading-relaxed text-white/50">
+                {t("syncPacks.emptyHint")}
+              </p>
+            </div>
+          )}
           {packs.map((pack) => (
             <SyncPackCard
               key={pack.id}
@@ -278,23 +320,26 @@ export function SyncPacksPage() {
 
           {isCreating && (
             <div
+              aria-busy={isSubmitting}
               className="flex items-center gap-3 rounded-lg border bg-black/20 px-4 py-3"
               style={{ borderColor: `${accentColor.value}55` }}
             >
               <input
                 ref={inputRef}
                 value={draftName}
+                disabled={isSubmitting}
+                aria-label={t("syncPacks.namePlaceholder")}
                 onChange={(event) => setDraftName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") submitDraft();
-                  if (event.key === "Escape") closeDraft();
+                  if (event.key === "Enter") { event.preventDefault(); void submitDraft(); }
+                  if (event.key === "Escape") { event.preventDefault(); closeDraft(); }
                 }}
                 placeholder={t("syncPacks.namePlaceholder")}
                 className="min-w-0 flex-1 bg-transparent font-minecraft text-lg normal-case text-white outline-none placeholder:text-white/25"
               />
               <button
                 onClick={submitDraft}
-                disabled={!draftName.trim() || showBusy}
+                disabled={!draftName.trim() || isSubmitting || showBusy}
                 className="px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider transition-opacity disabled:opacity-30"
                 style={{ color: accentColor.value }}
               >
@@ -302,6 +347,7 @@ export function SyncPacksPage() {
               </button>
               <button
                 onClick={closeDraft}
+                disabled={isSubmitting}
                 className="px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/35 transition-colors hover:text-white"
               >
                 {t("common.cancel")}

@@ -16,11 +16,13 @@ import { useInView } from "react-intersection-observer";
 import type { Profile } from "../../../../types/profile";
 import type { ScreenshotInfo } from "../../../../types/profile";
 import { getImagePreview } from "../../../../services/tauri-service";
+import { deleteFile } from "../../../../services/file-service";
+import { deleteProfileItems, removeDeletedSelection } from "../../../../services/profile-batch-delete";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { formatRelativeTime } from "../../../../utils/format-relative-time";
 import { ProfileScreenshotModal } from "../../ProfileScreenshotModal";
-import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
+import { ProfileBatchDeleteDialog } from "../../ProfileBatchDeleteDialog";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
@@ -62,6 +64,9 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [modalScreenshot, setModalScreenshot] = useState<ScreenshotInfo | null>(null);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const batchDeletingRef = useRef(false);
+  const batchDialogOpenRef = useRef(false);
+  const loadRequestRef = useRef(0);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -71,15 +76,18 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
+    const request = ++loadRequestRef.current;
     setLoading(true);
     setError(null);
     try {
       const list = await invoke<ScreenshotInfo[]>("list_profile_screenshots", { profileId: profile.id });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || request !== loadRequestRef.current) return;
       setScreenshots(list);
       // Stale Selektions-Eintraege dropen — wenn Files extern geloescht
       // wurden, haette selectedPaths sonst tote Pfade.
       setSelectedPaths(prev => {
+        // A failed delete must remain selected, including during the refresh.
+        if (batchDeletingRef.current) return prev;
         if (prev.size === 0) return prev;
         const alive = new Set(list.map(s => s.path));
         const kept = new Set<string>();
@@ -88,9 +96,9 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       });
     } catch (err) {
       console.error("[V3 Screenshots] Failed to load:", err);
-      if (mountedRef.current) setError(parseErrorMessage(err));
+      if (mountedRef.current && request === loadRequestRef.current) setError(parseErrorMessage(err));
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && request === loadRequestRef.current) setLoading(false);
     }
   }, [profile.id]);
 
@@ -111,6 +119,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const toggleSelection = (path: string) => {
+    if (batchDeletingRef.current) return;
     setSelectedPaths(prev => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path); else next.add(path);
@@ -130,46 +139,59 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
   }, []);
 
   const handleBatchDelete = useCallback(() => {
-    if (selectedPaths.size === 0) return;
-    const paths = Array.from(selectedPaths);
+    if (selectedPaths.size === 0 || batchDeletingRef.current || batchDialogOpenRef.current) return;
+    const paths = screenshots.filter(s => selectedPaths.has(s.path)).map(s => s.path);
+    if (paths.length === 0) return;
     const modalId = "batch-delete-screenshots";
     const doDelete = async () => {
+      if (batchDeletingRef.current) return;
+      batchDeletingRef.current = true;
       setIsBatchDeleting(true);
-      let successCount = 0;
       try {
-        for (const p of paths) {
-          try {
-            await invoke("delete_file", { path: p });
-            successCount++;
-          } catch (err) {
-            console.error("[V3 Screenshots] Delete failed for", p, err);
-          }
+        const result = await deleteProfileItems(paths, deleteFile);
+        if (mountedRef.current) {
+          const deleted = new Set(result.succeeded);
+          setScreenshots(prev => prev.filter(s => !deleted.has(s.path)));
+          setSelectedPaths(prev => removeDeletedSelection(prev, result.succeeded));
         }
-        toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: successCount }));
-        setSelectedPaths(new Set());
-        await loadData();
+        if (result.failed.length > 0) {
+          const errors = result.failed.map(({ id, error }) =>
+            `${screenshots.find(s => s.path === id)?.filename ?? id}: ${parseErrorMessage(error)}`,
+          ).join("\n");
+          toast.error(`${t("content_manager.update_result.finished_partial", {
+            succeeded: result.succeeded.length, failed: result.failed.length,
+          })}\n${t("content_manager.errors.batch_delete_failed", { errors })}`);
+        } else if (result.succeeded.length > 0) {
+          toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: result.succeeded.length }));
+        }
+        if (result.succeeded.length > 0 && mountedRef.current) await loadData();
       } finally {
-        setIsBatchDeleting(false);
+        batchDeletingRef.current = false;
+        batchDialogOpenRef.current = false;
+        if (mountedRef.current) setIsBatchDeleting(false);
         hideModal(modalId);
       }
     };
+    batchDialogOpenRef.current = true;
     showModal(modalId, (
-      <ConfirmDeleteDialog
-        isOpen={true}
+      <ProfileBatchDeleteDialog
         itemName={t("profiles.v3.screenshots.batchDeleteItemName", { count: paths.length })}
-        onClose={() => hideModal(modalId)}
+        onClose={() => { batchDialogOpenRef.current = false; hideModal(modalId); }}
         onConfirm={doDelete}
-        isDeleting={isBatchDeleting}
         title={t("profiles.v3.screenshots.batchDeleteTitle")}
         message={<p className="text-white/80 font-minecraft">{t("profiles.v3.screenshots.batchDeleteConfirm", { count: paths.length })}</p>}
       />
     ));
-  }, [selectedPaths, loadData, showModal, hideModal, isBatchDeleting, t]);
+  }, [selectedPaths, screenshots, loadData, showModal, hideModal, t]);
 
   // Esc clears selection
   useEffect(() => {
     if (selectedPaths.size === 0) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSelectedPaths(new Set()); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !batchDialogOpenRef.current && !batchDeletingRef.current) {
+        setSelectedPaths(new Set());
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedPaths.size]);
@@ -221,7 +243,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
         <button
           onClick={loadData}
-          disabled={loading}
+          disabled={loading || isBatchDeleting}
           className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
           title={t("profiles.v3.toolbar.refresh")}
         >
@@ -282,8 +304,8 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         totalCount={visibleScreenshots.length}
         accent={accentColor.value}
         allSelected={selectedPaths.size === visibleScreenshots.length && visibleScreenshots.length > 0}
-        onSelectAll={() => setSelectedPaths(new Set(visibleScreenshots.map(s => s.path)))}
-        onClear={() => setSelectedPaths(new Set())}
+        onSelectAll={() => { if (!batchDeletingRef.current) setSelectedPaths(new Set(visibleScreenshots.map(s => s.path))); }}
+        onClear={() => { if (!batchDeletingRef.current) setSelectedPaths(new Set()); }}
         actions={fabActions}
         batchProgress={null}
       />
@@ -348,19 +370,27 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   return (
     <div
       ref={ref}
-      onClick={(e) => {
-        // Klick in Select-Mode toggled Selection statt Modal zu oeffnen.
-        if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
-        onOpen();
-      }}
       style={isSelected ? { borderColor: `${accentColor}aa`, boxShadow: `0 0 0 1px ${accentColor}aa` } : undefined}
       className={`group relative aspect-video rounded-md overflow-hidden bg-white/5 border transition-all cursor-pointer ${
         isSelected ? "" : "border-white/10 hover:border-white/30"
       }`}
     >
+      <button
+        type="button"
+        aria-label={t(selectMode
+          ? isSelected ? 'profiles.v3.screenshots.deselectScreenshot' : 'profiles.v3.screenshots.selectScreenshot'
+          : 'profiles.v3.screenshots.openScreenshot', { name: screenshot.filename })}
+        aria-pressed={selectMode ? isSelected : undefined}
+        onClick={(e) => {
+          // Keep the existing select-mode action separate from normal opening.
+          if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
+          onOpen();
+        }}
+        className="absolute inset-0 z-[1] cursor-pointer rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2"
+      />
       {/* Preview / Placeholder / Error */}
       {previewError ? (
-        <div className="w-full h-full flex items-center justify-center text-white/25">
+        <div className="pointer-events-none w-full h-full flex items-center justify-center text-white/25">
           <Icon icon="solar:gallery-remove-bold" className="w-6 h-6" />
         </div>
       ) : previewUrl ? (
@@ -369,11 +399,11 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
           alt=""
           loading="lazy"
           onLoad={() => setIsLoaded(true)}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? "opacity-100" : "opacity-0"}`}
+          className={`pointer-events-none w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? "opacity-100" : "opacity-0"}`}
           style={{ imageRendering: "auto" }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-white/20">
+        <div className="pointer-events-none w-full h-full flex items-center justify-center text-white/20">
           <Icon icon="solar:gallery-bold-duotone" className="w-7 h-7" />
         </div>
       )}
@@ -381,7 +411,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
       {/* Hover overlay (dimmt Bild, zeigt Checkbox + Date) */}
       <div
         className={`absolute inset-0 pointer-events-none transition-opacity ${
-          isSelected ? "bg-black/25" : "bg-gradient-to-b from-black/40 via-transparent to-black/60 opacity-0 group-hover:opacity-100"
+          isSelected ? "bg-black/25" : "bg-gradient-to-b from-black/40 via-transparent to-black/60 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         }`}
       />
 
@@ -389,9 +419,12 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
           sonst erst on-hover. Eigener pointer-events-auto damit Click nicht
           durch den Overlay blockiert wird. */}
       <button
+        type="button"
+        aria-label={t(isSelected ? 'profiles.v3.screenshots.deselectScreenshot' : 'profiles.v3.screenshots.selectScreenshot', { name: screenshot.filename })}
+        aria-pressed={isSelected}
         onClick={(e) => { e.stopPropagation(); onToggleSelection(); }}
-        className={`absolute top-2 left-2 pointer-events-auto transition-opacity ${
-          selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        className={`absolute top-2 left-2 z-10 pointer-events-auto transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+          selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         }`}
         title={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
       >
@@ -401,12 +434,12 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
             isSelected ? "" : "bg-black/50 border-white/60 hover:border-white"
           }`}
         >
-          {isSelected && <Icon icon="solar:check-read-linear" className="w-3.5 h-3.5 text-black" />}
+          {isSelected && <Icon aria-hidden="true" icon="solar:check-read-linear" className="w-3.5 h-3.5 text-black" />}
         </div>
       </button>
 
       {/* Date-Badge unten links — nur bei Hover sichtbar */}
-      <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="pointer-events-none absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
         <span className="text-[10px] text-white font-minecraft bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
           {formatRelativeTime(screenshot.modified)}
         </span>

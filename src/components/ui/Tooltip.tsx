@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useCallback, useId, useLayoutEffect, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
+import { getModalPortalZIndex, useModalScope } from "./ModalScope";
+import { getTopDialogId, subscribeDialogLayer } from "./modal-focus";
 
 interface TooltipProps {
   content: string | React.ReactNode;
@@ -10,179 +12,155 @@ interface TooltipProps {
   delay?: number;
   className?: string;
   wrapperClassName?: string;
-  // "cursor" (default): follows the mouse. "top"/"bottom": static, centered above/below the trigger.
   position?: "cursor" | "top" | "bottom";
+  dismissKey?: string;
 }
 
-export function Tooltip({
-  content,
-  children,
-  delay = 300,
-  className = "",
-  wrapperClassName = "",
-  position = "cursor",
-}: TooltipProps) {
-  const isStatic = position === "top" || position === "bottom";
-  const isBottom = position === "bottom";
-  const [isVisible, setIsVisible] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout>();
-  const isHoveringRef = useRef(false);
+export function Tooltip({ content, children, delay = 300, className = "", wrapperClassName = "", position = "cursor", dismissKey }: TooltipProps) {
+  const id = useId();
+  const owner = useModalScope();
+  const accentColor = useThemeStore(state => state.accentColor);
+  const [visible, setVisible] = useState(false);
+  const [focused, setFocused] = useState<HTMLElement | null>(null);
+  const [engaged, setEngaged] = useState(false);
+  const [standalone, setStandalone] = useState(false);
+  const [point, setPoint] = useState({ x: 8, y: 8 });
+  const [layer, setLayer] = useState(1100);
+  const trigger = useRef<HTMLDivElement>(null);
+  const tooltip = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const hovering = useRef(false);
+  const pointerFocus = useRef(false);
+  const cursor = useRef({ x: 0, y: 0 });
 
-  // Theme values
-  const accentColor = useThemeStore((state) => state.accentColor);
-
-  const updateTooltipPosition = (clientX: number, clientY: number) => {
-    let x = clientX + 8;
-    let y = clientY + 8;
-
-    const tooltipWidth = tooltipRef.current?.offsetWidth || 200;
-    const tooltipHeight = tooltipRef.current?.offsetHeight || 30;
-
-    if (x + tooltipWidth > window.innerWidth) {
-      x = clientX - tooltipWidth - 8;
-    }
-
-    if (y + tooltipHeight > window.innerHeight) {
-      y = clientY - tooltipHeight - 8;
-    }
-
-    x = Math.max(8, x);
-    y = Math.max(8, y);
-
-    setTooltipPosition({ x, y });
-  };
-
-  // Static mode: anchor centered above/below the trigger. The transform on the tooltip element
-  // handles centering + vertical placement, so we only need the center-edge point.
-  const positionAboveTrigger = () => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltipPosition({ x: rect.left + rect.width / 2, y: isBottom ? rect.bottom + 8 : rect.top - 8 });
-  };
-
-  const showTooltip = (e: React.MouseEvent) => {
-    isHoveringRef.current = true;
-
-    // Sofort die Position aktualisieren
-    if (isStatic) {
-      positionAboveTrigger();
-    } else {
-      updateTooltipPosition(e.clientX, e.clientY);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      if (isHoveringRef.current) {
-        setIsVisible(true);
-      }
-    }, delay);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isStatic) return; // static tooltip doesn't follow the cursor
-    if (isHoveringRef.current) {
-      updateTooltipPosition(e.clientX, e.clientY);
-      // Wenn der Tooltip noch nicht sichtbar ist, zeige ihn sofort
-      if (!isVisible && timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        setIsVisible(true);
-      }
-    }
-  };
-
-  const hideTooltip = () => {
-    isHoveringRef.current = false;
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsVisible(false);
-  };
-
+  const clearTimer = useCallback(() => { if (timer.current !== undefined) clearTimeout(timer.current); timer.current = undefined; }, []);
+  const dismiss = useCallback(() => {
+    clearTimer(); hovering.current = false; setFocused(null); setVisible(false); setEngaged(false);
+  }, [clearTimer]);
+  const canShow = useCallback(() => Boolean(trigger.current?.isConnected &&
+    !trigger.current.closest('[inert], [hidden], [aria-hidden="true"]') &&
+    (getTopDialogId() ?? undefined) === owner), [owner]);
+  useEffect(() => () => { hovering.current = false; clearTimer(); }, [clearTimer]);
+  // Route changes dismiss without remounting or blurring the native action.
+  useLayoutEffect(() => { dismiss(); }, [dismissKey, dismiss]);
+  useLayoutEffect(() => {
+    let previousTop = getTopDialogId();
+    return subscribeDialogLayer(() => {
+      const nextTop = getTopDialogId();
+      if (nextTop !== previousTop || !canShow()) dismiss();
+      previousTop = nextTop;
+    });
+  }, [canShow, dismiss]);
+  useLayoutEffect(() => {
+    if (!canShow() || (focused && (!focused.isConnected || !trigger.current?.contains(focused) ||
+      focused.matches(':disabled, [aria-disabled="true"]') || focused.closest('[inert], [hidden], [aria-hidden="true"]')))) dismiss();
+  });
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    if (!engaged) return;
+    // Hover hints also close when Escape is pressed on a different control.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.isComposing && canShow() &&
+        (visible || timer.current !== undefined)) {
+        event.preventDefault(); event.stopPropagation(); dismiss();
       }
     };
-  }, []);
-
-  // Static mode: once the tooltip is measurable, clamp its centered x so it never
-  // overflows the viewport edges (e.g. buttons near the right border).
+    document.addEventListener("keydown", onEscape, true);
+    return () => document.removeEventListener("keydown", onEscape, true);
+  }, [engaged, visible, canShow, dismiss]);
   useLayoutEffect(() => {
-    if (!isStatic || !isVisible) return;
-    const rect = triggerRef.current?.getBoundingClientRect();
-    const tip = tooltipRef.current;
-    if (!rect || !tip) return;
-    const margin = 8;
-    const half = tip.offsetWidth / 2;
-    let x = rect.left + rect.width / 2;
-    x = Math.min(x, window.innerWidth - margin - half);
-    x = Math.max(x, margin + half);
-    const y = isBottom ? rect.bottom + 8 : rect.top - 8;
-    setTooltipPosition((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
-  }, [isVisible, isStatic]);
+    setStandalone(!trigger.current?.querySelector('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])'));
+  }, [children]);
 
-  const getTooltipClasses = () => {
-    // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
-    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+  const place = useCallback(() => {
+    const tip = tooltip.current, rect = trigger.current?.getBoundingClientRect();
+    if (!tip || !rect) return;
+    setLayer(getModalPortalZIndex(owner, 1100));
+    const width = tip.offsetWidth, height = tip.offsetHeight, margin = 8;
+    const anchored = position !== "cursor" || focused !== null;
+    let x = anchored ? rect.left + (rect.width - width) / 2 : cursor.current.x + margin;
+    let y = anchored ? (position === "bottom" ? rect.bottom + margin : rect.top - height - margin) : cursor.current.y + margin;
+    if (anchored && y < margin) y = rect.bottom + margin;
+    else if (y + height > window.innerHeight - margin) y = anchored ? rect.top - height - margin : cursor.current.y - height - margin;
+    if (!anchored && x + width > window.innerWidth - margin) x = cursor.current.x - width - margin;
+    x = Math.max(margin, Math.min(x, window.innerWidth - width - margin));
+    y = Math.max(margin, Math.min(y, window.innerHeight - height - margin));
+    setPoint(previous => previous.x === x && previous.y === y ? previous : { x, y });
+  }, [position, focused, owner]);
 
-    return `${baseClasses} ${className}`;
-  };
+  useLayoutEffect(() => {
+    if (!visible) return;
+    place();
+    const observer = new ResizeObserver(place);
+    if (trigger.current) observer.observe(trigger.current);
+    if (tooltip.current) observer.observe(tooltip.current);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer.disconnect(); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true);
+    };
+  }, [visible, place, content]);
 
-  return (
-    <>
-      <div
-        ref={triggerRef}
-        onMouseEnter={showTooltip}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={hideTooltip}
-        // `inline-flex items-center` instead of `inline-block` so the trigger
-        // wrapper has the same baseline/alignment semantics as the chips + icon
-        // buttons around it in flex rows. Plain `inline-block` was offsetting
-        // wrapped children by ~1px because its baseline sits on the last line
-        // of text while neighboring `inline-flex` items center their content.
-        className={`inline-flex items-center ${wrapperClassName}`}
-      >
-        {children}
-      </div>
+  useLayoutEffect(() => {
+    if (!focused || !visible) return;
+    const previous = focused.getAttribute("aria-describedby");
+    const ids = new Set((previous ?? "").split(/\s+/).filter(Boolean)); ids.add(id);
+    focused.setAttribute("aria-describedby", [...ids].join(" "));
+    return () => {
+      // Preserve descriptions another consumer may have added while shown.
+      const current = (focused.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(value => value && value !== id);
+      if (current.length) focused.setAttribute("aria-describedby", current.join(" "));
+      else focused.removeAttribute("aria-describedby");
+    };
+  }, [focused, visible, id]);
 
-      {isVisible && createPortal(
-        <div
-          ref={tooltipRef}
-          className={getTooltipClasses()}
-          style={{
-            left: tooltipPosition.x,
-            top: tooltipPosition.y,
-            position: 'fixed',
-            // static mode: center horizontally on the anchor point and sit above/below it
-            transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
-            textAlign: isStatic ? 'center' : undefined,
-            backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
-            borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
-            maxWidth: '300px', // Kompakt für kürzere Texte
-            wordWrap: 'break-word', // Automatischer Wortumbruch
-          }}
-        >
-          {content}
-        </div>,
-        document.body
-      )}
-    </>
-  );
+  return <>
+    <div ref={trigger} tabIndex={standalone ? 0 : undefined}
+      className={`inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${wrapperClassName}`}
+      onMouseEnter={event => {
+        if (!canShow()) return;
+        hovering.current = true; cursor.current = { x: event.clientX, y: event.clientY }; clearTimer();
+        setEngaged(true);
+        timer.current = setTimeout(() => {
+          timer.current = undefined;
+          if (hovering.current && canShow()) setVisible(true); else dismiss();
+        }, delay);
+      }}
+      onMouseMove={event => { cursor.current = { x: event.clientX, y: event.clientY }; if (visible) place(); }}
+      onMouseLeave={() => { hovering.current = false; clearTimer(); if (!focused) { setVisible(false); setEngaged(false); } }}
+      onPointerDownCapture={() => { pointerFocus.current = true; dismiss(); }}
+      onClickCapture={dismiss}
+      onFocusCapture={event => {
+        clearTimer();
+        const target = event.target as HTMLElement;
+        if (!pointerFocus.current && target.matches(":focus-visible") && canShow()) {
+          setFocused(target); setEngaged(true); setVisible(true);
+        } else { setFocused(null); if (!hovering.current) { setVisible(false); setEngaged(false); } }
+      }}
+      onBlurCapture={event => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          pointerFocus.current = false; setFocused(null);
+          if (!hovering.current) { setVisible(false); setEngaged(false); }
+        }
+      }}
+      onKeyDownCapture={event => {
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === "Tab") pointerFocus.current = false;
+        if (event.key === "Enter" || event.key === " ") dismiss();
+        if (canShow() && (visible || timer.current !== undefined) && event.key === "Escape") {
+          event.preventDefault(); event.stopPropagation(); dismiss();
+        }
+      }}>
+      {children}
+    </div>
+    {visible && canShow() && createPortal(<div ref={tooltip} id={id} role="tooltip" data-modal-owner={owner ?? undefined}
+      className={`fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none rounded-lg backdrop-blur-md ${className}`}
+      style={{ left: point.x, top: point.y, zIndex: layer, backgroundColor: `${accentColor.value}20`, borderColor: `${accentColor.value}60`,
+        maxWidth: "min(300px, calc(100vw - 16px))", maxHeight: "calc(100dvh - 16px)", overflow: "hidden", overflowWrap: "anywhere",
+        textAlign: position !== "cursor" || focused ? "center" : undefined }}>
+      {content}
+    </div>, document.body)}
+  </>;
 }
 
-// Convenience component for simple tooltip usage
-interface SimpleTooltipProps extends Omit<TooltipProps, 'children'> {
-  children: React.ReactNode;
-}
-
-export function SimpleTooltip(props: SimpleTooltipProps) {
-  return <Tooltip {...props} />;
-}
-
-// Static tooltip: shown centered above the trigger element instead of following the cursor.
-export function StaticTooltip(props: Omit<TooltipProps, 'position'>) {
-  return <Tooltip {...props} position="top" />;
-}
+export function SimpleTooltip(props: TooltipProps) { return <Tooltip {...props} />; }
+export function StaticTooltip(props: Omit<TooltipProps, "position">) { return <Tooltip {...props} position="top" />; }

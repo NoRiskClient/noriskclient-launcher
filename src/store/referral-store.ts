@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { ReferralInfo } from "../types/launcherConfig";
 import { getReferralInfo } from "../services/referral-service";
 import { translateApiError } from "../utils/nrc-error-translations";
+import i18n from "../i18n/i18n";
 
 const DISMISSED_KEY = "referral_banner_dismissed_code";
 
@@ -19,67 +20,87 @@ interface ReferralStoreState {
   checkIfDismissed: (code: string) => boolean;
 }
 
-export const useReferralStore = create<ReferralStoreState>((set, get) => ({
-  pendingCode: null,
-  referrerInfo: null,
-  isLoading: false,
-  error: null,
-  bannerVisible: false,
+export const useReferralStore = create<ReferralStoreState>((set, get) => {
+  // Ignore an older lookup after dismissal, a changed code, or a newer lookup.
+  let requestVersion = 0;
+  let sessionDismissedCode: string | null = null;
+  return {
+    pendingCode: null,
+    referrerInfo: null,
+    isLoading: false,
+    error: null,
+    bannerVisible: false,
 
-  setPendingCode: (code) => {
-    set({ pendingCode: code });
-    // Check if this code was already dismissed
-    if (code && !get().checkIfDismissed(code)) {
-      get().fetchReferralInfo(code);
-    }
-  },
+    setPendingCode: (code) => {
+      requestVersion++;
+      set({ pendingCode: code, referrerInfo: null, error: null, isLoading: false, bannerVisible: false });
+      // Check if this code was already dismissed
+      if (code && !get().checkIfDismissed(code)) {
+        get().fetchReferralInfo(code);
+      }
+    },
 
-  fetchReferralInfo: async (code) => {
-    // Don't fetch if already dismissed
-    if (get().checkIfDismissed(code)) {
-      return;
-    }
+    fetchReferralInfo: async (code) => {
+      // Don't fetch if already dismissed
+      if (get().checkIfDismissed(code)) {
+        return;
+      }
 
-    set({ isLoading: true, error: null });
+      const version = ++requestVersion;
+      set({ pendingCode: code, isLoading: true, error: null, referrerInfo: null, bannerVisible: true });
+      const isCurrent = () => version === requestVersion && get().pendingCode === code && !get().checkIfDismissed(code);
 
-    try {
-      const info = await getReferralInfo(code);
-      if (info.valid) {
-        set({
-          referrerInfo: info,
-          bannerVisible: true,
-          isLoading: false,
-        });
-      } else {
+      try {
+        const info = await getReferralInfo(code);
+        if (!isCurrent()) return;
+        if (info.valid) {
+          set({
+            referrerInfo: info,
+            bannerVisible: true,
+            isLoading: false,
+          });
+        } else {
+          set({
+            referrerInfo: null,
+            bannerVisible: true,
+            isLoading: false,
+            error: i18n.t("referral.invalidCode"),
+          });
+        }
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error("[ReferralStore] Failed to fetch referral info:", error);
         set({
           referrerInfo: null,
-          bannerVisible: false,
+          bannerVisible: true,
           isLoading: false,
-          error: "Referral code is no longer valid",
+          error: translateApiError(error, i18n.t("referral.fetchFailed")),
         });
       }
-    } catch (error) {
-      console.error("[ReferralStore] Failed to fetch referral info:", error);
-      set({
-        referrerInfo: null,
-        bannerVisible: false,
-        isLoading: false,
-        error: translateApiError(error, "Failed to fetch referral info"),
-      });
-    }
-  },
+    },
 
-  dismissBanner: () => {
-    const code = get().pendingCode;
-    if (code) {
-      // Remember that this code was dismissed
-      localStorage.setItem(DISMISSED_KEY, code);
-    }
-    set({ bannerVisible: false });
-  },
+    dismissBanner: () => {
+      const code = get().pendingCode;
+      requestVersion++;
+      sessionDismissedCode = code;
+      if (code) {
+        // Remember that this code was dismissed
+        try {
+          localStorage.setItem(DISMISSED_KEY, code);
+        } catch {
+          // Dismiss still works in this session when storage is unavailable.
+        }
+      }
+      set({ bannerVisible: false, error: null, isLoading: false, referrerInfo: null });
+    },
 
-  checkIfDismissed: (code) => {
-    const dismissedCode = localStorage.getItem(DISMISSED_KEY);
-    return dismissedCode === code;
-  },
-}));
+    checkIfDismissed: (code) => {
+      if (sessionDismissedCode === code) return true;
+      try {
+        return localStorage.getItem(DISMISSED_KEY) === code;
+      } catch {
+        return false;
+      }
+    },
+  };
+});

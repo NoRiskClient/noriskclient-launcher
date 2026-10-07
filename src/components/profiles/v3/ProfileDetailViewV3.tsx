@@ -148,7 +148,7 @@ export function ProfileDetailViewV3({
     overlay: true,
   });
 
-  const { isLaunching, statusMessage, handleLaunch, handleQuickPlayLaunch } = useProfileLaunch({
+  const { isLaunching, isPreparing, statusMessage, handleLaunch, handleQuickPlayLaunch } = useProfileLaunch({
     profileId: profile.id,
     onLaunchSuccess: () => {},
     onLaunchError: (error) => console.error("[V3] Profile launch error:", error),
@@ -249,12 +249,13 @@ export function ProfileDetailViewV3({
         profileId={currentProfile.id}
         onSwitchComplete={async () => {
           try {
-            await fetchProfiles();
+            await fetchProfiles({ throwOnError: true });
             const updatedProfiles = useProfileStore.getState().profiles;
             const updatedProfile = updatedProfiles.find(p => p.id === currentProfile.id);
             if (updatedProfile) setCurrentProfile(updatedProfile);
           } catch (err) {
             console.error("[V3] Failed to refresh profile data after modpack switch:", err);
+            throw err;
           }
         }}
       />
@@ -423,36 +424,45 @@ export function ProfileDetailViewV3({
           <div className="w-px h-5 bg-white/10 mx-1" />
           <Tooltip content={t('profiles.openFolder')} position="top" delay={0}>
             <button
+              type="button"
+              aria-label={t('profiles.openFolder')}
               onClick={handleOpenFolder}
-              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
             >
-              <Icon icon="solar:folder-linear" className="w-4 h-4" />
+              <Icon aria-hidden="true" icon="solar:folder-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
           <Tooltip content={t('profiles.duplicate')} position="top" delay={0}>
             <button
+              type="button"
+              aria-label={t('profiles.duplicate')}
               onClick={handleDuplicateProfile}
-              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
             >
-              <Icon icon="solar:copy-linear" className="w-4 h-4" />
+              <Icon aria-hidden="true" icon="solar:copy-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
           <Tooltip content={t('profiles.export')} position="top" delay={0}>
             <button
+              type="button"
+              aria-label={t('profiles.export')}
               onClick={handleOpenExportModal}
-              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
             >
-              <Icon icon="solar:upload-linear" className="w-4 h-4" />
+              <Icon aria-hidden="true" icon="solar:upload-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
           <div className="w-px h-5 bg-white/10 mx-1" />
           <Tooltip content={t('profiles.moreOptions')} position="top" delay={0}>
             <button
+              type="button"
+              aria-label={t('profiles.moreOptions')}
+              aria-expanded={isContextMenuOpen}
               ref={moreButtonRef}
               onClick={toggleContextMenu}
-              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
             >
-              <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
+              <Icon aria-hidden="true" icon="solar:menu-dots-bold" className="w-4 h-4" />
             </button>
           </Tooltip>
 
@@ -480,7 +490,7 @@ export function ProfileDetailViewV3({
               loader={currentProfile.loader}
               disabled={chipEditors.isLocked}
               disabledReason={chipEditors.lockReason}
-              onChange={(loader) => { void chipEditors.saveLoader(loader); }}
+              onChange={chipEditors.saveLoader}
             />
           </div>
 
@@ -503,9 +513,11 @@ export function ProfileDetailViewV3({
                     currentVersion={currentProfile.game_version}
                     versions={chipEditors.mcVersions}
                     isLoading={chipEditors.mcLoading}
-                    onSelect={(v) => {
-                      void chipEditors.saveGameVersion(v);
-                      close();
+                    error={chipEditors.mcError}
+                    isSaving={chipEditors.isSaving}
+                    onRetry={() => void chipEditors.loadMinecraftVersions()}
+                    onSelect={async (v) => {
+                      if (await chipEditors.saveGameVersion(v)) close();
                     }}
                   />
                 )}
@@ -550,9 +562,11 @@ export function ProfileDetailViewV3({
                         resolvedSource={resolvedLoaderVersion?.reason}
                         versions={chipEditors.loaderVersions}
                         isLoading={chipEditors.loaderLoading}
-                        onSelect={(v) => {
-                          void chipEditors.saveLoaderVersion(v);
-                          close();
+                        error={chipEditors.loaderError}
+                        isSaving={chipEditors.isSaving}
+                        onRetry={() => void chipEditors.loadLoaderVersions(currentProfile.loader!, currentProfile.game_version)}
+                        onSelect={async (v) => {
+                          if (await chipEditors.saveLoaderVersion(v)) close();
                         }}
                       />
                     )}
@@ -567,7 +581,7 @@ export function ProfileDetailViewV3({
                 icon="solar:folder-bold"
                 disabled={chipEditors.isLocked}
                 disabledReason={chipEditors.lockReason}
-                onSave={() => { void chipEditors.saveGroup(groupDraft); }}
+                onSave={() => chipEditors.saveGroup(groupDraft)}
                 onCancel={() => setGroupDraft(currentProfile.group ?? "")}
                 renderEditor={({ commit }) => (
                   <div className="px-2 pt-2 pb-1">
@@ -575,6 +589,7 @@ export function ProfileDetailViewV3({
                       autoFocus
                       type="text"
                       value={groupDraft}
+                      disabled={chipEditors.isSaving}
                       onChange={(e) => setGroupDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
                       placeholder={t("profiles.v3.chips.group.placeholder")}
@@ -639,20 +654,24 @@ export function ProfileDetailViewV3({
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               onClick={handleLaunch}
+              disabled={isPreparing}
+              aria-busy={isPreparing}
               variant={isLaunching ? "destructive" : "3d"}
               size="lg"
               heightClassName="h-14"
               widthClassName="w-[200px]"
-              icon={<Icon icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"} width="24" height="24" />}
+              icon={<Icon icon={isPreparing ? "svg-spinners:ring-resize" : isLaunching ? "solar:stop-bold" : "solar:play-bold"} width="24" height="24" />}
             >
-              {isLaunching ? t('profiles.stop') : t('profiles.play')}
+              {isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : isLaunching ? t('profiles.stop') : t('profiles.play')}
             </Button>
             <Tooltip content={t('profiles.editProfile')}>
               <button
+                type="button"
+                aria-label={t('profiles.editProfile')}
                 onClick={onEdit}
-                className="h-14 w-12 rounded-lg bg-white/[0.03] hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+                className="h-14 w-12 rounded-lg bg-white/[0.03] hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
               >
-                <Icon icon="solar:settings-bold" className="w-5 h-5" />
+                <Icon aria-hidden="true" icon="solar:settings-bold" className="w-5 h-5" />
               </button>
             </Tooltip>
           </div>
@@ -664,12 +683,12 @@ export function ProfileDetailViewV3({
             nutzt EXAKT das Stat-Padding/-Struktur (px-3 py-2 + gap-2.5 +
             leading-tight) damit 1:1 gleiche Pixel. */}
         <div className="flex items-center gap-2 flex-wrap mt-5">
-          {isLaunching && statusMessage ? (
+          {(isLaunching || isPreparing) && statusMessage ? (
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-400/25 min-w-[160px] animate-in fade-in duration-200">
               <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-emerald-300 flex-shrink-0" />
               <div className="flex flex-col leading-tight min-w-0">
                 <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft">
-                  {t("profiles.card.starting")}
+                  {isPreparing ? t('launch.preparing_short', { defaultValue: 'Preparing...' }) : t("profiles.card.starting")}
                 </span>
                 <span className="text-sm text-emerald-100/95 font-minecraft truncate" title={statusMessage}>
                   {statusMessage}
