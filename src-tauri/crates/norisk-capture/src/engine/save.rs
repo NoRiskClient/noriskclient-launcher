@@ -8,7 +8,7 @@ use norisk_ipc::{CaptureError, CaptureToLauncher, ClipManifest, ErrorCode, SaveC
 use super::{AudioSelection, Engine, RETAIN_FOR};
 use crate::buffer::RingBuffer;
 use crate::encoder::video::TIME_BASE_DEN;
-use crate::writer::{write_mp4, TrackInfo};
+use crate::writer::{part_path, write_mp4, TrackInfo};
 
 const FRESH_ENOUGH_SECONDS: f64 = 5.0;
 const PLAYBACK_CHECK_PACKETS: usize = 120;
@@ -110,7 +110,7 @@ impl Engine {
         };
 
         let created = chrono_now();
-        let path = free_path(
+        let path = reserve_path(
             &self.config.output_dir,
             &created.replace(':', "-"),
             &request.reason.slug(),
@@ -159,6 +159,7 @@ impl Engine {
                     }));
                 }
                 Err(e) => {
+                    let _ = std::fs::remove_file(part_path(&path));
                     log::error!("Could not write the clip: {e:#}");
                     let _ = events.send(CaptureToLauncher::Error(CaptureError {
                         code: ErrorCode::ClipWrite,
@@ -174,20 +175,26 @@ impl Engine {
     }
 }
 
-fn free_path(dir: &std::path::Path, stamp: &str, reason: &str) -> std::path::PathBuf {
-    let first = dir.join(format!("{stamp}_{reason}.mp4"));
-    if !first.exists() {
-        return first;
-    }
-
-    for attempt in 2..=99 {
-        let candidate = dir.join(format!("{stamp}_{reason}-{attempt}.mp4"));
-        if !candidate.exists() {
+fn reserve_path(dir: &std::path::Path, stamp: &str, reason: &str) -> std::path::PathBuf {
+    let _ = std::fs::create_dir_all(dir);
+    let candidates = std::iter::once(format!("{stamp}_{reason}.mp4"))
+        .chain((2..=99).map(|attempt| format!("{stamp}_{reason}-{attempt}.mp4")));
+    for name in candidates {
+        let candidate = dir.join(name);
+        if !candidate.exists() && claim(&candidate) {
             return candidate;
         }
     }
 
     dir.join(format!("{stamp}_{reason}-{}.mp4", std::process::id()))
+}
+
+fn claim(destination: &std::path::Path) -> bool {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(part_path(destination))
+        .is_ok()
 }
 
 fn chrono_now() -> String {
@@ -246,17 +253,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
 
-        let first = free_path(&dir, "1788803479", "clip");
+        let first = reserve_path(&dir, "1788803479", "clip");
         assert_eq!(first.file_name().unwrap(), "1788803479_clip.mp4");
         std::fs::write(&first, b"x").expect("write");
 
-        let second = free_path(&dir, "1788803479", "clip");
+        let second = reserve_path(&dir, "1788803479", "clip");
         assert_ne!(second, first, "the first clip must survive the second");
         assert_eq!(second.file_name().unwrap(), "1788803479_clip-2.mp4");
         std::fs::write(&second, b"x").expect("write");
 
-        let third = free_path(&dir, "1788803479", "clip");
+        let third = reserve_path(&dir, "1788803479", "clip");
         assert_eq!(third.file_name().unwrap(), "1788803479_clip-3.mp4");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_second_clip_while_the_first_is_still_being_written_gets_its_own_name() {
+        let dir = std::env::temp_dir().join(format!("nrc-reserve-path-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        let first = reserve_path(&dir, "1788803479", "clip");
+        let second = reserve_path(&dir, "1788803479", "clip");
+
+        assert_ne!(second, first, "both writers would share one temporary file");
+        assert_eq!(second.file_name().unwrap(), "1788803479_clip-2.mp4");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
