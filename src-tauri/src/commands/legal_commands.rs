@@ -29,6 +29,8 @@ const LEGAL_DOCUMENTS: [(&str, LegalDocumentKind); 3] = [
 
 type Acknowledged = HashMap<(String, String), u32>;
 
+static SHOWN: std::sync::Mutex<Option<Vec<LegalDocumentUpdate>>> = std::sync::Mutex::new(None);
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingLegalDocument {
@@ -64,6 +66,10 @@ async fn pool() -> Result<SqlitePool> {
 async fn fetch_updates() -> Result<Vec<LegalDocumentUpdate>> {
     let is_experimental = State::get().await?.config_manager.is_experimental_mode().await;
     Ok(LegalApi::get_updates(is_experimental).await?)
+}
+
+fn accepted_version(doc: &LegalDocumentUpdate) -> u32 {
+    doc.version.max(doc.acknowledgement_version.unwrap_or(0))
 }
 
 fn kind_of(doc: &LegalDocumentUpdate) -> Option<LegalDocumentKind> {
@@ -108,11 +114,15 @@ async fn store_versions(pool: &SqlitePool, versions: &[(&str, &str, u32)]) -> Re
 }
 
 async fn acknowledge_where(keep: impl Fn(LegalDocumentKind) -> bool) -> Result<()> {
-    let updates = fetch_updates().await?;
+    let shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let updates = match shown {
+        Some(updates) => updates,
+        None => fetch_updates().await?,
+    };
     let versions: Vec<(&str, &str, u32)> = updates
         .iter()
         .filter(|doc| kind_of(doc).is_some_and(&keep))
-        .map(|doc| (doc.slug.as_str(), doc.locale.as_str(), doc.version))
+        .map(|doc| (doc.slug.as_str(), doc.locale.as_str(), accepted_version(doc)))
         .collect();
     store_versions(&pool().await?, &versions).await
 }
@@ -167,6 +177,7 @@ pub async fn get_legal_status(locale: String, accepted_legacy_terms: bool) -> Re
             return Ok(LegalStatus::default());
         }
     };
+    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(updates.clone());
 
     let pool = pool().await?;
     let mut acknowledged = acknowledged_versions(&pool).await?;
