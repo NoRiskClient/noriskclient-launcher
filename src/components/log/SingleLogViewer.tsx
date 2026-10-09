@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
-import { useProcessStore } from "../../store/useProcessStore";
+import { useProcessStore, NO_LOGS } from "../../store/useProcessStore";
+import { useProcessLogs } from "../../hooks/useProcessEvents";
 import { LogViewerCore } from "./LogViewerCore";
 import { LogWindowTitlebar } from "./LogWindowTitlebar";
 import { getProcess } from "../../services/process-service";
@@ -20,8 +21,10 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
 
-  const logsMap = useProcessStore((state) => state.logs);
-  const launcherLogsMap = useProcessStore((state) => state.launcherLogs);
+  const { logs: mcLogs } = useProcessLogs(instanceId ?? null);
+  const launcherLogs = useProcessStore((state) =>
+    profileId ? state.launcherLogs.get(profileId) ?? NO_LOGS : NO_LOGS,
+  );
   const clearLogs = useProcessStore((state) => state.clearLogs);
   const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
 
@@ -43,13 +46,6 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
   }, [instanceId]);
 
   useProcessLogCursor(sessionId, instanceId);
-
-  const mcLogs = instanceId ? (logsMap.get(instanceId) || []) : [];
-
-  const launcherLogs = useMemo(() => {
-    if (!profileId) return [];
-    return launcherLogsMap.get(profileId) || [];
-  }, [profileId, launcherLogsMap]);
 
   const logs = mcLogs.length > 0 ? mcLogs : launcherLogs;
 
