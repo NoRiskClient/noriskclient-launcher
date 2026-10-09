@@ -3,7 +3,16 @@ use std::collections::VecDeque;
 use nnnoiseless::DenoiseState;
 
 const FRAME: usize = DenoiseState::FRAME_SIZE;
+const SAMPLE_RATE: u32 = 48_000;
 const SCALE: f32 = 32768.0;
+
+pub fn works_at(sample_rate: u32) -> bool {
+    let works = sample_rate == SAMPLE_RATE;
+    if !works {
+        log::warn!("Noise suppression needs a {SAMPLE_RATE} Hz microphone, this one runs at {sample_rate} Hz, so it is recorded without");
+    }
+    works
+}
 
 pub struct Denoiser {
     channels: usize,

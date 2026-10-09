@@ -425,6 +425,9 @@ pub(super) fn start_audio(
         .map(|(_, format)| format)
         .unwrap_or(format);
 
+    let denoise_microphone =
+        denoise_microphone && crate::audio::denoise::works_at(microphone_format.sample_rate);
+
     let mut stems = Vec::new();
     let mut game_stem: Option<(Option<Mixer>, AudioSink)> = None;
     let mut microphone_stem: Option<AudioSink> = None;
