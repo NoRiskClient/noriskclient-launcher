@@ -13,6 +13,7 @@ import {
   closeClipEditor,
   getClipDetails,
   getEditorClip,
+  reportClipEditorStayed,
   trimClip,
   type ClipDetails,
   type EditorClip,
@@ -89,7 +90,10 @@ export function ClipEditorWindow() {
         }).finally(() => {
           asking.current = false;
         });
-        if (!sure) return;
+        if (!sure) {
+          reportClipEditorStayed();
+          return;
+        }
       }
       closeNow();
     };

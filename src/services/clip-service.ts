@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { emit, listen, TauriEvent } from "@tauri-apps/api/event";
+import { Window } from "@tauri-apps/api/window";
 import type { CaptureRuntimeState, CaptureStatus, EncoderCapability } from "../types/launcherConfig";
 
 export function runtimeDownloadPercent(runtime: CaptureRuntimeState): number {
@@ -74,6 +76,32 @@ export async function getEditorClip(): Promise<EditorClip | null> {
 
 export async function closeClipEditor(): Promise<void> {
   return invoke("clip_editor_close");
+}
+
+const EDITOR_STAYED = "clip_editor_stayed";
+
+export async function closeClipEditorThen(next: () => void): Promise<void> {
+  const editor = await Window.getByLabel("clip_editor");
+  if (!editor) {
+    next();
+    return;
+  }
+  const stopWaiting = () => {
+    void closed.then((stop) => stop());
+    void stayed.then((stop) => stop());
+  };
+  const closed = editor.once(TauriEvent.WINDOW_DESTROYED, () => {
+    stopWaiting();
+    next();
+  });
+  const stayed = listen(EDITOR_STAYED, stopWaiting);
+  await Promise.all([closed, stayed]);
+  await editor.setFocus().catch(() => {});
+  await editor.close();
+}
+
+export function reportClipEditorStayed(): void {
+  void emit(EDITOR_STAYED);
 }
 
 export interface OpenApp {

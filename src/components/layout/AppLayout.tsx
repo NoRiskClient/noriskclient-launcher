@@ -35,6 +35,7 @@ import { FriendsSidebar } from "../friends/FriendsSidebar";
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
 import { useClipsStore } from "../../store/clips-store";
+import { closeClipEditorThen } from "../../services/clip-service";
 import { useChatStore } from "../../store/chat-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
 import type { UpdateInfo } from "../../types/updater";
@@ -207,7 +208,7 @@ export function AppLayout({
 
           if (closeRef.current) {
             closeRef.current.addEventListener("click", () =>
-              exit(0),
+              closeClipEditorThen(() => exit(0)).catch(() => exit(0)),
             );
           }
         } else {
