@@ -25,6 +25,8 @@ const REVOKE_URL: &str = "https://id.twitch.tv/oauth2/revoke";
 
 const REFRESH_SKEW: Duration = Duration::minutes(15);
 
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TwitchToken {
     pub access_token: String,
@@ -97,6 +99,7 @@ pub async fn request_device_code(scopes: &str) -> Result<DeviceCodeResponse> {
     let response = HTTP_CLIENT
         .post(DEVICE_CODE_URL)
         .form(&[("client_id", TWITCH_CLIENT_ID), ("scopes", scopes)])
+        .timeout(REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|e| AppError::RequestError(format!("Twitch device code request failed: {}", e)))?;
@@ -128,6 +131,7 @@ pub async fn poll_device_token(device_code: &str, scopes: &str) -> Result<PollOu
             ("scopes", scopes),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ])
+        .timeout(REQUEST_TIMEOUT)
         .send()
         .await;
     let response = match response {
@@ -181,6 +185,7 @@ pub async fn revoke(access_token: &str) {
     let result = HTTP_CLIENT
         .post(REVOKE_URL)
         .form(&[("client_id", TWITCH_CLIENT_ID), ("token", access_token)])
+        .timeout(REQUEST_TIMEOUT)
         .send()
         .await;
     match result {
@@ -206,6 +211,7 @@ pub async fn refresh_token(refresh_token: &str) -> RefreshOutcome {
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
         ])
+        .timeout(REQUEST_TIMEOUT)
         .send()
         .await
     {
