@@ -263,6 +263,7 @@ function TwitchScopeInfoModal({
           label={t("twitch.scopeInfoContinue")}
           icon="mdi:twitch"
           onClick={() => onContinue(available.filter((scope) => selected.has(scope)))}
+          disabled={!available.some((scope) => selected.has(scope))}
         />
       </div>
     </Modal>
