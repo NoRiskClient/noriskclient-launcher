@@ -357,7 +357,8 @@ fn inject_through_remote_thread(pid: u32, dll: &Path) -> Result<()> {
 
     let waited = unsafe { WaitForSingleObject(thread.0, LOAD_TIMEOUT_MS) };
     if waited != WAIT_OBJECT_0 {
-        anyhow::bail!("the game did not finish loading the hook within {LOAD_TIMEOUT_MS} ms");
+        std::mem::forget(remote);
+        anyhow::bail!("the game did not finish loading {} within {LOAD_TIMEOUT_MS} ms", dll.display());
     }
 
     let mut exit_code = 0u32;
