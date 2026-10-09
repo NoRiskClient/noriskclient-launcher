@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
 pub const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
+pub const LOG_TAIL_BYTES: u64 = 1024 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -75,11 +76,40 @@ pub fn clamp_log_read_len(requested: Option<u64>) -> u64 {
         .clamp(1, MAX_LOG_CURSOR_BYTES)
 }
 
+pub fn log_read_start(cursor: u64, total_bytes: u64, follow: bool) -> u64 {
+    if cursor != 0 && cursor <= total_bytes {
+        cursor
+    } else if follow {
+        total_bytes.saturating_sub(LOG_TAIL_BYTES)
+    } else {
+        0
+    }
+}
+
+pub fn line_aligned(buf: &[u8], starts_mid_line: bool, whole_budget: bool) -> std::ops::Range<usize> {
+    let begin = if starts_mid_line {
+        match buf.iter().position(|&b| b == b'\n') {
+            Some(newline) => newline + 1,
+            None if whole_budget => return buf.len()..buf.len(),
+            None => return 0..0,
+        }
+    } else {
+        0
+    };
+    let end = match buf.iter().rposition(|&b| b == b'\n') {
+        Some(newline) if newline >= begin => newline + 1,
+        _ if whole_budget => buf.len(),
+        _ => return 0..0,
+    };
+    begin..end
+}
+
 #[tauri::command]
 pub async fn get_process_log_cursor(
     session_id: String,
     cursor: u64,
     max_bytes: Option<u64>,
+    follow: Option<bool>,
 ) -> Result<ProcessLogCursor, CommandError> {
     use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
@@ -97,12 +127,10 @@ pub async fn get_process_log_cursor(
     let mut file = tokio::fs::File::open(&path).await.map_err(AppError::Io)?;
     let total_bytes = file.metadata().await.map_err(AppError::Io)?.len();
 
-    let mut read_start = cursor;
-    let mut new_file = false;
-    if read_start > total_bytes {
-        read_start = 0;
-        new_file = true;
-    }
+    let new_file = cursor > total_bytes;
+    let follow = follow.unwrap_or(false);
+    let read_start = log_read_start(cursor, total_bytes, follow);
+    let starts_mid_line = read_start > 0 && read_start != cursor;
 
     let read_len = clamp_log_read_len(max_bytes);
     let available = total_bytes.saturating_sub(read_start);
@@ -115,10 +143,19 @@ pub async fn get_process_log_cursor(
     let mut buf = Vec::with_capacity(bounded_read_len as usize);
     let mut reader = file.take(bounded_read_len);
     let read = reader.read_to_end(&mut buf).await.map_err(AppError::Io)?;
-    let next_cursor = read_start + read as u64;
+    let lines = if follow {
+        line_aligned(&buf, starts_mid_line, read as u64 == read_len)
+    } else {
+        0..buf.len()
+    };
+    let next_cursor = if lines.end == 0 {
+        if new_file { 0 } else { cursor }
+    } else {
+        read_start + lines.end as u64
+    };
 
     let output =
-        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf));
+        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf[lines]));
 
     Ok(ProcessLogCursor {
         cursor: next_cursor,
