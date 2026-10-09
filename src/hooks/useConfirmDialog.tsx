@@ -34,7 +34,7 @@ export function useConfirmDialog() {
   });
   const [inputValue, setInputValue] = useState("");
   const [isValid, setIsValid] = useState(true);
-  const [resolveRef, setResolveRef] = useState<(value: any) => void>(() => {});
+  const pending = useRef<((value: string | boolean) => void) | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -47,9 +47,16 @@ export function useConfirmDialog() {
       setOptions({ ...options, fullscreen: options.fullscreen ?? true });
       setInputValue(options.inputInitialValue || "");
       setIsValid(!options.inputRequired || !!options.inputInitialValue);
-      setResolveRef(() => resolve);
+      settle(false);
+      pending.current = resolve;
       setIsOpen(true);
     });
+  };
+
+  const settle = (value: string | boolean) => {
+    const resolve = pending.current;
+    pending.current = null;
+    resolve?.(value);
   };
 
   const handleClose = (e?: React.MouseEvent) => {
@@ -58,7 +65,7 @@ export function useConfirmDialog() {
     }
 
     setIsOpen(false);
-    resolveRef(false);
+    settle(false);
   };
 
   const handleConfirm = (e?: React.MouseEvent) => {
@@ -67,11 +74,7 @@ export function useConfirmDialog() {
     }
 
     setIsOpen(false);
-    if (options.type === "input") {
-      resolveRef(inputValue);
-    } else {
-      resolveRef(true);
-    }
+    settle(options.type === "input" ? inputValue : true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
