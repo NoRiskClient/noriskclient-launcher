@@ -526,7 +526,6 @@ impl NoriskClientAssetsDownloadService {
                 asset_id,
                 &assets,
                 is_experimental,
-                norisk_token,
                 Some(profile_id),
             )
             .await)
@@ -594,7 +593,6 @@ impl NoriskClientAssetsDownloadService {
         asset_id: &str,
         assets: &NoriskAssets,
         _is_experimental: bool,
-        norisk_token: &str,
         profile_id: Option<Uuid>,
     ) -> Result<()> {
         trace!(
@@ -654,7 +652,6 @@ impl NoriskClientAssetsDownloadService {
             let completed_counter_clone = Arc::clone(&completed_counter);
             let total_to_download_clone = Arc::clone(&total_to_download);
             let asset_id_clone = asset_id.to_string();
-            let norisk_token_clone = norisk_token.to_string();
             let stats = self.stats.clone();
 
             // Fast in-memory check instead of filesystem call
@@ -677,16 +674,13 @@ impl NoriskClientAssetsDownloadService {
                 let task_id = task_counter_clone.fetch_add(1, Ordering::SeqCst);
                 trace!("[NRC Assets Download '{}' Task {}] Starting download for: {}", asset_id_clone, task_id, name_clone);
 
-                // Use updated URL format from user edit
+                // ?v= = content hash, so Cloudflare can cache each version. No auth, the bucket is public.
                 let url = format!(
-                    "{}/{}/assets/{}",
-                    "https://cdn.norisk.gg/assets", asset_id_clone, name_clone
+                    "https://cdn.norisk.gg/assets/{}/assets/{}?v={}",
+                    asset_id_clone, name_clone, hash
                 );
 
-                let mut request = HTTP_CLIENT.get(&url);
-                request = request.header("Authorization", format!("Bearer {}", norisk_token_clone));
-
-                let response = match request.send().await {
+                let response = match HTTP_CLIENT.get(&url).send().await {
                     Ok(resp) => resp,
                     Err(e) => {
                         error!("[NRC Assets Download '{}' Task {}] Request error for {}: {}", asset_id_clone, task_id, name_clone, e);
