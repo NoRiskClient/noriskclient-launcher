@@ -59,10 +59,21 @@ impl FabricInstaller {
                 // Strip " (stable)" suffix if present for comparison
                 let target_version = specific_version_str.trim_end_matches(" (stable)").trim();
 
-                match all_versions
+                let cached = all_versions
                     .into_iter()
-                    .find(|v| v.loader.version == target_version)
-                {
+                    .find(|v| v.loader.version == target_version);
+                let found = match cached {
+                    Some(version) => Some(version),
+                    None => match fabric_api.refresh_loader_versions(version_id).await {
+                        Ok(fresh) => fresh.into_iter().find(|v| v.loader.version == target_version),
+                        Err(e) => {
+                            log::warn!("Refreshing Fabric versions for MC {} failed: {}", version_id, e);
+                            None
+                        }
+                    },
+                };
+
+                match found {
                     Some(found_version) => {
                         info!("Found specified Fabric version: {}", specific_version_str);
                         found_version
