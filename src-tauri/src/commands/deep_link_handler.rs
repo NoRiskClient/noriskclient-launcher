@@ -1,7 +1,9 @@
 use crate::error::AppError;
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::state_manager::State;
-use crate::utils::deep_link_utils::AuthBridgeResult;
+use crate::utils::deep_link_utils::{
+    is_main_window, AuthBridgeResult, PendingDeepLinkEvent, PendingDeepLinks,
+};
 use log::info;
 
 /// Tauri command called by the frontend after user confirms the auth bridge request.
@@ -33,4 +35,25 @@ pub async fn confirm_auth_bridge(session_id: String) -> Result<AuthBridgeResult,
         success: true,
         message: "success".to_string(),
     })
+}
+
+#[tauri::command]
+pub fn take_pending_deep_links(
+    app_handle: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Vec<PendingDeepLinkEvent> {
+    use tauri::Manager;
+    if !is_main_window(&window) {
+        log::warn!(
+            "[DeepLink] take_pending_deep_links rejected for window '{}'",
+            window.label()
+        );
+        return Vec::new();
+    }
+    let pending = app_handle
+        .try_state::<PendingDeepLinks>()
+        .map(|p| p.take())
+        .unwrap_or_default();
+    info!("[DeepLink] Frontend ready, handing over {} pending event(s)", pending.len());
+    pending
 }

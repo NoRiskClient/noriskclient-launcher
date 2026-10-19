@@ -169,7 +169,16 @@ async fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+            let logged_args: Vec<String> = argv
+                .iter()
+                .map(|a| match url::Url::parse(a) {
+                    Ok(u) if u.scheme() == "norisk" => {
+                        format!("norisk://{}{} (query hidden)", u.host_str().unwrap_or_default(), u.path())
+                    }
+                    _ => a.clone(),
+                })
+                .collect();
+            info!("SingleInstance plugin: Second instance triggered with args: {:?}", logged_args);
 
             // If the second invocation carried a CLI subcommand we recognize,
             // service it instead of bringing the window to the front.
@@ -309,24 +318,22 @@ async fn main() {
                 info!("Deep link schemes registered successfully.");
             }
 
-            // Handle deep links received while app is running
+            app.manage(utils::deep_link_utils::PendingDeepLinks::default());
+
             let deep_link_app_handle = app_handle.clone();
             app.deep_link().on_open_url(move |event| {
                 let handle = deep_link_app_handle.clone();
                 let urls = event.urls();
-                info!("Deep link received: {:?}", urls);
+                info!("Deep link received ({} URL(s))", urls.len());
                 tauri::async_runtime::spawn(async move {
                     utils::deep_link_utils::handle_deep_link(&handle, urls).await;
                 });
             });
 
-            // Handle cold-start deep links (app was launched via deep link)
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                info!("Cold-start deep link detected: {:?}", urls);
+                info!("Cold-start deep link detected ({} URL(s))", urls.len());
                 let cold_start_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    // Small delay to ensure state initialization has started
-                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                     utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
                 });
             }
@@ -894,6 +901,13 @@ async fn main() {
             add_message_reaction,
             remove_message_reaction,
             commands::deep_link_handler::confirm_auth_bridge,
+            commands::deep_link_handler::take_pending_deep_links,
+            commands::support_command::support_request_fetch,
+            commands::support_command::support_request_prepare,
+            commands::support_command::support_request_execute_action,
+            commands::support_command::support_request_submit,
+            commands::support_command::support_request_decline,
+            commands::support_command::support_request_close,
             commands::clip_commands::capture_apply_settings,
             commands::clip_commands::capture_release_hotkeys,
             commands::clip_commands::capture_status,

@@ -49,6 +49,7 @@ let launcherStartTracked = false;
 import flagsmith from 'flagsmith';
 import { FlagsmithProvider } from 'flagsmith/react';
 import { Button } from "./components/ui/buttons/Button";
+import { GuardedButton } from "./components/ui/buttons/GuardedButton";
 import { openExternalUrl } from "./services/tauri-service";
 import { ExternalLink } from "lucide-react";
 import { MinecraftAuthService } from "./services/minecraft-auth-service";
@@ -59,6 +60,10 @@ import { useNotificationStore } from "./store/notification-store";
 import { useMinecraftAuthStore } from "./store/minecraft-auth-store";
 import { useWelcomeStore } from "./store/welcome-store";
 import { useTwitchDeepLinkRequests } from "./components/account/TwitchLinkCard";
+import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
+import { drainPendingDeepLinks } from "./services/deep-link-service";
+import { DEEP_LINK_SUPPORT_REQUEST_EVENT } from "./services/support-request-service";
+import { openSupportRequestDialog } from "./components/support/SupportRequestDialog";
 import { WelcomeScreen } from "./components/welcome/WelcomeScreen";
 import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
@@ -248,86 +253,86 @@ export function App() {
   }, [navigate]);
 
   // Listen for deep link auth bridge requests
-  useEffect(() => {
-    const unlisten = listen<{ session_id: string; username: string }>(
-      "deep-link-auth-request",
-      (event) => {
-        const { session_id, username } = event.payload;
-        console.log("[App.tsx] Deep link auth request for:", username);
+  useDeepLinkHandler<{ session_id: string; username: string }>(
+    "deep-link-auth-request",
+    ({ session_id, username }) => {
+      console.log("[App.tsx] Deep link auth request for:", username);
 
-        showModal(
-          "deep-link-auth",
-          <Modal
-            title={t("deep_link.auth.title")}
-            onClose={() => hideModal("deep-link-auth")}
-            width="sm"
-            footer={
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="ghost"
-                  onClick={() => hideModal("deep-link-auth")}
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={async () => {
-                    hideModal("deep-link-auth");
-                    try {
-                      const result = await invoke<{
-                        success: boolean;
-                        message: string;
-                      }>("confirm_auth_bridge", {
-                        sessionId: session_id,
-                      });
-                      if (result.success) {
-                        toast.success(t("deep_link.auth.success"));
-                      } else {
-                        console.error("[App.tsx] Auth bridge confirm failed:", result.message);
-                        toast.error(t("deep_link.auth.error"));
-                      }
-                    } catch (e) {
-                      console.error("[App.tsx] Auth bridge confirm failed:", e);
+      showModal(
+        "deep-link-auth",
+        <Modal
+          title={t("deep_link.auth.title")}
+          onClose={() => hideModal("deep-link-auth")}
+          width="sm"
+          footer={
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => hideModal("deep-link-auth")}
+              >
+                {t("common.cancel")}
+              </Button>
+              <GuardedButton
+                variant="default"
+                onClick={async () => {
+                  hideModal("deep-link-auth");
+                  try {
+                    const result = await invoke<{
+                      success: boolean;
+                      message: string;
+                    }>("confirm_auth_bridge", {
+                      sessionId: session_id,
+                    });
+                    if (result.success) {
+                      toast.success(t("deep_link.auth.success"));
+                    } else {
+                      console.error("[App.tsx] Auth bridge confirm failed:", result.message);
                       toast.error(t("deep_link.auth.error"));
                     }
-                  }}
-                >
-                  {t("deep_link.auth.confirm")}
-                </Button>
-              </div>
-            }
-          >
-            <div className="p-6 text-white/80 font-minecraft">
-              <p>{t("deep_link.auth.description", { username })}</p>
+                  } catch (e) {
+                    console.error("[App.tsx] Auth bridge confirm failed:", e);
+                    toast.error(t("deep_link.auth.error"));
+                  }
+                }}
+              >
+                {t("deep_link.auth.confirm")}
+              </GuardedButton>
             </div>
-          </Modal>,
-        );
-      },
-    );
-
-    // Also listen for auth results when no confirmation is needed (e.g., errors)
-    const unlistenResult = listen<{ success: boolean; message: string }>(
-      "deep-link-auth-result",
-      (event) => {
-        const { success, message } = event.payload;
-        if (!success) {
-          if (message === "not_logged_in") {
-            toast.error(t("deep_link.auth.not_logged_in"));
-          } else {
-            console.error("[App.tsx] Auth bridge confirm failed:", message);
-            toast.error(t("deep_link.auth.error"));
           }
-        }
-      },
-    );
+        >
+          <div className="p-6 text-white/80 font-minecraft">
+            <p>{t("deep_link.auth.description", { username })}</p>
+          </div>
+        </Modal>,
+      );
+    },
+  );
 
-    return () => {
-      unlisten.then((f) => f());
-      unlistenResult.then((f) => f());
-    };
-  }, [showModal, hideModal, t]);
+  // Also listen for auth results when no confirmation is needed (e.g., errors)
+  useDeepLinkHandler<{ success: boolean; message: string }>(
+    "deep-link-auth-result",
+    ({ success, message }) => {
+      if (!success) {
+        if (message === "not_logged_in") {
+          toast.error(t("deep_link.auth.not_logged_in"));
+        } else {
+          console.error("[App.tsx] Auth bridge confirm failed:", message);
+          toast.error(t("deep_link.auth.error"));
+        }
+      }
+    },
+  );
+
+  useDeepLinkHandler<{ code?: string } | null>(
+    DEEP_LINK_SUPPORT_REQUEST_EVENT,
+    (payload) => openSupportRequestDialog(payload?.code),
+  );
 
   useTwitchDeepLinkRequests();
+
+  useEffect(() => {
+    drainPendingDeepLinks();
+  }, []);
 
   useEffect(() => {
     refreshNrcDataOnMount();
