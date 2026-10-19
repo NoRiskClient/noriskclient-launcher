@@ -4,7 +4,6 @@ import { Icon } from "@iconify/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
-import { listen } from "@tauri-apps/api/event";
 import { Modal } from "../ui/Modal";
 import { Tooltip } from "../ui/Tooltip";
 import { Button } from "../ui/buttons/Button";
@@ -12,6 +11,7 @@ import { CheckboxV2 } from "../ui/CheckboxV2";
 import { AccountLinkRow } from "./AccountLinkRow";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { useLatest } from "../../hooks/useLatest";
+import { useDeepLinkHandler } from "../../hooks/useDeepLinkHandler";
 import { openExternalUrl } from "../../services/tauri-service";
 import { TwitchService } from "../../services/twitch-service";
 import type { TwitchLoginPayload } from "../../types/twitch";
@@ -79,52 +79,47 @@ export function useTwitchDeepLinkRequests() {
   const { showModal, hideModal } = useGlobalModal();
   const startLink = useTwitchLinkFlow();
 
-  useEffect(() => {
-    const confirmUnlink = () => {
-      const close = () => hideModal(UNLINK_MODAL_ID);
-      showModal(
-        UNLINK_MODAL_ID,
-        <Modal
-          title={t("deep_link.twitch.unlink")}
-          onClose={close}
-          width="sm"
-          footer={
-            <div className="flex justify-end gap-3">
-              <Button variant="ghost" onClick={close}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  close();
-                  TwitchService.unlink()
-                    .then(() => toast.success(t("twitch.unlinked")))
-                    .catch(() => toast.error(t("twitch.unlinkFailed")));
-                }}
-              >
-                {t("deep_link.twitch.unlink")}
-              </Button>
-            </div>
-          }
-        >
-          <div className="p-6 text-white/80 font-minecraft text-sm">
-            <p>{t("deep_link.twitch.unlinkDescription")}</p>
+  const confirmUnlink = () => {
+    const close = () => hideModal(UNLINK_MODAL_ID);
+    showModal(
+      UNLINK_MODAL_ID,
+      <Modal
+        title={t("deep_link.twitch.unlink")}
+        onClose={close}
+        width="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                close();
+                TwitchService.unlink()
+                  .then(() => toast.success(t("twitch.unlinked")))
+                  .catch(() => toast.error(t("twitch.unlinkFailed")));
+              }}
+            >
+              {t("deep_link.twitch.unlink")}
+            </Button>
           </div>
-        </Modal>,
-      );
-    };
-
-    const unlisten = listen<{ action: "link" | "unlink" | "change" }>(
-      "deep-link-twitch-request",
-      ({ payload: { action } }) => {
-        if (action === "unlink") return confirmUnlink();
-        startLink({ intro: t(`deep_link.twitch.${action}Description`) });
-      },
+        }
+      >
+        <div className="p-6 text-white/80 font-minecraft text-sm">
+          <p>{t("deep_link.twitch.unlinkDescription")}</p>
+        </div>
+      </Modal>,
     );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [showModal, hideModal, startLink, t]);
+  };
+
+  useDeepLinkHandler<{ action: "link" | "unlink" | "change" }>(
+    "deep-link-twitch-request",
+    ({ action }) => {
+      if (action === "unlink") return confirmUnlink();
+      startLink({ intro: t(`deep_link.twitch.${action}Description`) });
+    },
+  );
 }
 
 export function TwitchLinkCard() {

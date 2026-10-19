@@ -23,3 +23,17 @@ where
         None => Ok(None),
     }
 }
+
+pub fn deserialize_string_from_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        other => Err(serde::de::Error::custom(format!(
+            "expected string or number, got {}",
+            other
+        ))),
+    }
+}
