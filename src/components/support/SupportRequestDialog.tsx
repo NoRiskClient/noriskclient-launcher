@@ -33,12 +33,15 @@ export function openSupportRequestDialog(code: string | undefined) {
 
 type Step = "hello" | "profile" | "fix" | "data" | "done";
 
+const LOADING_DELAY_MS = 300;
+
 function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => void }) {
   const { t } = useTranslation();
   const request = useSupportRequest(code);
   const profiles = useSupportProfiles();
   const [step, setStep] = useState<Step>("hello");
   const [actionCursor, setActionCursor] = useState(0);
+  const [slow, setSlow] = useState(false);
   const items = usePreparedItems({
     code,
     accountId: request.info?.account.id,
@@ -60,6 +63,11 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
       : !!request.info?.items.some((i) => getSupportItemDefinition(i.type)?.group === "action"));
   const steps: Step[] = ["hello", ...(multiProfile ? ["profile" as const] : []), ...(hasFixStep ? ["fix" as const] : []), "data"];
   const lastAction = Math.max(0, items.runnableActions.length - 1);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), LOADING_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (step === "fix" && items.prepared && !items.preparing && items.runnableActions.length === 0) setStep("data");
@@ -85,6 +93,7 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
   }
 
   if (!request.info) {
+    if (!slow) return null;
     return (
       <SupportFrame onClose={close}>
         <Spinner text={t("support_request.loading")} />
