@@ -103,6 +103,7 @@ impl SupportError {
     pub fn from_status(status: u16, detail: Option<String>) -> Self {
         let kind = match status {
             401 | 403 => SupportErrorKind::NotLoggedIn,
+            408 => SupportErrorKind::Offline,
             404 => SupportErrorKind::NotFound,
             410 => SupportErrorKind::Gone,
             413 => SupportErrorKind::TooLarge,

@@ -52,6 +52,15 @@ fn a_backend_without_support_requests_is_not_reported_as_a_missing_link() {
 }
 
 #[test]
+fn an_upload_the_backend_gave_up_on_asks_the_player_to_try_again() {
+    let timeout = r#"{"translatableKey":"message.ticket.support_request.error.upload_timeout","args":[]}"#;
+    assert_eq!(
+        SupportError::from_response(408, timeout, None).kind,
+        SupportErrorKind::Offline
+    );
+}
+
+#[test]
 fn message_starts_with_stable_key() {
     assert_eq!(
         SupportError::new(SupportErrorKind::Gone).to_string(),
