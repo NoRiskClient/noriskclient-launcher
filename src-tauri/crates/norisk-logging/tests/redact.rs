@@ -93,25 +93,25 @@ fn ignores_accounts_with_a_too_short_name() {
 #[test]
 fn masks_os_username_in_paths() {
     let masked =
-        mask_sensitive_data(r"Loading C:\Users\sheesh\AppData\Roaming\NoRiskClientV3\mods");
+        mask_sensitive_data(r"Loading C:\Users\steve\AppData\Roaming\NoRiskClientV3\mods");
     assert_eq!(
         masked,
         r"Loading C:\Users\*****\AppData\Roaming\NoRiskClientV3\mods"
     );
 
-    let masked = mask_sensitive_data("path: C:/Users/sheesh/Desktop/test.jar");
+    let masked = mask_sensitive_data("path: C:/Users/steve/Desktop/test.jar");
     assert_eq!(masked, "path: C:/Users/*****/Desktop/test.jar");
 
-    let masked = mask_sensitive_data("/home/sheesh/.minecraft and /Users/sheesh/Library");
+    let masked = mask_sensitive_data("/home/steve/.minecraft and /Users/steve/Library");
     assert_eq!(masked, "/home/*****/.minecraft and /Users/*****/Library");
 }
 
 #[test]
 fn masks_os_username_in_debug_escaped_paths() {
     let masked = mask_sensitive_data(
-        r#"Successfully saved config to "C:\\Users\\sheesh\\AppData\\Roaming\\norisk""#,
+        r#"Successfully saved config to "C:\\Users\\steve\\AppData\\Roaming\\norisk""#,
     );
-    assert!(!masked.contains("sheesh"), "os username leaked: {}", masked);
+    assert!(!masked.contains("steve"), "os username leaked: {}", masked);
     assert_eq!(
         masked,
         r#"Successfully saved config to "C:\\Users\\*****\\AppData\\Roaming\\norisk""#
