@@ -205,6 +205,9 @@ pub fn dispatch_cold_start(app: &AppHandle) -> bool {
 /// `true` if argv was consumed by a CLI subcommand — caller should then skip
 /// the default window-focus behavior.
 pub fn dispatch_hot_start(app: &AppHandle, argv: Vec<String>) -> bool {
+    if crate::utils::deep_link_utils::is_deep_link_launch(&argv) {
+        return false;
+    }
     // Log the parse failure instead of swallowing it: an unknown flag or a
     // subcommand this build predates is otherwise indistinguishable from "no
     // subcommand given", and the caller just silently focuses the window.

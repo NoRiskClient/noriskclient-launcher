@@ -172,6 +172,12 @@ async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
     );
 }
 
+pub fn is_deep_link_launch(argv: &[String]) -> bool {
+    argv.iter()
+        .skip(1)
+        .any(|arg| url::Url::parse(arg).is_ok_and(|u| u.scheme() == "norisk"))
+}
+
 pub fn is_main_window(window: &WebviewWindow) -> bool {
     window.label() == MAIN_WINDOW_LABEL
 }
