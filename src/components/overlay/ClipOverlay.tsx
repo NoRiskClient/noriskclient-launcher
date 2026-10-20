@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 
 import { useThemeStore } from "../../store/useThemeStore";
+import { errorKey } from "../../services/clip-service";
 
 const HOLD_MS = 2600;
 const FADE_MS = 400;
@@ -28,13 +29,6 @@ interface CaptureError {
 type Shown =
   | { kind: "saved"; clip: ClipManifest }
   | { kind: "error"; error: CaptureError };
-
-function errorKey(code: string): string {
-  return code
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
-}
 
 export function ClipOverlay() {
   const { t } = useTranslation();

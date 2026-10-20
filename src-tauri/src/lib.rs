@@ -10,3 +10,4 @@ pub mod logging;
 pub mod minecraft;
 pub mod state;
 pub mod sync;
+pub mod support;

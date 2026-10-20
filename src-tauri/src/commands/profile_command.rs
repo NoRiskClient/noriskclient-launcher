@@ -361,6 +361,7 @@ pub async fn launch_profile(
             quick_play_mp_clone,
             migration_info_clone,
             Vec::new(),
+            Vec::new(),
             false,
         )
             .await;
@@ -2709,9 +2710,11 @@ pub async fn launch_profile_with_overrides(
     quick_play_multiplayer: Option<String>,
     local_mods: Vec<String>,
     account: Option<String>,
+    jvm_args: Option<Vec<String>>,
 ) -> Result<(), CommandError> {
     let state = State::get().await?;
     let mut profile = resolve_profile_ref(&state, &profile_ref).await?;
+    let jvm_args = jvm_args.unwrap_or_default();
     apply_overrides(&mut profile, overrides)?;
 
     // Quick-play: explicit CLI value wins; otherwise fall back to the profile's
@@ -2728,7 +2731,7 @@ pub async fn launch_profile_with_overrides(
     };
 
     log::info!(
-        "[CLI launch] profile='{}' id={} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        "[CLI launch] profile='{}' id={} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?} jvm_args={:?}",
         profile.name,
         profile.id,
         profile.game_version,
@@ -2737,6 +2740,7 @@ pub async fn launch_profile_with_overrides(
         profile.selected_norisk_pack_id,
         qp_sp,
         qp_mp,
+        jvm_args,
     );
 
     let is_experimental = state.config_manager.is_experimental_mode().await;
@@ -2766,6 +2770,7 @@ pub async fn launch_profile_with_overrides(
             qp_mp,
             None,
             local_mod_paths,
+            jvm_args,
             true,
         )
         .await;
@@ -2987,6 +2992,8 @@ pub struct TempLaunchArgs {
     pub local_mods: Vec<String>,
     /// CLI `--account`: launch with this account (username or UUID).
     pub account: Option<String>,
+    #[serde(default)]
+    pub jvm_args: Vec<String>,
 }
 
 /// Spin up a throwaway MC instance with the given overrides. Builds an
@@ -3045,7 +3052,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         .calculate_instance_path_for_profile(&profile)?;
 
     log::info!(
-        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?} jvm_args={:?}",
         profile.id,
         display_name,
         game_dir,
@@ -3055,6 +3062,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         profile.selected_norisk_pack_id,
         args.quick_play_singleplayer,
         args.quick_play_multiplayer,
+        args.jvm_args,
     );
 
     let is_experimental = state.config_manager.is_experimental_mode().await;
@@ -3079,6 +3087,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
     let profile_clone = profile.clone();
     let qp_sp = args.quick_play_singleplayer.clone();
     let qp_mp = args.quick_play_multiplayer.clone();
+    let jvm_args = args.jvm_args.clone();
 
     tokio::spawn(async move {
         match installer::install_minecraft_version(
@@ -3090,6 +3099,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
             qp_mp,
             None,
             local_mod_paths,
+            jvm_args,
             false,
         )
         .await

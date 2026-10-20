@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use ffmpeg_next::ffi as ff;
-use norisk_ipc::ClipCodec;
+use norisk_ipc::{ticks_at, ClipCodec};
 
 use crate::buffer::{Clip, Packet};
 use crate::encoder::hw::av_error;
@@ -24,6 +24,8 @@ pub fn trim(
     destination: &Path,
     start_seconds: f64,
     end_seconds: f64,
+    video_start_seconds: Option<f64>,
+    video_end_seconds: Option<f64>,
     levels: &[norisk_ipc::TrackLevel],
 ) -> Result<TrimResult> {
     let clip = read(source)?;
@@ -31,52 +33,31 @@ pub fn trim(
     let (start_seconds, end_seconds) =
         usable_range(start_seconds, end_seconds, clip.duration_seconds())?;
 
-    let want_start = clip.first_pts + (start_seconds * TIME_BASE_DEN as f64) as i64;
-    let want_end = clip.first_pts + (end_seconds * TIME_BASE_DEN as f64) as i64;
+    let want_start = ticks_at(clip.first_pts, start_seconds, TIME_BASE_DEN as i64);
+    let want_end = ticks_at(clip.first_pts, end_seconds, TIME_BASE_DEN as i64);
 
-    let begin = clip
-        .video
-        .iter()
-        .filter(|p| p.keyframe && p.pts <= want_start)
-        .map(|p| p.pts)
-        .next_back()
-        .unwrap_or(clip.first_pts);
+    let begin = keyframe_at_or_before(&clip.video, want_start, clip.first_pts);
 
-    let video: Vec<Packet> = clip
-        .video
-        .iter()
-        .skip_while(|p| p.pts < begin)
-        .take_while(|p| p.pts <= want_end)
-        .cloned()
-        .collect();
+    let (picture_start, picture_end) = picture_window(
+        video_start_seconds,
+        video_end_seconds,
+        clip.first_pts,
+        want_start,
+        want_end,
+    );
+
+    let video = windowed_video(&clip.video, begin, picture_start, picture_end);
 
     if video.is_empty() {
         bail!("no frames fall inside {start_seconds:.1}s to {end_seconds:.1}s");
     }
 
-    let audio: Vec<AudioSource> = clip
-        .audio
-        .iter()
-        .map(|track| AudioSource {
-            format: track.format.clone(),
-            packets: track
-                .packets
-                .iter()
-                .filter(|p| p.pts >= begin && p.pts <= want_end)
-                .cloned()
-                .collect(),
-        })
-        .collect();
+    let audio = windowed_audio(&clip.audio, levels, clip.first_pts, begin, want_end);
 
-    let end_pts = video.last().map(|p| p.pts).unwrap_or(want_end);
     let audio_track = build_audio(&audio, levels)?;
+    let end_pts = furthest_pts(&video, &audio_track, want_end);
 
-    let bytes = video.iter().map(|p| p.len() as u64).sum::<u64>()
-        + audio_track
-            .iter()
-            .flat_map(|t| t.packets.iter())
-            .map(|p| p.len() as u64)
-            .sum::<u64>();
+    let bytes = total_bytes(&video, &audio_track);
 
     let cut = Clip {
         start_pts: begin,
@@ -98,8 +79,104 @@ pub fn trim(
     })
 }
 
-#[cfg(windows)]
-fn build_audio(
+pub(crate) fn keyframe_index_at_or_before(packets: &[Packet], pts: i64) -> Option<usize> {
+    packets.iter().rposition(|p| p.keyframe && p.pts <= pts)
+}
+
+fn keyframe_at_or_before(packets: &[Packet], pts: i64, fallback: i64) -> i64 {
+    keyframe_index_at_or_before(packets, pts)
+        .map(|index| packets[index].pts)
+        .unwrap_or(fallback)
+}
+
+pub(crate) fn picture_window(
+    start_seconds: Option<f64>,
+    end_seconds: Option<f64>,
+    origin: i64,
+    begin: i64,
+    end: i64,
+) -> (i64, i64) {
+    let at = |seconds: Option<f64>| {
+        seconds
+            .filter(|s| s.is_finite())
+            .map(|s| ticks_at(origin, s, TIME_BASE_DEN as i64).clamp(begin, end))
+    };
+
+    let start = at(start_seconds).unwrap_or(begin);
+    (start, at(end_seconds).unwrap_or(end).max(start))
+}
+
+fn windowed_video(packets: &[Packet], floor: i64, start: i64, end: i64) -> Vec<Packet> {
+    let from = keyframe_at_or_before(packets, start, floor).max(floor);
+    packets
+        .iter()
+        .skip_while(|p| p.pts < from)
+        .take_while(|p| p.pts <= end)
+        .cloned()
+        .collect()
+}
+
+pub(crate) fn furthest_pts(video: &[Packet], audio: &[AudioTrack], fallback: i64) -> i64 {
+    video
+        .iter()
+        .chain(audio.iter().flat_map(|track| track.packets.iter()))
+        .map(|p| p.pts)
+        .max()
+        .unwrap_or(fallback)
+}
+
+pub(crate) fn total_bytes(video: &[Packet], audio: &[AudioTrack]) -> u64 {
+    video
+        .iter()
+        .chain(audio.iter().flat_map(|track| track.packets.iter()))
+        .map(|p| p.len() as u64)
+        .sum()
+}
+
+pub(crate) fn windowed_audio(
+    sources: &[AudioSource],
+    levels: &[norisk_ipc::TrackLevel],
+    origin: i64,
+    begin: i64,
+    end: i64,
+) -> Vec<AudioSource> {
+    sources
+        .iter()
+        .enumerate()
+        .map(|(index, track)| {
+            let level = levels.iter().find(|level| level.stream == index as u32);
+            let ticks = level
+                .map(|level| level.offset_ticks(TIME_BASE_DEN as i64))
+                .unwrap_or(0);
+            let (from, to) = level
+                .map(|level| level.window_ticks(TIME_BASE_DEN as i64, origin))
+                .unwrap_or((None, None));
+
+            let first = from.map(|t| t.max(begin)).unwrap_or(begin);
+            let last = to.map(|t| t.min(end)).unwrap_or(end);
+
+            AudioSource {
+                format: track.format.clone(),
+                packets: track
+                    .packets
+                    .iter()
+                    .filter(|p| {
+                        p.pts >= first.saturating_sub(ticks)
+                            && p.pts <= last.saturating_sub(ticks)
+                    })
+                    .map(|p| Packet {
+                        pts: p.pts.saturating_add(ticks),
+                        dts: p.dts.saturating_add(ticks),
+                        ..p.clone()
+                    })
+                    .collect(),
+                quiet: Vec::new(),
+            }
+        })
+        .collect()
+}
+
+pub(crate) fn build_audio(
     audio: &[AudioSource],
     levels: &[norisk_ipc::TrackLevel],
 ) -> Result<Vec<AudioTrack>> {
@@ -107,14 +184,24 @@ fn build_audio(
         return Ok(Vec::new());
     };
 
-    if !norisk_ipc::levels_change_anything(levels) {
+    let hushed = audio.iter().any(|source| !source.quiet.is_empty());
+    if !norisk_ipc::levels_change_anything(levels) && !hushed {
         return Ok(as_recorded(mix));
     }
 
-    let stems: Vec<&AudioSource> = audio.iter().skip(1).collect();
+    let mut stems: Vec<(u32, &AudioSource)> = audio
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(index, source)| (index as u32, source))
+        .collect();
     if stems.is_empty() {
-        log::info!("This clip was recorded before the tracks were kept apart, so its balance is fixed; copying the mix");
-        return Ok(as_recorded(mix));
+        if !mix.quiet.is_empty() {
+            stems.push((0, mix));
+        } else {
+            log::info!("This clip was recorded before the tracks were kept apart, so its balance is fixed; copying the mix");
+            return Ok(as_recorded(mix));
+        }
     }
 
     match remix(&stems, levels) {
@@ -123,21 +210,6 @@ fn build_audio(
             log::warn!("Could not rebuild the mix, keeping the recorded one: {e:#}");
             Ok(as_recorded(mix))
         }
-    }
-}
-
-#[cfg(not(windows))]
-fn build_audio(
-    audio: &[AudioSource],
-    _levels: &[norisk_ipc::TrackLevel],
-) -> Result<Vec<AudioTrack>> {
-    Ok(audio.first().map(as_recorded).unwrap_or_default())
-}
-
-pub(crate) fn as_recorded_mix(clip: &SourceClip) -> Vec<AudioTrack> {
-    match clip.audio.first() {
-        Some(mix) => as_recorded(mix),
-        None => Vec::new(),
     }
 }
 
@@ -154,25 +226,23 @@ fn as_recorded(source: &AudioSource) -> Vec<AudioTrack> {
     }]
 }
 
-#[cfg(windows)]
-fn remix(stems: &[&AudioSource], levels: &[norisk_ipc::TrackLevel]) -> Result<AudioTrack> {
+fn remix(stems: &[(u32, &AudioSource)], levels: &[norisk_ipc::TrackLevel]) -> Result<AudioTrack> {
     use crate::audio::decoder::decode_all;
     use crate::audio::encoder::{AudioEncoder, DEFAULT_BITRATE, OUTPUT_CHANNELS, OUTPUT_SAMPLE_RATE};
 
     let start_pts = stems
         .iter()
-        .filter_map(|stem| stem.packets.first().map(|p| p.pts))
+        .filter_map(|(_, stem)| stem.packets.first().map(|p| p.pts))
         .min()
         .context("none of the clip's separate tracks has any audio in this range")?;
 
     let mut mixed: Vec<f32> = Vec::new();
 
-    for (index, stem) in stems.iter().enumerate() {
+    for &(stream, stem) in stems {
         if stem.packets.is_empty() {
             continue;
         }
 
-        let stream = (index + 1) as u32;
         let gain = levels
             .iter()
             .find(|level| level.stream == stream)
@@ -183,17 +253,24 @@ fn remix(stems: &[&AudioSource], levels: &[norisk_ipc::TrackLevel]) -> Result<Au
             continue;
         }
 
-        let samples = decode_all(
+        let mut samples = decode_all(
             stem.format.sample_rate,
             stem.format.channels,
             &stem.format.extradata,
             &stem.packets,
         )?;
+        let frame_at = |pts: i64| {
+            ((pts - stem.packets[0].pts).max(0) as i128 * OUTPUT_SAMPLE_RATE as i128
+                / TIME_BASE_DEN as i128) as usize
+        };
+        for &(from, to) in &stem.quiet {
+            silence(&mut samples, OUTPUT_CHANNELS as usize, frame_at(from), frame_at(to));
+        }
 
         let offset = ((stem.packets[0].pts - start_pts).max(0) as i128
             * OUTPUT_SAMPLE_RATE as i128
-            * OUTPUT_CHANNELS as i128
-            / TIME_BASE_DEN as i128) as usize;
+            / TIME_BASE_DEN as i128) as usize
+            * OUTPUT_CHANNELS as usize;
 
         if mixed.len() < offset + samples.len() {
             mixed.resize(offset + samples.len(), 0.0);
@@ -246,9 +323,34 @@ fn remix(stems: &[&AudioSource], levels: &[norisk_ipc::TrackLevel]) -> Result<Au
     })
 }
 
+const FADE_FRAMES: usize = 240;
+
+pub(crate) fn silence(samples: &mut [f32], channels: usize, from: usize, to: usize) {
+    let frames = samples.len() / channels.max(1);
+    let (from, to) = (from.min(frames), to.min(frames));
+    if to <= from {
+        return;
+    }
+    let fade = FADE_FRAMES.min((to - from) / 2);
+    for frame in from..to {
+        let into = frame - from;
+        let left = to - frame - 1;
+        let keep = if into < fade {
+            1.0 - (into + 1) as f32 / (fade + 1) as f32
+        } else if left < fade {
+            1.0 - (left + 1) as f32 / (fade + 1) as f32
+        } else {
+            0.0
+        };
+        for sample in &mut samples[frame * channels..(frame + 1) * channels] {
+            *sample *= keep;
+        }
+    }
+}
+
 const MIN_TRIM_SECONDS: f64 = 0.5;
 
-fn usable_range(start: f64, end: f64, duration: f64) -> Result<(f64, f64)> {
+pub(crate) fn usable_range(start: f64, end: f64, duration: f64) -> Result<(f64, f64)> {
     if !start.is_finite() || !end.is_finite() {
         bail!("the trim range has to be two real numbers");
     }
@@ -275,10 +377,10 @@ pub(crate) struct SourceClip {
 pub(crate) struct AudioSource {
     pub(crate) format: AudioFormat,
     pub(crate) packets: Vec<Packet>,
+    pub(crate) quiet: Vec<(i64, i64)>,
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]
 pub(crate) struct AudioFormat {
     pub(crate) sample_rate: u32,
     pub(crate) channels: u32,
@@ -287,7 +389,7 @@ pub(crate) struct AudioFormat {
 }
 
 impl SourceClip {
-    fn duration_seconds(&self) -> f64 {
+    pub(crate) fn duration_seconds(&self) -> f64 {
         match self.video.last() {
             Some(last) => ((last.pts - self.first_pts).max(0)) as f64 / TIME_BASE_DEN as f64,
             None => 0.0,
@@ -350,6 +452,7 @@ pub(crate) fn read(path: &Path) -> Result<SourceClip> {
             audio.push(AudioSource {
                 format: audio_format(format_ctx, *index)?,
                 packets: Vec::new(),
+                quiet: Vec::new(),
             });
             audio_bases.push((**(*format_ctx).streams.add(*index as usize)).time_base);
         }
@@ -531,51 +634,135 @@ mod tests {
     }
 
     #[test]
-    fn the_copied_data_begins_at_a_keyframe() {
+    fn a_later_picture_start_still_begins_on_a_keyframe() {
         let packets = ten_seconds();
-        let want_start = 5 * TIME_BASE_DEN as i64; // 5.0 s, mid group
+        let second = TIME_BASE_DEN as i64;
+        let begin = keyframe_at_or_before(&packets, 0, 0);
 
-        let begin = packets
-            .iter()
-            .filter(|p| p.keyframe && p.pts <= want_start)
-            .map(|p| p.pts)
-            .next_back()
-            .unwrap();
+        let (start, end) = picture_window(Some(5.0), None, 0, 0, 10 * second);
+        let video = windowed_video(&packets, begin, start, end);
+
+        assert!(video[0].keyframe, "the picture would decode into mush");
+        assert_eq!(
+            video[0].pts,
+            4 * second,
+            "5 s should fall back to the keyframe at 4 s, exactly as the clip's own start does"
+        );
+    }
+
+    #[test]
+    fn a_later_picture_start_never_reaches_back_past_the_cut() {
+        let packets = ten_seconds();
+        let second = TIME_BASE_DEN as i64;
+        let want_start = 6 * second;
+        let begin = keyframe_at_or_before(&packets, want_start, 0);
+
+        let (start, end) = picture_window(Some(7.0), None, 0, want_start, 10 * second);
+        let video = windowed_video(&packets, begin, start, end);
 
         assert_eq!(
-            begin,
-            4 * TIME_BASE_DEN as i64,
-            "5 s should fall back to the keyframe at 4 s"
+            video[0].pts, begin,
+            "with no keyframe of its own to land on, the picture keeps the cut's first frame"
+        );
+        assert!(video.iter().all(|p| p.pts >= begin));
+    }
+
+    #[test]
+    fn an_earlier_picture_end_drops_the_frames_after_it() {
+        let packets = ten_seconds();
+        let second = TIME_BASE_DEN as i64;
+
+        let (start, end) = picture_window(None, Some(3.0), 0, 0, 10 * second);
+        let video = windowed_video(&packets, 0, start, end);
+
+        assert_eq!(video.last().unwrap().pts, 3 * second);
+        assert!(video.len() < packets.len());
+    }
+
+    #[test]
+    fn a_picture_window_wider_than_the_cut_is_clamped_rather_than_resurrecting_frames() {
+        let packets = ten_seconds();
+        let second = TIME_BASE_DEN as i64;
+        let (want_start, want_end) = (4 * second, 6 * second);
+        let begin = keyframe_at_or_before(&packets, want_start, 0);
+
+        let (start, end) = picture_window(Some(-100.0), Some(100.0), 0, want_start, want_end);
+        let greedy = windowed_video(&packets, begin, start, end);
+
+        assert!(greedy.iter().all(|p| p.pts >= begin && p.pts <= want_end));
+    }
+
+    #[test]
+    fn a_picture_window_that_makes_no_sense_falls_back_to_the_cut() {
+        let second = TIME_BASE_DEN as i64;
+        let (want_start, want_end) = (second, 8 * second);
+
+        for nonsense in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                picture_window(Some(nonsense), Some(nonsense), 0, want_start, want_end),
+                (want_start, want_end),
+                "{nonsense} should count as no picture window at all"
+            );
+        }
+
+        let (start, end) = picture_window(Some(6.0), Some(2.0), 0, want_start, want_end);
+        assert!(end >= start, "a backwards window must not end before it starts");
+    }
+
+    #[test]
+    fn a_picture_window_is_measured_from_the_same_place_as_the_cut_and_the_tracks() {
+        let second = TIME_BASE_DEN as i64;
+        let origin = 5 * second;
+
+        assert_eq!(
+            picture_window(Some(2.0), Some(3.0), origin, origin, origin + 10 * second),
+            (origin + 2 * second, origin + 3 * second)
         );
     }
 
     #[test]
-    fn a_start_on_a_keyframe_needs_no_lead_in() {
-        let packets = ten_seconds();
-        let want_start = 6 * TIME_BASE_DEN as i64;
+    fn sound_that_outlasts_the_picture_still_sets_how_long_the_clip_runs() {
+        let second = TIME_BASE_DEN as i64;
+        let video: Vec<Packet> = (0..4).map(|i| frame(i * second, i == 0)).collect();
+        let track = AudioTrack {
+            sample_rate: 48_000,
+            channels: 2,
+            extradata: vec![0x12, 0x10],
+            packets: (0..9).map(|i| frame(i * second, true)).collect(),
+            label: "Mix".to_string(),
+        };
 
-        let begin = packets
-            .iter()
-            .filter(|p| p.keyframe && p.pts <= want_start)
-            .map(|p| p.pts)
-            .next_back()
-            .unwrap();
+        assert_eq!(furthest_pts(&video, &[track.clone()], 0), 8 * second);
+        assert_eq!(furthest_pts(&video, &[], 0), 3 * second);
+        assert_eq!(furthest_pts(&[], &[], 7 * second), 7 * second);
 
-        assert_eq!(begin, want_start);
+        let reordered: Vec<Packet> = [0, 3, 1, 2].iter().map(|&i| frame(i * second, i == 0)).collect();
+        assert_eq!(
+            furthest_pts(&reordered, &[], 0),
+            3 * second,
+            "a frame shown last but decoded earlier still sets the end",
+        );
     }
 
     #[test]
-    fn the_end_is_exact() {
+    fn a_picture_window_on_its_own_leaves_the_recorded_mix_alone() {
         let packets = ten_seconds();
-        let want_end = 7 * TIME_BASE_DEN as i64 + TIME_BASE_DEN as i64 / 60;
+        let second = TIME_BASE_DEN as i64;
+        let audio = vec![source("Mix", 10), source("Game", 10)];
 
-        let kept: Vec<&Packet> = packets.iter().filter(|p| p.pts <= want_end).collect();
-        let last = kept.last().unwrap().pts;
+        let built = build_audio(&audio, &[]).unwrap();
+        let (start, end) = picture_window(Some(2.0), Some(6.0), 0, 0, 10 * second);
+        let video = windowed_video(&packets, 0, start, end);
 
+        assert_eq!(
+            built[0].packets, audio[0].packets,
+            "a picture-only window must not send the sound through the mixer"
+        );
         assert!(
-            (want_end - last) < TIME_BASE_DEN as i64 / 60,
-            "the last kept frame should sit within one frame of the request"
+            !built[0].packets.is_empty(),
+            "a picture-only window must not throw the sound away"
         );
+        assert!(video.len() < packets.len(), "the picture was not narrowed at all");
     }
 
     fn source(label: &str, packets: usize) -> AudioSource {
@@ -587,11 +774,303 @@ mod tests {
                 label: label.to_string(),
             },
             packets: (0..packets as i64).map(|i| frame(i * 1_920, true)).collect(),
+            quiet: Vec::new(),
         }
     }
 
     fn level(stream: u32, volume: u32) -> norisk_ipc::TrackLevel {
-        norisk_ipc::TrackLevel { stream, volume }
+        norisk_ipc::TrackLevel {
+            stream,
+            volume,
+            offset_seconds: 0.0,
+            start_seconds: None,
+            end_seconds: None,
+        }
+    }
+
+    fn offset(stream: u32, offset_seconds: f64) -> norisk_ipc::TrackLevel {
+        norisk_ipc::TrackLevel {
+            offset_seconds,
+            ..level(stream, 100)
+        }
+    }
+
+    fn window(stream: u32, start: Option<f64>, end: Option<f64>) -> norisk_ipc::TrackLevel {
+        norisk_ipc::TrackLevel {
+            start_seconds: start,
+            end_seconds: end,
+            ..level(stream, 100)
+        }
+    }
+
+    const PACKET: i64 = 1_920;
+
+    #[test]
+    fn a_silenced_stretch_goes_quiet_with_soft_edges_and_leaves_the_rest_alone() {
+        let channels = 2;
+        let frames = 4_000;
+        let mut samples = vec![0.5f32; frames * channels];
+
+        silence(&mut samples, channels, 1_000, 3_000);
+
+        let at = |frame: usize| samples[frame * channels];
+        assert_eq!(at(999), 0.5, "sound before the stretch changed");
+        assert_eq!(at(3_000), 0.5, "sound after the stretch changed");
+        assert_eq!(at(2_000), 0.0, "the middle of the stretch is not silent");
+        assert!(at(1_000) > 0.0 && at(1_000) < 0.5, "the stretch starts with a hard click");
+        assert!(at(2_999) > 0.0 && at(2_999) < 0.5, "the stretch ends with a hard click");
+        assert!(
+            (1_000..1_240).all(|frame| at(frame) >= at(frame + 1)),
+            "the fade out is not a steady slope",
+        );
+        assert!(samples.chunks(channels).all(|frame| frame[0] == frame[1]), "the channels drifted apart");
+    }
+
+    #[test]
+    fn silencing_past_the_end_or_backwards_does_not_panic() {
+        let mut samples = vec![0.5f32; 100];
+
+        silence(&mut samples, 2, 40, 10_000);
+        assert!(samples[..80].iter().all(|s| *s == 0.5));
+
+        let before = samples.clone();
+        silence(&mut samples, 2, 30, 10);
+        silence(&mut samples, 0, 0, 10);
+        assert_eq!(samples.len(), before.len());
+    }
+
+    fn as_seconds(ticks: i64) -> f64 {
+        ticks as f64 / TIME_BASE_DEN as f64
+    }
+
+    #[test]
+    fn a_zero_offset_leaves_the_packets_exactly_where_no_offset_leaves_them() {
+        let sources = vec![source("Mix", 10), source("Game", 10)];
+        let end = 9 * PACKET;
+
+        let without = windowed_audio(&sources, &[], 0, 0, end);
+        let zero = windowed_audio(&sources, &[offset(0, 0.0), offset(1, 0.0)], 0, 0, end);
+
+        for (index, (a, b)) in without.iter().zip(&zero).enumerate() {
+            assert_eq!(a.packets, b.packets, "track {index} moved");
+            assert_eq!(a.packets, sources[index].packets, "track {index} was rewritten");
+        }
+    }
+
+    #[test]
+    fn a_positive_offset_moves_that_track_later_by_the_ticks_it_asks_for() {
+        let sources = vec![source("Mix", 10)];
+
+        let shifted = windowed_audio(&sources, &[offset(0, 0.25)], 0, 0, 100 * PACKET);
+
+        let ticks = TIME_BASE_DEN as i64 / 4;
+        assert_eq!(shifted[0].packets[0].pts, sources[0].packets[0].pts + ticks);
+        assert_eq!(shifted[0].packets[0].dts, sources[0].packets[0].dts + ticks);
+    }
+
+    #[test]
+    fn a_negative_offset_never_emits_a_timestamp_before_the_cut() {
+        let begin = 0;
+        let sources = vec![source("Mix", 10)];
+
+        let shifted = windowed_audio(&sources, &[offset(0, -0.05)], 0, begin, 9 * PACKET);
+
+        assert!(!shifted[0].packets.is_empty(), "the whole track was thrown away");
+        assert!(
+            shifted[0]
+                .packets
+                .iter()
+                .all(|p| p.pts >= begin && p.dts >= begin),
+            "a packet landed before the start of the cut"
+        );
+    }
+
+    #[test]
+    fn an_offset_moves_only_the_track_it_names() {
+        let sources = vec![source("Mix", 10), source("Game", 10), source("Microphone", 10)];
+        let end = 100 * PACKET;
+
+        let shifted = windowed_audio(&sources, &[offset(1, 0.1)], 0, 0, end);
+
+        assert_eq!(shifted[0].packets, sources[0].packets);
+        assert_eq!(shifted[2].packets, sources[2].packets);
+        assert_eq!(
+            shifted[1].packets[0].pts,
+            sources[1].packets[0].pts + TIME_BASE_DEN as i64 / 10
+        );
+    }
+
+    #[test]
+    fn an_offset_bigger_than_the_clip_empties_that_track_rather_than_panicking() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        for seconds in [600.0, -600.0, f64::MAX, f64::MIN] {
+            let shifted = windowed_audio(&sources, &[offset(0, seconds)], 0, 0, end);
+            assert!(
+                shifted[0].packets.is_empty(),
+                "{seconds} should push the whole track out of the range"
+            );
+        }
+    }
+
+    #[test]
+    fn an_offset_that_runs_past_the_end_is_cut_instead_of_growing_the_file() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        let kept = windowed_audio(&sources, &[offset(0, 0.0)], 0, 0, end)[0].packets.len();
+        let shifted = windowed_audio(&sources, &[offset(0, as_seconds(PACKET * 3))], 0, 0, end);
+
+        assert_eq!(shifted[0].packets.len(), kept - 3);
+        assert!(shifted[0].packets.iter().all(|p| p.pts <= end));
+    }
+
+    #[test]
+    fn a_track_with_no_window_of_its_own_follows_the_clip() {
+        let sources = vec![source("Mix", 10), source("Game", 10)];
+        let end = 9 * PACKET;
+
+        let without = windowed_audio(&sources, &[], 0, 0, end);
+        let empty_window = windowed_audio(
+            &sources,
+            &[window(0, None, None), window(1, None, None)],
+            0,
+            0,
+            end,
+        );
+
+        for (index, (a, b)) in without.iter().zip(&empty_window).enumerate() {
+            assert_eq!(a.packets, b.packets, "track {index} moved");
+            assert_eq!(
+                a.packets, sources[index].packets,
+                "track {index} was rewritten"
+            );
+        }
+    }
+
+    #[test]
+    fn a_later_start_of_its_own_drops_that_tracks_earlier_packets() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        let cut = windowed_audio(
+            &sources,
+            &[window(0, Some(as_seconds(3 * PACKET)), None)],
+            0,
+            0,
+            end,
+        );
+
+        assert_eq!(cut[0].packets.as_slice(), &sources[0].packets[3..]);
+    }
+
+    #[test]
+    fn an_earlier_end_of_its_own_drops_that_tracks_later_packets() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        let cut = windowed_audio(
+            &sources,
+            &[window(0, None, Some(as_seconds(5 * PACKET)))],
+            0,
+            0,
+            end,
+        );
+
+        assert_eq!(cut[0].packets.as_slice(), &sources[0].packets[..=5]);
+    }
+
+    #[test]
+    fn a_window_wider_than_the_clip_is_clamped_rather_than_resurrecting_audio() {
+        let sources = vec![source("Mix", 10)];
+        let (begin, end) = (2 * PACKET, 6 * PACKET);
+
+        let clip = windowed_audio(&sources, &[], 0, begin, end);
+        let greedy = windowed_audio(&sources, &[window(0, Some(-100.0), Some(100.0))], 0, begin, end);
+
+        assert_eq!(greedy[0].packets, clip[0].packets);
+        assert!(greedy[0].packets.iter().all(|p| p.pts >= begin && p.pts <= end));
+    }
+
+    #[test]
+    fn a_window_on_one_track_leaves_the_other_tracks_alone() {
+        let sources = vec![source("Mix", 10), source("Game", 10), source("Microphone", 10)];
+        let end = 9 * PACKET;
+
+        let cut = windowed_audio(
+            &sources,
+            &[window(1, Some(as_seconds(4 * PACKET)), Some(as_seconds(6 * PACKET)))],
+            0,
+            0,
+            end,
+        );
+
+        assert_eq!(cut[0].packets, sources[0].packets);
+        assert_eq!(cut[2].packets, sources[2].packets);
+        assert_eq!(cut[1].packets.as_slice(), &sources[1].packets[4..=6]);
+    }
+
+    #[test]
+    fn a_window_that_makes_no_sense_empties_the_track_rather_than_panicking() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        let backwards = windowed_audio(
+            &sources,
+            &[window(0, Some(as_seconds(8 * PACKET)), Some(as_seconds(2 * PACKET)))],
+            0,
+            0,
+            end,
+        );
+        assert!(backwards[0].packets.is_empty());
+
+        let enormous = windowed_audio(
+            &sources,
+            &[window(0, Some(f64::MAX), Some(f64::MIN))],
+            0,
+            0,
+            end,
+        );
+        assert!(enormous[0].packets.is_empty());
+
+        for nonsense in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let ignored = windowed_audio(
+                &sources,
+                &[window(0, Some(nonsense), Some(nonsense))],
+                0,
+                0,
+                end,
+            );
+            assert_eq!(
+                ignored[0].packets, sources[0].packets,
+                "{nonsense} should count as no window at all"
+            );
+        }
+    }
+
+    #[test]
+    fn a_window_is_read_in_the_finished_clip_so_it_measures_the_track_after_its_shift() {
+        let sources = vec![source("Mix", 10)];
+        let end = 9 * PACKET;
+
+        let both = windowed_audio(
+            &sources,
+            &[norisk_ipc::TrackLevel {
+                offset_seconds: as_seconds(2 * PACKET),
+                start_seconds: Some(as_seconds(4 * PACKET)),
+                end_seconds: None,
+                ..level(0, 100)
+            }],
+            0,
+            0,
+            end,
+        );
+
+        assert_eq!(both[0].packets.len(), 6);
+        assert_eq!(both[0].packets[0].pts, 4 * PACKET);
+        assert_eq!(both[0].packets[0].dts, 4 * PACKET);
+        assert!(both[0].packets.iter().all(|p| p.pts >= 0 && p.pts <= end));
     }
 
     #[test]

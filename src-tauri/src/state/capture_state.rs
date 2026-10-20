@@ -24,7 +24,9 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
 const PING_INTERVAL: Duration = Duration::from_secs(2);
 
-const HEARTBEAT_GRACE: Duration = Duration::from_secs(12);
+const ENGINE_REPORTS_PROTOCOL: bool = cfg!(not(target_os = "macos"));
+
+const HEARTBEAT_GRACE: Duration = Duration::from_secs(20);
 
 const BACKOFF: &[Duration] = &[
     Duration::from_secs(1),
@@ -37,6 +39,7 @@ const BACKOFF: &[Duration] = &[
 struct Session {
     config: Option<norisk_ipc::CaptureConfig>,
     attached_pid: Option<u32>,
+    attached_screen: Option<String>,
     attached_game: Option<String>,
     buffering_enabled: Option<bool>,
     attached_at: Option<std::time::Instant>,
@@ -109,8 +112,10 @@ pub struct CaptureSupervisor {
     ready: Arc<RwLock<Option<ReadyInfo>>>,
     active: Arc<RwLock<Option<(norisk_ipc::ClipCodec, norisk_ipc::EncoderPreference)>>>,
     last_status: Arc<RwLock<Option<norisk_ipc::StatusReport>>>,
+    last_error: Arc<RwLock<Option<norisk_ipc::CaptureError>>>,
     app: Arc<RwLock<Option<tauri::AppHandle>>>,
     running: Arc<RwLock<bool>>,
+    incompatible: std::sync::atomic::AtomicBool,
 }
 
 impl CaptureSupervisor {
@@ -125,8 +130,10 @@ impl CaptureSupervisor {
             ready: Arc::new(RwLock::new(None)),
             active: Arc::new(RwLock::new(None)),
             last_status: Arc::new(RwLock::new(None)),
+            last_error: Arc::new(RwLock::new(None)),
             app: Arc::new(RwLock::new(None)),
             running: Arc::new(RwLock::new(false)),
+            incompatible: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -148,11 +155,25 @@ impl CaptureSupervisor {
         *self.active.read().await
     }
 
+    pub async fn last_status(&self) -> Option<norisk_ipc::StatusReport> {
+        self.last_status.read().await.clone()
+    }
+
+    pub async fn last_error(&self) -> Option<norisk_ipc::CaptureError> {
+        self.last_error.read().await.clone()
+    }
+
     pub async fn is_running(&self) -> bool {
         *self.running.read().await
     }
 
     pub fn send(&self, command: LauncherToCapture) -> Result<()> {
+        if self.incompatible.load(std::sync::atomic::Ordering::Acquire) {
+            return Err(AppError::Other(
+                "the capture engine does not match this launcher; update or reinstall the launcher"
+                    .into(),
+            ));
+        }
         {
             let mut session = self
                 .session
@@ -160,9 +181,17 @@ impl CaptureSupervisor {
                 .unwrap_or_else(|poison| poison.into_inner());
             match &command {
                 LauncherToCapture::Configure(config) => session.config = Some(config.clone()),
-                LauncherToCapture::AttachWindow { pid } => session.attached_pid = Some(*pid),
+                LauncherToCapture::AttachWindow { pid } => {
+                    session.attached_pid = Some(*pid);
+                    session.attached_screen = None;
+                }
+                LauncherToCapture::AttachScreen { device } => {
+                    session.attached_screen = Some(device.clone());
+                    session.attached_pid = None;
+                }
                 LauncherToCapture::DetachWindow => {
                     session.attached_pid = None;
+                    session.attached_screen = None;
                     session.attached_game = None;
                 }
                 LauncherToCapture::SetBufferEnabled { enabled } => {
@@ -192,6 +221,14 @@ impl CaptureSupervisor {
             .attached_pid
     }
 
+    pub fn attached_screen(&self) -> Option<String> {
+        self.session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .attached_screen
+            .clone()
+    }
+
     pub fn attached_game(&self) -> Option<String> {
         self.session
             .lock()
@@ -206,8 +243,20 @@ impl CaptureSupervisor {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
         session.attached_pid = None;
+        session.attached_screen = None;
         session.attached_game = None;
         session.attached_at = None;
+    }
+
+    pub fn attach_screen(&self, device: String, name: String) -> Result<()> {
+        self.send(LauncherToCapture::AttachScreen { device })?;
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        session.attached_game = Some(name);
+        session.attached_at = Some(std::time::Instant::now());
+        Ok(())
     }
 
     pub fn attach_game(&self, pid: u32, name: String) -> Result<()> {
@@ -234,7 +283,7 @@ impl CaptureSupervisor {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
         let kind = game_kind(session.attached_game.as_deref());
-        let method = status.capture_method.clone();
+        let method = status.capture_method;
 
         if to == Buffering && session.buffering_since.is_none() {
             session.buffering_since = Some(std::time::Instant::now());
@@ -244,6 +293,8 @@ impl CaptureSupervisor {
                     json!({
                         "game": kind,
                         "capture_method": method,
+                        "codec": status.active_codec,
+                        "encoder": status.active_encoder,
                         "attach_ms": started.elapsed().as_millis() as u64,
                     }),
                 );
@@ -259,6 +310,7 @@ impl CaptureSupervisor {
                     json!({
                         "game": kind,
                         "capture_method": method,
+                        "encoder": status.active_encoder,
                         "minutes": tenths(since.elapsed().as_secs_f64() / 60.0),
                         "dropped_frames": status.dropped_frames,
                         "dropped_before_keyframe": status.dropped_before_keyframe,
@@ -292,6 +344,7 @@ impl CaptureSupervisor {
         }
 
         let mut receiver = self.take_command_receiver().await?;
+        self.incompatible.store(false, std::sync::atomic::Ordering::Release);
 
         let mut stale = 0;
         while receiver.try_recv().is_ok() {
@@ -367,15 +420,31 @@ impl CaptureSupervisor {
         let mut attempt = 0usize;
 
         loop {
-            match self.run_once(&exe, &mut commands).await {
+            let outcome = self.run_once(&exe, &mut commands).await;
+            crate::utils::clip_library::release_all_destinations();
+            if let Some(app) = self.app.read().await.as_ref() {
+                use tauri::Emitter;
+                let _ = app.emit("clip_engine_stopped", ());
+            }
+            match outcome {
                 Outcome::Shutdown => {
                     log::info!("Capture engine shut down as requested");
+                    return commands;
+                }
+                Outcome::Incompatible => {
+                    log::error!("Capture engine does not match this launcher; not restarting it");
+                    *self.ready.write().await = None;
+                    *self.active.write().await = None;
+                    *self.last_status.write().await = None;
+                    *self.state.write().await = CaptureState::Failed;
                     return commands;
                 }
                 Outcome::Lost(reason) => {
                     log::warn!("Capture engine went away: {reason}");
                     *self.state.write().await = CaptureState::Attaching;
                     *self.ready.write().await = None;
+                    *self.active.write().await = None;
+                    *self.last_status.write().await = None;
                 }
             }
 
@@ -467,6 +536,9 @@ impl CaptureSupervisor {
         if let Some(pid) = session.attached_pid {
             replay.push(LauncherToCapture::AttachWindow { pid });
         }
+        if let Some(device) = session.attached_screen {
+            replay.push(LauncherToCapture::AttachScreen { device });
+        }
         if !replay.is_empty() {
             log::info!("Restoring {} session command(s) on the capture engine", replay.len());
             for command in replay {
@@ -495,6 +567,10 @@ impl CaptureSupervisor {
                                 last_pong = Instant::now();
                             }
                             self.absorb(event).await;
+                            if self.incompatible.load(std::sync::atomic::Ordering::Acquire) {
+                                let _ = child.kill().await;
+                                return Outcome::Incompatible;
+                            }
                         }
                         Err(e) => log::warn!("Undecodable message from the capture engine: {e}"),
                     },
@@ -568,12 +644,32 @@ impl CaptureSupervisor {
     async fn absorb(&self, event: CaptureToLauncher) {
         match event {
             CaptureToLauncher::Ready(info) => {
-                if info.protocol_version != norisk_ipc::PROTOCOL_VERSION {
+                if ENGINE_REPORTS_PROTOCOL && info.protocol_version != norisk_ipc::PROTOCOL_VERSION {
+                    self.incompatible.store(true, std::sync::atomic::Ordering::Release);
                     log::error!(
                         "Capture engine speaks protocol {} but this launcher speaks {}",
                         info.protocol_version,
                         norisk_ipc::PROTOCOL_VERSION
                     );
+                    Box::pin(self.absorb(CaptureToLauncher::Error(norisk_ipc::CaptureError {
+                        code: norisk_ipc::ErrorCode::Protocol,
+                        message: format!(
+                            "The capture engine speaks protocol {} but the launcher speaks {}. \
+                             Update or reinstall the launcher so both halves are the same version.",
+                            info.protocol_version,
+                            norisk_ipc::PROTOCOL_VERSION
+                        ),
+                        recoverable: false,
+                        source: None,
+                    })))
+                    .await;
+                    return;
+                }
+                {
+                    let mut last_error = self.last_error.write().await;
+                    if last_error.as_ref().is_some_and(|e| e.code == norisk_ipc::ErrorCode::Protocol) {
+                        *last_error = None;
+                    }
                 }
                 log::info!(
                     "Capture engine {} ready on {} with {:?}",
@@ -589,6 +685,7 @@ impl CaptureSupervisor {
                         json!({
                             "engine_version": info.engine_version,
                             "gpu_vendor": gpu_vendor(&info.adapter),
+                            "driver_too_old": info.capabilities.iter().any(|c| c.driver_too_old),
                             "encoders": info.available_encoders,
                             "hardware_encoders": info
                                 .capabilities
@@ -604,6 +701,12 @@ impl CaptureSupervisor {
                 *self.ready.write().await = Some(info);
             }
             CaptureToLauncher::Status(status) => {
+                if status.state == CaptureState::Buffering {
+                    let mut last_error = self.last_error.write().await;
+                    if last_error.as_ref().is_some_and(|e| e.code != norisk_ipc::ErrorCode::Protocol) {
+                        *last_error = None;
+                    }
+                }
                 {
                     let mut current = self.state.write().await;
                     if *current != status.state {
@@ -644,7 +747,7 @@ impl CaptureSupervisor {
                             "audio_tracks": manifest.audio_tracks.len(),
                             "codec": active.map(|(codec, _)| codec),
                             "encoder": active.map(|(_, encoder)| encoder),
-                            "capture_method": status.as_ref().and_then(|s| s.capture_method.clone()),
+                            "capture_method": status.as_ref().and_then(|s| s.capture_method),
                             "capture_fps": status.as_ref().map(|s| s.capture_fps.round()),
                             "encode_fps": status.as_ref().map(|s| s.encode_fps.round()),
                             "dropped_frames": status.as_ref().map(|s| s.dropped_frames),
@@ -734,10 +837,39 @@ impl CaptureSupervisor {
                         "height": exported.height,
                     }),
                 );
+                crate::utils::clip_library::release_destination(&exported.path);
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_exported", &exported) {
                         log::warn!("Could not tell the UI about the export: {e}");
+                    }
+                }
+            }
+            CaptureToLauncher::GifExported(exported) => {
+                log::info!(
+                    "GIF written: {} ({}x{}, {} frames, {:.1} MB)",
+                    exported.path.display(),
+                    exported.width,
+                    exported.height,
+                    exported.frames,
+                    exported.size_bytes as f64 / 1e6
+                );
+                track(
+                    "clip_exported_gif",
+                    json!({
+                        "duration_s": tenths(exported.duration_seconds),
+                        "size_mb": megabytes(exported.size_bytes),
+                        "width": exported.width,
+                        "height": exported.height,
+                        "frames": exported.frames,
+                        "truncated": exported.truncated,
+                    }),
+                );
+                crate::utils::clip_library::release_destination(&exported.path);
+                if let Some(app) = self.app.read().await.as_ref() {
+                    use tauri::Emitter;
+                    if let Err(e) = app.emit("clip_gif_exported", &exported) {
+                        log::warn!("Could not tell the UI about the GIF: {e}");
                     }
                 }
             }
@@ -773,6 +905,7 @@ impl CaptureSupervisor {
                     .await;
                 }
 
+                crate::utils::clip_library::release_destination(&trimmed.path);
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_trimmed", &trimmed) {
@@ -781,6 +914,9 @@ impl CaptureSupervisor {
                 }
             }
             CaptureToLauncher::Error(error) => {
+                if error.code != norisk_ipc::ErrorCode::AudioDevice {
+                    *self.last_error.write().await = Some(error.clone());
+                }
                 log::error!(
                     "Capture engine error [{:?}]: {} (recoverable: {})",
                     error.code,
@@ -793,7 +929,7 @@ impl CaptureSupervisor {
                         "code": error.code,
                         "recoverable": error.recoverable,
                         "game": game_kind(self.attached_game().as_deref()),
-                        "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method.clone()),
+                        "capture_method": self.last_status.read().await.as_ref().and_then(|s| s.capture_method),
                     }),
                 );
                 if attaching_failed(error.code) {
@@ -823,6 +959,7 @@ impl Default for CaptureSupervisor {
 
 enum Outcome {
     Shutdown,
+    Incompatible,
     Lost(String),
 }
 

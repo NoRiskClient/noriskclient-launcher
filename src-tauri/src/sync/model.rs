@@ -110,6 +110,14 @@ pub struct SyncPackModEntry {
     pub version_overrides: HashMap<String, VersionOverride>,
 }
 
+pub fn mod_exclusion_key(mod_id: Uuid) -> String {
+    mod_id.to_string()
+}
+
+pub fn jar_exclusion_key(file_name: &str) -> String {
+    format!("jar:{}", file_name)
+}
+
 impl SyncPackModEntry {
     pub fn override_for(&self, mc_version: &str) -> Option<&VersionOverride> {
         self.version_overrides.get(mc_version)

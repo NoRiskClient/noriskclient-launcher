@@ -58,7 +58,8 @@ export default defineConfig(async () => ({
         minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
         singleLogWindow: resolve(__dirname, 'single-log-window.html'),
         testerWindow: resolve(__dirname, 'tester-window.html'),
-        applixirWindow: resolve(__dirname, 'applixir-window.html')
+        applixirWindow: resolve(__dirname, 'applixir-window.html'),
+        clipEditorWindow: resolve(__dirname, 'clip-editor-window.html')
       }
     }
   }

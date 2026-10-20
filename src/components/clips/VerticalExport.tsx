@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@iconify/react";
 
 import { Button } from "../ui/buttons/Button";
 import { Modal } from "../ui/Modal";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useThemeStore } from "../../store/useThemeStore";
-import { exportVertical, type ExportedClip, type ExportProgress } from "../../services/clip-service";
+import { exportVertical, samePath } from "../../services/clip-service";
+import { useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
@@ -31,34 +32,24 @@ export function VerticalExport({ src, path, onClose, onDone, t }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
 
-  useEffect(() => {
-    let stop: (() => void) | undefined;
-    let alive = true;
-
-    void (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      const stops = await Promise.all([
-        listen<ExportProgress>("clip_export_progress", (event) => {
-          if (!samePath(event.payload.source, path)) return;
-          setStage({ kind: "running", done: event.payload.done, total: event.payload.total });
-        }),
-        listen<ExportedClip>("clip_exported", (event) => {
-          if (!samePath(event.payload.source, path)) return;
-          onDone();
-        }),
-      ]);
-      if (!alive) {
-        stops.forEach((off) => off());
-        return;
+  useClipEngineEvents({
+    clip_export_progress: (progress) => {
+      if (!samePath(progress.source, path)) return;
+      setStage({ kind: "running", done: progress.done, total: progress.total });
+    },
+    clip_exported: (clip) => {
+      if (!samePath(clip.source, path)) return;
+      onDone();
+    },
+    clip_error: (error) => {
+      if (stage.kind === "running" && writeFailed(error, path)) {
+        setStage({ kind: "failed", why: t("clips.trim.failed") });
       }
-      stop = () => stops.forEach((off) => off());
-    })();
-
-    return () => {
-      alive = false;
-      stop?.();
-    };
-  }, [path, onDone]);
+    },
+    clip_engine_stopped: () => {
+      if (stage.kind === "running") setStage({ kind: "failed", why: t("clips.trim.failed") });
+    },
+  });
 
   const start = async () => {
     setStage({ kind: "running", done: 0, total: 0 });
@@ -178,9 +169,4 @@ export function VerticalExport({ src, path, onClose, onDone, t }: Props) {
       </div>
     </Modal>
   );
-}
-
-function samePath(a: string, b: string): boolean {
-  const flatten = (path: string) => path.replace(/\\/g, "/").toLowerCase();
-  return flatten(a) === flatten(b);
 }

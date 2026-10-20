@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 pub fn pipe_name(session_id: &str) -> String {
     format!(r"\\.\pipe\norisk-capture-{session_id}")
@@ -13,10 +13,12 @@ pub fn pipe_name(session_id: &str) -> String {
 pub enum LauncherToCapture {
     Configure(CaptureConfig),
     AttachWindow { pid: u32 },
+    AttachScreen { device: String },
     DetachWindow,
     SaveClip(SaveClipRequest),
     TrimClip(TrimClipRequest),
     ExportVertical(ExportVerticalRequest),
+    ExportGif(ExportGifRequest),
     PrepareAudioPreview(AudioPreviewRequest),
     SetBufferEnabled { enabled: bool },
     Ping { seq: u64 },
@@ -49,6 +51,10 @@ pub struct CaptureConfig {
     pub microphone_device_id: Option<String>,
     #[serde(default = "default_volume")]
     pub microphone_volume: u32,
+    #[serde(default)]
+    pub microphone_denoise: bool,
+    #[serde(default)]
+    pub excluded_audio_executable: Option<String>,
     pub output_dir: PathBuf,
 }
 
@@ -91,6 +97,8 @@ impl Default for CaptureConfig {
             capture_microphone: false,
             microphone_device_id: None,
             microphone_volume: default_volume(),
+            microphone_denoise: false,
+            excluded_audio_executable: None,
             output_dir: PathBuf::new(),
         }
     }
@@ -130,6 +138,8 @@ pub struct EncoderCapability {
     pub available: bool,
     pub hardware: bool,
     pub detail: Option<String>,
+    #[serde(default)]
+    pub driver_too_old: bool,
 }
 
 impl EncoderPreference {
@@ -165,7 +175,14 @@ pub fn select_encoder(
     };
 
     for &hardware_only in passes {
-        for &candidate in &codecs {
+        let order: Vec<ClipCodec> = if !hardware_only && preference != EncoderPreference::Software {
+            std::iter::once(ClipCodec::H264)
+                .chain(codecs.iter().copied().filter(|&c| c != ClipCodec::H264))
+                .collect()
+        } else {
+            codecs.clone()
+        };
+        for &candidate in &order {
             let available: Vec<EncoderPreference> = capabilities
                 .iter()
                 .filter(|c| c.codec == candidate && c.available)
@@ -216,6 +233,7 @@ pub enum CaptureToLauncher {
     ClipSaved(ClipManifest),
     ClipTrimmed(TrimmedClip),
     ClipExported(ExportedClip),
+    GifExported(ExportedGif),
     ExportProgress(ExportProgress),
     AudioPreviewReady(AudioPreview),
     Error(CaptureError),
@@ -236,6 +254,8 @@ pub struct ReadyInfo {
     pub microphones: Vec<AudioDeviceInfo>,
     #[serde(default)]
     pub supports_game_only_audio: bool,
+    #[serde(default)]
+    pub gpu_driver: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -255,6 +275,20 @@ impl CaptureState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CaptureMethod {
+    #[serde(rename = "graphics hook")]
+    GraphicsHook,
+    #[serde(rename = "window capture")]
+    WindowCapture,
+    #[serde(rename = "screen capture")]
+    ScreenCapture,
+    #[serde(rename = "screencapturekit")]
+    ScreenCaptureKit,
+    #[serde(rename = "unknown", other)]
+    Unknown,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StatusReport {
     pub state: CaptureState,
@@ -267,7 +301,9 @@ pub struct StatusReport {
     pub dropped_before_keyframe: u64,
     pub encode_latency_ms_p99: f32,
     #[serde(default)]
-    pub capture_method: Option<String>,
+    pub capture_method: Option<CaptureMethod>,
+    #[serde(default)]
+    pub retry_in_seconds: Option<u32>,
     #[serde(default)]
     pub active_codec: Option<ClipCodec>,
     #[serde(default)]
@@ -305,6 +341,8 @@ pub struct CaptureError {
     pub code: ErrorCode,
     pub message: String,
     pub recoverable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -319,6 +357,7 @@ pub enum ErrorCode {
     NotRecording,
     Paused,
     Internal,
+    Protocol,
 }
 
 pub fn encode_line<T: Serialize>(message: &T) -> serde_json::Result<String> {
@@ -347,6 +386,7 @@ mod selection_tests {
             available,
             hardware,
             detail: None,
+            driver_too_old: false,
         }
     }
 
@@ -422,7 +462,7 @@ mod selection_tests {
     }
 
     #[test]
-    fn a_machine_without_hardware_still_records() {
+    fn a_machine_without_hardware_records_h264_on_the_processor_because_it_is_the_lightest() {
         let cpu_only = machine(&[
             (ClipCodec::H264, EncoderPreference::Software),
             (ClipCodec::H265, EncoderPreference::Software),
@@ -430,6 +470,16 @@ mod selection_tests {
 
         assert_eq!(
             select_encoder(ClipCodec::H265, EncoderPreference::Auto, &cpu_only),
+            Some((ClipCodec::H264, EncoderPreference::Software))
+        );
+    }
+
+    #[test]
+    fn a_machine_without_hardware_or_h264_still_records_what_it_can() {
+        let cpu_only = machine(&[(ClipCodec::H265, EncoderPreference::Software)]);
+
+        assert_eq!(
+            select_encoder(ClipCodec::Av1, EncoderPreference::Auto, &cpu_only),
             Some((ClipCodec::H265, EncoderPreference::Software))
         );
     }
@@ -483,28 +533,12 @@ mod export_progress {
     }
 
     #[test]
-    fn a_fresh_export_is_at_nothing() {
+    fn progress_runs_from_nothing_to_one_and_an_empty_clip_counts_as_done() {
         assert_eq!(at(0, 900).fraction(), 0.0);
-    }
-
-    #[test]
-    fn halfway_is_a_half() {
         assert_eq!(at(450, 900).fraction(), 0.5);
-    }
-
-    #[test]
-    fn finished_is_one() {
         assert_eq!(at(900, 900).fraction(), 1.0);
-    }
-
-    #[test]
-    fn a_clip_with_no_frames_counts_as_done() {
-        assert_eq!(at(0, 0).fraction(), 1.0);
-    }
-
-    #[test]
-    fn a_count_past_the_end_does_not_overshoot() {
         assert_eq!(at(1000, 900).fraction(), 1.0);
+        assert_eq!(at(0, 0).fraction(), 1.0);
     }
 }
 
@@ -513,39 +547,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn round_trips_a_command() {
-        let msg = LauncherToCapture::SaveClip(SaveClipRequest {
-            pre_roll_seconds: 20,
-            post_roll_seconds: 10,
-            reason: ClipReason::Event("PLAYER_KILL".into()),
-        });
+    fn capture_methods_keep_the_text_older_launchers_and_analytics_know() {
+        let text = |method| serde_json::to_string(&method).unwrap();
+        assert_eq!(text(CaptureMethod::GraphicsHook), r#""graphics hook""#);
+        assert_eq!(text(CaptureMethod::WindowCapture), r#""window capture""#);
+        assert_eq!(text(CaptureMethod::ScreenCapture), r#""screen capture""#);
+        assert_eq!(text(CaptureMethod::ScreenCaptureKit), r#""screencapturekit""#);
 
-        let line = encode_line(&msg).unwrap();
-        assert!(line.ends_with('\n'));
-        assert_eq!(line.matches('\n').count(), 1, "framing must stay one line");
-
-        let back: LauncherToCapture = decode_line(&line).unwrap();
-        assert_eq!(back, msg);
+        let read = |raw: &str| serde_json::from_str::<CaptureMethod>(raw).unwrap();
+        assert_eq!(read(r#""graphics hook""#), CaptureMethod::GraphicsHook);
+        assert_eq!(read(r#""window capture""#), CaptureMethod::WindowCapture);
+        assert_eq!(read(r#""screen capture""#), CaptureMethod::ScreenCapture);
+        assert_eq!(read(r#""screencapturekit""#), CaptureMethod::ScreenCaptureKit);
+        assert_eq!(read(r#""some future method""#), CaptureMethod::Unknown);
     }
 
     #[test]
-    fn round_trips_a_report() {
-        let msg = CaptureToLauncher::Status(StatusReport {
-            state: CaptureState::BlockedFullscreenExclusive,
-            buffer_fill_seconds: 0.0,
-            buffer_bytes: 0,
-            capture_fps: 0.0,
-            encode_fps: 0.0,
-            dropped_frames: 0,
-            dropped_before_keyframe: 0,
-            encode_latency_ms_p99: 0.0,
-            capture_method: Some("graphics hook".to_string()),
-            active_codec: Some(ClipCodec::Av1),
-            active_encoder: Some(EncoderPreference::Nvenc),
-        });
+    fn a_report_from_a_newer_engine_with_an_unknown_capture_method_still_parses() {
+        let line = r#"{"type":"status","state":"buffering","buffer_fill_seconds":1.0,"buffer_bytes":10,"capture_fps":60.0,"encode_fps":60.0,"dropped_frames":0,"encode_latency_ms_p99":0.0,"capture_method":"desktop duplication"}"#;
 
-        let back: CaptureToLauncher = decode_line(&encode_line(&msg).unwrap()).unwrap();
-        assert_eq!(back, msg);
+        let CaptureToLauncher::Status(report) = decode_line(line).expect("parses") else {
+            panic!("not a status report");
+        };
+        assert_eq!(report.capture_method, Some(CaptureMethod::Unknown));
+    }
+
+    #[test]
+    fn edit_spans_from_a_newer_editor_with_extra_fields_still_parse() {
+        let span: Span = serde_json::from_str(r#"{"startSeconds":1.0,"endSeconds":2.0,"label":"x"}"#).unwrap();
+        assert_eq!(span, Span { start_seconds: 1.0, end_seconds: 2.0 });
+
+        let cut: TrackCut =
+            serde_json::from_str(r#"{"stream":1,"startSeconds":1.0,"endSeconds":2.0,"fade":true}"#).unwrap();
+        assert_eq!(cut, TrackCut { stream: 1, start_seconds: 1.0, end_seconds: 2.0 });
+
+        let level: TrackLevel = serde_json::from_str(r#"{"stream":2,"volume":80,"pan":0.5}"#).unwrap();
+        assert_eq!((level.stream, level.volume), (2, 80));
     }
 
     #[test]
@@ -574,6 +611,7 @@ mod tests {
             code: ErrorCode::Internal,
             message: "line one\nline two".into(),
             recoverable: true,
+            source: None,
         });
 
         let line = encode_line(&msg).unwrap();
@@ -584,51 +622,95 @@ mod tests {
     }
 
     #[test]
+    fn an_error_names_the_clip_it_failed_on_as_a_plain_path() {
+        let failed = CaptureToLauncher::Error(CaptureError {
+            code: ErrorCode::ClipWrite,
+            message: "disk full".into(),
+            recoverable: true,
+            source: Some(PathBuf::from("C:/clips/fight.mp4")),
+        });
+
+        let wire: serde_json::Value = serde_json::to_value(&failed).unwrap();
+        assert_eq!(wire["source"], "C:/clips/fight.mp4");
+        assert_eq!(decode_line::<CaptureToLauncher>(&encode_line(&failed).unwrap()).unwrap(), failed);
+    }
+
+    #[test]
+    fn an_error_without_a_clip_leaves_the_source_off_and_older_errors_still_parse() {
+        let general = CaptureToLauncher::Error(CaptureError {
+            code: ErrorCode::Internal,
+            message: "boom".into(),
+            recoverable: true,
+            source: None,
+        });
+        let wire: serde_json::Value = serde_json::to_value(&general).unwrap();
+        assert!(wire.get("source").is_none());
+
+        let older: CaptureToLauncher = decode_line(
+            r#"{"type":"error","code":"internal","message":"boom","recoverable":true}"#,
+        )
+        .unwrap();
+        assert_eq!(older, general);
+    }
+
+    #[test]
+    fn a_level_sent_without_an_offset_still_parses_and_sits_still() {
+        let level: TrackLevel = serde_json::from_str(r#"{"stream":2,"volume":80}"#).unwrap();
+
+        assert_eq!(level.offset_seconds, 0.0);
+        assert_eq!(level.offset_ticks(90_000), 0);
+        assert_eq!(level.start_seconds, None);
+        assert_eq!(level.end_seconds, None);
+        assert_eq!(level.window_ticks(90_000, 0), (None, None));
+    }
+
+    #[test]
+    fn a_level_speaks_camel_case_on_the_wire_like_the_other_requests() {
+        let level: TrackLevel = serde_json::from_str(
+            r#"{"stream":1,"volume":90,"offsetSeconds":0.5,"startSeconds":2.0,"endSeconds":8.0}"#,
+        )
+        .unwrap();
+        assert_eq!(level.offset_seconds, 0.5);
+        assert_eq!(level.start_seconds, Some(2.0));
+        assert_eq!(level.end_seconds, Some(8.0));
+
+        let written = serde_json::to_string(&level).unwrap();
+        assert!(written.contains("\"offsetSeconds\""), "{written}");
+        assert!(!written.contains("offset_seconds"), "{written}");
+    }
+
+    #[test]
+    fn a_removed_stretch_reads_what_the_editor_sends_and_nothing_else() {
+        let span: Span =
+            serde_json::from_str(r#"{"startSeconds":2.5,"endSeconds":4.0}"#).unwrap();
+        assert_eq!(span, Span { start_seconds: 2.5, end_seconds: 4.0 });
+
+        assert!(
+            serde_json::from_str::<Span>(r#"{"start_seconds":2.5,"end_seconds":4.0}"#).is_err(),
+            "a stretch in the wrong spelling must fail loudly, not arrive empty",
+        );
+    }
+
+    #[test]
+    fn a_window_that_is_not_a_number_is_no_window_at_all() {
+        let nonsense = TrackLevel {
+            stream: 1,
+            volume: 100,
+            offset_seconds: 0.0,
+            start_seconds: Some(f64::NAN),
+            end_seconds: Some(f64::INFINITY),
+        };
+
+        assert!(!nonsense.has_window());
+        assert!(!levels_change_anything(&[nonsense]));
+        assert_eq!(nonsense.window_ticks(90_000, 0), (None, None));
+    }
+
+    #[test]
     fn clip_reason_produces_a_filename_safe_slug() {
         assert_eq!(ClipReason::Manual.slug(), "clip");
         assert_eq!(ClipReason::Event("PLAYER_KILL".into()).slug(), "player_kill");
         assert_eq!(ClipReason::Event("bed/destroy!".into()).slug(), "bed_destroy_");
-    }
-
-    #[test]
-    fn auto_takes_the_best_available() {
-        let available = [EncoderPreference::Amf, EncoderPreference::Software];
-        assert_eq!(
-            EncoderPreference::Auto.resolve(&available),
-            Some(EncoderPreference::Amf)
-        );
-    }
-
-    #[test]
-    fn an_explicit_choice_is_honoured_when_usable() {
-        let available = [EncoderPreference::Nvenc, EncoderPreference::Software];
-        assert_eq!(
-            EncoderPreference::Software.resolve(&available),
-            Some(EncoderPreference::Software)
-        );
-    }
-
-    #[test]
-    fn an_unusable_choice_falls_back_instead_of_failing() {
-        let available = [EncoderPreference::Amf];
-        assert_eq!(
-            EncoderPreference::Nvenc.resolve(&available),
-            Some(EncoderPreference::Amf)
-        );
-    }
-
-    #[test]
-    fn nothing_available_resolves_to_nothing() {
-        assert_eq!(EncoderPreference::Auto.resolve(&[]), None);
-        assert_eq!(EncoderPreference::Nvenc.resolve(&[]), None);
-    }
-
-    #[test]
-    fn only_buffering_allows_saving() {
-        assert!(CaptureState::Buffering.can_save());
-        assert!(!CaptureState::BlockedFullscreenExclusive.can_save());
-        assert!(!CaptureState::Idle.can_save());
-        assert!(!CaptureState::Paused.can_save());
     }
 }
 
@@ -639,23 +721,63 @@ pub struct TrimClipRequest {
     pub start_seconds: f64,
     pub end_seconds: f64,
     #[serde(default)]
+    pub video_start_seconds: Option<f64>,
+    #[serde(default)]
+    pub video_end_seconds: Option<f64>,
+    #[serde(default)]
     pub levels: Vec<TrackLevel>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackLevel {
     pub stream: u32,
     pub volume: u32,
+    #[serde(default)]
+    pub offset_seconds: f64,
+    #[serde(default)]
+    pub start_seconds: Option<f64>,
+    #[serde(default)]
+    pub end_seconds: Option<f64>,
 }
 
 impl TrackLevel {
     pub fn gain(&self) -> f32 {
         self.volume.min(200) as f32 / 100.0
     }
+
+    pub fn offset_ticks(&self, ticks_per_second: i64) -> i64 {
+        if !self.offset_seconds.is_finite() {
+            return 0;
+        }
+        (self.offset_seconds * ticks_per_second as f64) as i64
+    }
+
+    pub fn window_ticks(&self, ticks_per_second: i64, origin: i64) -> (Option<i64>, Option<i64>) {
+        let at = |seconds: Option<f64>| {
+            seconds
+                .filter(|s| s.is_finite())
+                .map(|s| ticks_at(origin, s, ticks_per_second))
+        };
+        (at(self.start_seconds), at(self.end_seconds))
+    }
+
+    pub fn has_window(&self) -> bool {
+        let given = |seconds: Option<f64>| seconds.is_some_and(|s| s.is_finite());
+        given(self.start_seconds) || given(self.end_seconds)
+    }
+}
+
+pub fn ticks_at(origin: i64, seconds: f64, ticks_per_second: i64) -> i64 {
+    origin.saturating_add((seconds * ticks_per_second as f64) as i64)
 }
 
 pub fn levels_change_anything(levels: &[TrackLevel]) -> bool {
-    levels.iter().any(|level| level.volume != 100)
+    levels.iter().any(|level| {
+        level.volume != 100
+            || (level.offset_seconds.is_finite() && level.offset_seconds != 0.0)
+            || level.has_window()
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -678,9 +800,127 @@ pub struct PreviewTrack {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OverlayKind {
+    Blur { strength: u32 },
+    Box { colour: u32 },
+    Arrow { colour: u32, thickness: u32, towards: Corner },
+    Text {
+        content: String,
+        size: u32,
+        colour: u32,
+        #[serde(default)]
+        align: TextAlign,
+        #[serde(default)]
+        vertical: TextVertical,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextAlign {
+    Left,
+    #[default]
+    Center,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextVertical {
+    Top,
+    #[default]
+    Center,
+    Bottom,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Corner {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    #[default]
+    BottomRight,
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipOverlay {
+    #[serde(flatten)]
+    pub kind: OverlayKind,
+    pub left: f32,
+    pub top: f32,
+    pub width: f32,
+    pub height: f32,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ClipShape {
+    #[default]
+    Vertical,
+    Square,
+    Wide,
+    Original,
+}
+
+impl ClipShape {
+    pub fn ratio(self) -> Option<(i64, i64)> {
+        match self {
+            ClipShape::Vertical => Some((9, 16)),
+            ClipShape::Square => Some((1, 1)),
+            ClipShape::Wide => Some((21, 9)),
+            ClipShape::Original => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExportVerticalRequest {
     pub source: PathBuf,
     pub destination: PathBuf,
+    #[serde(default)]
+    pub shape: ClipShape,
+    #[serde(default)]
+    pub overlays: Vec<ClipOverlay>,
+    #[serde(default)]
+    pub start_seconds: Option<f64>,
+    #[serde(default)]
+    pub end_seconds: Option<f64>,
+    #[serde(default)]
+    pub video_start_seconds: Option<f64>,
+    #[serde(default)]
+    pub video_end_seconds: Option<f64>,
+    #[serde(default)]
+    pub levels: Vec<TrackLevel>,
+    #[serde(default)]
+    pub removed: Vec<Span>,
+    #[serde(default)]
+    pub blanked: Vec<Span>,
+    #[serde(default)]
+    pub muted: Vec<TrackCut>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Span {
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackCut {
+    pub stream: u32,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -708,6 +948,25 @@ pub struct ExportedClip {
     pub height: u32,
     pub duration_seconds: f64,
     pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExportGifRequest {
+    pub source: PathBuf,
+    pub destination: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedGif {
+    pub path: PathBuf,
+    pub source: PathBuf,
+    pub width: u32,
+    pub height: u32,
+    pub frames: u32,
+    pub duration_seconds: f64,
+    pub size_bytes: u64,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

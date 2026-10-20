@@ -96,19 +96,13 @@ pub async fn submit_tester_vote(
 pub async fn open_tester_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
-    let other = |action: &str, e: tauri::Error| {
-        CommandError::from(AppError::Other(format!(
-            "Failed to {} tester window: {}",
-            action, e
-        )))
-    };
-
     if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
-        window.show().map_err(|e| other("show", e))?;
-        window.unminimize().map_err(|e| other("unminimize", e))?;
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        window.set_focus().map_err(|e| other("focus", e))?;
+        crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
+            CommandError::from(AppError::Other(format!(
+                "Failed to bring tester window to front: {}",
+                e
+            )))
+        })?;
         return Ok(());
     }
 

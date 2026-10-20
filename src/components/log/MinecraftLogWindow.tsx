@@ -24,15 +24,13 @@ export function MinecraftLogWindow({ crashedProcess }: MinecraftLogWindowProps) 
   const { processes } = useProcessEvents({ autoFetch: true });
   const { logs: rawLogs } = useProcessLogs(selectedInstanceId);
 
-  const {
-    stoppedProcesses,
-    launcherLogs: launcherLogsMap,
-    selectedProcessId,
-    selectProcess,
-    clearLogs,
-    clearLauncherLogs,
-    markProcessStopped,
-  } = useProcessStore();
+  const stoppedProcesses = useProcessStore((state) => state.stoppedProcesses);
+  const launcherLogsMap = useProcessStore((state) => state.launcherLogs);
+  const selectedProcessId = useProcessStore((state) => state.selectedProcessId);
+  const selectProcess = useProcessStore((state) => state.selectProcess);
+  const clearLogs = useProcessStore((state) => state.clearLogs);
+  const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
+  const markProcessStopped = useProcessStore((state) => state.markProcessStopped);
 
   const crashedProcessHandledRef = useRef(false);
   useEffect(() => {

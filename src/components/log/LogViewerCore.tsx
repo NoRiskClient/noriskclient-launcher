@@ -130,7 +130,8 @@ export function LogViewerCore({
 }: LogViewerCoreProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const { showThreadPrefix, toggleShowThreadPrefix } = useLogSettingsStore();
+  const showThreadPrefix = useLogSettingsStore((state) => state.showThreadPrefix);
+  const toggleShowThreadPrefix = useLogSettingsStore((state) => state.toggleShowThreadPrefix);
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [levelFilters, setLevelFilters] = useState<Record<LogLevel, boolean>>({

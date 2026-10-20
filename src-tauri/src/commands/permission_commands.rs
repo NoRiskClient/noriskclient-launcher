@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::{OnceCell, RwLock};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -16,34 +17,40 @@ pub struct PermissionCacheState {
 
 static CACHE: OnceCell<RwLock<PermissionCacheState>> = OnceCell::const_new();
 
+const PERMISSIONS_CHANGED_EVENT: &str = "permissions:changed";
+
 async fn cache() -> &'static RwLock<PermissionCacheState> {
     CACHE
         .get_or_init(|| async { RwLock::new(PermissionCacheState::default()) })
         .await
 }
 
-pub async fn has_permission_internal(node: &str) -> bool {
-    let guard = cache().await.read().await;
-    if guard.nodes.is_empty() {
-        return false;
-    }
-    let set: HashSet<&str> = guard.nodes.iter().map(|s| s.as_str()).collect();
+fn grants(set: &HashSet<&str>, node: &str) -> bool {
     if set.contains("*") || set.contains(node) {
         return true;
     }
     let mut prefix = node;
     while let Some(dot) = prefix.rfind('.') {
         prefix = &prefix[..dot];
-        let wildcard = format!("{}.*", prefix);
-        if set.contains(wildcard.as_str()) {
+        if set.contains(format!("{}.*", prefix).as_str()) {
             return true;
         }
     }
     false
 }
 
+async fn granted_nodes(nodes: Vec<String>) -> Vec<String> {
+    let guard = cache().await.read().await;
+    let set: HashSet<&str> = guard.nodes.iter().map(|s| s.as_str()).collect();
+    nodes.into_iter().filter(|node| grants(&set, node)).collect()
+}
+
+pub async fn has_permission_internal(node: &str) -> bool {
+    !granted_nodes(vec![node.to_string()]).await.is_empty()
+}
+
 #[tauri::command]
-pub async fn refresh_permissions() -> Result<(), CommandError> {
+pub async fn refresh_permissions(app: AppHandle) -> Result<(), CommandError> {
     let state = State::get().await?;
     let is_experimental = state.config_manager.is_experimental_mode().await;
 
@@ -55,8 +62,8 @@ pub async fn refresh_permissions() -> Result<(), CommandError> {
         Some(a) => a,
         None => {
             debug!("[Permissions] No active account, clearing cache");
-            let mut guard = cache().await.write().await;
-            *guard = PermissionCacheState::default();
+            *cache().await.write().await = PermissionCacheState::default();
+            let _ = app.emit(PERMISSIONS_CHANGED_EVENT, ());
             return Ok(());
         }
     };
@@ -83,12 +90,12 @@ pub async fn refresh_permissions() -> Result<(), CommandError> {
                 sorted.len(),
                 account_id_str
             );
-            let mut guard = cache().await.write().await;
-            *guard = PermissionCacheState {
+            *cache().await.write().await = PermissionCacheState {
                 nodes: sorted,
                 last_fetched: Some(Utc::now()),
                 last_account_id: Some(account_id_str),
             };
+            let _ = app.emit(PERMISSIONS_CHANGED_EVENT, ());
             Ok(())
         }
         Err(e) => {
@@ -106,4 +113,9 @@ pub async fn get_cached_permissions() -> Result<PermissionCacheState, CommandErr
 #[tauri::command]
 pub async fn has_permission(node: String) -> Result<bool, CommandError> {
     Ok(has_permission_internal(&node).await)
+}
+
+#[tauri::command]
+pub async fn get_granted_permissions(nodes: Vec<String>) -> Result<Vec<String>, CommandError> {
+    Ok(granted_nodes(nodes).await)
 }

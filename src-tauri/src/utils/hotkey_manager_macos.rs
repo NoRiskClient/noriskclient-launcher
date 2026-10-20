@@ -39,19 +39,31 @@ extern "C" fn pressed(tag: u8) {
         if !clips.enabled {
             return;
         }
-        let request = match tag {
-            0 => norisk_ipc::LauncherToCapture::SaveClip(norisk_ipc::SaveClipRequest {
-                pre_roll_seconds: clips.pre_roll_seconds,
-                post_roll_seconds: clips.post_roll_seconds,
-                reason: norisk_ipc::ClipReason::Manual,
-            }),
-            1 => norisk_ipc::LauncherToCapture::SetBufferEnabled {
-                enabled: !state.capture_supervisor.buffering_wanted(),
-            },
+        let (request, what) = match tag {
+            0 => (
+                norisk_ipc::LauncherToCapture::SaveClip(norisk_ipc::SaveClipRequest {
+                    pre_roll_seconds: clips.pre_roll_seconds,
+                    post_roll_seconds: clips.post_roll_seconds,
+                    reason: norisk_ipc::ClipReason::Manual,
+                }),
+                "Clip requested by hotkey",
+            ),
+            1 => {
+                let resume = !state.capture_supervisor.buffering_wanted();
+                (
+                    norisk_ipc::LauncherToCapture::SetBufferEnabled { enabled: resume },
+                    if resume {
+                        "Buffering resumed by hotkey"
+                    } else {
+                        "Buffering paused by hotkey"
+                    },
+                )
+            }
             _ => return,
         };
-        if let Err(error) = state.capture_supervisor.send(request) {
-            log::warn!("Clip hotkey failed: {error}");
+        match state.capture_supervisor.send(request) {
+            Ok(()) => log::info!("{what}"),
+            Err(error) => log::warn!("Clip hotkey went nowhere: {error}"),
         }
     });
 }

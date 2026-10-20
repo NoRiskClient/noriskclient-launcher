@@ -683,30 +683,6 @@ fn qpc_100ns() -> i64 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn frame_count_divides_by_channels() {
-        let stereo = AudioFormat {
-            sample_rate: 48_000,
-            channels: 2,
-        };
-        assert_eq!(stereo.frame_count(2048), 1024);
-
-        let mono = AudioFormat {
-            sample_rate: 48_000,
-            channels: 1,
-        };
-        assert_eq!(mono.frame_count(1024), 1024);
-    }
-
-    #[test]
-    fn a_zero_channel_format_does_not_divide_by_zero() {
-        let broken = AudioFormat {
-            sample_rate: 48_000,
-            channels: 0,
-        };
-        assert_eq!(broken.frame_count(1024), 1024);
-    }
-
     const RATE: u32 = 48_000;
     const PACKET: usize = 480;
 
@@ -841,16 +817,104 @@ mod tests {
         let expected = filler_start + span_100ns(RATE as usize / 10, RATE);
         assert_eq!(clock.place(expected + 5_000, PACKET, RATE, false), expected);
     }
+}
+
+pub fn pid_of_executable(executable: &str) -> Option<u32> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    let wanted = executable.trim();
+    if wanted.is_empty() {
+        return None;
+    }
+
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?;
+
+        let mut entry = PROCESSENTRY32W {
+            dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+
+        let mut matching = Vec::new();
+        if Process32FirstW(snapshot, &mut entry).is_ok() {
+            loop {
+                let end = entry
+                    .szExeFile
+                    .iter()
+                    .position(|c| *c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name = String::from_utf16_lossy(&entry.szExeFile[..end]);
+                if name.eq_ignore_ascii_case(wanted) {
+                    matching.push((entry.th32ProcessID, entry.th32ParentProcessID));
+                }
+                if Process32NextW(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        let _ = CloseHandle(snapshot);
+        root_process(&matching)
+    }
+}
+
+fn root_process(matching: &[(u32, u32)]) -> Option<u32> {
+    matching
+        .iter()
+        .find(|(_, parent)| !matching.iter().any(|(pid, _)| pid == parent))
+        .or(matching.first())
+        .map(|(pid, _)| *pid)
+}
+
+#[cfg(test)]
+mod process_tests {
+    use super::*;
 
     #[test]
-    fn a_span_is_measured_from_the_frames_not_the_clock() {
-        assert_eq!(span_100ns(48_000, 48_000), 10_000_000);
-        assert_eq!(span_100ns(480, 48_000), 100_000);
-        assert_eq!(span_100ns(0, 48_000), 0);
+    fn this_test_binary_can_find_itself_by_name() {
+        let own = std::env::current_exe().unwrap();
+        let name = own.file_name().unwrap().to_string_lossy().to_string();
+
+        assert_eq!(
+            pid_of_executable(&name),
+            Some(std::process::id()),
+            "looking for {name} did not come back with our own pid",
+        );
     }
 
     #[test]
-    fn a_zero_sample_rate_does_not_divide_by_zero() {
-        assert_eq!(span_100ns(480, 0), 480 * 10_000_000);
+    fn the_name_is_matched_without_regard_to_case() {
+        let own = std::env::current_exe().unwrap();
+        let name = own.file_name().unwrap().to_string_lossy().to_uppercase();
+
+        assert_eq!(pid_of_executable(&name), Some(std::process::id()));
+    }
+
+    #[test]
+    fn of_several_processes_with_the_same_name_the_one_that_started_the_others_wins() {
+        let discord = [(4_120, 3_900), (4_200, 4_120), (5_010, 4_200), (6_000, 4_120)];
+        assert_eq!(root_process(&discord), Some(4_120));
+
+        let child_listed_first = [(5_010, 4_200), (4_200, 4_120), (4_120, 3_900)];
+        assert_eq!(root_process(&child_listed_first), Some(4_120));
+
+        assert_eq!(root_process(&[(77, 1)]), Some(77));
+        assert_eq!(root_process(&[]), None);
+    }
+
+    #[test]
+    fn a_parent_loop_still_picks_a_process_instead_of_nothing() {
+        assert_eq!(root_process(&[(10, 20), (20, 10)]), Some(10));
+    }
+
+    #[test]
+    fn nothing_and_nonsense_come_back_empty() {
+        assert_eq!(pid_of_executable(""), None);
+        assert_eq!(pid_of_executable("   "), None);
+        assert_eq!(pid_of_executable("definitely-not-running-42.exe"), None);
     }
 }

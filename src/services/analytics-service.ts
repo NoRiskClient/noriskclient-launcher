@@ -38,6 +38,10 @@ const checkAnalyticsEnabled = async (): Promise<boolean> => {
 const generateSessionId = (): string =>
     `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+export const setScreenTimeTab = (tab: string): void => {
+    invoke('set_screen_time_tab', { tab }).catch(() => undefined);
+};
+
 export const trackEvent = async (
     eventType: string,
     properties?: Record<string, any>,

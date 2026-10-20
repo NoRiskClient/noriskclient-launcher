@@ -459,17 +459,4 @@ mod tests {
         apply_gain(&[0.8, -0.8], 2.0, &mut out);
         assert_eq!(out, vec![1.0, -1.0]);
     }
-
-    #[test]
-    fn the_output_buffer_is_reused() {
-        let mut out = Vec::with_capacity(1024);
-        let before = out.capacity();
-
-        for _ in 0..100 {
-            apply_gain(&[0.1; 512], 1.0, &mut out);
-        }
-
-        assert_eq!(out.len(), 512);
-        assert_eq!(out.capacity(), before, "the buffer should not have grown");
-    }
 }

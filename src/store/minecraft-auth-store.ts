@@ -35,6 +35,7 @@ const setMojangTraits = (account: MinecraftAccount | null) => {
 interface MinecraftAuthState {
   accounts: MinecraftAccount[];
   activeAccount: MinecraftAccount | null;
+  accountsLoaded: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -47,6 +48,7 @@ interface MinecraftAuthState {
 export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
   accounts: [],
   activeAccount: null,
+  accountsLoaded: false,
   isLoading: false,
   error: null,
 
@@ -63,6 +65,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       set({
         accounts,
         activeAccount: fallbackActive,
+        accountsLoaded: true,
       });
 
       let activeAccount = fallbackActive;
@@ -91,6 +94,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       set({
         error: i18n.t('auth.errors.load_accounts', { error: parseErrorMessage(error) }),
         isLoading: false,
+        accountsLoaded: true,
       });
       setMojangTraits(null);
     }

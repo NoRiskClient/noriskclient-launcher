@@ -3,11 +3,11 @@
 import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/buttons/Button";
 import { Input } from "../components/ui/Input";
-import { Label } from "../components/ui/Label";
 import { StatusMessage } from "../components/ui/StatusMessage";
 
 interface ConfirmOptions {
@@ -20,6 +20,7 @@ interface ConfirmOptions {
   inputInitialValue?: string;
   inputRequired?: boolean;
   type?: "confirm" | "input" | "warning" | "danger";
+  icon?: string;
   fullscreen?: boolean;
 }
 
@@ -33,7 +34,7 @@ export function useConfirmDialog() {
   });
   const [inputValue, setInputValue] = useState("");
   const [isValid, setIsValid] = useState(true);
-  const [resolveRef, setResolveRef] = useState<(value: any) => void>(() => {});
+  const pending = useRef<((value: string | boolean) => void) | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -46,9 +47,16 @@ export function useConfirmDialog() {
       setOptions({ ...options, fullscreen: options.fullscreen ?? true });
       setInputValue(options.inputInitialValue || "");
       setIsValid(!options.inputRequired || !!options.inputInitialValue);
-      setResolveRef(() => resolve);
+      settle(false);
+      pending.current = resolve;
       setIsOpen(true);
     });
+  };
+
+  const settle = (value: string | boolean) => {
+    const resolve = pending.current;
+    pending.current = null;
+    resolve?.(value);
   };
 
   const handleClose = (e?: React.MouseEvent) => {
@@ -57,7 +65,7 @@ export function useConfirmDialog() {
     }
 
     setIsOpen(false);
-    resolveRef(false);
+    settle(false);
   };
 
   const handleConfirm = (e?: React.MouseEvent) => {
@@ -66,11 +74,7 @@ export function useConfirmDialog() {
     }
 
     setIsOpen(false);
-    if (options.type === "input") {
-      resolveRef(inputValue);
-    } else {
-      resolveRef(true);
-    }
+    settle(options.type === "input" ? inputValue : true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,7 +138,10 @@ export function useConfirmDialog() {
   };
 
   const renderContent = () => (
-    <div className="p-6 space-y-6" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={options.type === "input" ? "p-6 space-y-6" : "px-6 pt-6"}
+      onClick={(e) => e.stopPropagation()}
+    >
       {options.message && (
         <StatusMessage
           type={getStatusMessageType()}
@@ -165,6 +172,7 @@ export function useConfirmDialog() {
       ? createPortal(
           <Modal
             title={options.title}
+            titleIcon={options.icon ? <Icon icon={options.icon} className="w-5 h-5" /> : undefined}
             onClose={handleClose}
             width="md"
             footer={renderFooter()}
@@ -178,5 +186,6 @@ export function useConfirmDialog() {
   return {
     confirm,
     confirmDialog,
+    isOpen,
   };
 }

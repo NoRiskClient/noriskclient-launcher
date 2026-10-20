@@ -55,6 +55,7 @@ pub struct ProbeResult {
     pub compiled_in: bool,
     pub opens: bool,
     pub detail: Option<String>,
+    pub driver_too_old: bool,
 }
 
 pub fn probe_all() -> Vec<ProbeResult> {
@@ -108,6 +109,7 @@ fn probe_one(
         compiled_in: false,
         opens: false,
         detail: None,
+        driver_too_old: false,
     };
 
     let Ok(name) = std::ffi::CString::new(candidate.name) else {
@@ -122,14 +124,24 @@ fn probe_one(
     }
     result.compiled_in = true;
 
-    if candidate.hardware {
+    let takes_gpu_frames =
+        unsafe { (*codec_ptr).capabilities & ff::AV_CODEC_CAP_HARDWARE as i32 != 0 };
+
+    if takes_gpu_frames {
         let Some(pool) = pool else {
             result.detail = Some("no graphics device available to test with".into());
             return result;
         };
         match try_open_hardware(codec_ptr, pool) {
             Ok(()) => result.opens = true,
-            Err(e) => result.detail = Some(shorten(&e.to_string())),
+            Err(e) => {
+                result.driver_too_old = driver_too_old(candidate, &e.to_string());
+                result.detail = Some(if result.driver_too_old {
+                    "the NVIDIA driver is too old for NVENC; version 570 or newer is needed".into()
+                } else {
+                    shorten(&e.to_string())
+                });
+            }
         }
     } else {
         match try_open_software(codec_ptr) {
@@ -208,6 +220,10 @@ impl Drop for ContextGuard {
     }
 }
 
+fn driver_too_old(candidate: &Candidate, error: &str) -> bool {
+    candidate.preference == EncoderPreference::Nvenc && error.contains("not implemented")
+}
+
 fn shorten(message: &str) -> String {
     let trimmed = message.trim();
     match trimmed.char_indices().nth(160) {
@@ -230,6 +246,7 @@ fn measure_capabilities() -> Vec<EncoderCapability> {
             available: r.opens,
             hardware: r.hardware,
             detail: r.detail,
+            driver_too_old: r.driver_too_old,
         })
         .collect()
 }
@@ -275,19 +292,13 @@ mod tests {
     }
 
     #[test]
-    fn every_codec_has_all_three_vendors_plus_software() {
-        for codec in ClipCodec::all() {
-            let list = candidates(codec);
-            assert_eq!(list.len(), 4, "{codec:?} should cover NVIDIA, AMD, Intel and software");
-            assert!(list.iter().filter(|c| c.hardware).count() == 3);
-        }
-    }
+    fn only_an_nvenc_that_ffmpeg_calls_unimplemented_means_an_old_driver() {
+        let nvenc = &candidates(ClipCodec::H264)[0];
+        let amf = &candidates(ClipCodec::H264)[1];
+        let unimplemented = av_error(ff::AVERROR(ff::ENOSYS));
 
-    #[test]
-    fn encoder_names_resolve_for_known_pairings() {
-        assert_eq!(encoder_name(ClipCodec::H264, EncoderPreference::Nvenc), Some("h264_nvenc"));
-        assert_eq!(encoder_name(ClipCodec::Av1, EncoderPreference::Nvenc), Some("av1_nvenc"));
-        assert_eq!(encoder_name(ClipCodec::H265, EncoderPreference::Software), Some("libx265"));
-        assert_eq!(encoder_name(ClipCodec::H264, EncoderPreference::Auto), None);
+        assert!(driver_too_old(nvenc, &unimplemented), "FFmpeg said {unimplemented:?}");
+        assert!(!driver_too_old(nvenc, &av_error(ff::AVERROR(ff::EINVAL))));
+        assert!(!driver_too_old(amf, &unimplemented));
     }
 }

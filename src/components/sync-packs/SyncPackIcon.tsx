@@ -19,7 +19,7 @@ function fallbackBlockUrl(packId: string): string {
 interface SyncPackIconProps {
   packId: string;
   icon: string | null;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
 }
 
@@ -40,11 +40,16 @@ export function SyncPackIcon({
 
   useEffect(() => setFailed(false), [src]);
 
-  const box = size === "sm" ? "h-8 w-8" : "h-11 w-11";
+  const box =
+    size === "xs"
+      ? "h-5 w-5 rounded"
+      : size === "sm"
+        ? "h-8 w-8 rounded-lg"
+        : "h-11 w-11 rounded-lg";
 
   return (
     <div
-      className={`${box} flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border ${className}`}
+      className={`${box} flex flex-shrink-0 items-center justify-center overflow-hidden border ${className}`}
       style={{
         backgroundColor: `${accentColor.value}1a`,
         borderColor: `${accentColor.value}4d`,

@@ -235,6 +235,8 @@ function parseLogEntriesForProcess(
   return { entries, parserState: nextParserState };
 }
 
+export const NO_LOGS: LogEntry[] = [];
+
 export const useProcessStore = create<ProcessStore>((set, get) => ({
   // Initial state
   processes: [],

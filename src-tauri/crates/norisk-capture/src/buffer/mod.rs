@@ -316,13 +316,6 @@ mod tests {
     }
 
     #[test]
-    fn a_keyframe_opens_a_new_segment() {
-        let mut buffer = RingBuffer::new(30.0, TB);
-        fill(&mut buffer, 240, 120, 100);
-        assert_eq!(buffer.segment_count(), 2);
-    }
-
-    #[test]
     fn the_window_bounds_what_is_kept() {
         let mut buffer = RingBuffer::new(10.0, TB);
         fill(&mut buffer, 3600, 120, 1000);

@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
+import { WindowFrame } from "../ui/WindowFrame";
 import { TesterWindowTitlebar } from "./TesterWindowTitlebar";
 import { TesterIssueCard } from "./TesterIssueCard";
 import {
@@ -26,52 +27,6 @@ function buildIssueUrl(issue: TesterIssue): string {
   return `${WEBSITE_BASE}/issues/${slug}`;
 }
 
-function complementaryBackground(hex: string): string {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  const rgb = m
-    ? {
-        r: Number.parseInt(m[1], 16),
-        g: Number.parseInt(m[2], 16),
-        b: Number.parseInt(m[3], 16),
-      }
-    : { r: 34, g: 34, b: 34 };
-  const r = Math.min(Math.floor(rgb.r * 0.1), 30);
-  const g = Math.min(Math.floor(rgb.g * 0.1), 30);
-  const b = Math.min(Math.floor(rgb.b * 0.1), 30);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function BorderGlow({ color }: { color: string }) {
-  return (
-    <>
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
-        style={{
-          background: `linear-gradient(to right, transparent, ${color}70, transparent)`,
-        }}
-      />
-      <div
-        className="absolute bottom-0 left-0 right-0 h-[2px] pointer-events-none"
-        style={{
-          background: `linear-gradient(to right, transparent, ${color}70, transparent)`,
-        }}
-      />
-      <div
-        className="absolute top-0 bottom-0 left-0 w-[2px] pointer-events-none"
-        style={{
-          background: `linear-gradient(to bottom, transparent, ${color}70, transparent)`,
-        }}
-      />
-      <div
-        className="absolute top-0 bottom-0 right-0 w-[2px] pointer-events-none"
-        style={{
-          background: `linear-gradient(to bottom, transparent, ${color}70, transparent)`,
-        }}
-      />
-    </>
-  );
-}
-
 export function TesterWindow() {
   const accentColor = useThemeStore((state) => state.accentColor);
   const [issues, setIssues] = useState<TesterIssue[]>([]);
@@ -79,7 +34,6 @@ export function TesterWindow() {
   const [busyIssueId, setBusyIssueId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"bug" | "review">("review");
   const closeOnEmptyRef = useRef(false);
-  const bgColor = complementaryBackground(accentColor.value);
 
   useEffect(() => {
     const themeStore = useThemeStore.getState();
@@ -185,16 +139,7 @@ export function TesterWindow() {
   );
 
   return (
-    <div
-      className="flex flex-col h-screen w-screen text-white overflow-hidden relative backdrop-blur-lg border-2"
-      style={{
-        backgroundColor: bgColor,
-        backgroundImage: `linear-gradient(to bottom right, ${bgColor}, rgba(0,0,0,0.9))`,
-        borderColor: `${accentColor.value}30`,
-        boxShadow: `0 0 15px ${accentColor.value}30, inset 0 0 10px ${accentColor.value}20`,
-      }}
-    >
-      <BorderGlow color={accentColor.value} />
+    <WindowFrame>
       <TesterWindowTitlebar remaining={issues.length} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col p-4">
@@ -275,7 +220,7 @@ export function TesterWindow() {
         </div>
       </div>
       </div>
-    </div>
+    </WindowFrame>
   );
 }
 

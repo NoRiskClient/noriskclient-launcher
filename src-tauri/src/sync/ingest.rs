@@ -397,7 +397,7 @@ pub async fn add_dependencies(
         .into_iter()
         .filter(|d| find_mod_by_project_id(&existing, &d.project_id).is_none())
         .filter_map(|d| {
-            mod_from_unified_version(&d.version).inspect(|_| {
+            mod_from_unified_version(&d.version, d.display_name()).inspect(|_| {
                 info!("Adding dependency {} to sync pack {}", d.project_id, pack_id);
             })
         })

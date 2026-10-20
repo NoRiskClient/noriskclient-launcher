@@ -67,8 +67,14 @@ struct Inner {
 unsafe impl Send for Inner {}
 unsafe impl Sync for Inner {}
 
+#[derive(Clone, Copy)]
+pub enum Source {
+    Window(HWND),
+    Screen(windows::Win32::Graphics::Gdi::HMONITOR),
+}
+
 pub struct CaptureSession {
-    hwnd: HWND,
+    hwnd: Option<HWND>,
     inner: Arc<Inner>,
     pool: Direct3D11CaptureFramePool,
     session: GraphicsCaptureSession,
@@ -79,17 +85,24 @@ pub struct CaptureSession {
 impl CaptureSession {
     pub fn start(
         device: CaptureDevice,
-        hwnd: HWND,
+        source: Source,
         target_fps: u32,
         sink: impl FrameSink,
     ) -> Result<Self> {
         let interop: IGraphicsCaptureItemInterop =
             windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
                 .context("GraphicsCaptureItem interop factory unavailable")?;
-        let item: GraphicsCaptureItem = unsafe {
-            interop
-                .CreateForWindow(hwnd)
-                .context("CreateForWindow failed")?
+        let (item, hwnd): (GraphicsCaptureItem, Option<HWND>) = unsafe {
+            match source {
+                Source::Window(hwnd) => (
+                    interop.CreateForWindow(hwnd).context("CreateForWindow failed")?,
+                    Some(hwnd),
+                ),
+                Source::Screen(monitor) => (
+                    interop.CreateForMonitor(monitor).context("CreateForMonitor failed")?,
+                    None,
+                ),
+            }
         };
 
         let size = item.Size().context("capture item has no size")?;
@@ -169,11 +182,22 @@ impl CaptureSession {
     }
 
     pub fn window_state(&self) -> WindowState {
-        window::state_of(self.hwnd)
+        match self.hwnd {
+            Some(hwnd) => window::state_of(hwnd),
+            None => WindowState {
+                alive: true,
+                minimized: false,
+                foreground: true,
+            },
+        }
     }
 
     pub fn window_pid(&self) -> u32 {
-        window::pid_of(self.hwnd)
+        self.hwnd.map_or(0, window::pid_of)
+    }
+
+    pub fn is_screen(&self) -> bool {
+        self.hwnd.is_none()
     }
 
     pub fn state(&self) -> CaptureState {
@@ -181,7 +205,7 @@ impl CaptureSession {
         if !window.alive {
             return CaptureState::Failed;
         }
-        if !window.should_produce_frames() {
+        if !window.should_produce_frames() || self.is_screen() {
             return CaptureState::Buffering;
         }
 

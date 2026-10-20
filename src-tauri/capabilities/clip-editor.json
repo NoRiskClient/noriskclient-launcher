@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "clip-editor",
+  "description": "Minimal capability for the clip editor window. It talks to the launcher through its own commands, listens for events, shows itself once painted, is dragged by its title bar and minimised or maximised from its own buttons. Closing goes through a command, so it needs no file, opener, dialog, process or updater access.",
+  "windows": [
+    "clip_editor"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize"
+  ]
+}

@@ -1,18 +1,5 @@
 "use client";
 
-/**
- * LocalContentTabV3 — Konzept-stilisierter Content-Tab fuer Mods, ResourcePacks,
- * Shaders, DataPacks, NoRisk. Wiederverwendet useLocalContentManager (identische
- * Datenlogik wie V2), rendert aber im V3-Konzept-Look:
- *
- *  - Sticky Toolbar: Search + Filter + Sort + Refresh + Add-CTA
- *  - Grid aus Mod-Tiles mit Icon, Name, Version, Toggle, Hover-Menu
- *
- * Bewusst vereinfacht ggn. V2: keine Batch-Selection, keine Update-Check-Bar,
- * kein NoRisk-Pack-Selector. Komplexere Operationen bleiben im V2-Tab
- * verfuegbar (Toggle `USE_V3 = false`).
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { VirtuosoGrid } from "react-virtuoso";
@@ -47,8 +34,19 @@ import { ContentActionButtons, type ContentActionButton } from "../../../ui/Cont
 import type { DropdownOption } from "../../../ui/CustomDropdown";
 import { ContentTile } from "./local-content/ContentTile";
 import { NoriskPackSelector } from "./local-content/NoriskPackSelector";
+import { SyncModTile } from "./local-content/SyncModTile";
+import { useProfileSyncMods } from "./local-content/useProfileSyncMods";
+import { ContentGroupDivider } from "./local-content/ContentGroupDivider";
+import { syncModKey, syncModPlatform, type ProfileSyncPackMod } from "../../../../types/syncPacks";
+import {
+  filterSyncMods,
+  gridEntryKey,
+  groupGridEntries,
+  localItemKey,
+  mergeGridEntries,
+  type GridEntry,
+} from "./local-content/contentGrid";
 
-// Pre-load der haeufig genutzten Iconify-Icons fuer schnelleres First-Paint
 preloadIcons([
   "solar:magnifer-linear", "solar:filter-bold", "solar:sort-vertical-bold",
   "solar:alt-arrow-down-linear", "solar:refresh-bold", "solar:refresh-circle-bold",
@@ -59,15 +57,14 @@ preloadIcons([
   "solar:play-bold", "solar:pause-bold", "solar:volume-cross-bold",
   "solar:volume-cross-linear", "solar:volume-loud-linear", "solar:volume-loud-bold",
   "solar:box-bold", "solar:danger-triangle-bold", "solar:close-circle-bold",
-  // Sort/Filter icons
   "solar:sort-from-top-to-bottom-bold", "solar:ruler-bold", "solar:list-bold",
-  "solar:hand-stars-bold",
+  "solar:hand-stars-bold", "solar:link-round-bold",
 ]);
 
 type SortKey = "name" | "size" | "type" | "updates";
 type FilterKey =
   | "all" | "enabled" | "disabled"
-  | "hasUpdate" | "fromModpack" | "manuallyAdded" | "updatesPaused" | "noriskIssues";
+  | "hasUpdate" | "fromModpack" | "manuallyAdded" | "fromSyncPack" | "updatesPaused" | "noriskIssues";
 
 interface LocalContentTabV3Props<T extends LocalContentItem> {
   profile: Profile;
@@ -91,10 +88,9 @@ interface FilterOption {
   value: FilterKey;
   labelKey: string;
   icon: string;
-  /** Gruppen-Trennlinie VOR diesem Item einfuegen. */
   separator?: boolean;
-  /** Wenn true, nur zeigen wenn NRC-Pack aktiv. */
   nrcOnly?: boolean;
+  syncOnly?: boolean;
 }
 
 const FILTER_OPTIONS: FilterOption[] = [
@@ -105,6 +101,7 @@ const FILTER_OPTIONS: FilterOption[] = [
   { value: "updatesPaused", labelKey: "profiles.v3.filter.updatesPaused",  icon: "solar:volume-cross-bold" },
   { value: "fromModpack",   labelKey: "profiles.v3.filter.fromModpack",    icon: "solar:box-bold",             separator: true },
   { value: "manuallyAdded", labelKey: "profiles.v3.filter.manuallyAdded",  icon: "solar:hand-stars-bold" },
+  { value: "fromSyncPack",  labelKey: "profiles.v3.filter.fromSyncPack",   icon: "solar:link-round-bold",      syncOnly: true },
   { value: "noriskIssues",  labelKey: "profiles.v3.filter.noriskIssues",   icon: "solar:danger-triangle-bold", separator: true, nrcOnly: true },
 ];
 
@@ -127,17 +124,14 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     onRefreshRequired,
   });
 
+  const sync = useProfileSyncMods(profile, contentType === "Mod");
+
   const accentColor = useThemeStore((s) => s.accentColor);
   const navigate = useNavigate();
   const { setActiveDropContext, registerRefreshCallback, unregisterRefreshCallback } = useAppDragDropStore();
 
-  // Map LocalContentType → BackendContentType fuer den Drag-Drop-Store
   const backendContentType = contentType as BackendContentType;
 
-  // Drag-Drop-Context registrieren: damit Dateien die auf das Fenster gezogen
-  // werden als Import fuer DIESEN Tab erkannt werden. Unregister bei Unmount.
-  // WICHTIG: `manager` nicht in Deps — das Objekt ist jede Render neu
-  // (returnt vom Hook), sonst Endlos-Loop.
   const fetchDataRef = useRef(manager.fetchData);
   fetchDataRef.current = manager.fetchData;
   useEffect(() => {
@@ -151,7 +145,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     };
   }, [profile?.id, backendContentType, setActiveDropContext, registerRefreshCallback, unregisterRefreshCallback]);
 
-  // Navigation zur Mod-Detail-Page wenn Modrinth/CurseForge-Projekt
   const navigateToModDetail = useCallback((item: LocalContentItem) => {
     if (item.modrinth_info?.project_id) {
       navigate(`/mods/modrinth/${item.modrinth_info.project_id}`);
@@ -165,18 +158,14 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
 
-  // ── Version-Switcher-State (pro Item) ─────────────────────────────────────
   const versionOptions = useVersionOptions();
   const [switchingVersionFor, setSwitchingVersionFor] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
-
-  const tileKey = useCallback((item: LocalContentItem): string => item.path_str || item.filename, []);
 
   const getItemPlatformAndProjectId = useCallback((item: LocalContentItem): { platform: ModPlatform | null; projectId: string | null } => {
     const plat = item.platform;
     if (plat === ModPlatform.Modrinth) return { platform: plat, projectId: item.modrinth_info?.project_id ?? null };
     if (plat === ModPlatform.CurseForge) return { platform: plat, projectId: item.curseforge_info?.project_id ?? null };
-    // Fallback
     if (item.modrinth_info?.project_id)  return { platform: ModPlatform.Modrinth,   projectId: item.modrinth_info.project_id };
     if (item.curseforge_info?.project_id) return { platform: ModPlatform.CurseForge, projectId: item.curseforge_info.project_id };
     return { platform: null, projectId: null };
@@ -185,7 +174,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const handleOpenVersionDropdown = useCallback(async (item: LocalContentItem) => {
     const { platform, projectId } = getItemPlatformAndProjectId(item);
     await versionOptions.toggle(
-      tileKey(item),
+      localItemKey(item),
       platform && projectId
         ? {
             platform,
@@ -195,7 +184,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           }
         : null,
     );
-  }, [contentType, getItemPlatformAndProjectId, profile, tileKey, versionOptions]);
+  }, [contentType, getItemPlatformAndProjectId, profile, versionOptions]);
 
   const handleSwitchVersion = useCallback(async (item: LocalContentItem, newVersion: UnifiedVersion) => {
     versionOptions.close();
@@ -210,33 +199,30 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     }
   }, [manager, t, versionOptions]);
 
-  // Batch Enable/Disable — iteriert Selection und toggelt nur die Mods,
-  // deren aktueller State vom Ziel abweicht.
   const runBatch = useCallback(async (enabled: boolean) => {
+    const syncChanged = await sync.setHere(sync.selectedMods, enabled);
+    sync.clearSelection();
+
     const targets = manager.items.filter(
       (item) => manager.selectedItemIds.has(item.filename) && item.is_disabled === enabled,
     );
-    if (targets.length === 0) {
-      manager.handleSelectAllToggle(false);
-      return;
-    }
-
-    setBatchProgress({ current: 0, total: targets.length });
-    try {
-      const changed = await manager.handleBatchSetEnabled(enabled);
-      setBatchProgress({ current: targets.length, total: targets.length });
-      if (changed > 0) {
-        toast.success(
-          t(enabled ? "profiles.v3.batch.enabled" : "profiles.v3.batch.disabled", {
-            count: changed,
-          }),
-        );
+    let localChanged = 0;
+    if (targets.length > 0) {
+      setBatchProgress({ current: 0, total: targets.length });
+      try {
+        localChanged = await manager.handleBatchSetEnabled(enabled);
+        setBatchProgress({ current: targets.length, total: targets.length });
+      } finally {
+        setBatchProgress(null);
       }
-    } finally {
-      setBatchProgress(null);
-      manager.handleSelectAllToggle(false);
     }
-  }, [manager, t]);
+    manager.handleSelectAllToggle(false);
+
+    const changed = localChanged + syncChanged;
+    if (changed > 0) {
+      toast.success(t(enabled ? "profiles.v3.batch.enabled" : "profiles.v3.batch.disabled", { count: changed }));
+    }
+  }, [manager, sync, t]);
 
   const handleBatchEnable = useCallback(() => runBatch(true), [runBatch]);
   const handleBatchDisable = useCallback(() => runBatch(false), [runBatch]);
@@ -261,8 +247,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const isNrc = contentType === "NoRiskMod";
   const selectedPackId = profile?.selected_norisk_pack_id ?? null;
 
-  // Flagsmith blocked-mods Config laden wenn ein NRC-Pack aktiv ist.
-  // Beeinflusst die Warn-Overlays auf Mods die mit NoRisk inkompatibel sind.
   const [isBlockedConfigLoaded, setIsBlockedConfigLoaded] = useState(false);
   useEffect(() => {
     if (profile?.selected_norisk_pack_id) {
@@ -277,9 +261,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     }
   }, [profile?.selected_norisk_pack_id]);
 
-  // Helper: hat ein Item ein verfuegbares Update? Matched die Logik aus dem
-  // Render-Loop (siehe `updateAvailable` unten) — manager.contentUpdates wird
-  // per `update-identifier` indiziert.
   const hasUpdate = useCallback((item: LocalContentItem) => {
     const key = getUpdateIdentifier(item);
     return !!(key && manager.contentUpdates[key]);
@@ -294,6 +275,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       case "hasUpdate":     list = list.filter(hasUpdate); break;
       case "fromModpack":   list = list.filter(i => !!i.modpack_origin); break;
       case "manuallyAdded": list = list.filter(i => !i.modpack_origin && !i.norisk_info); break;
+      case "fromSyncPack":  list = []; break;
       case "updatesPaused": list = list.filter(i => i.updates_enabled === false); break;
       case "noriskIssues":  list = list.filter(i => {
         if (!isBlockedConfigLoaded) return false;
@@ -318,7 +300,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         sorted.sort((a, b) => manager.getItemPlatformDisplayName(a).localeCompare(manager.getItemPlatformDisplayName(b)));
         break;
       case "updates":
-        // Mods mit Update zuerst, danach alphabetisch.
         sorted.sort((a, b) => {
           const ua = hasUpdate(a) ? 1 : 0;
           const ub = hasUpdate(b) ? 1 : 0;
@@ -330,11 +311,6 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     return sorted;
   }, [manager.filteredItems, manager.getItemPlatformDisplayName, filter, sortBy, getDisplayFileName, hasUpdate, isBlockedConfigLoaded]);
 
-  // "Add content" opens an in-place side sheet instead of navigating to a
-  // dedicated browse route, so the profile view stays mounted and the
-  // install-then-see-in-list feedback loop doesn't require a page-nav.
-  // NoRisk mods are gated off the sheet since they come via the pack
-  // selector, not Modrinth browse.
   const canBrowse = contentType !== "NoRiskMod";
   const [isBrowseSheetOpen, setBrowseSheetOpen] = useState(false);
   const handleAddClick = useCallback(() => {
@@ -342,9 +318,52 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   }, []);
   const handleBrowseSheetClose = useCallback(() => {
     setBrowseSheetOpen(false);
-    // Refresh in case the user installed something while the sheet was open.
     manager.fetchData(true);
   }, [manager]);
+
+  const visibleSyncMods = useMemo(
+    () => filterSyncMods(sync.mods, filter, manager.searchQuery),
+    [filter, manager.searchQuery, sync.mods],
+  );
+
+  const gridEntries = useMemo(
+    () => mergeGridEntries(visibleItems, visibleSyncMods, sortBy === "name" ? getDisplayFileName : null),
+    [visibleItems, visibleSyncMods, sortBy, getDisplayFileName],
+  );
+
+  const grouped = sync.mods.length > 0;
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = useCallback((id: string) => {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+
+  const entryGroups = useMemo(
+    () => groupGridEntries(gridEntries, t("profiles.v3.groups.profile")),
+    [gridEntries, t],
+  );
+
+  const syncVersionPicker = (entry: ProfileSyncPackMod) => {
+    const key = syncModKey(entry);
+    const platform = syncModPlatform(entry);
+    return {
+      open: versionOptions.openKey === key,
+      versions: versionOptions.versionsFor(key),
+      loading: versionOptions.loadingFor(key),
+      error: versionOptions.errorFor(key),
+      onClose: versionOptions.close,
+      onOpen: () => void versionOptions.toggle(
+        key,
+        platform && entry.project_id
+          ? { platform, projectId: entry.project_id, loaders: [profile.loader], gameVersions: [profile.game_version] }
+          : null,
+      ),
+    };
+  };
 
   const sortDropdownOptions: DropdownOption[] = useMemo(
     () => SORT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey), icon: o.icon })),
@@ -353,31 +372,33 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const filterDropdownOptions: DropdownOption[] = useMemo(
     () => FILTER_OPTIONS
       .filter(opt => !opt.nrcOnly || isBlockedConfigLoaded)
+      .filter(opt => !opt.syncOnly || sync.mods.length > 0)
       .map(o => ({ value: o.value, label: t(o.labelKey), icon: o.icon, separator: o.separator })),
-    [t, isBlockedConfigLoaded],
+    [t, isBlockedConfigLoaded, sync.mods.length],
   );
 
-  // Loading-Spinner erst nach 500ms zeigen: schnelle Loads (Cache-Hit etc.)
-  // rendern dann direkt die Liste statt kurz "Loading…" zu flashen.
+  const isWaitingForContent = !sync.ready || (manager.isLoading && gridEntries.length === 0);
   const shouldShowLoadingSpinner = useDelayedTrue(
-    manager.isLoading && visibleItems.length === 0,
+    isWaitingForContent,
     500,
   );
 
-  // Esc-Key clear'd Selection — `manager` nicht in Deps (neu per Render).
-  const selectAllToggleRef = useRef(manager.handleSelectAllToggle);
-  selectAllToggleRef.current = manager.handleSelectAllToggle;
-  const hasSelection = manager.selectedItemIds.size > 0;
+  const clearSelectionRef = useRef(() => {});
+  clearSelectionRef.current = () => {
+    manager.handleSelectAllToggle(false);
+    sync.clearSelection();
+  };
+  const selectionCount = manager.selectedItemIds.size + sync.selection.size;
+  const hasSelection = selectionCount > 0;
   useEffect(() => {
     if (!hasSelection) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") selectAllToggleRef.current(false);
+      if (e.key === "Escape") clearSelectionRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [hasSelection]);
 
-  // FAB-Actions: Enable / Disable / (optional) Update-Check-Toggle / Delete.
   const batchBusy = manager.isBatchToggling || !!batchProgress;
   const fabActions: FABActionConfig[] = [
     { icon: "solar:play-bold",  label: t("profiles.v3.fab.enable"),  onClick: handleBatchEnable,  disabled: batchBusy },
@@ -392,7 +413,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       label: manager.isBatchDeleting ? "…" : t("profiles.v3.fab.delete"),
       tone: "danger",
       onClick: manager.handleBatchDeleteSelected,
-      disabled: manager.isBatchDeleting,
+      disabled: manager.isBatchDeleting || sync.selection.size > 0,
     },
   ];
 
@@ -416,7 +437,10 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       disabled: manager.isAnyTaskRunning,
       loading: manager.isAnyTaskRunning,
       tooltip: t("profiles.v3.toolbar.refresh"),
-      onClick: () => manager.fetchData(false),
+      onClick: () => {
+        manager.fetchData(false);
+        void sync.reload();
+      },
     },
     ...(canBrowse ? [{
       id: "add",
@@ -428,9 +452,94 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     }] : []),
   ];
 
+  const renderGridEntry = (gridEntry: GridEntry<T>) => {
+    if (gridEntry.kind === "sync") {
+      const entry = gridEntry.entry;
+      const { platform, project_id: projectId } = entry;
+      return (
+        <SyncModTile
+          entry={entry}
+          sync={sync}
+          mcVersion={profile.game_version}
+          selectMode={hasSelection}
+          versionPicker={syncVersionPicker(entry)}
+          menuOpen={hoverMenuId === syncModKey(entry)}
+          onMenuToggle={(open) => setHoverMenuId(open ? syncModKey(entry) : null)}
+          onNameClick={platform && projectId ? () => navigate(`/mods/${platform}/${projectId}`) : undefined}
+        />
+      );
+    }
+    const item = gridEntry.item;
+    const key = localItemKey(item);
+    const updateKey = getUpdateIdentifier(item);
+    const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
+    const noRiskStatus = isBlockedConfigLoaded
+      ? FlagsmithService.getModNoRiskStatus(
+          item.filename,
+          item.modrinth_info?.project_id || item.curseforge_info?.project_id,
+          item.modrinth_info?.version_id || (item.curseforge_info as any)?.file_id,
+        )
+      : null;
+    return (
+      <ContentTile
+        key={key}
+        item={item}
+        displayName={getDisplayFileName(item)}
+        iconUrl={manager.getItemIcon(item)}
+        platformLabel={manager.getItemPlatformDisplayName(item)}
+        busy={manager.itemBeingToggled === item.filename || manager.itemBeingDeleted === item.filename}
+        onToggle={() => manager.handleToggleItemEnabled(item)}
+        onDelete={() => manager.handleDeleteItem(item)}
+        onOpenFolder={() => manager.handleOpenItemFolder(item)}
+        onNameClick={(item.modrinth_info?.project_id || item.curseforge_info?.project_id) ? () => navigateToModDetail(item) : undefined}
+        menuOpen={hoverMenuId === item.filename}
+        onMenuToggle={(open) => setHoverMenuId(open ? item.filename : null)}
+        selectMode={hasSelection}
+        isSelected={manager.selectedItemIds.has(item.filename)}
+        onToggleSelection={() => manager.handleItemSelectionChange(item.filename, !manager.selectedItemIds.has(item.filename))}
+        onToggleUpdateChecks={item.id ? () => manager.handleToggleItemUpdatesEnabled(item) : undefined}
+        onQuickUpdate={updateAvailable
+          ? () => manager.handleUpdateContentItem(item, updateAvailable)
+          : undefined}
+        quickUpdateDisabled={!!updateAvailable && (() => {
+          const isFromModPack = !!item.modpack_origin;
+          return isFromModPack
+            ? item.updates_enabled !== true
+            : item.updates_enabled === false;
+        })()}
+        quickUpdateTooltip={updateAvailable
+          ? (
+            <div className="max-w-xs text-left">
+              <ModUpdateText
+                isFromModPack={!!item.modpack_origin}
+                updateVersion={updateAvailable}
+                currentVersion={(item.modrinth_info as any)?.version_number || (item.curseforge_info as any)?.version_number}
+                modpackOrigin={item.modpack_origin}
+                updatesEnabled={item.updates_enabled}
+              />
+            </div>
+          )
+          : undefined}
+        isQuickUpdating={manager.itemsBeingUpdated.has(item.filename)}
+        noRiskStatus={noRiskStatus}
+        overridesPack={(() => {
+          const projectId = item.modrinth_info?.project_id || item.curseforge_info?.project_id;
+          return projectId && !item.is_disabled ? sync.overriddenPackByProject.get(projectId) : undefined;
+        })()}
+        versionDropdownOpen={versionOptions.openKey === key}
+        availableVersions={versionOptions.versionsFor(key)}
+        isLoadingVersions={versionOptions.loadingFor(key)}
+        versionError={versionOptions.errorFor(key)}
+        onVersionClick={() => handleOpenVersionDropdown(item)}
+        onSwitchVersion={(v) => handleSwitchVersion(item, v)}
+        updateAvailable={updateAvailable}
+        isSwitchingVersion={switchingVersionFor === item.filename}
+      />
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
-      {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-5 py-2.5 border-b border-white/10 flex-shrink-0 bg-black/20 sticky top-0 z-10">
         <SearchWithFilters
           searchValue={manager.searchQuery}
@@ -446,12 +555,10 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           className="flex-1"
         />
 
-        {/* NoRisk pack selector (only for NRC) */}
         {isNrc && (
           <NoriskPackSelector profile={profile} onChanged={onRefreshRequired} />
         )}
 
-        {/* Update-Check-Error: auffaellig weil kritisch (Netzwerk/API-Problem). */}
         {manager.contentUpdateError && (
           <Tooltip content={manager.contentUpdateError}>
             <div className="h-9 px-3 rounded-lg bg-red-600/20 border border-red-500/30 text-white flex items-center gap-2 font-smallcaps text-base">
@@ -464,10 +571,9 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         <ContentActionButtons actions={toolbarActions} size="sm" />
       </div>
 
-      {/* ── Content area ───────────────────────────────────────────────── */}
       <div
         ref={setScrollParent}
-        className={`flex-1 min-h-0 overflow-y-auto p-5 ${manager.selectedItemIds.size > 0 ? "pb-24" : ""}`}
+        className={`flex-1 min-h-0 overflow-y-auto p-5 ${hasSelection ? "pb-24" : ""}`}
       >
         {manager.error && (
           <div className="mb-4 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
@@ -490,7 +596,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
             title={t("profiles.v3.content.noPackTitle")}
             hint={t("profiles.v3.content.noPackHint")}
           />
-        ) : manager.isLoading && visibleItems.length === 0 ? (
+        ) : isWaitingForContent ? (
           shouldShowLoadingSpinner ? (
             <div className="flex items-center justify-center h-40 text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
               <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
@@ -499,7 +605,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           ) : (
             <div className="h-40" />
           )
-        ) : visibleItems.length === 0 ? (
+        ) : gridEntries.length === 0 ? (
           <EmptyStateV3
             icon={emptyStateIconOverride ?? "solar:widget-bold-duotone"}
             title={manager.searchQuery
@@ -510,96 +616,61 @@ export function LocalContentTabV3<T extends LocalContentItem>({
               : undefined}
           />
         ) : (
+          grouped ? (
+            <div className="space-y-4">
+              {entryGroups.map((group) => {
+                const isCollapsed = collapsedGroups.has(group.id);
+                return (
+                  <div key={group.id}>
+                    <ContentGroupDivider
+                      label={group.label}
+                      count={group.entries.length}
+                      packId={group.packId}
+                      packIcon={group.packIcon}
+                      collapsed={isCollapsed}
+                      onToggle={() => toggleGroup(group.id)}
+                      onOpen={group.packId ? () => sync.openPack(group.packId!) : undefined}
+                      openLabel={t("profiles.v3.groups.openPack")}
+                      tag={group.packId ? t("profiles.v3.groups.syncPackTag") : undefined}
+                    />
+                    {!isCollapsed && (
+                      <div className="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {group.entries.map((gridEntry) => (
+                          <div key={gridEntryKey(gridEntry)}>{renderGridEntry(gridEntry)}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
           <VirtuosoGrid
-            data={visibleItems}
+            data={gridEntries}
             customScrollParent={scrollParent ?? undefined}
             listClassName="grid grid-cols-1 lg:grid-cols-2 gap-3"
-            computeItemKey={(index, item) => `${index}:${tileKey(item)}`}
-            itemContent={(_, item) => {
-              const key = tileKey(item);
-              const updateKey = getUpdateIdentifier(item);
-              const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
-              const noRiskStatus = isBlockedConfigLoaded
-                ? FlagsmithService.getModNoRiskStatus(
-                    item.filename,
-                    item.modrinth_info?.project_id || item.curseforge_info?.project_id,
-                    item.modrinth_info?.version_id || (item.curseforge_info as any)?.file_id,
-                  )
-                : null;
-              return (
-                <ContentTile
-                  key={key}
-                  item={item}
-                  displayName={getDisplayFileName(item)}
-                  iconUrl={manager.getItemIcon(item)}
-                  platformLabel={manager.getItemPlatformDisplayName(item)}
-                  busy={manager.itemBeingToggled === item.filename || manager.itemBeingDeleted === item.filename}
-                  onToggle={() => manager.handleToggleItemEnabled(item)}
-                  onDelete={() => manager.handleDeleteItem(item)}
-                  onOpenFolder={() => manager.handleOpenItemFolder(item)}
-                  onNameClick={(item.modrinth_info?.project_id || item.curseforge_info?.project_id) ? () => navigateToModDetail(item) : undefined}
-                  menuOpen={hoverMenuId === item.filename}
-                  onMenuToggle={(open) => setHoverMenuId(open ? item.filename : null)}
-                  selectMode={manager.selectedItemIds.size > 0}
-                  isSelected={manager.selectedItemIds.has(item.filename)}
-                  onToggleSelection={() => manager.handleItemSelectionChange(item.filename, !manager.selectedItemIds.has(item.filename))}
-                  onToggleUpdateChecks={item.id ? () => manager.handleToggleItemUpdatesEnabled(item) : undefined}
-                  onQuickUpdate={updateAvailable
-                    ? () => manager.handleUpdateContentItem(item, updateAvailable)
-                    : undefined}
-                  quickUpdateDisabled={!!updateAvailable && (() => {
-                    const isFromModPack = !!item.modpack_origin;
-                    return isFromModPack
-                      ? item.updates_enabled !== true
-                      : item.updates_enabled === false;
-                  })()}
-                  quickUpdateTooltip={updateAvailable
-                    ? (
-                      <div className="max-w-xs text-left">
-                        <ModUpdateText
-                          isFromModPack={!!item.modpack_origin}
-                          updateVersion={updateAvailable}
-                          currentVersion={(item.modrinth_info as any)?.version_number || (item.curseforge_info as any)?.version_number}
-                          modpackOrigin={item.modpack_origin}
-                          updatesEnabled={item.updates_enabled}
-                        />
-                      </div>
-                    )
-                    : undefined}
-                  isQuickUpdating={manager.itemsBeingUpdated.has(item.filename)}
-                  noRiskStatus={noRiskStatus}
-                  versionDropdownOpen={versionOptions.openKey === key}
-                  availableVersions={versionOptions.versionsFor(key)}
-                  isLoadingVersions={versionOptions.loadingFor(key)}
-                  versionError={versionOptions.errorFor(key)}
-                  onVersionClick={() => handleOpenVersionDropdown(item)}
-                  onSwitchVersion={(v) => handleSwitchVersion(item, v)}
-                  updateAvailable={updateAvailable}
-                  isSwitchingVersion={switchingVersionFor === item.filename}
-                />
-              );
-            }}
+            computeItemKey={(index, gridEntry) => `${index}:${gridEntryKey(gridEntry)}`}
+            itemContent={(_, gridEntry) => renderGridEntry(gridEntry)}
           />
+          )
         )}
       </div>
 
-      {/* ── Floating Action Bar ─────────────────────────────────────────── */}
       <FloatingActionBar
-        visible={manager.selectedItemIds.size > 0 || !!batchProgress}
-        count={manager.selectedItemIds.size}
-        totalCount={visibleItems.length}
+        visible={hasSelection || !!batchProgress}
+        count={selectionCount}
+        totalCount={visibleItems.length + visibleSyncMods.length}
         accent={accentColor.value}
-        allSelected={manager.areAllFilteredSelected}
-        onSelectAll={() => manager.handleSelectAllToggle(true)}
-        onClear={() => manager.handleSelectAllToggle(false)}
+        allSelected={manager.areAllFilteredSelected && visibleSyncMods.every((entry) => sync.selection.has(syncModKey(entry)))}
+        onSelectAll={() => {
+          manager.handleSelectAllToggle(true);
+          sync.selectAll(visibleSyncMods);
+        }}
+        onClear={() => clearSelectionRef.current()}
         batchProgress={batchProgress}
         actions={fabActions}
       />
 
-      {/* Side-sheet replaces the old `/profilesv2/:id/browse/:type` route
-          push — keeps the profile view mounted under the sheet and lets
-          the install→see-in-list feedback loop happen without a page-nav
-          round trip. */}
       <BrowseContentSideSheetV3
         open={isBrowseSheetOpen}
         profile={profile}
@@ -608,8 +679,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         onInstallSuccess={() => manager.fetchData(true)}
       />
 
-      {/* Confirm-dialog for single and batch delete — the manager toggles
-          `isConfirmDeleteDialogOpen` but leaves the UI to the consumer. */}
+      {sync.confirmDialog}
+
       <ConfirmDeleteDialog
         isOpen={manager.isConfirmDeleteDialogOpen}
         itemName={

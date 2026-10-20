@@ -2726,7 +2726,7 @@ impl LocalContentLoader {
         }
 
         if params.fetch_modrinth_data {
-            Self::attach_icon_urls(&state, &mut final_items).await;
+            Self::attach_project_details(&state, &mut final_items).await;
         }
 
         info!(
@@ -2738,7 +2738,7 @@ impl LocalContentLoader {
         Ok(final_items)
     }
 
-    async fn attach_icon_urls(state: &Arc<State>, items: &mut [LocalContentItem]) {
+    async fn attach_project_details(state: &Arc<State>, items: &mut [LocalContentItem]) {
         let modrinth_ids: Vec<String> = items
             .iter()
             .filter_map(|i| i.modrinth_info.as_ref().map(|m| m.project_id.clone()))
@@ -2747,11 +2747,22 @@ impl LocalContentLoader {
             .collect();
 
         if !modrinth_ids.is_empty() {
-            let projects = state.content_cache.peek_modrinth_projects(modrinth_ids).await;
+            let projects: HashMap<String, _> = state
+                .content_cache
+                .get_modrinth_projects(modrinth_ids, CacheBehaviour::StaleWhileRevalidate)
+                .await
+                .unwrap_or_else(|e| {
+                    debug!("Could not load Modrinth project details: {}", e);
+                    Vec::new()
+                })
+                .into_iter()
+                .map(|project| (project.id.clone(), project))
+                .collect();
             for item in items.iter_mut() {
                 if let Some(info) = item.modrinth_info.as_mut() {
                     if let Some(project) = projects.get(&info.project_id) {
                         info.icon_url = project.icon_url.clone();
+                        info.name = project.title.clone();
                     }
                 }
             }
@@ -2769,12 +2780,24 @@ impl LocalContentLoader {
             .collect();
 
         if !curseforge_ids.is_empty() {
-            let mods = state.content_cache.peek_curseforge_mods(curseforge_ids).await;
+            let mods: HashMap<u32, _> = state
+                .content_cache
+                .get_curseforge_mods(curseforge_ids, None, CacheBehaviour::StaleWhileRevalidate)
+                .await
+                .map(|response| response.data)
+                .unwrap_or_else(|e| {
+                    debug!("Could not load CurseForge project details: {}", e);
+                    Vec::new()
+                })
+                .into_iter()
+                .map(|cf_mod| (cf_mod.id, cf_mod))
+                .collect();
             for item in items.iter_mut() {
                 if let Some(info) = item.curseforge_info.as_mut() {
                     if let Ok(id) = info.project_id.parse::<u32>() {
                         if let Some(cf_mod) = mods.get(&id) {
                             info.icon_url = cf_mod.logo.as_ref().map(|l| l.url.clone());
+                            info.name = cf_mod.name.clone();
                         }
                     }
                 }

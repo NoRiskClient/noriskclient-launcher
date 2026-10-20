@@ -2,6 +2,7 @@ use crate::integrations::unified_mod::{
     get_mod_versions_unified, ModPlatform, UnifiedDependency, UnifiedDependencyType,
     UnifiedModVersionsParams, UnifiedVersion,
 };
+use crate::integrations::mod_lookup::project_titles;
 use log::{error, info, warn};
 use std::collections::{HashSet, VecDeque};
 
@@ -15,6 +16,13 @@ pub struct DependencyTarget {
 pub struct ResolvedDependency {
     pub project_id: String,
     pub version: UnifiedVersion,
+    pub title: Option<String>,
+}
+
+impl ResolvedDependency {
+    pub fn display_name(&self) -> String {
+        self.title.clone().unwrap_or_else(|| self.version.name.clone())
+    }
 }
 
 pub fn pick_version<'a>(
@@ -144,8 +152,20 @@ pub async fn resolve_required_dependencies_seen(
             resolved.push(ResolvedDependency {
                 project_id,
                 version: chosen.clone(),
+                title: None,
             });
         }
+    }
+
+    let ids: Vec<String> = resolved.iter().map(|d| d.project_id.clone()).collect();
+    let titles = match platform {
+        ModPlatform::Modrinth => project_titles(ids, Vec::new()).await,
+        ModPlatform::CurseForge => {
+            project_titles(Vec::new(), ids.iter().filter_map(|id| id.parse().ok()).collect()).await
+        }
+    };
+    for dependency in &mut resolved {
+        dependency.title = titles.get(&dependency.project_id).cloned();
     }
 
     resolved

@@ -24,6 +24,10 @@ use crate::commands::process_command::{
 use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
 };
+use commands::twitch_command::{
+    twitch_available_scopes, twitch_begin_device_login, twitch_cancel_login, twitch_is_linked,
+    twitch_unlink,
+};
 use commands::minecraft_command::{
     add_skin,
     apply_skin_from_base64,
@@ -87,6 +91,7 @@ use commands::file_command::{
 
 // Import config commands
 use commands::config_commands::{get_app_version, get_launcher_config, set_launcher_config};
+use commands::legal_commands::{acknowledge_legal_documents, acknowledge_legal_notice, get_legal_status};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -149,6 +154,9 @@ use commands::friends_command::{
 
 #[tokio::main]
 async fn main() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+
     if let Err(e) = logging::setup_logging().await {
         eprintln!("FEHLER: Logging konnte nicht initialisiert werden: {}", e);
     }
@@ -161,7 +169,16 @@ async fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+            let logged_args: Vec<String> = argv
+                .iter()
+                .map(|a| match url::Url::parse(a) {
+                    Ok(u) if u.scheme() == "norisk" => {
+                        format!("norisk://{}{} (query hidden)", u.host_str().unwrap_or_default(), u.path())
+                    }
+                    _ => a.clone(),
+                })
+                .collect();
+            info!("SingleInstance plugin: Second instance triggered with args: {:?}", logged_args);
 
             // If the second invocation carried a CLI subcommand we recognize,
             // service it instead of bringing the window to the front.
@@ -301,24 +318,22 @@ async fn main() {
                 info!("Deep link schemes registered successfully.");
             }
 
-            // Handle deep links received while app is running
+            app.manage(utils::deep_link_utils::PendingDeepLinks::default());
+
             let deep_link_app_handle = app_handle.clone();
             app.deep_link().on_open_url(move |event| {
                 let handle = deep_link_app_handle.clone();
                 let urls = event.urls();
-                info!("Deep link received: {:?}", urls);
+                info!("Deep link received ({} URL(s))", urls.len());
                 tauri::async_runtime::spawn(async move {
                     utils::deep_link_utils::handle_deep_link(&handle, urls).await;
                 });
             });
 
-            // Handle cold-start deep links (app was launched via deep link)
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                info!("Cold-start deep link detected: {:?}", urls);
+                info!("Cold-start deep link detected ({} URL(s))", urls.len());
                 let cold_start_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    // Small delay to ensure state initialization has started
-                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                     utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
                 });
             }
@@ -542,6 +557,8 @@ async fn main() {
                 //debug_utils::debug_unified_mod_versions().await;
             });
 
+            utils::screen_time::spawn(app_handle.clone());
+
             // --- Register Focus Event Listener for Discord RPC ---
             if let Some(main_window) = app.get_webview_window("main") {
                 let focus_app_handle = app_handle.clone();
@@ -565,6 +582,7 @@ async fn main() {
                 // --- Handle window close request (from taskbar, etc.) ---
                 main_window.listen("tauri://close-requested", move |_event| {
                     info!("Window close requested via system (taskbar, etc.). Exiting application.");
+                    utils::screen_time::report_before_exit();
                     std::process::exit(0);
                 });
             } else {
@@ -607,6 +625,11 @@ async fn main() {
             get_active_account,
             set_active_account,
             get_accounts,
+            twitch_available_scopes,
+            twitch_begin_device_login,
+            twitch_cancel_login,
+            twitch_unlink,
+            twitch_is_linked,
             search_modrinth_mods,
             search_modrinth_projects,
             search_mods_unified_command,
@@ -660,6 +683,9 @@ async fn main() {
             copy_profile,
             export_profile,
             get_launcher_config,
+            get_legal_status,
+            acknowledge_legal_documents,
+            acknowledge_legal_notice,
             set_launcher_config,
             get_launcher_directory,
             resolve_image_path,
@@ -783,6 +809,7 @@ async fn main() {
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,
             commands::permission_commands::has_permission,
+            commands::permission_commands::get_granted_permissions,
             commands::tester_command::fetch_tester_queue_count,
             commands::tester_command::fetch_tester_queue,
             commands::tester_command::submit_tester_vote,
@@ -804,6 +831,7 @@ async fn main() {
             refresh_vanilla_cape_data,
             track_analytics_event,
             commands::analytics_command::get_system_os_info,
+            commands::analytics_command::set_screen_time_tab,
             commands::profile_command::launch_profile_with_overrides,
             commands::profile_command::launch_temp_profile,
             commands::profile_command::add_profile_symlink,
@@ -831,6 +859,8 @@ async fn main() {
             commands::sync_pack_command::delete_sync_pack,
             commands::sync_pack_command::set_profile_sync_packs,
             commands::sync_pack_command::get_profile_sync_conflicts,
+            commands::sync_pack_command::get_profile_sync_pack_mods,
+            commands::sync_pack_command::set_profile_sync_mods_excluded,
             commands::sync_pack_command::sync_profile_now,
             commands::sync_pack_command::set_sync_pack_mod_enabled,
             commands::sync_pack_command::remove_sync_pack_entries,
@@ -871,6 +901,13 @@ async fn main() {
             add_message_reaction,
             remove_message_reaction,
             commands::deep_link_handler::confirm_auth_bridge,
+            commands::deep_link_handler::take_pending_deep_links,
+            commands::support_command::support_request_fetch,
+            commands::support_command::support_request_prepare,
+            commands::support_command::support_request_execute_action,
+            commands::support_command::support_request_submit,
+            commands::support_command::support_request_decline,
+            commands::support_command::support_request_close,
             commands::clip_commands::capture_apply_settings,
             commands::clip_commands::capture_release_hotkeys,
             commands::clip_commands::capture_status,
@@ -888,17 +925,26 @@ async fn main() {
             commands::clip_commands::clip_details,
             commands::clip_commands::clip_set_favourite,
             commands::clip_commands::clip_open_apps,
+            commands::clip_commands::clip_list_screens,
             commands::clip_commands::clip_save_thumbnail,
             commands::clip_commands::clip_export_vertical,
+            commands::clip_commands::clip_export_gif,
             commands::clip_commands::clip_prepare_preview,
             commands::clip_commands::clip_rename,
             commands::clip_commands::clip_open_folder,
+            commands::clip_commands::clip_open_editor,
+            commands::clip_commands::clip_editor_current,
+            commands::clip_commands::clip_editor_close,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {
+                if matches!(event, tauri::RunEvent::Exit) {
+                    utils::screen_time::report_before_exit();
+                }
+
                 #[cfg(target_os = "macos")]
                 if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                     use std::sync::atomic::{AtomicBool, Ordering};

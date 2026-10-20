@@ -3,5 +3,6 @@
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>gg.norisk.capture</string>
 <key>CFBundleName</key><string>NoRiskClient Clips</string>
+<key>LSUIElement</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>NoRiskClient records your microphone in game clips when microphone recording is enabled.</string>
 </dict></plist>

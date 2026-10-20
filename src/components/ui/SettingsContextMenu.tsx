@@ -3,9 +3,10 @@
 import React, { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
 import type { Profile } from "../../types/profile";
 
-export interface ContextMenuItem {
+export interface ContextMenuItem<T = Profile> {
   /** Unique identifier for the menu item */
   id: string;
   /** Label text to display */
@@ -19,32 +20,34 @@ export interface ContextMenuItem {
   /** Whether this item is disabled */
   disabled?: boolean;
   /** Click handler */
-  onClick: (profile: Profile) => void;
+  onClick: (target: T) => void;
 }
 
-export interface SettingsContextMenuProps {
-  /** The profile this menu is for */
-  profile: Profile;
+export interface SettingsContextMenuProps<T = Profile> {
+  /** The item this menu is for */
+  target: T;
   /** Whether the menu is visible */
   isOpen: boolean;
   /** Position coordinates */
   position: { x: number; y: number };
   /** Menu items to display */
-  items: ContextMenuItem[];
+  items: ContextMenuItem<T>[];
   /** Close handler */
   onClose: () => void;
   /** Optional ref to the settings button that triggers this menu */
   triggerButtonRef?: React.RefObject<HTMLElement>;
+  compact?: boolean;
 }
 
-export function SettingsContextMenu({
-  profile,
+export function SettingsContextMenu<T = Profile>({
+  target,
   isOpen,
   position,
   items,
   onClose,
   triggerButtonRef,
-}: SettingsContextMenuProps) {
+  compact = false,
+}: SettingsContextMenuProps<T>) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -103,11 +106,11 @@ export function SettingsContextMenu({
   return (
     <div
       ref={menuRef}
-      className="absolute bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden"
+      className={`absolute ${MENU_PANEL_CLASSES}`}
       style={{
         left: position.x,
         top: position.y,
-        minWidth: "200px",
+        minWidth: compact ? "176px" : "200px",
       }}
     >
       <div className="py-2">
@@ -115,17 +118,17 @@ export function SettingsContextMenu({
           <React.Fragment key={item.id}>
             {/* Separator */}
             {item.separator && (
-              <div className="h-px bg-white/10 mx-2 my-2" />
+              <div className={compact ? menuSeparatorClasses(true) : "h-px bg-white/10 mx-2 my-2"} />
             )}
             
             <button
               onClick={() => {
                 if (!item.disabled) {
-                  item.onClick(profile);
+                  item.onClick(target);
                   onClose();
                 }
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left font-minecraft text-sm transition-colors duration-150 ${
+              className={`${compact ? menuItemClasses(true) : "w-full flex items-center gap-3 px-4 py-3 text-left font-minecraft text-sm transition-colors duration-150"} ${
                 item.disabled
                   ? 'text-white/30 cursor-not-allowed opacity-50'
                   : item.destructive
