@@ -42,6 +42,9 @@
   </content_rating>
 
   <releases>  
+    <release version="0.6.29" date="2026-10-20">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29</url>
+    </release>
     <release version="0.6.29~beta.7" date="2026-10-19">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.7</url>
     </release>
