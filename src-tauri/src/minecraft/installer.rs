@@ -878,7 +878,7 @@ pub async fn install_minecraft_version(
     } else if modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
         let loader_str = if modloader_enum == ModLoader::NeoForge { "neoforge" } else { "forge" };
         let is_legacy_forge = modloader_enum == ModLoader::Forge
-            && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
+            && mc_utils::is_legacy_minecraft_version(version_id);
 
         // Early services go through the meta file like everything else: the loader registers an
         // ITransformerDiscoveryService, and ModLauncher puts what it reports into Layer.SERVICE.
