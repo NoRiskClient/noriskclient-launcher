@@ -215,6 +215,8 @@ export function CapeBrowser(): JSX.Element {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
+  const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
+  const allCapesRef = useRef<CosmeticCape[]>([]);
   const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
@@ -225,6 +227,10 @@ export function CapeBrowser(): JSX.Element {
   useEffect(() => {
     preloadIcons(["solar:add-square-bold-duotone"]);
   }, []);
+
+  useEffect(() => {
+  allCapesRef.current = allCapes;
+}, [allCapes]);
 
   // Initial load for ALL capes
   useEffect(() => {
@@ -345,20 +351,47 @@ export function CapeBrowser(): JSX.Element {
 
         // Priority: Search > Owned Only > Browse All
         if (currentSearchQuery && currentSearchQuery.trim() !== "") {
-          // Search for player capes - this should work regardless of current tab
-          const playerCapesOptions: GetPlayerCapesPayloadOptions = {
-            player_identifier: currentSearchQuery.trim(),
-          };
-          response = await getPlayerCapes(playerCapesOptions);
+          const query = currentSearchQuery.trim().toLowerCase();
 
-          // Always use the "all" setters for search results since we're searching globally
-          setAllCapes(response);
-          setAllPagination({
-            currentPage: 0,
-            pageSize: response.length,
-            totalItems: response.length,
-            totalPages: 1,
+          // 1. First filter locally against already-resolved creator names
+          const localMatches = allCapesRef.current.filter((cape) => {
+            const cachedName = creatorNameCacheRef.current.get(cape.firstSeen);
+            return cachedName?.toLowerCase().includes(query);
           });
+
+          if (localMatches.length > 0) {
+            setAllCapes(localMatches);
+            setAllPagination({
+              currentPage: 0,
+              pageSize: localMatches.length,
+              totalItems: localMatches.length,
+              totalPages: 1,
+            });
+          } else {
+            // 2. Fallback: exact name/UUID lookup (existing behavior)
+            try {
+              const playerCapesOptions: GetPlayerCapesPayloadOptions = {
+                player_identifier: currentSearchQuery.trim(),
+              };
+              response = await getPlayerCapes(playerCapesOptions);
+              setAllCapes(response);
+              setAllPagination({
+                currentPage: 0,
+                pageSize: response.length,
+                totalItems: response.length,
+                totalPages: 1,
+              });
+            } catch (searchError) {
+              // No exact match either -> show empty result instead of an error toast
+              setAllCapes([]);
+              setAllPagination({
+                currentPage: 0,
+                pageSize: 0,
+                totalItems: 0,
+                totalPages: 1,
+              });
+            }
+          }
         } else if (currentFilters.showOwnedOnly && currentActiveAccount) {
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
           const setPagination = getPaginationSetter(currentFilters.showOwnedOnly);
@@ -1024,6 +1057,7 @@ export function CapeBrowser(): JSX.Element {
               isExperimental={isExperimental}
               isModerator={isModerator && !filters.showOwnedOnly && !filters.showVanillaOnly}
               onModeratorDeleteCape={isModerator && !filters.showVanillaOnly && !filters.showOwnedOnly ? handleModeratorDeleteCapeClick : undefined}
+              creatorNameCache={creatorNameCacheRef.current}
             />
       </div>
     </div>

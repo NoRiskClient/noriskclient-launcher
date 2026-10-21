@@ -408,6 +408,7 @@ export interface CapeListProps {
   isExperimental?: boolean;
   isModerator?: boolean;
   onModeratorDeleteCape?: (cape: CosmeticCape) => void;
+  creatorNameCache?: Map<string, string>;
 }
 
 export function CapeList({
@@ -431,9 +432,11 @@ export function CapeList({
   isExperimental = false,
   isModerator = false,
   onModeratorDeleteCape,
+  creatorNameCache,
 }: CapeListProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
-  const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
+  const internalCacheRef = useRef<Map<string, string>>(new Map());
+  const creatorNameCacheRef = { current: creatorNameCache ?? internalCacheRef.current };
   const { showModal, hideModal } = useGlobalModal();
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{
