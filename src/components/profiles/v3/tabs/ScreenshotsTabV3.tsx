@@ -139,7 +139,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       try {
         for (const p of paths) {
           try {
-            await invoke("delete_file", { path: p });
+            await invoke("delete_file", { filePath: p });
             successCount++;
           } catch (err) {
             console.error("[V3 Screenshots] Delete failed for", p, err);
