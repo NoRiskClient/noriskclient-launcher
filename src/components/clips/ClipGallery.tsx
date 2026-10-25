@@ -586,11 +586,13 @@ function ClipPlayer({
   const [ratio, setRatio] = useState(16 / 9);
 
   const edit = useCallback(() => {
-    openClipEditor(clip.path, clip.name).catch((e) => {
-      console.error("Could not open the clip editor", e);
-      toast.error(parseErrorMessage(e));
-    });
-  }, [clip.name, clip.path]);
+    openClipEditor(clip.path, clip.name)
+      .then(onClose)
+      .catch((e) => {
+        console.error("Could not open the clip editor", e);
+        toast.error(parseErrorMessage(e));
+      });
+  }, [clip.name, clip.path, onClose]);
 
   const footer = (
     <div className="flex items-center justify-end gap-3">
