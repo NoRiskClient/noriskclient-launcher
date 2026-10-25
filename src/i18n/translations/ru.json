@@ -2946,8 +2946,6 @@
   "clips.editor.help.step_undo": "Ошибся? Нажми {{keys}}, чтобы отменить.",
   "clips.editor.help.step_save": "Нажми Сохранить. Твой исходный клип останется целым.",
   "clips.editor.help.ok": "Понятно",
-  "clips.editor.mac_notice.title": "Скоро и на Mac",
-  "clips.editor.mac_notice.message": "Наложения появятся на macOS в следующем обновлении. Обрезка, вырезание из середины, раздельные дорожки и форматы уже работают.",
   "clips.editor.switch.title": "Перейти к другому клипу?",
   "clips.editor.switch.message": "Твои изменения в этом клипе будут потеряны, если ты откроешь {{name}}.",
   "clips.editor.switch.confirm": "Перейти",

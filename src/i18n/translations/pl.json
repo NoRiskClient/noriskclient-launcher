@@ -2944,8 +2944,6 @@
   "clips.editor.help.step_undo": "Pomyłka? Naciśnij {{keys}}, aby cofnąć.",
   "clips.editor.help.step_save": "Kliknij Zapisz. Twój oryginalny klip zostaje bezpieczny.",
   "clips.editor.help.ok": "Jasne",
-  "clips.editor.mac_notice.title": "Wkrótce także na Macu",
-  "clips.editor.mac_notice.message": "Nakładki pojawią się na macOS w następnej aktualizacji. Przycinanie, cięcia w środku, osobne ścieżki i formaty działają już teraz.",
   "clips.editor.switch.title": "Przełączyć na inny klip?",
   "clips.editor.switch.message": "Twoje zmiany w tym klipie zostaną utracone, jeśli otworzysz {{name}}.",
   "clips.editor.switch.confirm": "Przełącz",

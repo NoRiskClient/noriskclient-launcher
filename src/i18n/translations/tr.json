@@ -2920,8 +2920,6 @@
   "clips.editor.help.step_undo": "Hata mı yaptın? Geri almak için {{keys}} tuşuna bas.",
   "clips.editor.help.step_save": "Kaydet'e tıkla. Orijinal klibin güvende kalır.",
   "clips.editor.help.ok": "Tamam",
-  "clips.editor.mac_notice.title": "Yakında Mac'te de",
-  "clips.editor.mac_notice.message": "Katmanlar bir sonraki güncellemeyle macOS'a da geliyor. Kırpma, ortadan kesme, ayrı parçalar ve biçimler şimdiden çalışıyor.",
   "clips.editor.switch.title": "Başka bir klibe geçilsin mi?",
   "clips.editor.switch.message": "{{name}} açarsan bu klipteki değişikliklerin kaybolacak.",
   "clips.editor.switch.confirm": "Geç",

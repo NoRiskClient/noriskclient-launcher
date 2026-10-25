@@ -2935,8 +2935,6 @@
   "clips.editor.help.step_undo": "गलती हो गई? वापस लेने के लिए {{keys}} दबाएँ।",
   "clips.editor.help.step_save": "सेव पर क्लिक करें। तुम्हारी असली क्लिप सुरक्षित रहती है।",
   "clips.editor.help.ok": "समझ गया",
-  "clips.editor.mac_notice.title": "जल्द ही Mac पर भी",
-  "clips.editor.mac_notice.message": "ओवरले अगले अपडेट के साथ macOS पर भी आएँगे। ट्रिम, बीच में कट, अलग ट्रैक और फ़ॉर्मेट अभी से काम करते हैं।",
   "clips.editor.switch.title": "दूसरी क्लिप पर जाएँ?",
   "clips.editor.switch.message": "{{name}} खोलने पर इस क्लिप में किए गए आपके बदलाव खो जाएँगे।",
   "clips.editor.switch.confirm": "बदलें",

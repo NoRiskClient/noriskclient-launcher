@@ -31,8 +31,7 @@ import {
   OVERLAY_NAME,
   SHAPES,
   type Panel,
-  OVERLAYS,
-  OFFERED_PANELS,
+  PANELS,
   type LaneWindow,
   NO_WINDOW,
   type Translate,
@@ -138,8 +137,8 @@ export function ClipTrimmer({
 
   const [ratio, setRatio] = useState(16 / 9);
   const [shape, setShape] = useState<ClipShape>("original");
-  const [panel, setPanel] = useState<Panel>(OFFERED_PANELS[0].id);
-  const activePanel = OFFERED_PANELS.find((entry) => entry.id === panel) ?? OFFERED_PANELS[0];
+  const [panel, setPanel] = useState<Panel>(PANELS[0].id);
+  const activePanel = PANELS.find((entry) => entry.id === panel) ?? PANELS[0];
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [laneTrim, setLaneTrim] = useState<LaneTrim | null>(null);
@@ -659,7 +658,7 @@ export function ClipTrimmer({
       id: "view",
       label: t("clips.editor.menu.view"),
       sections: [
-        OFFERED_PANELS.map((entry) => ({
+        PANELS.map((entry) => ({
           id: entry.id,
           label: t(entry.label),
           checked: panel === entry.id,
@@ -863,7 +862,7 @@ export function ClipTrimmer({
           <LayoutPanel id="stage" minSize={STAGE_MIN} className="flex flex-col" style={{ overflow: "hidden" }}>
             <div className="flex min-h-0 flex-1 gap-1.5">
               <nav className="flex w-[6.5rem] shrink-0 flex-col gap-1 overflow-hidden rounded-[var(--border-radius)] border border-white/10 bg-black/30 p-1">
-                {OFFERED_PANELS.map((entry) => (
+                {PANELS.map((entry) => (
                   <button
                     key={entry.id}
                     type="button"
@@ -912,21 +911,6 @@ export function ClipTrimmer({
                       <p className="font-minecraft text-xs leading-relaxed text-white/50">
                         {t(activePanel.hint)}
                       </p>
-                      {!OVERLAYS && (
-                        <div className="flex items-start gap-2.5 rounded border border-white/10 bg-black/30 px-3 py-2.5">
-                          <Icon
-                            icon="solar:info-circle-bold"
-                            className="mt-0.5 h-4 w-4 shrink-0"
-                            style={{ color: accentColor.value }}
-                          />
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className="font-minecraft text-sm text-white">{t("clips.editor.mac_notice.title")}</span>
-                            <span className="font-minecraft text-xs leading-relaxed text-white/60">
-                              {t("clips.editor.mac_notice.message")}
-                            </span>
-                          </div>
-                        </div>
-                      )}
                       {panel === "tools" && (
                         <div className="flex flex-col gap-2">
                           {TOOLS.map((tool) => (

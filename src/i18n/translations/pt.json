@@ -2920,8 +2920,6 @@
   "clips.editor.help.step_undo": "Errou? Aperte {{keys}} para desfazer.",
   "clips.editor.help.step_save": "Clique em Salvar. Seu clipe original fica seguro.",
   "clips.editor.help.ok": "Entendi",
-  "clips.editor.mac_notice.title": "Em breve também no Mac",
-  "clips.editor.mac_notice.message": "As sobreposições chegam ao macOS na próxima atualização. Cortar, cortes no meio, faixas separadas e formatos já funcionam.",
   "clips.editor.switch.title": "Mudar para outro clipe?",
   "clips.editor.switch.message": "Suas alterações neste clipe serão perdidas se você abrir {{name}}.",
   "clips.editor.switch.confirm": "Mudar",

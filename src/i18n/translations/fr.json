@@ -2920,8 +2920,6 @@
   "clips.editor.help.step_undo": "Une erreur ? Appuie sur {{keys}} pour l'annuler.",
   "clips.editor.help.step_save": "Clique sur Enregistrer. Ton clip original reste intact.",
   "clips.editor.help.ok": "Compris",
-  "clips.editor.mac_notice.title": "Bientôt aussi sur Mac",
-  "clips.editor.mac_notice.message": "Les incrustations arrivent sur macOS avec la prochaine mise à jour. Le découpage, les coupes au milieu, les pistes séparées et les formats fonctionnent déjà.",
   "clips.editor.switch.title": "Passer à un autre clip ?",
   "clips.editor.switch.message": "Tes modifications de ce clip seront perdues si tu ouvres {{name}}.",
   "clips.editor.switch.confirm": "Changer",

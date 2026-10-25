@@ -2509,8 +2509,6 @@
   "clips.editor.help.step_undo": "Vertan? Drück {{keys}}, dann ist es rückgängig.",
   "clips.editor.help.step_save": "Klick auf Speichern. Dein Original bleibt sicher.",
   "clips.editor.help.ok": "Alles klar",
-  "clips.editor.mac_notice.title": "Bald auch auf dem Mac",
-  "clips.editor.mac_notice.message": "Overlays kommen mit dem nächsten Update auch auf macOS. Kürzen, Schnitte in der Mitte, getrennte Spuren und Formate gehen schon jetzt.",
   "clips.editor.switch.title": "Zu anderem Clip wechseln?",
   "clips.editor.switch.message": "Deine Änderungen an diesem Clip gehen verloren, wenn du {{name}} öffnest.",
   "clips.editor.switch.confirm": "Wechseln",
