@@ -394,10 +394,11 @@ pub(crate) struct AudioFormat {
 
 impl SourceClip {
     pub(crate) fn duration_seconds(&self) -> f64 {
-        match self.video.last() {
-            Some(last) => ((last.pts - self.first_pts).max(0)) as f64 / TIME_BASE_DEN as f64,
-            None => 0.0,
-        }
+        let Some(last) = self.video.iter().map(|p| p.pts).max() else {
+            return 0.0;
+        };
+        let frame = TIME_BASE_DEN as i64 / self.track.fps.max(1) as i64;
+        (last - self.first_pts + frame).max(0) as f64 / TIME_BASE_DEN as f64
     }
 }
 
