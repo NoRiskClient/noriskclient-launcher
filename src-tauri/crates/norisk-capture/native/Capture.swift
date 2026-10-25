@@ -29,6 +29,25 @@ struct CaptureFailure: LocalizedError {
 }
 func seconds(_ value: Double) -> CMTime { CMTime(seconds: value, preferredTimescale: 1_000_000) }
 func time(_ sample: CMSampleBuffer) -> Double { CMSampleBufferGetPresentationTimeStamp(sample).seconds }
+func detached(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
+    guard let format = CMSampleBufferGetFormatDescription(sample) else { return nil }
+    var size = 0
+    guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: &size, bufferListOut: nil, bufferListSize: 0,
+            blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: nil) == noErr else { return nil }
+    let list = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: MemoryLayout<AudioBufferList>.alignment)
+    defer { list.deallocate() }
+    let buffers = list.assumingMemoryBound(to: AudioBufferList.self)
+    var block: CMBlockBuffer?
+    guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: nil, bufferListOut: buffers, bufferListSize: size,
+            blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: &block) == noErr else { return nil }
+    var copy: CMSampleBuffer?
+    guard CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil,
+            formatDescription: format, sampleCount: CMSampleBufferGetNumSamples(sample),
+            presentationTimeStamp: CMSampleBufferGetPresentationTimeStamp(sample), packetDescriptions: nil, sampleBufferOut: &copy) == noErr,
+          let copy, CMSampleBufferSetDataBufferFromAudioBufferList(copy, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
+            flags: 0, bufferList: buffers) == noErr else { return nil }
+    return copy
+}
 func keyframe(_ sample: CMSampleBuffer) -> Bool {
     let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]]
     return attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool != true
@@ -339,7 +358,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         } else {
             guard state == "buffering" else { return }
             let label = type == .microphone ? "Microphone" : (stream === audioStream ? (config.audio_source == "both" ? "Other" : "System") : "Game")
-            if !ring.video.isEmpty { ring.append(sample, label: label, retain: retainSeconds) }
+            if !ring.video.isEmpty, let copy = detached(sample) { ring.append(copy, label: label, retain: retainSeconds) }
         }
     }
 
