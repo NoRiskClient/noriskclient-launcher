@@ -2841,6 +2841,7 @@
   "clips.gallery.delete_message": "“{{name}}” silinsin mi? Dosya klip klasöründen kaldırılır ve geri alınamaz.",
   "clips.gallery.rename_label": "Yeni ad",
   "clips.gallery.delete_failed": "Bu klip silinemedi.",
+  "clips.gallery.in_editor": "Bu klip düzenleyicide açık. Önce düzenleyiciyi kapat.",
   "clips.gallery.cancel": "Sakla",
   "clips.gallery.count_one": "{{count}} klip",
   "clips.gallery.count_other": "{{count}} klip",

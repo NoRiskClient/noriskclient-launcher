@@ -2841,6 +2841,7 @@
   "clips.gallery.delete_message": "Eliminare “{{name}}”? Il file verrà rimosso dalla cartella dei clip e non potrà essere ripristinato.",
   "clips.gallery.rename_label": "Nuovo nome",
   "clips.gallery.delete_failed": "Impossibile eliminare questa clip.",
+  "clips.gallery.in_editor": "Questa clip è aperta nell'editor. Chiudi prima l'editor.",
   "clips.gallery.cancel": "Mantienila",
   "clips.gallery.count_one": "{{count}} clip",
   "clips.gallery.count_other": "{{count}} clip",

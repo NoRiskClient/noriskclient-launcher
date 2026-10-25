@@ -2841,6 +2841,7 @@
   "clips.gallery.delete_message": "Supprimer « {{name}} » ? Le fichier sera retiré de ton dossier de clips et ne pourra pas être restauré.",
   "clips.gallery.rename_label": "Nouveau nom",
   "clips.gallery.delete_failed": "Impossible de supprimer ce clip.",
+  "clips.gallery.in_editor": "Ce clip est ouvert dans l'éditeur. Ferme d'abord l'éditeur.",
   "clips.gallery.cancel": "Garder",
   "clips.gallery.count_one": "{{count}} clip",
   "clips.gallery.count_other": "{{count}} clips",

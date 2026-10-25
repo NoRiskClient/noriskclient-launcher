@@ -275,7 +275,8 @@ pub async fn clip_storage_usage() -> Result<crate::utils::clip_library::StorageU
 }
 
 #[tauri::command]
-pub async fn clip_delete(path: std::path::PathBuf) -> Result<(), CommandError> {
+pub async fn clip_delete(app: tauri::AppHandle, path: std::path::PathBuf) -> Result<(), CommandError> {
+    refuse_while_editing(&app, &path)?;
     let dir = clip_dir().await?;
     crate::utils::clip_library::delete(&dir, &path)?;
     log::info!("Deleted clip {}", path.display());
@@ -564,9 +565,11 @@ pub async fn clip_set_favourite(
 
 #[tauri::command]
 pub async fn clip_rename(
+    app: tauri::AppHandle,
     path: std::path::PathBuf,
     name: String,
 ) -> Result<std::path::PathBuf, CommandError> {
+    refuse_while_editing(&app, &path)?;
     let dir = clip_dir().await?;
     let renamed = crate::utils::clip_library::rename(&dir, &path, &name)?;
     log::info!("Renamed {} to {}", path.display(), renamed.display());
@@ -606,8 +609,38 @@ static EDITOR_CLIP: std::sync::Mutex<Option<EditorClip>> = std::sync::Mutex::new
 
 static EDITOR_OPENING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+pub fn editing_clip() -> Option<std::path::PathBuf> {
+    EDITOR_CLIP
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .map(|clip| std::path::PathBuf::from(&clip.path))
+}
+
+fn refuse_while_editing(app: &tauri::AppHandle, path: &std::path::Path) -> Result<(), CommandError> {
+    use tauri::Manager;
+
+    if app.get_webview_window(EDITOR_LABEL).is_none() {
+        return Ok(());
+    }
+    let same = |a: &std::path::Path, b: &std::path::Path| match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    };
+    if editing_clip().is_some_and(|open| same(&open, path)) {
+        return Err(crate::error::AppError::Other(
+            "This clip is open in the editor. Close the editor first.".into(),
+        )
+        .into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
-pub fn clip_editor_current() -> Option<EditorClip> {
+pub fn clip_editor_current(app: tauri::AppHandle) -> Option<EditorClip> {
+    use tauri::Manager;
+
+    app.get_webview_window(EDITOR_LABEL)?;
     EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 

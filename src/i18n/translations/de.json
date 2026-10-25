@@ -2430,6 +2430,7 @@
   "clips.gallery.delete_message": "„{{name}}“ löschen? Die Datei wird aus deinem Clip Ordner entfernt und kann nicht wiederhergestellt werden.",
   "clips.gallery.rename_label": "Neuer Name",
   "clips.gallery.delete_failed": "Der Clip konnte nicht gelöscht werden.",
+  "clips.gallery.in_editor": "Dieser Clip ist gerade im Editor offen. Schließ zuerst den Editor.",
   "clips.gallery.cancel": "Behalten",
   "clips.gallery.count_one": "{{count}} Clip",
   "clips.gallery.count_other": "{{count}} Clips",

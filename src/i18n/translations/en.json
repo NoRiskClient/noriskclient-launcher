@@ -2450,6 +2450,7 @@
   "clips.gallery.delete_message": "Delete “{{name}}”? The file is removed from your clip folder and cannot be restored.",
   "clips.gallery.rename_label": "New name",
   "clips.gallery.delete_failed": "Could not delete that clip.",
+  "clips.gallery.in_editor": "This clip is open in the editor. Close the editor first.",
   "clips.gallery.cancel": "Keep it",
   "clips.gallery.count_one": "{{count}} clip",
   "clips.gallery.count_other": "{{count}} clips",

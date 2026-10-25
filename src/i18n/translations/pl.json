@@ -2855,6 +2855,7 @@
   "clips.gallery.delete_message": "Usunąć „{{name}}”? Plik zostanie usunięty z folderu klipów i nie będzie można go przywrócić.",
   "clips.gallery.rename_label": "Nowa nazwa",
   "clips.gallery.delete_failed": "Nie udało się usunąć tego klipu.",
+  "clips.gallery.in_editor": "Ten klip jest otwarty w edytorze. Najpierw zamknij edytor.",
   "clips.gallery.cancel": "Zachowaj",
   "clips.gallery.count_one": "{{count}} klip",
   "clips.gallery.count_few": "{{count}} klipy",

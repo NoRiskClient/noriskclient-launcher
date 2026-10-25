@@ -2857,6 +2857,7 @@
   "clips.gallery.delete_message": "Удалить «{{name}}»? Файл будет удалён из папки клипов, восстановить его нельзя.",
   "clips.gallery.rename_label": "Новое имя",
   "clips.gallery.delete_failed": "Не удалось удалить этот клип.",
+  "clips.gallery.in_editor": "Этот клип открыт в редакторе. Сначала закрой редактор.",
   "clips.gallery.cancel": "Оставить",
   "clips.gallery.count_one": "{{count}} клип",
   "clips.gallery.count_few": "{{count}} клипа",

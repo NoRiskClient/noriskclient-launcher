@@ -2841,6 +2841,7 @@
   "clips.gallery.delete_message": "Excluir “{{name}}”? O arquivo será removido da sua pasta de clipes e não poderá ser restaurado.",
   "clips.gallery.rename_label": "Novo nome",
   "clips.gallery.delete_failed": "Não foi possível excluir esse clipe.",
+  "clips.gallery.in_editor": "Este clipe está aberto no editor. Fecha primeiro o editor.",
   "clips.gallery.cancel": "Manter",
   "clips.gallery.count_one": "{{count}} clipe",
   "clips.gallery.count_other": "{{count}} clipes",

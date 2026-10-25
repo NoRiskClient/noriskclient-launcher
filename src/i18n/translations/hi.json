@@ -2856,6 +2856,7 @@
   "clips.gallery.delete_message": "“{{name}}” हटाएँ? फ़ाइल आपके क्लिप फ़ोल्डर से हट जाएगी और वापस नहीं लाई जा सकेगी।",
   "clips.gallery.rename_label": "नया नाम",
   "clips.gallery.delete_failed": "वह क्लिप डिलीट नहीं हो सकी।",
+  "clips.gallery.in_editor": "यह क्लिप एडिटर में खुली है। पहले एडिटर बंद करें।",
   "clips.gallery.cancel": "रहने दें",
   "clips.gallery.count_one": "{{count}} क्लिप",
   "clips.gallery.count_other": "{{count}} क्लिप्स",
