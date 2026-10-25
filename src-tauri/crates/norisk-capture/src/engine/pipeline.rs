@@ -117,6 +117,7 @@ impl Engine {
 
     pub(super) fn attach(&mut self, target: Target) -> Result<()> {
         log::info!("Attaching to {}", target.label());
+        self.excluded.set(None);
         self.keyframe_warned = false;
         self.empty_warned = false;
 

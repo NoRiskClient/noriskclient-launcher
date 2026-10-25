@@ -120,7 +120,9 @@ impl Engine {
             return device;
         }
 
-        match crate::audio::wasapi::pid_of_executable(executable) {
+        let running = crate::audio::wasapi::pid_of_executable(executable);
+        self.excluded.set(Some(running));
+        match running {
             Some(pid) => {
                 log::info!("Keeping {executable} (pid {pid}) out of the clip's audio");
                 AudioSource::EverythingExcept(pid)

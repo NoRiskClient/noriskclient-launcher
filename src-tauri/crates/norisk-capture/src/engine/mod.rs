@@ -51,6 +51,8 @@ pub struct Engine {
     rate_sample: (u64, u64, Instant),
     keyframe_warned: bool,
     empty_warned: bool,
+    excluded: std::cell::Cell<Option<Option<u32>>>,
+    excluded_checked: Instant,
 }
 
 #[derive(Clone, Copy)]
@@ -75,6 +77,7 @@ struct Retired {
 }
 
 const RETAIN_FOR: Duration = Duration::from_secs(MAX_CLIP_SECONDS_RETAINED);
+const EXCLUDED_CHECK_EVERY: Duration = Duration::from_secs(5);
 const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 
 fn latency_p99_ms(window: &LatencyWindow) -> f32 {
@@ -109,6 +112,8 @@ impl Engine {
             rate_sample: (0, 0, Instant::now()),
             keyframe_warned: false,
             empty_warned: false,
+            excluded: std::cell::Cell::new(None),
+            excluded_checked: Instant::now(),
         }
     }
 
@@ -132,6 +137,7 @@ impl Engine {
             self.step_retry();
             self.step_health();
             self.step_resize_watch();
+            self.step_excluded_watch();
 
             if self.retired.as_ref().is_some_and(|r| r.at.elapsed() >= RETAIN_FOR) {
                 log::debug!("Releasing the buffer kept across the last rebuild");
@@ -422,6 +428,28 @@ impl Engine {
                 );
                 false
             }
+        }
+    }
+
+    fn step_excluded_watch(&mut self) {
+        if self.active.is_none() || self.excluded_checked.elapsed() < EXCLUDED_CHECK_EVERY {
+            return;
+        }
+        self.excluded_checked = Instant::now();
+        let Some(excluded) = self.excluded.get() else {
+            return;
+        };
+        let Some(executable) = self.config.excluded_audio_executable.clone() else {
+            return;
+        };
+        let running = crate::audio::wasapi::pid_of_executable(executable.trim());
+        if running == excluded {
+            return;
+        }
+        log::info!("{executable} started or stopped; rebuilding the audio to keep it out");
+        if let Some(aim) = self.attached_aim() {
+            self.detach_retaining_buffer(Duration::ZERO);
+            self.aim_at(aim);
         }
     }
 
