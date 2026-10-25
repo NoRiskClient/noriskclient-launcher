@@ -44,6 +44,7 @@ import {
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
+import { useTimelineZoom } from "./editor/useTimelineZoom";
 import { BlankCover, PlayheadClock, PlayheadMark, usePlayhead } from "./editor/Playhead";
 import { silenced, useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
@@ -523,6 +524,8 @@ export function ClipTrimmer({
   const timelineCard = useRef<HTMLElement>(null);
   const timelineBody = useRef<HTMLDivElement>(null);
   const timelineContent = useRef<HTMLDivElement>(null);
+  const lanesScroll = useRef<HTMLDivElement>(null);
+  const timelineZoom = useTimelineZoom(lanesScroll, scaleRef);
   const timelineSized = useRef(rowsLayout.defaultLayout !== undefined);
   const gripping = useRef(false);
 
@@ -665,6 +668,29 @@ export function ClipTrimmer({
           checked: panel === entry.id,
           onSelect: () => setPanel(entry.id),
         })),
+        [
+          {
+            id: "zoom_in",
+            label: t("clips.editor.menu.zoom_in"),
+            shortcut: shortcutText("+", t),
+            disabled: !timelineZoom.canZoomIn,
+            onSelect: timelineZoom.zoomIn,
+          },
+          {
+            id: "zoom_out",
+            label: t("clips.editor.menu.zoom_out"),
+            shortcut: shortcutText("-", t),
+            disabled: !timelineZoom.canZoomOut,
+            onSelect: timelineZoom.zoomOut,
+          },
+          {
+            id: "zoom_fit",
+            label: t("clips.editor.menu.zoom_fit"),
+            shortcut: shortcutText("0", t),
+            disabled: !timelineZoom.canZoomOut,
+            onSelect: timelineZoom.fit,
+          },
+        ],
         [
           {
             id: "timeline",
@@ -1291,9 +1317,14 @@ export function ClipTrimmer({
                     )}
                   </div>
 
-                  <div className="relative flex select-none flex-col gap-1.5">
+                  <div ref={lanesScroll} className="custom-scrollbar overflow-x-auto">
+                  <div
+                    data-zoomed={timelineZoom.zoom > 1}
+                    className="group/timeline relative flex select-none flex-col gap-1.5"
+                    style={{ width: `calc(9.5rem + (100% - 9.5rem) * ${timelineZoom.zoom})` }}
+                  >
                     <div className="flex">
-                      <div className="w-[9.5rem] shrink-0" />
+                      <div className="sticky left-0 z-30 w-[9.5rem] shrink-0 group-data-[zoomed=true]/timeline:bg-neutral-950" />
                       <Ruler
                         scale={scaleRef}
                         duration={view.length}
@@ -1426,6 +1457,7 @@ export function ClipTrimmer({
                       {!separate && clipHandles(start, end)}
                       {target === "all" && cutRange("bottom-0 top-[1.875rem]")}
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>

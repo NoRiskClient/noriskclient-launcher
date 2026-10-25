@@ -158,6 +158,7 @@ export function Lane({
 
   return (
     <div className="flex">
+      <div className="sticky left-0 z-30 shrink-0 rounded-l group-data-[zoomed=true]/timeline:bg-neutral-950">
       <div
         className={cn(
           "flex w-[9.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
@@ -178,6 +179,7 @@ export function Lane({
           <div className="flex min-w-0 items-center gap-2">{head}</div>
         )}
         {control}
+      </div>
       </div>
       <div
         role="presentation"
