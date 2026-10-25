@@ -432,3 +432,48 @@ func soundtrack(_ audio: [AVAssetTrack], levels: [Level], muted: Any?, timeline:
     try target.insertTimeRange(range, of: track, at: range.start)
     return mixed
 }
+
+@available(macOS 15.0, *)
+func exportGif(_ message: [String: Any]) async throws {
+    guard let source = message["source"] as? String, let path = message["destination"] as? String else {
+        throw failure("The GIF source or destination is missing.")
+    }
+    let asset = AVURLAsset(url: URL(fileURLWithPath: source))
+    let duration = try await asset.load(.duration).seconds
+    guard duration.isFinite, duration > 0, let video = try await asset.loadTracks(withMediaType: .video).first else {
+        throw failure("The clip has no readable video.")
+    }
+    let delay = 8, interval = Double(delay) / 100, budget = 1000 / delay
+    let needed = max(1, Int((duration / interval).rounded(.up)))
+    let count = min(needed, budget)
+    let bounds = CGRect(origin: .zero, size: try await video.load(.naturalSize)).applying(try await video.load(.preferredTransform))
+    let sourceWidth = max(1, Int(bounds.width)), sourceHeight = max(1, Int(bounds.height))
+    let width = min(400, sourceWidth), height = sourceWidth <= 400 ? sourceHeight : max(1, sourceHeight * 400 / sourceWidth)
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: width, height: height)
+    generator.requestedTimeToleranceBefore = seconds(interval / 2)
+    generator.requestedTimeToleranceAfter = seconds(interval / 2)
+    let destination = URL(fileURLWithPath: path)
+    let part = destination.appendingPathExtension("part")
+    try? FileManager.default.removeItem(at: part)
+    guard let gif = CGImageDestinationCreateWithURL(part as CFURL, UTType.gif.identifier as CFString, count, nil) else {
+        throw failure("Could not create the GIF.")
+    }
+    CGImageDestinationSetProperties(gif, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    let frame = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: interval, kCGImagePropertyGIFUnclampedDelayTime: interval]] as CFDictionary
+    let times = (0..<count).map { CMTime(seconds: min(Double($0) * interval, duration - 0.001), preferredTimescale: 600) }
+    var written = 0
+    for await result in generator.images(for: times) {
+        guard let image = try? result.image else { continue }
+        CGImageDestinationAddImage(gif, image, frame)
+        written += 1
+        emit("export_progress", ["source": source, "done": written, "total": count])
+    }
+    guard written > 0 else { throw failure("The clip produced no frames to turn into a GIF.") }
+    guard CGImageDestinationFinalize(gif) else { try? FileManager.default.removeItem(at: part); throw failure("Could not finish the GIF.") }
+    try? FileManager.default.removeItem(at: destination)
+    try FileManager.default.moveItem(at: part, to: destination)
+    emit("gif_exported", ["path": path, "source": source, "width": width, "height": height, "frames": written,
+                          "durationSeconds": Double(written) * interval, "sizeBytes": fileSize(destination), "truncated": needed > budget])
+}
