@@ -111,8 +111,8 @@ const PANELS: { id: Panel; icon: string; label: string; hint: string }[] = [
   { id: "format", icon: "solar:smartphone-bold", label: "clips.editor.shape.label", hint: "clips.editor.shape.hint" },
 ];
 
-export const FULL_EDITOR = !isMacOS();
-export const OFFERED_PANELS = FULL_EDITOR ? PANELS : PANELS.filter((entry) => entry.id === "audio");
+export const OVERLAYS = !isMacOS();
+export const OFFERED_PANELS = OVERLAYS ? PANELS : PANELS.filter((entry) => entry.id !== "tools");
 
 export interface LaneWindow {
   start: number | null;

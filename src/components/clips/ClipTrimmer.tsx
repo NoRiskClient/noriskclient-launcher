@@ -31,7 +31,7 @@ import {
   OVERLAY_NAME,
   SHAPES,
   type Panel,
-  FULL_EDITOR,
+  OVERLAYS,
   OFFERED_PANELS,
   type LaneWindow,
   NO_WINDOW,
@@ -476,7 +476,7 @@ export function ClipTrimmer({
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (busy || held || typing() || useGlobalModalStore.getState().modals.length > 0) return;
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (FULL_EDITOR && mark) {
+        if (mark) {
           event.preventDefault();
           removeMark();
         } else if (chosen !== null) {
@@ -486,7 +486,7 @@ export function ClipTrimmer({
         return;
       }
       if (event.key === "Escape") {
-        if (FULL_EDITOR && mark) {
+        if (mark) {
           event.preventDefault();
           cancelMark();
         } else if (chosen !== null) {
@@ -495,7 +495,6 @@ export function ClipTrimmer({
         }
         return;
       }
-      if (!FULL_EDITOR) return;
       if (event.key.toLowerCase() !== "s" || event.shiftKey || event.repeat) return;
       event.preventDefault();
       toggleMark();
@@ -644,18 +643,16 @@ export function ClipTrimmer({
             onSelect: history.redo,
           },
         ],
-        FULL_EDITOR
-          ? [
-              {
-                id: "mark",
-                label: t("clips.editor.cut.start"),
-                icon: "solar:scissors-square-bold",
-                shortcut: "S",
-                disabled: busy,
-                onSelect: toggleMark,
-              },
-            ]
-          : [],
+        [
+          {
+            id: "mark",
+            label: t("clips.editor.cut.start"),
+            icon: "solar:scissors-square-bold",
+            shortcut: "S",
+            disabled: busy,
+            onSelect: toggleMark,
+          },
+        ],
       ],
     },
     {
@@ -915,7 +912,7 @@ export function ClipTrimmer({
                       <p className="font-minecraft text-xs leading-relaxed text-white/50">
                         {t(activePanel.hint)}
                       </p>
-                      {!FULL_EDITOR && (
+                      {!OVERLAYS && (
                         <div className="flex items-start gap-2.5 rounded border border-white/10 bg-black/30 px-3 py-2.5">
                           <Icon
                             icon="solar:info-circle-bold"
@@ -1210,20 +1207,16 @@ export function ClipTrimmer({
                     onClick={history.redo}
                     disabled={!history.canRedo}
                   />
-                  {FULL_EDITOR && (
-                    <>
-                      <span className="mx-1 h-6 w-px bg-white/10" />
-                      <ClipIconButton
-                        icon="solar:scissors-square-bold"
-                        label={t("clips.editor.cut.start")}
-                        aria-pressed={mark !== null}
-                        onClick={toggleMark}
-                        disabled={busy}
-                        className={cn(mark && "bg-white/10")}
-                        style={mark ? { color: accentColor.value, borderColor: accentColor.value } : undefined}
-                      />
-                    </>
-                  )}
+                  <span className="mx-1 h-6 w-px bg-white/10" />
+                  <ClipIconButton
+                    icon="solar:scissors-square-bold"
+                    label={t("clips.editor.cut.start")}
+                    aria-pressed={mark !== null}
+                    onClick={toggleMark}
+                    disabled={busy}
+                    className={cn(mark && "bg-white/10")}
+                    style={mark ? { color: accentColor.value, borderColor: accentColor.value } : undefined}
+                  />
                 </div>
                 <span className="h-6 w-px shrink-0 bg-white/10" />
                 <div className="flex min-w-0 items-center gap-4 overflow-hidden">
@@ -1266,7 +1259,7 @@ export function ClipTrimmer({
               >
                 <div ref={timelineContent} className="px-3 py-2">
                   <div className="mb-2 flex h-7 items-center gap-3">
-                    {FULL_EDITOR && movable.length > 0 && (
+                    {movable.length > 0 && (
                       <>
                         <TrackLink
                           separate={separate}
@@ -1310,9 +1303,7 @@ export function ClipTrimmer({
                       <p className="ml-auto min-w-0 truncate font-minecraft text-[11px] text-white/40">
                         {overlays.length > 0
                           ? t("clips.editor.overlay.hint")
-                          : FULL_EDITOR
-                            ? t("clips.editor.remove.hint")
-                            : t("clips.trim.hint")}
+                          : t("clips.editor.remove.hint")}
                       </p>
                     )}
                   </div>
