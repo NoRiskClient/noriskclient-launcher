@@ -98,6 +98,7 @@ fn build_macos() {
         "native/Permissions.swift",
         "native/Capture.swift",
         "native/Media.swift",
+        "native/Overlay.swift",
     ];
     for source in sources {
         println!("cargo:rerun-if-changed={source}");

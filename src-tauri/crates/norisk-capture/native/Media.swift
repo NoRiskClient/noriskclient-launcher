@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 
 func shifted(_ sample: CMSampleBuffer, by origin: CMTime) throws -> CMSampleBuffer {
     var count = 0
@@ -221,7 +222,8 @@ func editMedia(_ message: [String: Any]) async throws {
     guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first,
           let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
     else { throw failure("The clip has no video track.") }
-    for piece in timeline.kept(pictureStart, pictureEnd) {
+    let pieces = timeline.kept(pictureStart, pictureEnd)
+    for piece in pieces {
         try await place(sourceVideo, into: video, from: piece.from, to: piece.to, at: timeline.out(piece.from))
     }
     guard !video.segments.isEmpty else { throw failure("No frames fall inside the trimmed range.") }
@@ -243,22 +245,21 @@ func editMedia(_ message: [String: Any]) async throws {
         guard crop.width > 0, crop.height > 0 else { throw failure("The video is too small for a \(ratio.0):\(ratio.1) crop.") }
         width = crop.width; height = crop.height
         let fps = try await sourceVideo.load(.nominalFrameRate)
-        let vc = AVMutableVideoComposition()
+        let painter = Painter(overlays: message["overlays"], blanked: spans(message["blanked"]),
+                              width: Int(sourceBounds.width), height: Int(sourceBounds.height))
+        let frame = CGRect(x: crop.left, y: Int(sourceBounds.height) - crop.top - crop.height, width: crop.width, height: crop.height)
+        let black = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: frame.size))
+        let vc = try await AVMutableVideoComposition.videoComposition(with: composition) { request in
+            let at = request.compositionTime.seconds
+            guard let piece = pieces.first(where: { at >= timeline.out($0.from) && at < timeline.out($0.from) + $0.to - $0.from }) else {
+                return request.finish(with: black, context: nil)
+            }
+            let painted = painter.paint(request.sourceImage, at: piece.from + at - timeline.out(piece.from))
+            request.finish(with: painted.cropped(to: frame).transformed(by: CGAffineTransform(translationX: -frame.minX, y: -frame.minY)), context: nil)
+        }
         vc.renderSize = CGSize(width: width, height: height)
         vc.frameDuration = CMTime(value: 1, timescale: CMTimeScale(fps.isFinite && fps >= 1 ? fps.rounded() : 60))
-        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
-        layer.setTransform(sourceTransform.concatenating(CGAffineTransform(
-            translationX: -sourceBounds.minX - CGFloat(crop.left), y: -sourceBounds.minY - CGFloat(crop.top))), at: .zero)
-        let blanked = merged(spans(message["blanked"]).flatMap { span in
-            timeline.kept(max(span.from, pictureStart), min(span.to, pictureEnd)).map { Span(from: timeline.out($0.from), to: timeline.out($0.to)) }
-        })
-        for span in blanked {
-            layer.setOpacity(0, at: seconds(span.from))
-            layer.setOpacity(1, at: seconds(span.to))
-        }
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration); instruction.layerInstructions = [layer]
-        vc.instructions = [instruction]; videoComposition = vc
+        videoComposition = vc
     }
     try await export(composition, to: destination, preset: render ? AVAssetExportPresetHighestQuality : AVAssetExportPresetPassthrough,
         video: videoComposition, progress: render ? source : nil)

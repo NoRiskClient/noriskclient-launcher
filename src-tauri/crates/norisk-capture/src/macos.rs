@@ -1,10 +1,13 @@
 use std::ffi::{c_char, CStr, CString};
 
+const FONT: &[u8] = include_bytes!("../../../../public/fonts/smallcaps.ttf");
+
 extern "C" {
     fn nrc_capture_supported() -> bool;
     fn nrc_input_monitoring(request: bool) -> bool;
     fn nrc_open_permission_settings(permission: u8) -> bool;
     fn nrc_capture_main(logger: extern "C" fn(*const c_char));
+    fn nrc_set_overlay_font(bytes: *const u8, length: usize);
     fn nrc_open_apps(foreground: bool) -> *mut c_char;
     fn nrc_free_string(value: *mut c_char);
     fn nrc_hotkeys(bindings: *const c_char, callback: extern "C" fn(u8)) -> i32;
@@ -22,7 +25,10 @@ pub fn run() {
             eprintln!("Could not set up capture logging: {error}");
         }
     }
-    unsafe { nrc_capture_main(log_native) }
+    unsafe {
+        nrc_set_overlay_font(FONT.as_ptr(), FONT.len());
+        nrc_capture_main(log_native)
+    }
 }
 
 pub fn open_apps(foreground: bool) -> String {
