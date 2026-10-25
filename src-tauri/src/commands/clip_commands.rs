@@ -314,6 +314,7 @@ pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), Comman
     let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
 
     let state = State::get().await?;
+    engine_running(&state).await?;
     state
         .capture_supervisor
         .send(LauncherToCapture::PrepareAudioPreview(
@@ -363,19 +364,31 @@ pub async fn clip_export_vertical(
             blanked: blanked.unwrap_or_default(),
             muted: muted.unwrap_or_default(),
         },
-    ))?;
+    )).await?;
 
     Ok(destination)
 }
 
-fn dispatch(
+async fn engine_running(state: &State) -> crate::error::Result<()> {
+    if state.capture_supervisor.is_running().await {
+        return Ok(());
+    }
+    Err(crate::error::AppError::Other(
+        "The clip engine is not running. Turn clips on in Settings > Clips and try again.".into(),
+    ))
+}
+
+async fn dispatch(
     state: &State,
     destination: &std::path::Path,
     command: LauncherToCapture,
 ) -> crate::error::Result<()> {
-    state.capture_supervisor.send(command).inspect_err(|_| {
-        crate::utils::clip_library::release_destination(destination);
-    })
+    engine_running(state)
+        .await
+        .and_then(|()| state.capture_supervisor.send(command))
+        .inspect_err(|_| {
+            crate::utils::clip_library::release_destination(destination);
+        })
 }
 
 async fn clip_duration(source: &std::path::Path) -> Option<f64> {
@@ -462,7 +475,8 @@ pub async fn clip_export_gif(
             source,
             destination: destination.clone(),
         }),
-    )?;
+    )
+    .await?;
 
     Ok(destination)
 }
@@ -500,7 +514,8 @@ pub async fn clip_trim(
             video_end_seconds,
             levels: levels.unwrap_or_default(),
         }),
-    )?;
+    )
+    .await?;
 
     Ok(destination)
 }
