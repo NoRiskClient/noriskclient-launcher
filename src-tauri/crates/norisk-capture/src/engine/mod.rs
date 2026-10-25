@@ -750,6 +750,8 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.microphone_volume != next.microphone_volume
         || current.microphone_denoise != next.microphone_denoise
         || current.excluded_audio_executable != next.excluded_audio_executable
+        || current.bitrate_kbps != next.bitrate_kbps
+        || current.buffer_seconds != next.buffer_seconds
 }
 
 #[cfg(test)]
@@ -803,13 +805,13 @@ mod tests {
     }
 
     #[test]
-    fn bitrate_and_buffer_length_apply_without_a_restart() {
+    fn bitrate_and_buffer_length_rebuild_the_pipeline() {
         let mut next = base();
         next.bitrate_kbps = 40_000;
-        assert!(!needs_restart(&base(), &next));
+        assert!(needs_restart(&base(), &next));
 
         let mut next = base();
         next.buffer_seconds = 60;
-        assert!(!needs_restart(&base(), &next));
+        assert!(needs_restart(&base(), &next));
     }
 }
