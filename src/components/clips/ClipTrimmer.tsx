@@ -45,7 +45,7 @@ import {
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
 import { BlankCover, PlayheadClock, PlayheadMark, usePlayhead } from "./editor/Playhead";
-import { useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
+import { silenced, useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { EditorHelpModal, EditorMenuBar, shortcutText, type MenuDef } from "./editor/EditorMenuBar";
@@ -163,6 +163,7 @@ export function ClipTrimmer({
   const shot = laneWindow(picture, start, end);
   const cuts = useCuts({ playhead, separate, start, end, shot, windows });
   const {
+    withMark,
     removed,
     blanked,
     muted,
@@ -279,7 +280,9 @@ export function ClipTrimmer({
     (apart: boolean) => {
       setSeparate(apart);
       if (apart) {
+        const kept = { start: start > 0 ? tidy(start) : null, end: end < duration ? tidy(end) : null };
         setPicture({ start: tidy(start), end: tidy(end) });
+        setWindows(Object.fromEntries(movable.map((track) => [track.stream, kept])));
         setStart(0);
         setEnd(duration);
         return;
@@ -412,22 +415,26 @@ export function ClipTrimmer({
     [mark, view, viewAt],
   );
 
-  const save = useCallback(
-    () =>
-      render.save({
-        overlays,
-        shape,
-        start,
-        end,
-        levels,
-        videoStart: shot.start,
-        videoEnd: shot.end,
-        removed,
-        blanked,
-        hushed,
-      }),
-    [blanked, end, hushed, levels, overlays, removed, render.save, shape, shot.end, shot.start, start],
-  );
+  const save = useCallback(() => {
+    if (!withMark) {
+      toast(t("clips.editor.cut.too_little"), { id: "clip-cut-hint" });
+      return;
+    }
+    const from = separate ? Math.min(shot.from, ...levels.map((level) => level.startSeconds ?? start)) : start;
+    const to = separate ? Math.max(shot.to, ...levels.map((level) => level.endSeconds ?? end)) : end;
+    render.save({
+      overlays,
+      shape,
+      start: from,
+      end: to,
+      levels,
+      videoStart: shot.from > from ? shot.from : null,
+      videoEnd: shot.to < to ? shot.to : null,
+      removed: withMark.removed,
+      blanked: withMark.blanked,
+      hushed: silenced(withMark.muted),
+    });
+  }, [end, levels, overlays, render.save, separate, shape, shot.from, shot.to, start, t, withMark]);
 
   const keyboardFocus = useRef(false);
 

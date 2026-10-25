@@ -92,7 +92,8 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
         edit.shape === "original" &&
         edit.removed.length === 0 &&
         edit.blanked.length === 0 &&
-        edit.hushed.length === 0
+        edit.hushed.length === 0 &&
+        edit.videoStart === null
       ) {
         job.current = "trim";
         if (!(await onTrim(edit.start, edit.end, edit.levels, edit.videoStart, edit.videoEnd))) finish();
