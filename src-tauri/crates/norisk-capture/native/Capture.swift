@@ -16,9 +16,11 @@ func emit(_ type: String, _ fields: [String: Any] = [:]) {
     FileHandle.standardOutput.write(data + Data([10]))
 }
 private let outputLock = NSLock()
-func report(_ error: Error, code: String = "internal", recoverable: Bool = true) {
+func report(_ error: Error, code: String = "internal", recoverable: Bool = true, source: String? = nil) {
     captureLog("Error [\(code)]: \(error.localizedDescription)")
-    emit("error", ["code": code, "message": error.localizedDescription, "recoverable": recoverable])
+    var fields: [String: Any] = ["code": code, "message": error.localizedDescription, "recoverable": recoverable]
+    if let source { fields["source"] = source }
+    emit("error", fields)
 }
 func failure(_ message: String) -> NSError { NSError(domain: "NoRiskCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
 struct CaptureFailure: LocalizedError {
@@ -185,7 +187,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 pendingMedia.enter()
                 Task {
                     defer { pendingMedia.leave() }
-                    do { try await editMedia(message) } catch { report(error, code: "clip_write") }
+                    do { try await editMedia(message) } catch { report(error, code: "clip_write", source: message["source"] as? String) }
                 }
             case "export_gif":
                 report(failure("GIF export is not available on macOS yet."), code: "clip_write")
