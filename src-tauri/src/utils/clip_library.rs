@@ -615,7 +615,9 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
             format!("{base}{suffix}{}.{extension}", attempt + 1)
         };
         let candidate = plain(dir.join(name));
-        if !candidate.exists() && pending.insert(reservation(&candidate)) {
+        let key = reservation(&candidate);
+        if !candidate.exists() && !pending.contains_key(&key) {
+            pending.insert(key, reservation(&source));
             return Ok(candidate);
         }
     }
@@ -636,8 +638,8 @@ fn unsuffixed<'a>(stem: &'a str, suffix: &str) -> &'a str {
         .unwrap_or(stem)
 }
 
-static PENDING: std::sync::Mutex<std::collections::BTreeSet<String>> =
-    std::sync::Mutex::new(std::collections::BTreeSet::new());
+static PENDING: std::sync::Mutex<std::collections::BTreeMap<String, String>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
 
 fn reservation(destination: &Path) -> String {
     plain(destination.to_path_buf()).to_string_lossy().to_lowercase()
@@ -648,6 +650,14 @@ pub fn release_destination(destination: &Path) {
         .lock()
         .unwrap_or_else(|poison| poison.into_inner())
         .remove(&reservation(destination));
+}
+
+pub fn release_destinations_of(source: &Path) {
+    let source = reservation(source);
+    PENDING
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .retain(|_, from| *from != source);
 }
 
 pub fn release_all_destinations() {
@@ -1313,6 +1323,16 @@ mod tests {
         assert_ne!(first, second, "the engine has not written either file yet");
 
         release_destination(&first);
+        assert_eq!(trimmed_destination(&dir, &clip).unwrap(), first);
+    }
+
+    #[test]
+    fn a_failed_export_frees_the_names_it_reserved() {
+        let dir = temp_dir("release-failed");
+        let clip = write_clip(&dir, "failed.mp4", 10);
+
+        let first = trimmed_destination(&dir, &clip).unwrap();
+        release_destinations_of(&guard_inside(&dir, &clip).unwrap());
         assert_eq!(trimmed_destination(&dir, &clip).unwrap(), first);
     }
 
