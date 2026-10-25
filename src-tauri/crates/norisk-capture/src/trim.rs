@@ -108,12 +108,16 @@ pub(crate) fn picture_window(
 
 fn windowed_video(packets: &[Packet], floor: i64, start: i64, end: i64) -> Vec<Packet> {
     let from = keyframe_at_or_before(packets, start, floor).max(floor);
-    packets
-        .iter()
-        .skip_while(|p| p.pts < from)
-        .take_while(|p| p.pts <= end)
-        .cloned()
-        .collect()
+    let Some(first) = packets.iter().position(|p| p.pts >= from) else {
+        return Vec::new();
+    };
+    let Some(last) = packets.iter().rposition(|p| p.pts <= end) else {
+        return Vec::new();
+    };
+    if last < first {
+        return Vec::new();
+    }
+    packets[first..=last].to_vec()
 }
 
 pub(crate) fn furthest_pts(video: &[Packet], audio: &[AudioTrack], fallback: i64) -> i64 {
@@ -665,6 +669,32 @@ mod tests {
             "with no keyframe of its own to land on, the picture keeps the cut's first frame"
         );
         assert!(video.iter().all(|p| p.pts >= begin));
+    }
+
+    #[test]
+    fn the_end_keeps_the_b_frames_shown_before_it() {
+        let tick = TIME_BASE_DEN as i64 / 60;
+        let at = |frame: i64, keyframe: bool| Packet {
+            data: vec![0; 10].into(),
+            pts: frame * tick,
+            dts: frame * tick,
+            keyframe,
+        };
+        let decode_order = vec![
+            at(0, true),
+            at(3, false),
+            at(1, false),
+            at(2, false),
+            at(6, false),
+            at(4, false),
+            at(5, false),
+        ];
+
+        let video = windowed_video(&decode_order, 0, 0, 5 * tick);
+        let mut shown: Vec<i64> = video.iter().map(|p| p.pts / tick).collect();
+        shown.sort();
+
+        assert_eq!(shown, vec![0, 1, 2, 3, 4, 5, 6], "frames 4 and 5 need frame 6 to decode");
     }
 
     #[test]
