@@ -270,6 +270,34 @@ unsafe fn open_device_client(id: Option<&str>) -> Result<(IAudioClient, AudioFor
         .Activate(CLSCTX_ALL, None)
         .context("could not activate the audio client")?;
 
+    let format = AudioFormat {
+        sample_rate: PROCESS_SAMPLE_RATE,
+        channels: PROCESS_CHANNELS,
+    };
+    let wave = wave_format(format);
+    let converted = client.Initialize(
+        AUDCLNT_SHAREMODE_SHARED,
+        AUDCLNT_STREAMFLAGS_LOOPBACK
+            | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+            | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+            | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+        2_000_000,
+        0,
+        &wave.Format,
+        None,
+    );
+    match converted {
+        Ok(()) => return Ok((client, format)),
+        Err(e) => log::warn!(
+            "The output device would not convert to {} Hz stereo, recording its own format instead: {e}",
+            PROCESS_SAMPLE_RATE
+        ),
+    }
+
+    let client: IAudioClient = device
+        .Activate(CLSCTX_ALL, None)
+        .context("could not activate the audio client")?;
+
     let mix_format = client
         .GetMixFormat()
         .context("could not read the device mix format")?;
@@ -916,5 +944,12 @@ mod process_tests {
         assert_eq!(pid_of_executable(""), None);
         assert_eq!(pid_of_executable("   "), None);
         assert_eq!(pid_of_executable("definitely-not-running-42.exe"), None);
+    }
+
+    #[test]
+    #[ignore = "needs a real output device"]
+    fn the_output_device_is_recorded_at_the_microphone_format() {
+        let (_, format) = probe_source(&AudioSource::DefaultDevice).unwrap();
+        assert_eq!((format.sample_rate, format.channels), (PROCESS_SAMPLE_RATE, PROCESS_CHANNELS));
     }
 }
