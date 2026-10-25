@@ -285,7 +285,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         if config.capture_audio && config.audio_source != "game_only", let display = content.displays.first {
             let audio = SCStreamConfiguration()
             audio.width = 2; audio.height = 2; audio.minimumFrameInterval = CMTime(seconds: 1, preferredTimescale: 1)
-            audio.capturesAudio = true; audio.sampleRate = 48000; audio.channelCount = 2; audio.excludesCurrentProcessAudio = true
+            audio.capturesAudio = true; audio.sampleRate = 48000; audio.channelCount = 2; audio.excludesCurrentProcessAudio = false
             let excluded = config.audio_source == "both" ? content.applications.filter { $0.processID == pid } : []
             let other = SCStream(filter: SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: []), configuration: audio, delegate: self)
             try other.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
