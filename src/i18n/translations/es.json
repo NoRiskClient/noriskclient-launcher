@@ -2199,6 +2199,8 @@
   "settings.clips.permissions.microphone": "Micrófono",
   "settings.clips.permissions.microphone.hint": "Añade tu micrófono a los clips.",
   "settings.clips.permissions.refresh": "Actualizar",
+  "settings.clips.permissions.reset_hint": "¿Ya está permitido en Ajustes del Sistema pero sigue sin funcionar? Tras una actualización, macOS puede conservar una entrada antigua. Restablécela, vuelve a permitirla y reinicia el launcher.",
+  "settings.clips.permissions.reset": "Restablecer",
   "settings.clips.permissions.granted": "Concedido",
   "settings.clips.permissions.unchecked": "Sin comprobar",
   "settings.clips.permissions.required": "Acceso necesario",

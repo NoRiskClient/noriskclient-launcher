@@ -2215,6 +2215,8 @@
   "settings.clips.permissions.microphone": "Mikrofon",
   "settings.clips.permissions.microphone.hint": "Nimmt dein Mikrofon in Clips auf.",
   "settings.clips.permissions.refresh": "Aktualisieren",
+  "settings.clips.permissions.reset_hint": "Schon in den Systemeinstellungen erlaubt und es geht trotzdem nicht? Nach einem Update hängt macOS manchmal an einem alten Eintrag. Setz ihn zurück, erlaube erneut und starte den Launcher neu.",
+  "settings.clips.permissions.reset": "Zurücksetzen",
   "settings.clips.permissions.granted": "Erlaubt",
   "settings.clips.permissions.unchecked": "Nicht geprüft",
   "settings.clips.permissions.required": "Zugriff erforderlich",

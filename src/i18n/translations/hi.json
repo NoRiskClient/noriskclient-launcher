@@ -2214,6 +2214,8 @@
   "settings.clips.permissions.microphone": "माइक्रोफ़ोन",
   "settings.clips.permissions.microphone.hint": "आपके माइक्रोफ़ोन को क्लिप में जोड़ता है।",
   "settings.clips.permissions.refresh": "रीफ़्रेश",
+  "settings.clips.permissions.reset_hint": "सिस्टम सेटिंग्स में पहले से अनुमति है फिर भी काम नहीं कर रहा? अपडेट के बाद macOS पुरानी एंट्री रख सकता है। उसे रीसेट करें, फिर से अनुमति दें और लॉन्चर को रीस्टार्ट करें।",
+  "settings.clips.permissions.reset": "रीसेट करें",
   "settings.clips.permissions.granted": "दी गई",
   "settings.clips.permissions.unchecked": "जाँच नहीं हुई",
   "settings.clips.permissions.required": "एक्सेस ज़रूरी",

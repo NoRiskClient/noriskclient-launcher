@@ -2199,6 +2199,8 @@
   "settings.clips.permissions.microphone": "Mikrofon",
   "settings.clips.permissions.microphone.hint": "Mikrofonunu kliplere ekler.",
   "settings.clips.permissions.refresh": "Yenile",
+  "settings.clips.permissions.reset_hint": "Sistem Ayarları'nda zaten izin verildi ama yine çalışmıyor mu? Bir güncellemeden sonra macOS eski bir kaydı tutabilir. Sıfırla, yeniden izin ver ve başlatıcıyı yeniden başlat.",
+  "settings.clips.permissions.reset": "Sıfırla",
   "settings.clips.permissions.granted": "Verildi",
   "settings.clips.permissions.unchecked": "Kontrol edilmedi",
   "settings.clips.permissions.required": "Erişim gerekli",

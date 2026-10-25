@@ -346,6 +346,10 @@ export async function openCapturePermissionSettings(permission: CapturePermissio
   return invoke("capture_open_permission_settings", { permission });
 }
 
+export async function resetCapturePermissions(): Promise<void> {
+  return invoke("capture_reset_permissions");
+}
+
 export function errorKey(code: string): string {
   return code
     .split("_")
