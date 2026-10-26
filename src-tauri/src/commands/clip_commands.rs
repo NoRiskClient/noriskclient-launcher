@@ -309,7 +309,10 @@ pub async fn clip_reveal(app: tauri::AppHandle, path: std::path::PathBuf) -> Res
 }
 
 #[tauri::command]
-pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), CommandError> {
+pub async fn clip_prepare_preview(
+    path: std::path::PathBuf,
+    waveform_only: Option<bool>,
+) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
     let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
 
@@ -317,7 +320,10 @@ pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), Comman
     state
         .capture_supervisor
         .send(LauncherToCapture::PrepareAudioPreview(
-            norisk_ipc::AudioPreviewRequest { source },
+            norisk_ipc::AudioPreviewRequest {
+                source,
+                waveform_only: waveform_only.unwrap_or(false),
+            },
         ))?;
     Ok(())
 }

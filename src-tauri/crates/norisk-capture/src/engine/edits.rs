@@ -15,7 +15,7 @@ impl Engine {
 
         let spawned = std::thread::Builder::new()
             .name("nrc-preview".into())
-            .spawn(move || match crate::preview::prepare(&request.source) {
+            .spawn(move || match crate::preview::prepare(&request.source, request.waveform_only) {
                 Ok(tracks) => {
                     let _ = events.send(CaptureToLauncher::AudioPreviewReady(
                         norisk_ipc::AudioPreview {

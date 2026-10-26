@@ -13,8 +13,11 @@ import {
   closeClipEditor,
   getClipDetails,
   getEditorClip,
+  prepareClipPreview,
   reportClipEditorStayed,
+  samePath,
   trimClip,
+  withHeardTracks,
   type ClipDetails,
   type EditorClip,
   type TrackLevel,
@@ -24,6 +27,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { WindowFrame } from "../ui/WindowFrame";
 import { Button } from "../ui/buttons/Button";
+import { useClipEngineEvents } from "./useClipEngineEvents";
 
 const PROBE_TIMEOUT_MS = 15_000;
 
@@ -151,7 +155,11 @@ export function ClipEditorWindow() {
     let current = true;
     void getClipDetails(path)
       .then((loaded) => {
-        if (current) setDetails(loaded);
+        if (!current) return;
+        setDetails(loaded);
+        if (!loaded?.audioTracks.length) {
+          prepareClipPreview(path, true).catch((e) => console.warn("Could not ask for the clip's sound", e));
+        }
       })
       .catch((e) => {
         console.warn("Could not read the clip's details", e);
@@ -160,6 +168,13 @@ export function ClipEditorWindow() {
       current = false;
     };
   }, [path]);
+
+  useClipEngineEvents({
+    clip_audio_preview: (preview) => {
+      if (!path || preview.tracks.length === 0 || !samePath(preview.source, path)) return;
+      setDetails((current) => (current?.audioTracks.length ? current : withHeardTracks(current, preview.tracks)));
+    },
+  });
 
   const close = useCallback(() => leave.current(), []);
 

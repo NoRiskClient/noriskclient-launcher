@@ -118,10 +118,17 @@ export interface PreviewTrack {
   stream: number;
   label: string;
   path: string;
+  adjustable?: boolean;
+  peaks?: number[];
 }
 
-export async function prepareClipPreview(path: string): Promise<void> {
-  return invoke("clip_prepare_preview", { path });
+export interface AudioPreview {
+  source: string;
+  tracks: PreviewTrack[];
+}
+
+export async function prepareClipPreview(path: string, waveformOnly = false): Promise<void> {
+  return invoke("clip_prepare_preview", { path, waveformOnly });
 }
 
 export interface ExportProgress {
@@ -274,6 +281,25 @@ export interface ClipDetails {
   fps: number;
   peakStepMs: number;
   audioTracks: ClipAudioTrack[];
+}
+
+const PEAK_STEP_MS = 20;
+
+export function withHeardTracks(details: ClipDetails | null, tracks: PreviewTrack[]): ClipDetails {
+  return {
+    durationSeconds: 0,
+    width: 0,
+    height: 0,
+    fps: 0,
+    peakStepMs: PEAK_STEP_MS,
+    ...details,
+    audioTracks: tracks.map(({ label, stream, adjustable, peaks }) => ({
+      label,
+      stream,
+      adjustable: adjustable ?? false,
+      peaks: peaks ?? [],
+    })),
+  };
 }
 
 export async function getClipDetails(path: string): Promise<ClipDetails | null> {

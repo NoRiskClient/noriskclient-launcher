@@ -675,6 +675,15 @@ mod tests {
     }
 
     #[test]
+    fn a_preview_track_from_an_older_engine_still_parses_without_a_waveform() {
+        let track: PreviewTrack =
+            serde_json::from_str(r#"{"stream":0,"label":"Mix","path":"C:/tmp/a.wav"}"#).unwrap();
+
+        assert!(track.peaks.is_empty());
+        assert!(!track.adjustable);
+    }
+
+    #[test]
     fn a_level_sent_without_an_offset_still_parses_and_sits_still() {
         let level: TrackLevel = serde_json::from_str(r#"{"stream":2,"volume":80}"#).unwrap();
 
@@ -804,6 +813,8 @@ pub fn levels_change_anything(levels: &[TrackLevel]) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AudioPreviewRequest {
     pub source: PathBuf,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub waveform_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -818,6 +829,10 @@ pub struct PreviewTrack {
     pub stream: u32,
     pub label: String,
     pub path: PathBuf,
+    #[serde(default)]
+    pub adjustable: bool,
+    #[serde(default)]
+    pub peaks: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

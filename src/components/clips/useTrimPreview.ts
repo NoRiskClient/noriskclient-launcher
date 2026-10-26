@@ -6,6 +6,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   prepareClipPreview,
   samePath,
+  type AudioPreview,
   type PreviewTrack,
   type Span,
   type TrackLevel,
@@ -81,10 +82,11 @@ export function useTrimPreview({ path, video, standby, levels, muted, active }: 
 
     void (async () => {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen<{ source: string; tracks: PreviewTrack[] }>(
+      const unlisten = await listen<AudioPreview>(
         "clip_audio_preview",
         (event) => {
           if (loaded || !samePath(event.payload.source, path)) return;
+          if (event.payload.tracks.some((track) => !track.path)) return;
           loaded = true;
           void load(event.payload.tracks);
         },
