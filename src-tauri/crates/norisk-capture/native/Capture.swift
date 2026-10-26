@@ -59,6 +59,10 @@ func audioExclusions(_ content: SCShareableContent, executable: String?) -> [SCR
         return path == executable || path.hasPrefix(bundle)
     }
 }
+func sameFormat(_ first: CMSampleBuffer, _ second: CMSampleBuffer) -> Bool {
+    guard let one = CMSampleBufferGetFormatDescription(first), let two = CMSampleBufferGetFormatDescription(second) else { return false }
+    return CMFormatDescriptionEqual(one, otherFormatDescription: two)
+}
 func keyframe(_ sample: CMSampleBuffer) -> Bool {
     let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]]
     return attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool != true
@@ -74,6 +78,15 @@ struct Settings: Decodable {
     var output_dir: String = ""
 }
 
+func needsRestart(_ current: Settings, _ next: Settings) -> Bool {
+    current.width != next.width || current.height != next.height || current.fps != next.fps
+        || current.bitrate_kbps != next.bitrate_kbps || current.gop_seconds != next.gop_seconds
+        || current.codec != next.codec || current.encoder != next.encoder
+        || current.capture_audio != next.capture_audio || current.audio_source != next.audio_source
+        || current.capture_microphone != next.capture_microphone || current.microphone_device_id != next.microphone_device_id
+        || current.microphone_denoise != next.microphone_denoise || current.excluded_audio_executable != next.excluded_audio_executable
+}
+
 final class Samples {
     var video: [CMSampleBuffer] = []
     var audio: [String: [CMSampleBuffer]] = [:]
@@ -82,8 +95,16 @@ final class Samples {
     var playbackOffset = 0.0
     func append(_ sample: CMSampleBuffer, label: String?, retain: Double) {
         if let label = label {
+            if let last = audio[label]?.last, !sameFormat(last, sample) {
+                for old in audio[label]! { bytes -= CMSampleBufferGetTotalSampleSize(old) }
+                audio[label] = nil
+            }
             audio[label, default: []].append(sample)
         } else {
+            if let last = video.last, !sameFormat(last, sample) {
+                for old in video { bytes -= CMSampleBufferGetTotalSampleSize(old) }
+                video.removeAll(); keyframes.removeAll()
+            }
             let sync = keyframe(sample)
             if video.isEmpty && !sync { droppedBeforeKeyframe += 1; return }
             if sync { keyframes.append(video.count) }
@@ -186,9 +207,13 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             switch message["type"] as? String {
             case "configure":
                 let next = try JSONDecoder().decode(Settings.self, from: JSONSerialization.data(withJSONObject: message))
-                await stop()
-                queue.sync { config = next }
-                startAttachment()
+                if queue.sync(execute: { stream == nil || needsRestart(config, next) }) {
+                    await stop()
+                    queue.sync { config = next }
+                    startAttachment(keepingBuffer: true)
+                } else {
+                    queue.sync { config = next }
+                }
             case "attach_window":
                 guard let pid = message["pid"] as? Int32 else { return }
                 await stop(); queue.sync { self.pid = pid; screen = nil }
@@ -222,11 +247,11 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         }
     }
 
-    @MainActor func startAttachment() {
+    @MainActor func startAttachment(keepingBuffer: Bool = false) {
         guard let aim = queue.sync(execute: { self.screen.map(Aim.screen) ?? self.pid.map(Aim.window) }), queue.sync(execute: { enabled }) else { return }
         let generation = queue.sync { self.generation }
         attachment = Task {
-            do { try await attach(aim) }
+            do { try await attach(aim, keepingBuffer: keepingBuffer) }
             catch {
                 guard !Task.isCancelled, queue.sync(execute: { self.generation == generation }) else { return }
                 await captureFailed(error)
@@ -272,7 +297,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         try? await old.0?.stopCapture(); try? await old.1?.stopCapture()
     }
 
-    @MainActor func attach(_ aim: Aim) async throws {
+    @MainActor func attach(_ aim: Aim, keepingBuffer: Bool) async throws {
         try Task.checkCancellation()
         queue.sync { state = "attaching" }
         guard CGPreflightScreenCaptureAccess() else {
@@ -356,7 +381,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             audioStream = other
         }
         queue.sync {
-            ring = Samples(); audioSource = source; denoiser = config.capture_microphone && config.microphone_denoise ? Denoiser() : nil; self.width = width; self.height = height; self.codec = codec
+            if !keepingBuffer { ring = Samples() }; audioSource = source; denoiser = config.capture_microphone && config.microphone_denoise ? Denoiser() : nil; self.width = width; self.height = height; self.codec = codec
             self.encoder = hardware ? "video_toolbox" : "software"; compression = session
             self.stream = stream; self.audioStream = audioStream
         }
