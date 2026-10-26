@@ -167,6 +167,10 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var framesInFlight = 0
     @MainActor var attachment: Task<Void, Never>?
     @MainActor var exclusionWatch: Task<Void, Never>?
+    @MainActor var retry: Task<Void, Never>?
+    @MainActor var failures: [Double] = []
+    @MainActor var rests = 0
+    @MainActor var bufferingSince: Double?
     var saveRetention: [UUID: Double] = [:]
     var retainSeconds: Double { max(Double(config.buffer_seconds), saveRetention.values.max() ?? 0) }
 
@@ -285,6 +289,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     @MainActor func stop(state nextState: String? = nil) async {
         attachment?.cancel(); attachment = nil
         exclusionWatch?.cancel(); exclusionWatch = nil
+        retry?.cancel(); retry = nil; bufferingSince = nil
         let old = queue.sync { () -> (SCStream?, SCStream?) in
             generation += 1
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
@@ -403,6 +408,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             timer.setEventHandler { [weak self] in self?.encodeFrame() }
             timer.resume(); frameTimer = timer
         }
+        bufferingSince = ProcessInfo.processInfo.systemUptime
         if source == "system", config.capture_audio, let other = queue.sync(execute: { audioStream }), let display = content.displays.first {
             watchExclusions(other, display: display, executable: config.excluded_audio_executable,
                             current: Set(audioExclusions(content, executable: config.excluded_audio_executable).map(\.processID)))
@@ -433,7 +439,42 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         Task { @MainActor in
             guard queue.sync(execute: { stream === self.stream || stream === self.audioStream }) else { return }
-            await captureFailed(error)
+            await streamBroke(error)
+        }
+    }
+
+    @MainActor func streamBroke(_ error: Error) async {
+        let native = error as NSError
+        let code = native.domain == SCStreamErrorDomain ? SCStreamError.Code(rawValue: native.code) : nil
+        guard code != .userDeclined, code != .userStopped,
+              let aim = queue.sync(execute: { self.screen.map(Aim.screen) ?? self.pid.map(Aim.window) }) else {
+            await captureFailed(error); return
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        if let since = bufferingSince, now - since >= 120 { failures.removeAll(); rests = 0 }
+        failures = failures.filter { now - $0 < 120 } + [now]
+        await stop(state: "attaching")
+        if failures.count >= 3 {
+            let rest = 60 * Double(1 << min(rests, 3))
+            rests += 1; failures.removeAll()
+            report(failure("Recording keeps failing, so it waits \(Int(rest)) s before trying again: \(error.localizedDescription)"), code: "graphics_device")
+            queue.sync { state = "paused" }
+            retryAttachment(aim, after: rest)
+        } else if failures.count == 1 {
+            report(failure("Recording broke (\(error.localizedDescription)); it is starting again."), code: "graphics_device")
+            startAttachment(keepingBuffer: true)
+        } else {
+            captureLog("Recording broke again (\(error.localizedDescription)); trying again in 2 s")
+            retryAttachment(aim, after: 2)
+        }
+    }
+
+    @MainActor func retryAttachment(_ aim: Aim, after delay: Double) {
+        let generation = queue.sync { self.generation }
+        retry = Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled, queue.sync(execute: { self.generation == generation }) else { return }
+            startAttachment(keepingBuffer: true)
         }
     }
 
