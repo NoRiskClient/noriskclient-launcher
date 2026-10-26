@@ -68,7 +68,7 @@ struct Settings: Decodable {
     var width: Int = 1920, height: Int = 1080, fps: Int = 60, bitrate_kbps: Int = 20_000
     var buffer_seconds: Int = 30, gop_seconds: Double = 2
     var codec: String = "h264", encoder: String = "auto", capture_audio: Bool = true
-    var audio_source: String = "system", capture_microphone: Bool = false
+    var audio_source: String = "system", capture_microphone: Bool = false, microphone_denoise: Bool = false
     var microphone_device_id: String?, audio_device_id: String?, excluded_audio_executable: String?
     var game_volume: Int = 100, other_volume: Int = 100, microphone_volume: Int = 100
     var output_dir: String = ""
@@ -132,6 +132,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var compression: VTCompressionSession?
     var ring = Samples()
     var pid: Int32?, screen: CGDirectDisplayID?, enabled = true, generation = 0, audioSource = "system"
+    var denoiser: Denoiser?
     var state = "idle", codec = "h264", encoder = "video_toolbox"
     var width = 1920, height = 1080, frames = 0, captured = 0, dropped = 0
     var latencies: [Double] = []
@@ -264,7 +265,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
             let old = (stream, audioStream); stream = nil; audioStream = nil
             if let session = compression { VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid); VTCompressionSessionInvalidate(session) }
-            compression = nil; framesInFlight = 0
+            compression = nil; framesInFlight = 0; denoiser = nil
             state = nextState ?? (enabled ? "idle" : "paused")
             return old
         }
@@ -355,7 +356,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             audioStream = other
         }
         queue.sync {
-            ring = Samples(); audioSource = source; self.width = width; self.height = height; self.codec = codec
+            ring = Samples(); audioSource = source; denoiser = config.capture_microphone && config.microphone_denoise ? Denoiser() : nil; self.width = width; self.height = height; self.codec = codec
             self.encoder = hardware ? "video_toolbox" : "software"; compression = session
             self.stream = stream; self.audioStream = audioStream
         }
@@ -427,7 +428,10 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         } else {
             guard state == "buffering" else { return }
             let label = type == .microphone ? "Microphone" : (stream === audioStream ? (audioSource == "both" ? "Other" : "System") : "Game")
-            if !ring.video.isEmpty, let copy = detached(sample) { ring.append(copy, label: label, retain: retainSeconds) }
+            if !ring.video.isEmpty, let copy = detached(sample) {
+                if type == .microphone { denoiser?.clean(copy) }
+                ring.append(copy, label: label, retain: retainSeconds)
+            }
         }
     }
 

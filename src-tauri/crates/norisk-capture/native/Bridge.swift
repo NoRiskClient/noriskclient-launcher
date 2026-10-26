@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 
 @_cdecl("nrc_open_apps")
@@ -132,4 +133,46 @@ func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convent
 func captureSupported() -> Bool {
     if #available(macOS 15.0, *) { return true }
     return false
+}
+
+private var denoiserNew: (@convention(c) (UInt16) -> UnsafeMutableRawPointer?)?
+private var denoiserProcess: (@convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<Float>?, Int) -> Void)?
+private var denoiserFree: (@convention(c) (UnsafeMutableRawPointer?) -> Void)?
+
+@_cdecl("nrc_set_denoiser")
+func setDenoiser(_ new: @escaping @convention(c) (UInt16) -> UnsafeMutableRawPointer?,
+                 _ process: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<Float>?, Int) -> Void,
+                 _ free: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void) {
+    denoiserNew = new; denoiserProcess = process; denoiserFree = free
+}
+
+final class Denoiser {
+    private var states: [UnsafeMutableRawPointer?] = []
+    private var warned = false
+
+    deinit { states.forEach { denoiserFree?($0) } }
+
+    func clean(_ sample: CMSampleBuffer) {
+        guard let format = CMSampleBufferGetFormatDescription(sample),
+              let description = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee else { return }
+        guard description.mFormatID == kAudioFormatLinearPCM, description.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              description.mBitsPerChannel == 32, description.mSampleRate == 48000 else {
+            if !warned { warned = true; captureLog("Noise suppression needs a 48000 Hz float microphone, this one runs at \(description.mSampleRate) Hz, so it is recorded without") }
+            return
+        }
+        var size = 0
+        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: &size, bufferListOut: nil, bufferListSize: 0,
+                blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: nil) == noErr else { return }
+        let list = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { list.deallocate() }
+        let buffers = list.assumingMemoryBound(to: AudioBufferList.self)
+        var block: CMBlockBuffer?
+        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: nil, bufferListOut: buffers, bufferListSize: size,
+                blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: &block) == noErr else { return }
+        for (index, buffer) in UnsafeMutableAudioBufferListPointer(buffers).enumerated() {
+            guard let data = buffer.mData else { continue }
+            while states.count <= index { states.append(denoiserNew?(UInt16(max(1, buffer.mNumberChannels)))) }
+            denoiserProcess?(states[index], data.assumingMemoryBound(to: Float.self), Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
+        }
+    }
 }
