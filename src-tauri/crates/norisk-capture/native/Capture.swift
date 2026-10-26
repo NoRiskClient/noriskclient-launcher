@@ -59,6 +59,12 @@ func audioExclusions(_ content: SCShareableContent, executable: String?) -> [SCR
         return path == executable || path.hasPrefix(bundle)
     }
 }
+func hostSeconds() -> Double { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
+func outputSize(_ frame: CGRect, scale: Double, config: Settings) -> (width: Int, height: Int) {
+    let pixelWidth = frame.width * scale, pixelHeight = frame.height * scale
+    let ratio = min(Double(config.width) / pixelWidth, Double(config.height) / pixelHeight, 1)
+    return (max(2, Int(pixelWidth * ratio) / 2 * 2), max(2, Int(pixelHeight * ratio) / 2 * 2))
+}
 func sameFormat(_ first: CMSampleBuffer, _ second: CMSampleBuffer) -> Bool {
     guard let one = CMSampleBufferGetFormatDescription(first), let two = CMSampleBufferGetFormatDescription(second) else { return false }
     return CMFormatDescriptionEqual(one, otherFormatDescription: two)
@@ -93,7 +99,22 @@ final class Samples {
     var bytes = 0, droppedBeforeKeyframe = 0
     private var keyframes: [Int] = []
     var playbackOffset = 0.0
+    var retired: Samples?, retiredAt = 0.0, spoiledAfter: Double?
+    var seconds: Double { video.isEmpty ? 0 : time(video.last!) - time(video.first!) }
+    func retire() {
+        let old = Samples()
+        if let cut = spoiledAfter {
+            let kept = video.prefix { time($0) <= cut }.count
+            old.video = Array(video.prefix(kept)); old.keyframes = keyframes.filter { $0 < kept }
+            old.audio = audio.mapValues { $0.filter { time($0) <= cut } }
+        } else {
+            old.video = video; old.keyframes = keyframes; old.audio = audio
+        }
+        retired = old.video.isEmpty ? nil : old; retiredAt = hostSeconds(); spoiledAfter = nil
+        video.removeAll(); keyframes.removeAll(); audio.removeAll(); bytes = 0
+    }
     func append(_ sample: CMSampleBuffer, label: String?, retain: Double) {
+        if retired != nil, hostSeconds() - retiredAt > 130 { retired = nil }
         if let label = label {
             if let last = audio[label]?.last, !sameFormat(last, sample) {
                 for old in audio[label]! { bytes -= CMSampleBufferGetTotalSampleSize(old) }
@@ -101,10 +122,7 @@ final class Samples {
             }
             audio[label, default: []].append(sample)
         } else {
-            if let last = video.last, !sameFormat(last, sample) {
-                for old in video { bytes -= CMSampleBufferGetTotalSampleSize(old) }
-                video.removeAll(); keyframes.removeAll()
-            }
+            if let last = video.last, !sameFormat(last, sample) { retire() }
             let sync = keyframe(sample)
             if video.isEmpty && !sync { droppedBeforeKeyframe += 1; return }
             if sync { keyframes.append(video.count) }
@@ -168,6 +186,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     @MainActor var attachment: Task<Void, Never>?
     @MainActor var exclusionWatch: Task<Void, Never>?
     @MainActor var retry: Task<Void, Never>?
+    @MainActor var resizeWatch: Task<Void, Never>?
     @MainActor var failures: [Double] = []
     @MainActor var rests = 0
     @MainActor var bufferingSince: Double?
@@ -290,6 +309,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         attachment?.cancel(); attachment = nil
         exclusionWatch?.cancel(); exclusionWatch = nil
         retry?.cancel(); retry = nil; bufferingSince = nil
+        resizeWatch?.cancel(); resizeWatch = nil
         let old = queue.sync { () -> (SCStream?, SCStream?) in
             generation += 1
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
@@ -316,7 +336,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         var content: SCShareableContent?
         var filter: SCContentFilter?
         var frame = CGRect.zero
-        var pid: Int32?
+        var pid: Int32?, windowID: CGWindowID?
         switch aim {
         case .window(let wanted):
             pid = wanted
@@ -327,7 +347,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 content = current
                 if let window = current.windows.filter({ $0.owningApplication?.processID == wanted && $0.windowLayer == 0 && $0.frame.width >= 128 && $0.frame.height >= 128 })
                     .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) {
-                    filter = SCContentFilter(desktopIndependentWindow: window); frame = window.frame
+                    filter = SCContentFilter(desktopIndependentWindow: window); frame = window.frame; windowID = window.windowID
                     break
                 }
                 if kill(wanted, 0) != 0 { break }
@@ -344,11 +364,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             filter = SCContentFilter(display: display, excludingWindows: []); frame = display.frame
         }
         guard let filter, let content else { throw CaptureFailure(code: "window_not_found", message: "Nothing to record was found.") }
-        let pixelWidth = frame.width * Double(filter.pointPixelScale)
-        let pixelHeight = frame.height * Double(filter.pointPixelScale)
-        let ratio = min(Double(config.width) / pixelWidth, Double(config.height) / pixelHeight, 1)
-        let width = max(2, Int(pixelWidth * ratio) / 2 * 2)
-        let height = max(2, Int(pixelHeight * ratio) / 2 * 2)
+        let (width, height) = outputSize(frame, scale: Double(filter.pointPixelScale), config: config)
         let source = pid == nil ? "system" : config.audio_source
         let hardware = config.encoder != "software"
         let codec = supportsCodec(config.codec, hardware: hardware) ? config.codec : "h264"
@@ -409,6 +425,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             timer.resume(); frameTimer = timer
         }
         bufferingSince = ProcessInfo.processInfo.systemUptime
+        watchSize(aim, windowID: windowID, scale: Double(filter.pointPixelScale), config: config, recording: (width, height))
         if source == "system", config.capture_audio, let other = queue.sync(execute: { audioStream }), let display = content.displays.first {
             watchExclusions(other, display: display, executable: config.excluded_audio_executable,
                             current: Set(audioExclusions(content, executable: config.excluded_audio_executable).map(\.processID)))
@@ -466,6 +483,34 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         } else {
             captureLog("Recording broke again (\(error.localizedDescription)); trying again in 2 s")
             retryAttachment(aim, after: 2)
+        }
+    }
+
+    @MainActor func watchSize(_ aim: Aim, windowID: CGWindowID?, scale: Double, config: Settings, recording: (width: Int, height: Int)) {
+        resizeWatch = Task {
+            var pending: (width: Int, height: Int)?, since = 0.0, began: Double?
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled, let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false) else { continue }
+                let frame: CGRect?
+                switch aim {
+                case .window: frame = content.windows.first { $0.windowID == windowID }?.frame
+                case .screen(let id): frame = content.displays.first { $0.displayID == id }?.frame
+                }
+                guard let frame, frame.width >= 128, frame.height >= 128 else { pending = nil; began = nil; continue }
+                let wanted = outputSize(frame, scale: scale, config: config)
+                guard wanted != recording else { pending = nil; began = nil; continue }
+                let now = hostSeconds()
+                if began == nil { began = now - 1 }
+                guard let settling = pending, settling == wanted else { pending = wanted; since = now; continue }
+                guard now - since >= 2, !Task.isCancelled else { continue }
+                captureLog("Size settled; recording \(wanted.width)x\(wanted.height) instead of \(recording.width)x\(recording.height)")
+                let spoiled = began
+                queue.sync { ring.spoiledAfter = spoiled }
+                await stop()
+                startAttachment(keepingBuffer: true)
+                return
+            }
         }
     }
 
@@ -531,12 +576,16 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func save(_ request: [String: Any]) {
         guard pendingSaves < 3 else { report(failure("Wait for the pending clips to finish saving."), code: "clip_write"); return }
+        let older = self.ring.retired.flatMap { old in
+            self.ring.seconds < 5 && hostSeconds() - self.ring.retiredAt <= 130 && old.seconds > self.ring.seconds + 0.1 ? old : nil
+        }
+        let ring = older ?? self.ring
         guard let last = ring.video.last else { report(failure("The replay buffer is empty."), code: "buffer_empty"); return }
         let pre = Double(request["pre_roll_seconds"] as? Int ?? 30)
-        let post = Double(request["post_roll_seconds"] as? Int ?? 0)
-        let end = time(last) + (state == "buffering" ? post : 0)
+        let post = older == nil && state == "buffering" ? Double(request["post_roll_seconds"] as? Int ?? 0) : 0
+        let end = time(last) + post
         let start = time(last) - pre
-        let ring = self.ring, config = self.config, width = self.width, height = self.height
+        let config = self.config
         let reason = request["reason"] as? [String: Any] ?? ["type": "manual"]
         pendingSaves += 1; pendingMedia.enter()
         let id = UUID()
@@ -547,7 +596,8 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             do {
                 let snapshot = try ring.snapshot(from: start, through: end)
                 Task {
-                    do { try await saveMedia(snapshot, config: config, width: width, height: height, reason: reason) }
+                    let size = snapshot.video.first.flatMap(CMSampleBufferGetFormatDescription).map(CMVideoFormatDescriptionGetDimensions)
+                    do { try await saveMedia(snapshot, config: config, width: Int(size?.width ?? 0), height: Int(size?.height ?? 0), reason: reason) }
                     catch { report(error, code: "clip_write") }
                     self.queue.async { self.pendingSaves -= 1; self.pendingMedia.leave() }
                 }
