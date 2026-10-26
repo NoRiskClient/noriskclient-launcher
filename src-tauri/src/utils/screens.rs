@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScreenInfo {
     pub device: String,
     pub width: u32,
@@ -44,7 +44,15 @@ pub fn list() -> Vec<ScreenInfo> {
     found
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub fn list() -> Vec<ScreenInfo> {
+    let mut found: Vec<ScreenInfo> =
+        serde_json::from_str(&norisk_capture::macos::screens()).unwrap_or_default();
+    found.sort_by_key(|screen| (!screen.primary, screen.device.clone()));
+    found
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn list() -> Vec<ScreenInfo> {
     Vec::new()
 }

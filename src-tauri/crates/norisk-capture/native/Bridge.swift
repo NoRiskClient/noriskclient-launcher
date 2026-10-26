@@ -24,6 +24,22 @@ func openApps(_ foreground: Bool) -> UnsafeMutablePointer<CChar>? {
     return strdup(json)
 }
 
+@_cdecl("nrc_screens")
+func screens() -> UnsafeMutablePointer<CChar>? {
+    var count: UInt32 = 0
+    guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return strdup("[]") }
+    var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+    guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return strdup("[]") }
+    let main = CGMainDisplayID()
+    let found: [[String: Any]] = ids.prefix(Int(count)).compactMap { id in
+        guard let mode = CGDisplayCopyDisplayMode(id) else { return nil }
+        return ["device": String(id), "width": mode.pixelWidth, "height": mode.pixelHeight, "primary": id == main]
+    }
+    guard let data = try? JSONSerialization.data(withJSONObject: found),
+          let json = String(data: data, encoding: .utf8) else { return nil }
+    return strdup(json)
+}
+
 @_cdecl("nrc_free_string")
 func freeString(_ value: UnsafeMutablePointer<CChar>?) { free(value) }
 

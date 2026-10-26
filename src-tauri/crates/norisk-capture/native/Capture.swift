@@ -119,6 +119,11 @@ final class Samples {
     }
 }
 
+enum Aim {
+    case window(Int32)
+    case screen(CGDirectDisplayID)
+}
+
 @available(macOS 15.0, *)
 final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     let queue = DispatchQueue(label: "nrc.capture")
@@ -126,7 +131,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var stream: SCStream?, audioStream: SCStream?
     var compression: VTCompressionSession?
     var ring = Samples()
-    var pid: Int32?, enabled = true, generation = 0
+    var pid: Int32?, screen: CGDirectDisplayID?, enabled = true, generation = 0, audioSource = "system"
     var state = "idle", codec = "h264", encoder = "video_toolbox"
     var width = 1920, height = 1080, frames = 0, captured = 0, dropped = 0
     var latencies: [Double] = []
@@ -185,9 +190,13 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 startAttachment()
             case "attach_window":
                 guard let pid = message["pid"] as? Int32 else { return }
-                await stop(); queue.sync { self.pid = pid }
+                await stop(); queue.sync { self.pid = pid; screen = nil }
                 startAttachment()
-            case "detach_window": await stop(); queue.sync { pid = nil; state = "idle" }
+            case "attach_screen":
+                guard let device = message["device"] as? String, let display = CGDirectDisplayID(device) else { return }
+                await stop(); queue.sync { pid = nil; screen = display }
+                startAttachment()
+            case "detach_window": await stop(); queue.sync { pid = nil; screen = nil; state = "idle" }
             case "set_buffer_enabled":
                 let enabled = message["enabled"] as? Bool ?? false
                 await stop(); queue.sync { self.enabled = enabled; state = enabled ? "idle" : "paused" }
@@ -213,10 +222,10 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     @MainActor func startAttachment() {
-        guard let pid = queue.sync(execute: { self.pid }), queue.sync(execute: { enabled }) else { return }
+        guard let aim = queue.sync(execute: { self.screen.map(Aim.screen) ?? self.pid.map(Aim.window) }), queue.sync(execute: { enabled }) else { return }
         let generation = queue.sync { self.generation }
         attachment = Task {
-            do { try await attach(pid) }
+            do { try await attach(aim) }
             catch {
                 guard !Task.isCancelled, queue.sync(execute: { self.generation == generation }) else { return }
                 await captureFailed(error)
@@ -262,7 +271,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         try? await old.0?.stopCapture(); try? await old.1?.stopCapture()
     }
 
-    @MainActor func attach(_ pid: Int32) async throws {
+    @MainActor func attach(_ aim: Aim) async throws {
         try Task.checkCancellation()
         queue.sync { state = "attaching" }
         guard CGPreflightScreenCaptureAccess() else {
@@ -274,25 +283,42 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         }
         try Task.checkCancellation()
         var content: SCShareableContent?
-        var target: SCWindow?
-        for _ in 0..<120 {
-            try Task.checkCancellation()
+        var filter: SCContentFilter?
+        var frame = CGRect.zero
+        var pid: Int32?
+        switch aim {
+        case .window(let wanted):
+            pid = wanted
+            for _ in 0..<120 {
+                try Task.checkCancellation()
+                let current = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+                try Task.checkCancellation()
+                content = current
+                if let window = current.windows.filter({ $0.owningApplication?.processID == wanted && $0.windowLayer == 0 && $0.frame.width >= 128 && $0.frame.height >= 128 })
+                    .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) {
+                    filter = SCContentFilter(desktopIndependentWindow: window); frame = window.frame
+                    break
+                }
+                if kill(wanted, 0) != 0 { break }
+                try await Task.sleep(nanoseconds: 500_000_000)
+            }
+            guard filter != nil else { throw CaptureFailure(code: "window_not_found", message: "No capturable game window was found for process \(wanted). Open the game window and enable clips again.") }
+        case .screen(let wanted):
             let current = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
             try Task.checkCancellation()
-            target = current.windows.filter { $0.owningApplication?.processID == pid && $0.windowLayer == 0 && $0.frame.width >= 128 && $0.frame.height >= 128 }
-                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
             content = current
-            if target != nil { break }
-            if kill(pid, 0) != 0 { break }
-            try await Task.sleep(nanoseconds: 500_000_000)
+            guard let display = current.displays.first(where: { $0.displayID == wanted }) else {
+                throw CaptureFailure(code: "window_not_found", message: "Screen \(wanted) is not connected. Plug it in or pick another screen.")
+            }
+            filter = SCContentFilter(display: display, excludingWindows: []); frame = display.frame
         }
-        guard let window = target, let content = content else { throw CaptureFailure(code: "window_not_found", message: "No capturable game window was found for process \(pid). Open the game window and enable clips again.") }
-        let filter = SCContentFilter(desktopIndependentWindow: window)
-        let pixelWidth = window.frame.width * Double(filter.pointPixelScale)
-        let pixelHeight = window.frame.height * Double(filter.pointPixelScale)
+        guard let filter, let content else { throw CaptureFailure(code: "window_not_found", message: "Nothing to record was found.") }
+        let pixelWidth = frame.width * Double(filter.pointPixelScale)
+        let pixelHeight = frame.height * Double(filter.pointPixelScale)
         let ratio = min(Double(config.width) / pixelWidth, Double(config.height) / pixelHeight, 1)
         let width = max(2, Int(pixelWidth * ratio) / 2 * 2)
         let height = max(2, Int(pixelHeight * ratio) / 2 * 2)
+        let source = pid == nil ? "system" : config.audio_source
         let hardware = config.encoder != "software"
         let codec = supportsCodec(config.codec, hardware: hardware) ? config.codec : "h264"
         let session = try makeEncoder(width: width, height: height, codec: codec, hardware: hardware)
@@ -309,7 +335,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         sc.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(config.fps))
         sc.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         sc.queueDepth = 4; sc.showsCursor = false; sc.scalesToFit = true
-        sc.capturesAudio = config.capture_audio && config.audio_source != "system"
+        sc.capturesAudio = config.capture_audio && source != "system"
         sc.sampleRate = 48000; sc.channelCount = 2
         sc.captureMicrophone = config.capture_microphone
         sc.microphoneCaptureDeviceID = config.microphone_device_id
@@ -318,18 +344,18 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         if sc.capturesAudio { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
         if sc.captureMicrophone { try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
         var audioStream: SCStream?
-        if config.capture_audio && config.audio_source != "game_only", let display = content.displays.first {
+        if config.capture_audio && source != "game_only", let display = content.displays.first {
             let audio = SCStreamConfiguration()
             audio.width = 2; audio.height = 2; audio.minimumFrameInterval = CMTime(seconds: 1, preferredTimescale: 1)
             audio.capturesAudio = true; audio.sampleRate = 48000; audio.channelCount = 2; audio.excludesCurrentProcessAudio = false
-            let excluded = config.audio_source == "both" ? content.applications.filter { $0.processID == pid }
+            let excluded = source == "both" ? content.applications.filter { $0.processID == pid }
                 : audioExclusions(content, executable: config.excluded_audio_executable)
             let other = SCStream(filter: SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: []), configuration: audio, delegate: self)
             try other.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
             audioStream = other
         }
         queue.sync {
-            ring = Samples(); self.width = width; self.height = height; self.codec = codec
+            ring = Samples(); audioSource = source; self.width = width; self.height = height; self.codec = codec
             self.encoder = hardware ? "video_toolbox" : "software"; compression = session
             self.stream = stream; self.audioStream = audioStream
         }
@@ -351,7 +377,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             timer.setEventHandler { [weak self] in self?.encodeFrame() }
             timer.resume(); frameTimer = timer
         }
-        if config.audio_source == "system", config.capture_audio, let other = queue.sync(execute: { audioStream }), let display = content.displays.first {
+        if source == "system", config.capture_audio, let other = queue.sync(execute: { audioStream }), let display = content.displays.first {
             watchExclusions(other, display: display, executable: config.excluded_audio_executable,
                             current: Set(audioExclusions(content, executable: config.excluded_audio_executable).map(\.processID)))
         }
@@ -400,7 +426,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             }
         } else {
             guard state == "buffering" else { return }
-            let label = type == .microphone ? "Microphone" : (stream === audioStream ? (config.audio_source == "both" ? "Other" : "System") : "Game")
+            let label = type == .microphone ? "Microphone" : (stream === audioStream ? (audioSource == "both" ? "Other" : "System") : "Game")
             if !ring.video.isEmpty, let copy = detached(sample) { ring.append(copy, label: label, retain: retainSeconds) }
         }
     }
