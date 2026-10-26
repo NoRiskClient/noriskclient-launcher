@@ -50,6 +50,15 @@ func detached(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
             flags: 0, bufferList: buffers) == noErr else { return nil }
     return copy
 }
+@available(macOS 15.0, *)
+func audioExclusions(_ content: SCShareableContent, executable: String?) -> [SCRunningApplication] {
+    guard let executable = executable?.trimmingCharacters(in: .whitespaces), !executable.isEmpty else { return [] }
+    let bundle = executable.range(of: ".app/").map { String(executable[..<$0.upperBound]) } ?? executable
+    return content.applications.filter { app in
+        guard let path = NSRunningApplication(processIdentifier: app.processID)?.executableURL?.path else { return false }
+        return path == executable || path.hasPrefix(bundle)
+    }
+}
 func keyframe(_ sample: CMSampleBuffer) -> Bool {
     let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]]
     return attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool != true
@@ -60,7 +69,7 @@ struct Settings: Decodable {
     var buffer_seconds: Int = 30, gop_seconds: Double = 2
     var codec: String = "h264", encoder: String = "auto", capture_audio: Bool = true
     var audio_source: String = "system", capture_microphone: Bool = false
-    var microphone_device_id: String?, audio_device_id: String?
+    var microphone_device_id: String?, audio_device_id: String?, excluded_audio_executable: String?
     var game_volume: Int = 100, other_volume: Int = 100, microphone_volume: Int = 100
     var output_dir: String = ""
 }
@@ -130,6 +139,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     var scheduledSaves: [UUID: DispatchWorkItem] = [:]
     var framesInFlight = 0
     @MainActor var attachment: Task<Void, Never>?
+    @MainActor var exclusionWatch: Task<Void, Never>?
     var saveRetention: [UUID: Double] = [:]
     var retainSeconds: Double { max(Double(config.buffer_seconds), saveRetention.values.max() ?? 0) }
 
@@ -239,6 +249,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     @MainActor func stop(state nextState: String? = nil) async {
         attachment?.cancel(); attachment = nil
+        exclusionWatch?.cancel(); exclusionWatch = nil
         let old = queue.sync { () -> (SCStream?, SCStream?) in
             generation += 1
             frameTimer?.cancel(); frameTimer = nil; latestImage = nil
@@ -311,7 +322,8 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             let audio = SCStreamConfiguration()
             audio.width = 2; audio.height = 2; audio.minimumFrameInterval = CMTime(seconds: 1, preferredTimescale: 1)
             audio.capturesAudio = true; audio.sampleRate = 48000; audio.channelCount = 2; audio.excludesCurrentProcessAudio = false
-            let excluded = config.audio_source == "both" ? content.applications.filter { $0.processID == pid } : []
+            let excluded = config.audio_source == "both" ? content.applications.filter { $0.processID == pid }
+                : audioExclusions(content, executable: config.excluded_audio_executable)
             let other = SCStream(filter: SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: []), configuration: audio, delegate: self)
             try other.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
             audioStream = other
@@ -338,6 +350,31 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             timer.schedule(deadline: .now(), repeating: .nanoseconds(1_000_000_000 / max(1, config.fps)))
             timer.setEventHandler { [weak self] in self?.encodeFrame() }
             timer.resume(); frameTimer = timer
+        }
+        if config.audio_source == "system", config.capture_audio, let other = queue.sync(execute: { audioStream }), let display = content.displays.first {
+            watchExclusions(other, display: display, executable: config.excluded_audio_executable,
+                            current: Set(audioExclusions(content, executable: config.excluded_audio_executable).map(\.processID)))
+        }
+    }
+
+    @MainActor func watchExclusions(_ stream: SCStream, display: SCDisplay, executable: String?, current: Set<pid_t>) {
+        guard let executable, !executable.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        exclusionWatch = Task {
+            var excluded = current
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled, let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false) else { continue }
+                let apps = audioExclusions(content, executable: executable)
+                let pids = Set(apps.map(\.processID))
+                guard pids != excluded, !Task.isCancelled else { continue }
+                do {
+                    try await stream.updateContentFilter(SCContentFilter(display: display, excludingApplications: apps, exceptingWindows: []))
+                    excluded = pids
+                    captureLog("Keeping \(apps.count) process(es) of \(executable) out of the system audio")
+                } catch {
+                    captureLog("Could not update the excluded audio program: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
