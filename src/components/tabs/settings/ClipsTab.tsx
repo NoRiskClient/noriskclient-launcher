@@ -637,7 +637,7 @@ export function ClipsTab() {
               </SettingRow>
             )}
 
-            {effectiveAudioSource === "system" && (
+            {effectiveAudioSource === "system" && !isMacOS() && (
               <SettingRow
                 label={t("settings.clips.audio.device")}
                 description={t("settings.clips.audio.device.description")}
