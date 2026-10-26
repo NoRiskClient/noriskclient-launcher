@@ -551,7 +551,7 @@ export function ClipsTab() {
               </div>
             </SettingRow>
 
-            {effectiveAudioSource === "system" && !isMacOS() && (
+            {effectiveAudioSource === "system" && (
               <SettingRow
                 label={t("settings.clips.audio.exclude")}
                 description={t(
