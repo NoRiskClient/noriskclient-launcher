@@ -661,6 +661,7 @@ impl CaptureSupervisor {
                         ),
                         recoverable: false,
                         source: None,
+                        destination: None,
                     })))
                     .await;
                     return;
@@ -937,8 +938,8 @@ impl CaptureSupervisor {
                 if attaching_failed(error.code) {
                     self.forget_attachment();
                 }
-                if let Some(source) = error.source.as_ref() {
-                    crate::utils::clip_library::release_destinations_of(source);
+                if let Some(destination) = error.destination.as_ref() {
+                    crate::utils::clip_library::release_destination(destination);
                 }
                 if !error.recoverable {
                     *self.state.write().await = CaptureState::Failed;

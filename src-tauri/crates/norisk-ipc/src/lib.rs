@@ -343,6 +343,8 @@ pub struct CaptureError {
     pub recoverable: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub destination: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -612,6 +614,7 @@ mod tests {
             message: "line one\nline two".into(),
             recoverable: true,
             source: None,
+            destination: None,
         });
 
         let line = encode_line(&msg).unwrap();
@@ -628,6 +631,7 @@ mod tests {
             message: "disk full".into(),
             recoverable: true,
             source: Some(PathBuf::from("C:/clips/fight.mp4")),
+            destination: None,
         });
 
         let wire: serde_json::Value = serde_json::to_value(&failed).unwrap();
@@ -642,15 +646,32 @@ mod tests {
             message: "boom".into(),
             recoverable: true,
             source: None,
+            destination: None,
         });
         let wire: serde_json::Value = serde_json::to_value(&general).unwrap();
         assert!(wire.get("source").is_none());
+        assert!(wire.get("destination").is_none());
 
         let older: CaptureToLauncher = decode_line(
             r#"{"type":"error","code":"internal","message":"boom","recoverable":true}"#,
         )
         .unwrap();
         assert_eq!(older, general);
+    }
+
+    #[test]
+    fn a_failed_export_names_the_file_it_was_writing() {
+        let failed = CaptureToLauncher::Error(CaptureError {
+            code: ErrorCode::ClipWrite,
+            message: "encoder gone".into(),
+            recoverable: true,
+            source: Some(PathBuf::from("C:/clips/fight.mp4")),
+            destination: Some(PathBuf::from("C:/clips/fight.gif")),
+        });
+
+        let wire: serde_json::Value = serde_json::to_value(&failed).unwrap();
+        assert_eq!(wire["destination"], "C:/clips/fight.gif");
+        assert_eq!(decode_line::<CaptureToLauncher>(&encode_line(&failed).unwrap()).unwrap(), failed);
     }
 
     #[test]

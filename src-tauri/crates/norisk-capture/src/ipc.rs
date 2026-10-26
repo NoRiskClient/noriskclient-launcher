@@ -96,6 +96,7 @@ fn refusal(error: impl std::fmt::Display) -> CaptureToLauncher {
         ),
         recoverable: true,
         source: None,
+        destination: None,
     })
 }
 
