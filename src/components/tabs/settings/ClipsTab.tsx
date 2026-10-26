@@ -1,6 +1,6 @@
 "use client";
 
-import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../../store/capture-permissions-store";
+import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
@@ -101,8 +101,7 @@ export function ClipsTab() {
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const supported = supportsClips();
-  const permissions = useCapturePermissionsStore((state) => state.permissions);
-  const permissionsReady = !isMacOS() || allCapturePermissionsGranted(permissions);
+  const permissionsReady = useCapturePermissionsReady();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
