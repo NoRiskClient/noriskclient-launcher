@@ -526,9 +526,14 @@ struct Cleanup {
     over_by: u64,
 }
 
-fn cleanup_plan(clips: &[ClipEntry], limit: u64, extra: u64, keep: &[PathBuf]) -> Cleanup {
-    let mut total: u64 = clips.iter().map(|c| c.size_bytes).sum::<u64>() + extra;
-    let kept: Vec<u32> = keep.iter().map(|path| fingerprint(path)).collect();
+fn same_name(a: &Path, b: &Path) -> bool {
+    a.file_name()
+        .zip(b.file_name())
+        .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b))
+}
+
+fn cleanup_plan(clips: &[ClipEntry], limit: u64, keep: &[PathBuf]) -> Cleanup {
+    let mut total: u64 = clips.iter().map(|c| c.size_bytes).sum();
     if total <= limit {
         return Cleanup::default();
     }
@@ -538,7 +543,7 @@ fn cleanup_plan(clips: &[ClipEntry], limit: u64, extra: u64, keep: &[PathBuf]) -
         if total <= limit {
             break;
         }
-        if clip.favourite || !clip.managed || kept.contains(&fingerprint(&clip.path)) {
+        if clip.favourite || !clip.managed || keep.iter().any(|kept| same_name(kept, &clip.path)) {
             plan.spared += 1;
             continue;
         }
@@ -556,7 +561,7 @@ pub fn enforce_limit(dir: &Path, limit_gb: u32, keep: &[PathBuf]) -> Result<Vec<
     }
     let limit = limit_gb as u64 * 1024 * 1024 * 1024;
 
-    let plan = cleanup_plan(&list(dir)?, limit, gif_bytes(dir), keep);
+    let plan = cleanup_plan(&list(dir)?, limit, keep);
     let mut removed = Vec::new();
 
     for path in plan.remove {
@@ -967,7 +972,7 @@ mod tests {
             someone_elses("wedding", 40, 100),
         ];
 
-        let plan = cleanup_plan(&clips, 40, 0, &[]);
+        let plan = cleanup_plan(&clips, 40, &[]);
 
         assert_eq!(
             plan.remove,
@@ -980,7 +985,7 @@ mod tests {
 
     #[test]
     fn cleanup_takes_the_oldest_until_it_fits() {
-        let plan = cleanup_plan(&library(), 100, 0, &[]);
+        let plan = cleanup_plan(&library(), 100, &[]);
 
         assert_eq!(
             plan.remove,
@@ -993,7 +998,7 @@ mod tests {
 
     #[test]
     fn cleanup_keeps_going_until_it_actually_fits() {
-        let plan = cleanup_plan(&library(), 45, 0, &[]);
+        let plan = cleanup_plan(&library(), 45, &[]);
         assert_eq!(
             plan.remove,
             vec![PathBuf::from("old.mp4"), PathBuf::from("mid.mp4")],
@@ -1002,25 +1007,28 @@ mod tests {
     }
 
     #[test]
-    fn cleanup_never_takes_the_clip_it_runs_for() {
+    fn cleanup_keeps_the_new_clip_however_its_folder_is_written() {
         let clips = library();
-        let newest = clips[0].path.clone();
 
-        let plan = cleanup_plan(&clips, 0, 0, &[newest.clone()]);
+        let plan = cleanup_plan(&clips, 0, &[PathBuf::from("\\\\server\\share\\clips\\NEW.mp4")]);
 
-        assert!(!plan.remove.contains(&newest), "the clip that was just saved was deleted");
-        assert_eq!(plan.spared, 1);
+        assert!(!plan.remove.contains(&clips[0].path), "the clip that was just saved was deleted");
     }
 
     #[test]
-    fn gifs_count_against_the_limit() {
-        let plan = cleanup_plan(&library(), 1000, 1000, &[]);
-        assert!(!plan.remove.is_empty(), "the GIFs' space was not counted");
+    fn gifs_show_in_the_usage_but_never_cost_a_clip() {
+        let dir = temp_dir("gif-usage");
+        write_clip(&dir, "fight.mp4", 10);
+        write_clip(&dir, "fight.gif", 5);
+
+        assert_eq!(usage(&dir, 1).unwrap().used_bytes, 15);
+        assert_eq!(cleanup_plan(&list(&dir).unwrap(), 10, &[]), Cleanup::default());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn cleanup_does_nothing_when_there_is_room() {
-        assert_eq!(cleanup_plan(&library(), 1000, 0, &[]), Cleanup::default());
+        assert_eq!(cleanup_plan(&library(), 1000, &[]), Cleanup::default());
     }
 
     #[test]
@@ -1028,7 +1036,7 @@ mod tests {
         let mut clips = library();
         clips[2].favourite = true;
 
-        let plan = cleanup_plan(&clips, 100, 0, &[]);
+        let plan = cleanup_plan(&clips, 100, &[]);
 
         assert_eq!(
             plan.remove,
@@ -1049,7 +1057,7 @@ mod tests {
             })
             .collect();
 
-        let plan = cleanup_plan(&clips, 40, 0, &[]);
+        let plan = cleanup_plan(&clips, 40, &[]);
 
         assert!(plan.remove.is_empty(), "nothing marked may be deleted");
         assert_eq!(plan.spared, 3);
