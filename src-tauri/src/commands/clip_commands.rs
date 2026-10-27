@@ -373,9 +373,7 @@ async fn engine_running(state: &State) -> crate::error::Result<()> {
     if state.capture_supervisor.is_running().await {
         return Ok(());
     }
-    Err(crate::error::AppError::Other(
-        "The clip engine is not running. Turn clips on in Settings > Clips and try again.".into(),
-    ))
+    Err(crate::error::AppError::ClipEngineOff)
 }
 
 async fn dispatch(

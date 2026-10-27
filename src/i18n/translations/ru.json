@@ -2914,6 +2914,7 @@
   "clips.trim.kept": "Сохранено {{seconds}} с",
   "clips.trim.saved": "Изменённая копия сохранена рядом с оригиналом",
   "clips.trim.failed": "Не удалось сохранить клип",
+  "clips.engine_off": "Клипы выключены. Включи их в Настройки > Клипы, чтобы редактировать или экспортировать.",
   "clips.trim.from": "От",
   "clips.trim.to": "До",
   "clips.trim.kept_label": "сохранено",

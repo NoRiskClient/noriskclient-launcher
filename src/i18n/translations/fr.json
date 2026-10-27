@@ -2888,6 +2888,7 @@
   "clips.trim.kept": "{{seconds}} s conservées",
   "clips.trim.saved": "Copie modifiée enregistrée à côté de l'original",
   "clips.trim.failed": "Le clip n'a pas pu être enregistré",
+  "clips.engine_off": "Les clips sont désactivés. Active-les dans Paramètres > Clips pour modifier ou exporter.",
   "clips.trim.from": "De",
   "clips.trim.to": "À",
   "clips.trim.kept_label": "conservé",

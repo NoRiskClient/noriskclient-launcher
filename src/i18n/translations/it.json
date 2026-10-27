@@ -2888,6 +2888,7 @@
   "clips.trim.kept": "{{seconds}} s mantenuti",
   "clips.trim.saved": "Copia modificata salvata accanto all'originale",
   "clips.trim.failed": "Impossibile salvare la clip",
+  "clips.engine_off": "Le clip sono disattivate. Attivale in Impostazioni > Clip per modificare o esportare.",
   "clips.trim.from": "Da",
   "clips.trim.to": "A",
   "clips.trim.kept_label": "mantenuti",

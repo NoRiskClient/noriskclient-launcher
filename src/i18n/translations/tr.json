@@ -2888,6 +2888,7 @@
   "clips.trim.kept": "{{seconds}} sn tutuldu",
   "clips.trim.saved": "Düzenlenmiş kopya, orijinalin yanına kaydedildi",
   "clips.trim.failed": "Klip kaydedilemedi",
+  "clips.engine_off": "Klipler kapalı. Düzenlemek veya dışa aktarmak için Ayarlar > Klipler bölümünden aç.",
   "clips.trim.from": "Başlangıç",
   "clips.trim.to": "Bitiş",
   "clips.trim.kept_label": "tutulan",

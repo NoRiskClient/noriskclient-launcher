@@ -32,7 +32,7 @@ import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
-import { useClipEngineEvents } from "./useClipEngineEvents";
+import { clipFailure, useClipEngineEvents } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { trackEvent } from "../../services/analytics-service";
 
@@ -139,10 +139,10 @@ export function ClipGallery({
       } catch (e) {
         gifDone(clip.path);
         console.error("Could not start the GIF export", e);
-        toast.error(parseErrorMessage(e));
+        toast.error(clipFailure(e, t));
       }
     },
-    [gifDone],
+    [gifDone, t],
   );
 
   const setFavourite = useCallback(

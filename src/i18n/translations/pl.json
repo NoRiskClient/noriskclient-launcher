@@ -2912,6 +2912,7 @@
   "clips.trim.kept": "{{seconds}} s zachowane",
   "clips.trim.saved": "Edytowana kopia zapisana obok oryginału",
   "clips.trim.failed": "Nie udało się zapisać klipu",
+  "clips.engine_off": "Klipy są wyłączone. Włącz je w Ustawienia > Klipy, aby edytować lub eksportować.",
   "clips.trim.from": "Od",
   "clips.trim.to": "Do",
   "clips.trim.kept_label": "zachowane",

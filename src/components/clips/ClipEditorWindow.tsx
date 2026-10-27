@@ -24,6 +24,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useFontStore } from "../../store/font-store";
 import { WindowFrame } from "../ui/WindowFrame";
 import { Button } from "../ui/buttons/Button";
+import { clipFailure } from "./useClipEngineEvents";
 
 const PROBE_TIMEOUT_MS = 15_000;
 
@@ -178,7 +179,7 @@ export function ClipEditorWindow() {
         return true;
       } catch (e) {
         console.error("Could not trim the clip", e);
-        toast.error(t("clips.trim.failed"));
+        toast.error(clipFailure(e, t, t("clips.trim.failed")));
         return false;
       } finally {
         setSaving(false);

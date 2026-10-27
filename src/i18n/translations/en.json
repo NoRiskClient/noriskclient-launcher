@@ -2497,6 +2497,7 @@
   "clips.trim.kept": "{{seconds}} s kept",
   "clips.trim.saved": "Edited copy saved beside the original",
   "clips.trim.failed": "The clip could not be saved",
+  "clips.engine_off": "Clips are turned off. Turn them on in Settings > Clips to edit or export.",
   "clips.trim.from": "From",
   "clips.trim.to": "To",
   "clips.trim.kept_label": "kept",

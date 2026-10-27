@@ -2477,6 +2477,7 @@
   "clips.trim.kept": "{{seconds}} s bleiben",
   "clips.trim.saved": "Bearbeitete Kopie neben dem Original gespeichert",
   "clips.trim.failed": "Der Clip konnte nicht gespeichert werden",
+  "clips.engine_off": "Clips sind ausgeschaltet. Schalte sie unter Einstellungen > Clips ein, um zu bearbeiten oder zu exportieren.",
   "clips.trim.from": "Von",
   "clips.trim.to": "Bis",
   "clips.trim.kept_label": "bleiben",

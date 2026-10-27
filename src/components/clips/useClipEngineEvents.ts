@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+import { parseErrorMessage } from "../../utils/error-utils";
+
 import {
   samePath,
   type ExportProgress,
@@ -13,6 +15,11 @@ export interface CaptureError {
   message?: string;
   recoverable?: boolean;
   source?: string | null;
+}
+
+export function clipFailure(error: unknown, t: (key: string) => string, fallback?: string): string {
+  if ((error as { kind?: unknown } | null)?.kind === "ClipEngineOff") return t("clips.engine_off");
+  return fallback ?? parseErrorMessage(error);
 }
 
 export function writeFailed(error: CaptureError, path: string): boolean {

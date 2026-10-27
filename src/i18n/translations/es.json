@@ -2888,6 +2888,7 @@
   "clips.trim.kept": "{{seconds}} s conservados",
   "clips.trim.saved": "Copia editada guardada junto al original",
   "clips.trim.failed": "No se pudo guardar el clip",
+  "clips.engine_off": "Los clips están desactivados. Actívalos en Ajustes > Clips para editar o exportar.",
   "clips.trim.from": "Desde",
   "clips.trim.to": "Hasta",
   "clips.trim.kept_label": "conservado",
