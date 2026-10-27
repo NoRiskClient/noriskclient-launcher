@@ -238,7 +238,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           boxShadow: getBoxShadow(),
           color: getTextColor(),
           transform: isPressed ? "translateY(1px)" : "translateY(0)",
-          filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
+          filter: isHovered && !disabled ? "brightness(1.1)" : undefined,
           ...createRadiusStyle(borderRadius),
         }}
         onClick={handleRipple}
