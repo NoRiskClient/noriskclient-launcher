@@ -354,6 +354,10 @@
     scrollbar-width: none;  /* Firefox */
 }
 
+[data-scrolled="true"] .timeline-clip {
+    clip-path: inset(0 0 0 var(--timeline-scroll));
+}
+
 /*
  * Modrinth scroll containers don't carry the `.custom-scrollbar` class, so
  * their scrollbar falls back to the browser default — looks out of place

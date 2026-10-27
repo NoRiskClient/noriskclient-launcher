@@ -44,8 +44,9 @@ import {
 } from "./editor/shared";
 import { useFilmstrip } from "./editor/useFilmstrip";
 import { useWindowDrag } from "./editor/useWindowDrag";
+import { useTimelineZoom } from "./editor/useTimelineZoom";
 import { BlankCover, PlayheadClock, PlayheadMark, usePlayhead } from "./editor/Playhead";
-import { useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
+import { silenced, useCuts, type MarkEdge, type PartLane } from "./editor/useCuts";
 import { useOverlays } from "./editor/useOverlays";
 import { OverlayBox } from "./editor/OverlayPreview";
 import { EditorHelpModal, EditorMenuBar, shortcutText, type MenuDef } from "./editor/EditorMenuBar";
@@ -62,6 +63,7 @@ import {
   GapBlock,
   JoinMark,
   Pieces,
+  ZoomBar,
 } from "./editor/Timeline";
 import { PanelTitle, OverlayInspector } from "./editor/Inspector";
 import {
@@ -163,6 +165,7 @@ export function ClipTrimmer({
   const shot = laneWindow(picture, start, end);
   const cuts = useCuts({ playhead, separate, start, end, shot, windows });
   const {
+    withMark,
     removed,
     blanked,
     muted,
@@ -279,7 +282,9 @@ export function ClipTrimmer({
     (apart: boolean) => {
       setSeparate(apart);
       if (apart) {
+        const kept = { start: start > 0 ? tidy(start) : null, end: end < duration ? tidy(end) : null };
         setPicture({ start: tidy(start), end: tidy(end) });
+        setWindows(Object.fromEntries(movable.map((track) => [track.stream, kept])));
         setStart(0);
         setEnd(duration);
         return;
@@ -412,22 +417,26 @@ export function ClipTrimmer({
     [mark, view, viewAt],
   );
 
-  const save = useCallback(
-    () =>
-      render.save({
-        overlays,
-        shape,
-        start,
-        end,
-        levels,
-        videoStart: shot.start,
-        videoEnd: shot.end,
-        removed,
-        blanked,
-        hushed,
-      }),
-    [blanked, end, hushed, levels, overlays, removed, render.save, shape, shot.end, shot.start, start],
-  );
+  const save = useCallback(() => {
+    if (!withMark) {
+      toast(t("clips.editor.cut.too_little"), { id: "clip-cut-hint" });
+      return;
+    }
+    const from = separate ? Math.min(shot.from, ...levels.map((level) => level.startSeconds ?? start)) : start;
+    const to = separate ? Math.max(shot.to, ...levels.map((level) => level.endSeconds ?? end)) : end;
+    render.save({
+      overlays,
+      shape,
+      start: from,
+      end: to,
+      levels,
+      videoStart: shot.from > from ? shot.from : null,
+      videoEnd: shot.to < to ? shot.to : null,
+      removed: withMark.removed,
+      blanked: withMark.blanked,
+      hushed: silenced(withMark.muted),
+    });
+  }, [end, levels, overlays, render.save, separate, shape, shot.from, shot.to, start, t, withMark]);
 
   const keyboardFocus = useRef(false);
 
@@ -516,6 +525,8 @@ export function ClipTrimmer({
   const timelineCard = useRef<HTMLElement>(null);
   const timelineBody = useRef<HTMLDivElement>(null);
   const timelineContent = useRef<HTMLDivElement>(null);
+  const lanesScroll = useRef<HTMLDivElement>(null);
+  const timelineZoom = useTimelineZoom(lanesScroll, scaleRef);
   const timelineSized = useRef(rowsLayout.defaultLayout !== undefined);
   const gripping = useRef(false);
 
@@ -658,6 +669,29 @@ export function ClipTrimmer({
           checked: panel === entry.id,
           onSelect: () => setPanel(entry.id),
         })),
+        [
+          {
+            id: "zoom_in",
+            label: t("clips.editor.menu.zoom_in"),
+            shortcut: shortcutText("+", t),
+            disabled: !timelineZoom.canZoomIn,
+            onSelect: timelineZoom.zoomIn,
+          },
+          {
+            id: "zoom_out",
+            label: t("clips.editor.menu.zoom_out"),
+            shortcut: shortcutText("-", t),
+            disabled: !timelineZoom.canZoomOut,
+            onSelect: timelineZoom.zoomOut,
+          },
+          {
+            id: "zoom_fit",
+            label: t("clips.editor.menu.zoom_fit"),
+            shortcut: shortcutText("0", t),
+            disabled: !timelineZoom.canZoomOut,
+            onSelect: timelineZoom.fit,
+          },
+        ],
         [
           {
             id: "timeline",
@@ -1284,7 +1318,11 @@ export function ClipTrimmer({
                     )}
                   </div>
 
-                  <div className="relative flex select-none flex-col gap-1.5">
+                  <div ref={lanesScroll} className="no-scrollbar overflow-x-auto">
+                  <div
+                    className="relative flex select-none flex-col gap-1.5"
+                    style={{ width: `calc(9.5rem + (100% - 9.5rem) * ${timelineZoom.zoom})` }}
+                  >
                     <div className="flex">
                       <div className="w-[9.5rem] shrink-0" />
                       <Ruler
@@ -1401,7 +1439,7 @@ export function ClipTrimmer({
                       />
                     ))}
 
-                    <div className="pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
+                    <div className="timeline-clip pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
                       {!separate && clipMasks(start, end)}
                       {removed.map((span, index) => (
                         <JoinMark
@@ -1420,6 +1458,13 @@ export function ClipTrimmer({
                       {target === "all" && cutRange("bottom-0 top-[1.875rem]")}
                     </div>
                   </div>
+                  </div>
+                  <ZoomBar
+                    scroller={lanesScroll}
+                    track={scaleRef}
+                    hidden={!timelineZoom.canZoomOut}
+                    color={accentColor.value}
+                  />
                 </div>
               </div>
             </section>

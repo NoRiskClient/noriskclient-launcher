@@ -661,6 +661,7 @@ impl CaptureSupervisor {
                         ),
                         recoverable: false,
                         source: None,
+                        destination: None,
                     })))
                     .await;
                     return;
@@ -774,8 +775,16 @@ impl CaptureSupervisor {
 
                 if let Some(dir) = self.clip_dir_for_cleanup().await {
                     let (dir, limit) = dir;
+                    let mut keep = vec![manifest.path.clone()];
+                    keep.extend(
+                        self.app
+                            .read()
+                            .await
+                            .as_ref()
+                            .and_then(crate::commands::clip_commands::editing_clip),
+                    );
                     match tokio::task::spawn_blocking(move || {
-                        crate::utils::clip_library::enforce_limit(&dir, limit)
+                        crate::utils::clip_library::enforce_limit(&dir, limit, &keep)
                     })
                     .await
                     {
@@ -934,6 +943,9 @@ impl CaptureSupervisor {
                 );
                 if attaching_failed(error.code) {
                     self.forget_attachment();
+                }
+                if let Some(destination) = error.destination.as_ref() {
+                    crate::utils::clip_library::release_destination(destination);
                 }
                 if !error.recoverable {
                     *self.state.write().await = CaptureState::Failed;

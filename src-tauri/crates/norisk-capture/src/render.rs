@@ -90,7 +90,7 @@ fn at_frame_height(overlay: &norisk_ipc::ClipOverlay, frame_height: u32) -> nori
 }
 
 fn place(pts: i64, start: i64, end: i64, last: Option<i64>) -> Option<i64> {
-    (pts >= start && pts <= end && last.is_none_or(|last| pts > last)).then_some(pts)
+    (pts >= start && pts < end && last.is_none_or(|last| pts > last)).then_some(pts)
 }
 
 struct Gaps(Vec<(i64, i64)>);
@@ -808,18 +808,18 @@ mod tests {
         let inside: Vec<i64> = times
             .iter()
             .copied()
-            .filter(|pts| (start..=end).contains(pts))
+            .filter(|pts| (start..end).contains(pts))
             .collect();
 
         assert_eq!(out, inside, "a frame was moved, lost or invented");
-        assert!(out.iter().all(|pts| (start..=end).contains(pts)));
+        assert!(out.iter().all(|pts| (start..end).contains(pts)));
         assert!(out.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
     fn uneven_frames_span_what_the_source_spans_not_count_times_interval() {
         let times = uneven();
-        let (start, end) = (0, *times.last().unwrap());
+        let (start, end) = (0, *times.last().unwrap() + 1);
 
         let out = kept(&times, start, end);
         let span = out.last().unwrap() - out.first().unwrap();

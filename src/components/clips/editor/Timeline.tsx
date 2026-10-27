@@ -86,7 +86,7 @@ export function Ruler({
         holdPointer(event);
         onScrub(event.clientX);
       }}
-      className="relative h-6 min-w-0 flex-1 cursor-ew-resize overflow-hidden border-b border-white/10"
+      className="timeline-clip relative h-6 min-w-0 flex-1 cursor-ew-resize overflow-hidden border-b border-white/10"
     >
       <span
         ref={probe}
@@ -160,7 +160,7 @@ export function Lane({
     <div className="flex">
       <div
         className={cn(
-          "flex w-[9.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
+          "sticky left-0 z-30 flex w-[9.5rem] shrink-0 flex-col justify-center gap-1 rounded-l border-y border-l px-2 transition-colors",
           active ? "border-white/20 bg-white/10" : "border-white/10 bg-black/30",
           height,
         )}
@@ -190,7 +190,7 @@ export function Lane({
             : undefined
         }
         className={cn(
-          "relative min-w-0 flex-1 overflow-hidden rounded-r border border-white/10 bg-black/30",
+          "timeline-clip relative min-w-0 flex-1 overflow-hidden rounded-r border border-white/10 bg-black/30",
           height,
           onScrub && "cursor-ew-resize",
         )}
@@ -200,6 +200,80 @@ export function Lane({
         }}
       >
         {children}
+      </div>
+    </div>
+  );
+}
+
+export function ZoomBar({
+  scroller,
+  track,
+  hidden,
+  color,
+}: {
+  scroller: RefObject<HTMLDivElement | null>;
+  track: RefObject<HTMLDivElement | null>;
+  hidden: boolean;
+  color: string;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const grab = useRef<{ x: number; start: number } | null>(null);
+  const [shown, setShown] = useState({ start: 0, size: 1 });
+
+  useEffect(() => {
+    const box = scroller.current;
+    const lane = track.current;
+    if (!box || !lane) return;
+    const sync = () => {
+      const width = lane.offsetWidth;
+      if (width <= 0) return;
+      setShown({ start: box.scrollLeft / width, size: Math.min(1, (box.clientWidth - lane.offsetLeft) / width) });
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(box);
+    observer.observe(lane);
+    box.addEventListener("scroll", sync, { passive: true });
+    return () => {
+      observer.disconnect();
+      box.removeEventListener("scroll", sync);
+    };
+  }, [scroller, track]);
+
+  const scrollTo = (start: number) => {
+    const box = scroller.current;
+    const lane = track.current;
+    if (box && lane) box.scrollLeft = Math.min(1 - shown.size, Math.max(0, start)) * lane.offsetWidth;
+  };
+  const share = (clientX: number) => {
+    const box = bar.current?.getBoundingClientRect();
+    return box && box.width > 0 ? (clientX - box.left) / box.width : 0;
+  };
+
+  return (
+    <div aria-hidden={hidden} className={cn("flex h-3 items-center pl-[9.5rem]", hidden && "invisible")}>
+      <div
+        ref={bar}
+        role="presentation"
+        onPointerDown={(event) => {
+          holdPointer(event);
+          const at = share(event.clientX);
+          const inside = at >= shown.start && at <= shown.start + shown.size;
+          const start = inside ? shown.start : at - shown.size / 2;
+          if (!inside) scrollTo(start);
+          grab.current = { x: at, start };
+        }}
+        onPointerMove={(event) => {
+          if (grab.current) scrollTo(grab.current.start + share(event.clientX) - grab.current.x);
+        }}
+        onPointerUp={() => (grab.current = null)}
+        onPointerCancel={() => (grab.current = null)}
+        className="group/zoombar relative h-1.5 flex-1 cursor-pointer rounded-full bg-white/5"
+      >
+        <div
+          className="absolute inset-y-0 rounded-full opacity-50 transition-opacity group-hover/zoombar:opacity-80"
+          style={{ left: `${shown.start * 100}%`, width: `${shown.size * 100}%`, backgroundColor: color }}
+        />
       </div>
     </div>
   );

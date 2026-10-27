@@ -38,6 +38,12 @@ function fit(span: Span, room: Room): Span | null {
   return { startSeconds: from, endSeconds: from + length };
 }
 
+export function silenced(muted: Record<number, Span[]>) {
+  return Object.entries(muted).flatMap(([stream, spans]) =>
+    spans.map((span) => ({ stream: Number(stream), ...span })),
+  );
+}
+
 export function useCuts({ playhead, separate, start, end, shot, windows }: Timing) {
   const [removed, setRemoved] = useState<Span[]>([]);
   const [blanked, setBlanked] = useState<Span[]>([]);
@@ -89,29 +95,26 @@ export function useCuts({ playhead, separate, start, end, shot, windows }: Timin
     [mark, room],
   );
 
-  const applyMark = useCallback((): boolean => {
-    if (!mark) return false;
+  const withMark = useMemo((): CutState | null => {
+    if (!mark) return { removed, blanked, muted };
     const span = { startSeconds: tidy(mark.startSeconds), endSeconds: tidy(mark.endSeconds) };
     if (target === "all") {
       const next = merged([...removed, span]);
-      if (shot.to - shot.from - hollowed(next, shot.from, shot.to) < MIN_LENGTH) return false;
-      setRemoved(next);
-    } else if (target === "video") {
-      setBlanked((current) => merged([...current, span]));
-    } else {
-      setMuted((current) => ({ ...current, [target]: merged([...(current[target] ?? []), span]) }));
+      if (shot.to - shot.from - hollowed(next, shot.from, shot.to) < MIN_LENGTH) return null;
+      return { removed: next, blanked, muted };
     }
+    if (target === "video") return { removed, blanked: merged([...blanked, span]), muted };
+    return { removed, blanked, muted: { ...muted, [target]: merged([...(muted[target] ?? []), span]) } };
+  }, [blanked, mark, muted, removed, shot.from, shot.to, target]);
+
+  const applyMark = useCallback((): boolean => {
+    if (!mark || !withMark) return false;
+    restore(withMark);
     setDraft(null);
     return true;
-  }, [mark, removed, shot.from, shot.to, target]);
+  }, [mark, restore, withMark]);
 
-  const hushed = useMemo(
-    () =>
-      Object.entries(muted).flatMap(([stream, spans]) =>
-        spans.map((span) => ({ stream: Number(stream), ...span })),
-      ),
-    [muted],
-  );
+  const hushed = useMemo(() => silenced(muted), [muted]);
 
   const unremove = useCallback(
     (index: number) => setRemoved((current) => current.filter((_, at) => at !== index)),
@@ -131,6 +134,7 @@ export function useCuts({ playhead, separate, start, end, shot, windows }: Timin
   );
 
   return {
+    withMark,
     removed,
     blanked,
     muted,

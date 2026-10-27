@@ -51,6 +51,8 @@ pub struct Engine {
     rate_sample: (u64, u64, Instant),
     keyframe_warned: bool,
     empty_warned: bool,
+    excluded: std::cell::Cell<Option<Option<u32>>>,
+    excluded_checked: Instant,
 }
 
 #[derive(Clone, Copy)]
@@ -75,6 +77,7 @@ struct Retired {
 }
 
 const RETAIN_FOR: Duration = Duration::from_secs(MAX_CLIP_SECONDS_RETAINED);
+const EXCLUDED_CHECK_EVERY: Duration = Duration::from_secs(5);
 const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 
 fn latency_p99_ms(window: &LatencyWindow) -> f32 {
@@ -109,6 +112,8 @@ impl Engine {
             rate_sample: (0, 0, Instant::now()),
             keyframe_warned: false,
             empty_warned: false,
+            excluded: std::cell::Cell::new(None),
+            excluded_checked: Instant::now(),
         }
     }
 
@@ -132,6 +137,7 @@ impl Engine {
             self.step_retry();
             self.step_health();
             self.step_resize_watch();
+            self.step_excluded_watch();
 
             if self.retired.as_ref().is_some_and(|r| r.at.elapsed() >= RETAIN_FOR) {
                 log::debug!("Releasing the buffer kept across the last rebuild");
@@ -425,6 +431,28 @@ impl Engine {
         }
     }
 
+    fn step_excluded_watch(&mut self) {
+        if self.active.is_none() || self.excluded_checked.elapsed() < EXCLUDED_CHECK_EVERY {
+            return;
+        }
+        self.excluded_checked = Instant::now();
+        let Some(excluded) = self.excluded.get() else {
+            return;
+        };
+        let Some(executable) = self.config.excluded_audio_executable.clone() else {
+            return;
+        };
+        let running = crate::audio::wasapi::pid_of_executable(executable.trim());
+        if running == excluded {
+            return;
+        }
+        log::info!("{executable} started or stopped; rebuilding the audio to keep it out");
+        if let Some(aim) = self.attached_aim() {
+            self.detach_retaining_buffer(Duration::ZERO);
+            self.aim_at(aim);
+        }
+    }
+
     fn step_retry(&mut self) {
         let now = Instant::now();
         let Some(retry) = self.retry.take_if(|retry| now >= retry.at) else {
@@ -691,16 +719,6 @@ impl Engine {
     }
 
     fn emit_error(&self, code: ErrorCode, message: String, recoverable: bool) {
-        self.emit_error_about(code, message, recoverable, None);
-    }
-
-    fn emit_error_about(
-        &self,
-        code: ErrorCode,
-        message: String,
-        recoverable: bool,
-        source: Option<std::path::PathBuf>,
-    ) {
         if recoverable {
             log::warn!("{code:?}: {message}");
         } else {
@@ -710,7 +728,8 @@ impl Engine {
             code,
             message,
             recoverable,
-            source,
+            source: None,
+            destination: None,
         }));
     }
 }
@@ -750,6 +769,8 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.microphone_volume != next.microphone_volume
         || current.microphone_denoise != next.microphone_denoise
         || current.excluded_audio_executable != next.excluded_audio_executable
+        || current.bitrate_kbps != next.bitrate_kbps
+        || current.buffer_seconds != next.buffer_seconds
 }
 
 #[cfg(test)]
@@ -803,13 +824,13 @@ mod tests {
     }
 
     #[test]
-    fn bitrate_and_buffer_length_apply_without_a_restart() {
+    fn bitrate_and_buffer_length_rebuild_the_pipeline() {
         let mut next = base();
         next.bitrate_kbps = 40_000;
-        assert!(!needs_restart(&base(), &next));
+        assert!(needs_restart(&base(), &next));
 
         let mut next = base();
         next.buffer_seconds = 60;
-        assert!(!needs_restart(&base(), &next));
+        assert!(needs_restart(&base(), &next));
     }
 }

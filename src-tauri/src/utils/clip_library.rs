@@ -492,10 +492,28 @@ pub fn rename(dir: &Path, path: &Path, name: &str) -> Result<PathBuf> {
     Ok(plain(destination))
 }
 
+fn gif_bytes(dir: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(resolved(dir)) else {
+        return 0;
+    };
+    entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("gif"))
+        })
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .sum()
+}
+
 pub fn usage(dir: &Path, limit_gb: u32) -> Result<StorageUsage> {
     let clips = list(dir)?;
     Ok(StorageUsage {
-        used_bytes: clips.iter().map(|c| c.size_bytes).sum(),
+        used_bytes: clips.iter().map(|c| c.size_bytes).sum::<u64>() + gif_bytes(dir),
         limit_bytes: limit_gb as u64 * 1024 * 1024 * 1024,
         clip_count: clips.len(),
     })
@@ -508,7 +526,13 @@ struct Cleanup {
     over_by: u64,
 }
 
-fn cleanup_plan(clips: &[ClipEntry], limit: u64) -> Cleanup {
+fn same_name(a: &Path, b: &Path) -> bool {
+    a.file_name()
+        .zip(b.file_name())
+        .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b))
+}
+
+fn cleanup_plan(clips: &[ClipEntry], limit: u64, keep: &[PathBuf]) -> Cleanup {
     let mut total: u64 = clips.iter().map(|c| c.size_bytes).sum();
     if total <= limit {
         return Cleanup::default();
@@ -519,7 +543,7 @@ fn cleanup_plan(clips: &[ClipEntry], limit: u64) -> Cleanup {
         if total <= limit {
             break;
         }
-        if clip.favourite || !clip.managed {
+        if clip.favourite || !clip.managed || keep.iter().any(|kept| same_name(kept, &clip.path)) {
             plan.spared += 1;
             continue;
         }
@@ -531,13 +555,13 @@ fn cleanup_plan(clips: &[ClipEntry], limit: u64) -> Cleanup {
     plan
 }
 
-pub fn enforce_limit(dir: &Path, limit_gb: u32) -> Result<Vec<PathBuf>> {
+pub fn enforce_limit(dir: &Path, limit_gb: u32, keep: &[PathBuf]) -> Result<Vec<PathBuf>> {
     if limit_gb == 0 {
         return Ok(Vec::new());
     }
     let limit = limit_gb as u64 * 1024 * 1024 * 1024;
 
-    let plan = cleanup_plan(&list(dir)?, limit);
+    let plan = cleanup_plan(&list(dir)?, limit, keep);
     let mut removed = Vec::new();
 
     for path in plan.remove {
@@ -948,7 +972,7 @@ mod tests {
             someone_elses("wedding", 40, 100),
         ];
 
-        let plan = cleanup_plan(&clips, 40);
+        let plan = cleanup_plan(&clips, 40, &[]);
 
         assert_eq!(
             plan.remove,
@@ -961,7 +985,7 @@ mod tests {
 
     #[test]
     fn cleanup_takes_the_oldest_until_it_fits() {
-        let plan = cleanup_plan(&library(), 100);
+        let plan = cleanup_plan(&library(), 100, &[]);
 
         assert_eq!(
             plan.remove,
@@ -974,7 +998,7 @@ mod tests {
 
     #[test]
     fn cleanup_keeps_going_until_it_actually_fits() {
-        let plan = cleanup_plan(&library(), 45);
+        let plan = cleanup_plan(&library(), 45, &[]);
         assert_eq!(
             plan.remove,
             vec![PathBuf::from("old.mp4"), PathBuf::from("mid.mp4")],
@@ -983,8 +1007,28 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_keeps_the_new_clip_however_its_folder_is_written() {
+        let clips = library();
+
+        let plan = cleanup_plan(&clips, 0, &[PathBuf::from("\\\\server\\share\\clips\\NEW.mp4")]);
+
+        assert!(!plan.remove.contains(&clips[0].path), "the clip that was just saved was deleted");
+    }
+
+    #[test]
+    fn gifs_show_in_the_usage_but_never_cost_a_clip() {
+        let dir = temp_dir("gif-usage");
+        write_clip(&dir, "fight.mp4", 10);
+        write_clip(&dir, "fight.gif", 5);
+
+        assert_eq!(usage(&dir, 1).unwrap().used_bytes, 15);
+        assert_eq!(cleanup_plan(&list(&dir).unwrap(), 10, &[]), Cleanup::default());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn cleanup_does_nothing_when_there_is_room() {
-        assert_eq!(cleanup_plan(&library(), 1000), Cleanup::default());
+        assert_eq!(cleanup_plan(&library(), 1000, &[]), Cleanup::default());
     }
 
     #[test]
@@ -992,7 +1036,7 @@ mod tests {
         let mut clips = library();
         clips[2].favourite = true;
 
-        let plan = cleanup_plan(&clips, 100);
+        let plan = cleanup_plan(&clips, 100, &[]);
 
         assert_eq!(
             plan.remove,
@@ -1013,7 +1057,7 @@ mod tests {
             })
             .collect();
 
-        let plan = cleanup_plan(&clips, 40);
+        let plan = cleanup_plan(&clips, 40, &[]);
 
         assert!(plan.remove.is_empty(), "nothing marked may be deleted");
         assert_eq!(plan.spared, 3);
@@ -1218,7 +1262,7 @@ mod tests {
     fn a_zero_limit_disables_cleanup() {
         let dir = temp_dir("nolimit");
         write_clip(&dir, "a.mp4", 1024);
-        assert!(enforce_limit(&dir, 0).unwrap().is_empty());
+        assert!(enforce_limit(&dir, 0, &[]).unwrap().is_empty());
         assert_eq!(list(&dir).unwrap().len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }

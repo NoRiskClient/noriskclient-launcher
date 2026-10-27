@@ -143,6 +143,14 @@ impl Engine {
                     );
                     if let Err(e) = plays_back(&written.path) {
                         log::error!("The saved clip {} will not play back: {e:#}", written.path.display());
+                        let _ = events.send(CaptureToLauncher::Error(CaptureError {
+                            code: ErrorCode::ClipWrite,
+                            message: format!("the saved clip will not play back: {e:#}"),
+                            recoverable: true,
+                            source: Some(written.path),
+                            destination: None,
+                        }));
+                        return;
                     }
                     let _ = events.send(CaptureToLauncher::ClipSaved(ClipManifest {
                         path: written.path,
@@ -165,7 +173,8 @@ impl Engine {
                         code: ErrorCode::ClipWrite,
                         message: format!("{e:#}"),
                         recoverable: true,
-                        source: None,
+                        source: Some(path),
+                        destination: None,
                     }));
                 }
             })

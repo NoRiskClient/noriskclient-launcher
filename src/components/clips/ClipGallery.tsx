@@ -21,6 +21,7 @@ import {
   setClipFavourite,
   getClipStorageUsage,
   listClips,
+  getEditorClip,
   openClipEditor,
   revealClip,
   samePath,
@@ -163,8 +164,19 @@ export function ClipGallery({
     [refresh, t],
   );
 
+  const editing = useCallback(
+    async (clip: ClipEntry) => {
+      const open = await getEditorClip().catch(() => null);
+      if (!open || !samePath(open.path, clip.path)) return false;
+      toast.error(t("clips.gallery.in_editor"));
+      return true;
+    },
+    [t],
+  );
+
   const rename = useCallback(
     async (clip: ClipEntry, wanted: string): Promise<boolean> => {
+      if (await editing(clip)) return false;
       try {
         const moved = await renameClip(clip.path, wanted);
         setSelected((current) =>
@@ -178,7 +190,7 @@ export function ClipGallery({
         return false;
       }
     },
-    [refresh],
+    [editing, refresh],
   );
 
   const edit = useCallback((clip: ClipEntry) => {
@@ -190,6 +202,7 @@ export function ClipGallery({
 
   const remove = useCallback(
     async (clip: ClipEntry) => {
+      if (await editing(clip)) return;
       const sure = await confirm({
         title: t("clips.gallery.delete"),
         message: t("clips.gallery.delete_message", { name: clip.name }),
@@ -586,11 +599,13 @@ function ClipPlayer({
   const [ratio, setRatio] = useState(16 / 9);
 
   const edit = useCallback(() => {
-    openClipEditor(clip.path, clip.name).catch((e) => {
-      console.error("Could not open the clip editor", e);
-      toast.error(parseErrorMessage(e));
-    });
-  }, [clip.name, clip.path]);
+    openClipEditor(clip.path, clip.name)
+      .then(onClose)
+      .catch((e) => {
+        console.error("Could not open the clip editor", e);
+        toast.error(parseErrorMessage(e));
+      });
+  }, [clip.name, clip.path, onClose]);
 
   const footer = (
     <div className="flex items-center justify-end gap-3">
