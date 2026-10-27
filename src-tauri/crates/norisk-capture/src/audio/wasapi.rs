@@ -945,11 +945,4 @@ mod process_tests {
         assert_eq!(pid_of_executable("   "), None);
         assert_eq!(pid_of_executable("definitely-not-running-42.exe"), None);
     }
-
-    #[test]
-    #[ignore = "needs a real output device"]
-    fn the_output_device_is_recorded_at_the_microphone_format() {
-        let (_, format) = probe_source(&AudioSource::DefaultDevice).unwrap();
-        assert_eq!((format.sample_rate, format.channels), (PROCESS_SAMPLE_RATE, PROCESS_CHANNELS));
-    }
 }

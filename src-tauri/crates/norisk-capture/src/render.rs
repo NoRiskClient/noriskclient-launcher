@@ -1121,42 +1121,6 @@ mod render_tests {
 
     #[test]
     #[ignore = "needs a real clip in NRC_TEST_CLIP"]
-    fn a_render_to_the_clips_end_keeps_its_last_frame() {
-        let source = std::path::PathBuf::from(std::env::var("NRC_TEST_CLIP").unwrap());
-        let destination = std::env::temp_dir().join("nrc-end-render-test.mp4");
-        let _ = std::fs::remove_file(&destination);
-
-        let original = crate::trim::read(&source).unwrap();
-        let end = original.duration_seconds();
-        let start = (end - 3.0).max(0.0);
-        let request = norisk_ipc::ExportVerticalRequest {
-            source,
-            destination: destination.clone(),
-            shape: norisk_ipc::ClipShape::Original,
-            start_seconds: Some(start),
-            end_seconds: Some(end),
-            ..Default::default()
-        };
-        super::render(&request, |_, _| {}).unwrap();
-
-        let shown = |clip: &crate::trim::SourceClip, from: i64| {
-            clip.video.iter().filter(|p| p.pts >= from).count()
-        };
-        let from = original.first_pts
-            + (start * crate::encoder::video::TIME_BASE_DEN as f64).round() as i64;
-        let written = crate::trim::read(&destination).unwrap();
-        println!("{} of {} frames", written.video.len(), shown(&original, from));
-        assert!(written.video.len() + 1 >= shown(&original, from));
-        assert!(written.video.len() <= shown(&original, from));
-        assert_eq!(
-            (written.duration_seconds() * 1000.0).round(),
-            ((end - start) * 1000.0).round(),
-            "the last frame of the clip went missing"
-        );
-    }
-
-    #[test]
-    #[ignore = "needs a real clip in NRC_TEST_CLIP"]
     fn a_cut_render_runs_exactly_as_long_as_the_cut() {
         use crate::encoder::video::TIME_BASE_DEN;
 

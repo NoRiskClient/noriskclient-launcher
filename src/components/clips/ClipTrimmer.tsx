@@ -62,6 +62,7 @@ import {
   GapBlock,
   JoinMark,
   Pieces,
+  ZoomBar,
 } from "./editor/Timeline";
 import { PanelTitle, OverlayInspector } from "./editor/Inspector";
 import {
@@ -1292,14 +1293,13 @@ export function ClipTrimmer({
                     )}
                   </div>
 
-                  <div ref={lanesScroll} className="custom-scrollbar overflow-x-auto">
+                  <div ref={lanesScroll} className="no-scrollbar overflow-x-auto">
                   <div
-                    data-zoomed={timelineZoom.zoom > 1}
-                    className="group/timeline relative flex select-none flex-col gap-1.5"
+                    className="relative flex select-none flex-col gap-1.5"
                     style={{ width: `calc(9.5rem + (100% - 9.5rem) * ${timelineZoom.zoom})` }}
                   >
                     <div className="flex">
-                      <div className="sticky left-0 z-30 w-[9.5rem] shrink-0 group-data-[zoomed=true]/timeline:bg-neutral-950" />
+                      <div className="w-[9.5rem] shrink-0" />
                       <Ruler
                         scale={scaleRef}
                         duration={view.length}
@@ -1414,7 +1414,7 @@ export function ClipTrimmer({
                       />
                     ))}
 
-                    <div className="pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
+                    <div className="timeline-clip pointer-events-none absolute inset-y-0 left-[9.5rem] right-0">
                       {!separate && clipMasks(start, end)}
                       {removed.map((span, index) => (
                         <JoinMark
@@ -1434,6 +1434,12 @@ export function ClipTrimmer({
                     </div>
                   </div>
                   </div>
+                  <ZoomBar
+                    scroller={lanesScroll}
+                    track={scaleRef}
+                    hidden={!timelineZoom.canZoomOut}
+                    color={accentColor.value}
+                  />
                 </div>
               </div>
             </section>

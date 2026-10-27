@@ -148,6 +148,7 @@ impl Engine {
                             message: format!("the saved clip will not play back: {e:#}"),
                             recoverable: true,
                             source: Some(written.path),
+                            destination: None,
                         }));
                         return;
                     }
@@ -173,6 +174,7 @@ impl Engine {
                         message: format!("{e:#}"),
                         recoverable: true,
                         source: Some(path),
+                        destination: None,
                     }));
                 }
             })

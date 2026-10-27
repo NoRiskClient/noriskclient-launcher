@@ -42,10 +42,31 @@ export function useTimelineZoom(
   useEffect(() => {
     const box = scroller.current;
     if (!box) return;
+    const sync = () => {
+      box.style.setProperty("--timeline-scroll", `${box.scrollLeft}px`);
+      box.dataset.scrolled = String(box.scrollLeft > 0);
+    };
+    sync();
+    box.addEventListener("scroll", sync, { passive: true });
+    return () => box.removeEventListener("scroll", sync);
+  }, [scroller]);
+
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
     const wheel = (event: WheelEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return;
+      if (event.deltaY === 0) return;
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        zoomBy(event.deltaY < 0 ? STEP : 1 / STEP, event.clientX);
+        return;
+      }
+      const room = box.scrollWidth - box.clientWidth;
+      if (room <= 0 || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
       event.preventDefault();
-      zoomBy(event.deltaY < 0 ? STEP : 1 / STEP, event.clientX);
+      const lines = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+      const pages = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? box.clientWidth : 1;
+      box.scrollLeft += event.deltaY * lines * pages;
     };
     box.addEventListener("wheel", wheel, { passive: false });
     return () => box.removeEventListener("wheel", wheel);

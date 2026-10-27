@@ -719,16 +719,6 @@ impl Engine {
     }
 
     fn emit_error(&self, code: ErrorCode, message: String, recoverable: bool) {
-        self.emit_error_about(code, message, recoverable, None);
-    }
-
-    fn emit_error_about(
-        &self,
-        code: ErrorCode,
-        message: String,
-        recoverable: bool,
-        source: Option<std::path::PathBuf>,
-    ) {
         if recoverable {
             log::warn!("{code:?}: {message}");
         } else {
@@ -738,7 +728,8 @@ impl Engine {
             code,
             message,
             recoverable,
-            source,
+            source: None,
+            destination: None,
         }));
     }
 }

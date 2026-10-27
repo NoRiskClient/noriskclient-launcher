@@ -15,7 +15,7 @@ impl Engine {
 
         let spawned = std::thread::Builder::new()
             .name("nrc-preview".into())
-            .spawn(move || match crate::preview::prepare(&request.source) {
+            .spawn(move || match crate::preview::prepare(&request.source, request.waveform_only) {
                 Ok(tracks) => {
                     let _ = events.send(CaptureToLauncher::AudioPreviewReady(
                         norisk_ipc::AudioPreview {
@@ -46,6 +46,7 @@ impl Engine {
             "Vertical export failed",
             "could not start the export",
             request.source.clone(),
+            request.destination.clone(),
             move |report| {
                 let started = Instant::now();
                 let result = crate::render::render(&request, report)?;
@@ -74,6 +75,7 @@ impl Engine {
             "GIF export failed",
             "could not start the GIF export",
             request.source.clone(),
+            request.destination.clone(),
             move |report| {
                 let started = Instant::now();
                 let result = crate::gif::to_gif(&request.source, &request.destination, report)?;
@@ -102,12 +104,13 @@ impl Engine {
         failed: &'static str,
         unstarted: &str,
         source: std::path::PathBuf,
+        destination: std::path::PathBuf,
         work: F,
     ) where
         F: FnOnce(&dyn Fn(u32, u32)) -> anyhow::Result<CaptureToLauncher> + Send + 'static,
     {
         let events = self.events.clone();
-        let about = source.clone();
+        let about = (source.clone(), destination.clone());
 
         let spawned = std::thread::Builder::new()
             .name(thread.into())
@@ -135,18 +138,14 @@ impl Engine {
                     }
                     Err(e) => {
                         log::error!("{failed}: {e:#}");
-                        let _ = events.send(CaptureToLauncher::Error(CaptureError {
-                            code: ErrorCode::ClipWrite,
-                            message: format!("{e:#}"),
-                            recoverable: true,
-                            source: Some(source.clone()),
-                        }));
+                        let _ = events.send(edit_failed(format!("{e:#}"), source.clone(), destination));
                     }
                 }
             });
 
         if let Err(e) = spawned {
-            self.emit_error_about(ErrorCode::ClipWrite, format!("{unstarted}: {e}"), true, Some(about));
+            log::warn!("{unstarted}: {e}");
+            let _ = self.events.send(edit_failed(format!("{unstarted}: {e}"), about.0, about.1));
         }
     }
 
@@ -156,6 +155,7 @@ impl Engine {
             "Trim failed",
             "could not start the trim",
             request.source.clone(),
+            request.destination.clone(),
             move |_| {
                 let started = Instant::now();
                 let result = crate::trim::trim(
@@ -184,4 +184,14 @@ impl Engine {
             },
         );
     }
+}
+
+fn edit_failed(message: String, source: std::path::PathBuf, destination: std::path::PathBuf) -> CaptureToLauncher {
+    CaptureToLauncher::Error(CaptureError {
+        code: ErrorCode::ClipWrite,
+        message,
+        recoverable: true,
+        source: Some(source),
+        destination: Some(destination),
+    })
 }
