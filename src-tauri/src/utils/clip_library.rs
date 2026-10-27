@@ -1010,7 +1010,7 @@ mod tests {
     fn cleanup_keeps_the_new_clip_however_its_folder_is_written() {
         let clips = library();
 
-        let plan = cleanup_plan(&clips, 0, &[PathBuf::from("\\\\server\\share\\clips\\NEW.mp4")]);
+        let plan = cleanup_plan(&clips, 0, &[Path::new("elsewhere").join("clips").join("NEW.mp4")]);
 
         assert!(!plan.remove.contains(&clips[0].path), "the clip that was just saved was deleted");
     }
