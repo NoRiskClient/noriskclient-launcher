@@ -29,10 +29,9 @@ struct Painter {
         let unit = Double(height) / 1080
         let scaled = { (value: Int) in max(1, Int((Double(value) * unit).rounded())) }
         layers = (value as? [[String: Any]] ?? []).compactMap { overlay in
-            let number = { (key: String) in (overlay[key] as? NSNumber)?.doubleValue }
-            guard let kind = overlay["kind"] as? String, let from = number("startSeconds"), let to = number("endSeconds"),
-                  let rect = pixelRect(left: number("left") ?? 0, top: number("top") ?? 0, width: number("width") ?? 0,
-                                       height: number("height") ?? 0, frameWidth: width, frameHeight: height)
+            guard let kind = overlay["kind"] as? String, let from = overlay.number("startSeconds"), let to = overlay.number("endSeconds"),
+                  let rect = pixelRect(left: overlay.number("left") ?? 0, top: overlay.number("top") ?? 0, width: overlay.number("width") ?? 0,
+                                       height: overlay.number("height") ?? 0, frameWidth: width, frameHeight: height)
             else { return nil }
             let area = CGRect(x: rect.left, y: height - rect.top - rect.height, width: rect.width, height: rect.height)
             let colour = (overlay["colour"] as? NSNumber)?.uint32Value ?? 0

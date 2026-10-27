@@ -217,12 +217,11 @@ func editMedia(_ message: [String: Any]) async throws {
     guard let path = message["destination"] as? String else { throw failure("The export destination is missing.") }
     let destination = URL(fileURLWithPath: path)
     let render = message["type"] as? String == "export_vertical"
-    let number = { (key: String) -> Double? in (message[key] as? NSNumber)?.doubleValue.finite }
-    let start = max(0, number("start_seconds") ?? 0), end = min(duration, number("end_seconds") ?? duration)
+    let start = max(0, message.number("start_seconds") ?? 0), end = min(duration, message.number("end_seconds") ?? duration)
     guard end - start >= 0.5 else { throw failure("A trimmed clip has to be at least 0.5 seconds long.") }
     let timeline = Timeline(start: start, end: end, removed: render ? spans(message["removed"]) : [])
-    let pictureStart = min(max(number("video_start_seconds") ?? start, start), end)
-    let pictureEnd = max(min(max(number("video_end_seconds") ?? end, start), end), pictureStart)
+    let pictureStart = min(max(message.number("video_start_seconds") ?? start, start), end)
+    let pictureEnd = max(min(max(message.number("video_end_seconds") ?? end, start), end), pictureStart)
     let composition = AVMutableComposition()
     guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first,
           let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
@@ -277,13 +276,16 @@ extension Double {
     var finite: Double? { isFinite ? self : nil }
 }
 
+extension Dictionary where Key == String, Value == Any {
+    func number(_ key: String) -> Double? { (self[key] as? NSNumber)?.doubleValue.finite }
+}
+
 struct Span { var from: Double, to: Double }
 
 func spans(_ value: Any?, stream: Int? = nil) -> [Span] {
     (value as? [[String: Any]] ?? []).compactMap { span in
         if let stream, (span["stream"] as? NSNumber)?.intValue != stream { return nil }
-        guard let from = (span["startSeconds"] as? NSNumber)?.doubleValue, let to = (span["endSeconds"] as? NSNumber)?.doubleValue,
-              from.isFinite, to.isFinite, to > from else { return nil }
+        guard let from = span.number("startSeconds"), let to = span.number("endSeconds"), to > from else { return nil }
         return Span(from: from, to: to)
     }
 }
@@ -334,8 +336,8 @@ struct Level {
 func trackLevels(_ value: Any?) -> [Level] {
     (value as? [[String: Any]] ?? []).compactMap { level in
         guard let stream = (level["stream"] as? NSNumber)?.intValue, let volume = (level["volume"] as? NSNumber)?.intValue else { return nil }
-        let time = { (key: String) in (level[key] as? NSNumber)?.doubleValue.finite }
-        return Level(stream: stream, volume: volume, offset: time("offsetSeconds") ?? 0, from: time("startSeconds"), to: time("endSeconds"))
+        return Level(stream: stream, volume: volume, offset: level.number("offsetSeconds") ?? 0,
+                     from: level.number("startSeconds"), to: level.number("endSeconds"))
     }
 }
 

@@ -412,7 +412,10 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             audioStream = other
         }
         queue.sync {
-            if !keepingBuffer { ring = Samples() }; audioSource = source; denoiser = config.capture_microphone && config.microphone_denoise ? Denoiser() : nil; self.width = width; self.height = height; self.codec = codec
+            if !keepingBuffer { ring = Samples() }
+            audioSource = source
+            denoiser = config.capture_microphone && config.microphone_denoise ? Denoiser() : nil
+            self.width = width; self.height = height; self.codec = codec
             self.encoder = hardware ? "video_toolbox" : "software"; compression = session
             self.stream = stream; self.audioStream = audioStream
         }
