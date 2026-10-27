@@ -16,10 +16,11 @@ func emit(_ type: String, _ fields: [String: Any] = [:]) {
     FileHandle.standardOutput.write(data + Data([10]))
 }
 private let outputLock = NSLock()
-func report(_ error: Error, code: String = "internal", recoverable: Bool = true, source: String? = nil) {
+func report(_ error: Error, code: String = "internal", recoverable: Bool = true, source: String? = nil, destination: String? = nil) {
     captureLog("Error [\(code)]: \(error.localizedDescription)")
     var fields: [String: Any] = ["code": code, "message": error.localizedDescription, "recoverable": recoverable]
     if let source { fields["source"] = source }
+    if let destination { fields["destination"] = destination }
     emit("error", fields)
 }
 func failure(_ message: String) -> NSError { NSError(domain: "NoRiskCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
@@ -255,13 +256,17 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 pendingMedia.enter()
                 Task {
                     defer { pendingMedia.leave() }
-                    do { try await editMedia(message) } catch { report(error, code: "clip_write", source: message["source"] as? String) }
+                    do { try await editMedia(message) } catch {
+                        report(error, code: "clip_write", source: message["source"] as? String, destination: message["destination"] as? String)
+                    }
                 }
             case "export_gif":
                 pendingMedia.enter()
                 Task {
                     defer { pendingMedia.leave() }
-                    do { try await exportGif(message) } catch { report(error, code: "clip_write", source: message["source"] as? String) }
+                    do { try await exportGif(message) } catch {
+                        report(error, code: "clip_write", source: message["source"] as? String, destination: message["destination"] as? String)
+                    }
                 }
             default: break
             }
@@ -587,6 +592,7 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         let start = time(last) - pre
         let config = self.config
         let reason = request["reason"] as? [String: Any] ?? ["type": "manual"]
+        let named = clipDestination(config: config, reason: reason)
         pendingSaves += 1; pendingMedia.enter()
         let id = UUID()
         saveRetention[id] = pre + post + config.gop_seconds
@@ -597,8 +603,8 @@ final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 let snapshot = try ring.snapshot(from: start, through: end)
                 Task {
                     let size = snapshot.video.first.flatMap(CMSampleBufferGetFormatDescription).map(CMVideoFormatDescriptionGetDimensions)
-                    do { try await saveMedia(snapshot, config: config, width: Int(size?.width ?? 0), height: Int(size?.height ?? 0), reason: reason) }
-                    catch { report(error, code: "clip_write") }
+                    do { try await saveMedia(snapshot, config: config, width: Int(size?.width ?? 0), height: Int(size?.height ?? 0), reason: reason, to: named) }
+                    catch { report(error, code: "clip_write", source: named.url.path) }
                     self.queue.async { self.pendingSaves -= 1; self.pendingMedia.leave() }
                 }
             } catch { self.pendingSaves -= 1; self.pendingMedia.leave(); report(error, code: "buffer_empty") }

@@ -113,8 +113,16 @@ func temporaryDirectory() throws -> URL {
     return dir
 }
 
+func clipDestination(config: Settings, reason: [String: Any]) -> (url: URL, stamp: String) {
+    let dir = URL(fileURLWithPath: config.output_dir, isDirectory: true)
+    let stamp = String(Int(Date().timeIntervalSince1970))
+    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && ($0.isLetter || $0.isNumber) ? String($0).lowercased() : "_" }.joined()
+    return (dir.appendingPathComponent("\(stamp)_\(slug)-\(UUID().uuidString.prefix(8)).mp4"), stamp)
+}
+
 @available(macOS 15.0, *)
-func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, reason: [String: Any]) async throws {
+func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, reason: [String: Any],
+               to named: (url: URL, stamp: String)) async throws {
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
     let raw = temp.appendingPathComponent("capture.mov")
     let labels = try await writeSamples(samples, to: raw)
@@ -151,11 +159,8 @@ func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, re
             stem.isEnabled = false
         }
     }
-    let dir = URL(fileURLWithPath: config.output_dir, isDirectory: true)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    let stamp = String(Int(Date().timeIntervalSince1970))
-    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && ($0.isLetter || $0.isNumber) ? String($0).lowercased() : "_" }.joined()
-    let destination = dir.appendingPathComponent("\(stamp)_\(slug)-\(UUID().uuidString.prefix(8)).mp4")
+    let (destination, stamp) = named
+    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
     try await export(composition, to: destination)
     let tracks: [[String: Any]] = audio.isEmpty ? [] : [["label": "Mix", "stream": 0, "adjustable": false, "peaks": []]] + labels.enumerated().map { index, label in
         ["label": label, "stream": index + 1, "adjustable": true, "peaks": audioPeaks(audio[index])]
