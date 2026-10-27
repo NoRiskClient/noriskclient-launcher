@@ -160,19 +160,13 @@ final class Denoiser {
             if !warned { warned = true; captureLog("Noise suppression needs a 48000 Hz float microphone, this one runs at \(description.mSampleRate) Hz, so it is recorded without") }
             return
         }
-        var size = 0
-        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: &size, bufferListOut: nil, bufferListSize: 0,
-                blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: nil) == noErr else { return }
-        let list = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: MemoryLayout<AudioBufferList>.alignment)
-        defer { list.deallocate() }
-        let buffers = list.assumingMemoryBound(to: AudioBufferList.self)
-        var block: CMBlockBuffer?
-        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: nil, bufferListOut: buffers, bufferListSize: size,
-                blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: &block) == noErr else { return }
-        for (index, buffer) in UnsafeMutableAudioBufferListPointer(buffers).enumerated() {
-            guard let data = buffer.mData else { continue }
-            while states.count <= index { states.append(denoiserNew?(UInt16(max(1, buffer.mNumberChannels)))) }
-            denoiserProcess?(states[index], data.assumingMemoryBound(to: Float.self), Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
+        _ = withAudioBuffers(sample) { buffers -> Void? in
+            for (index, buffer) in UnsafeMutableAudioBufferListPointer(buffers).enumerated() {
+                guard let data = buffer.mData else { continue }
+                while states.count <= index { states.append(denoiserNew?(UInt16(max(1, buffer.mNumberChannels)))) }
+                denoiserProcess?(states[index], data.assumingMemoryBound(to: Float.self), Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
+            }
+            return ()
         }
     }
 }

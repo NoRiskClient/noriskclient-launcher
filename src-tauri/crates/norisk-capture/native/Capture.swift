@@ -32,8 +32,7 @@ struct CaptureFailure: LocalizedError {
 }
 func seconds(_ value: Double) -> CMTime { CMTime(seconds: value, preferredTimescale: 1_000_000) }
 func time(_ sample: CMSampleBuffer) -> Double { CMSampleBufferGetPresentationTimeStamp(sample).seconds }
-func detached(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
-    guard let format = CMSampleBufferGetFormatDescription(sample) else { return nil }
+func withAudioBuffers<T>(_ sample: CMSampleBuffer, _ body: (UnsafeMutablePointer<AudioBufferList>) -> T?) -> T? {
     var size = 0
     guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: &size, bufferListOut: nil, bufferListSize: 0,
             blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: nil) == noErr else { return nil }
@@ -43,13 +42,19 @@ func detached(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
     var block: CMBlockBuffer?
     guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, bufferListSizeNeededOut: nil, bufferListOut: buffers, bufferListSize: size,
             blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: &block) == noErr else { return nil }
-    var copy: CMSampleBuffer?
-    guard CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil,
-            formatDescription: format, sampleCount: CMSampleBufferGetNumSamples(sample),
-            presentationTimeStamp: CMSampleBufferGetPresentationTimeStamp(sample), packetDescriptions: nil, sampleBufferOut: &copy) == noErr,
-          let copy, CMSampleBufferSetDataBufferFromAudioBufferList(copy, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
-            flags: 0, bufferList: buffers) == noErr else { return nil }
-    return copy
+    return withExtendedLifetime(block) { body(buffers) }
+}
+func detached(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
+    guard let format = CMSampleBufferGetFormatDescription(sample) else { return nil }
+    return withAudioBuffers(sample) { buffers -> CMSampleBuffer? in
+        var copy: CMSampleBuffer?
+        guard CMAudioSampleBufferCreateWithPacketDescriptions(allocator: nil, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil,
+                formatDescription: format, sampleCount: CMSampleBufferGetNumSamples(sample),
+                presentationTimeStamp: CMSampleBufferGetPresentationTimeStamp(sample), packetDescriptions: nil, sampleBufferOut: &copy) == noErr,
+              let copy, CMSampleBufferSetDataBufferFromAudioBufferList(copy, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
+                flags: 0, bufferList: buffers) == noErr else { return nil }
+        return copy
+    }
 }
 @available(macOS 15.0, *)
 func audioExclusions(_ content: SCShareableContent, executable: String?) -> [SCRunningApplication] {
