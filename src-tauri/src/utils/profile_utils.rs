@@ -2345,9 +2345,12 @@ impl LocalContentLoader {
 
                 let is_valid_item = match params.content_type {
                     ContentType::ResourcePack => {
-                        (file_name_str.ends_with(".zip")
-                            || file_name_str.ends_with(".zip.disabled"))
-                            && !is_directory
+                        if is_directory {
+                            path.join("pack.mcmeta").is_file()
+                        } else {
+                            file_name_str.ends_with(".zip")
+                                || file_name_str.ends_with(".zip.disabled")
+                        }
                     }
                     ContentType::ShaderPack => {
                         (file_name_str.ends_with(".zip")

@@ -43,6 +43,17 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     Ok(())
 }
 
+async fn read_pack_png_from_dir_as_base64(dir: &Path) -> Result<String> {
+    let icon_path = dir.join("pack.png");
+    match tokio::fs::read(&icon_path).await {
+        Ok(bytes) => Ok(STANDARD.encode(&bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(AppError::PngNotFoundInArchive(dir.to_path_buf()))
+        }
+        Err(e) => Err(AppError::Io(e)),
+    }
+}
+
 /// Helper function to read a specific zip entry by index and encode it as Base64
 async fn read_zip_entry_as_base64(
     zip: &mut ZipFileReader<tokio::io::BufReader<tokio::fs::File>>,
@@ -79,6 +90,9 @@ async fn read_zip_entry_as_base64(
 ///
 /// A `Result` containing the Base64 encoded string of the first PNG found, or an `AppError`.
 pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<String> {
+    if archive_path.is_dir() {
+        return read_pack_png_from_dir_as_base64(archive_path).await;
+    }
     if !archive_path.exists() {
         debug!("Archive not found at path: {}", archive_path.display());
         return Err(AppError::FileNotFound(archive_path.to_path_buf()));
