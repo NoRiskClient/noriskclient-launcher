@@ -14,6 +14,7 @@ use crate::state::State;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use crate::utils::import_safety::{safe_file_component, strip_profile_flags, ImportSecurityReport};
 use chrono::Utc;
+#[cfg(not(unix))]
 use fs4::tokio::AsyncFileExt;
 use log::{info, warn};
 use sanitize_filename::sanitize;
@@ -111,10 +112,50 @@ async fn world_is_open(world_dir: &Path) -> bool {
         return false;
     }
 
+    session_lock_is_held(&lock_path).await
+}
+
+#[cfg(unix)]
+async fn session_lock_is_held(lock_path: &Path) -> bool {
+    use std::os::fd::AsRawFd;
+
+    let file = match std::fs::File::open(lock_path) {
+        Ok(file) => file,
+        Err(err) => {
+            warn!(
+                "Could not open {} to check the world lock, assuming it is not in use: {}",
+                lock_path.display(),
+                err
+            );
+            return false;
+        }
+    };
+
+    let mut lock: libc::flock = unsafe { std::mem::zeroed() };
+    lock.l_type = libc::F_WRLCK as _;
+    lock.l_whence = libc::SEEK_SET as _;
+    lock.l_start = 0;
+    lock.l_len = 0;
+
+    let result = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETLK, &mut lock) };
+    if result == -1 {
+        warn!(
+            "Could not query the world lock on {}, assuming it is not in use: {}",
+            lock_path.display(),
+            std::io::Error::last_os_error()
+        );
+        return false;
+    }
+
+    lock.l_type != libc::F_UNLCK as libc::c_short
+}
+
+#[cfg(not(unix))]
+async fn session_lock_is_held(lock_path: &Path) -> bool {
     let Ok(file) = tokio::fs::OpenOptions::new()
         .write(true)
         .create(false)
-        .open(&lock_path)
+        .open(lock_path)
         .await
     else {
         return true;
