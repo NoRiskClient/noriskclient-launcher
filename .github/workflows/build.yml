@@ -279,7 +279,8 @@ jobs:
           
           echo "Removing conflicting libraries..."
           find squashfs-root -name "*wayland*" -delete
-          
+          chmod -R a+rX squashfs-root
+
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
           
