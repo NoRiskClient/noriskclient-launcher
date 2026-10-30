@@ -459,7 +459,7 @@ async fn main() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
                 trace!("Attempting to retrieve launcher configuration for update check...");

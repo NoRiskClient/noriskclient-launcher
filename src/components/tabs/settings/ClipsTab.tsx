@@ -1,6 +1,6 @@
 "use client";
 
-import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../../store/capture-permissions-store";
+import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
@@ -101,8 +101,7 @@ export function ClipsTab() {
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const supported = supportsClips();
-  const permissions = useCapturePermissionsStore((state) => state.permissions);
-  const permissionsReady = !isMacOS() || allCapturePermissionsGranted(permissions);
+  const permissionsReady = useCapturePermissionsReady();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -552,7 +551,7 @@ export function ClipsTab() {
               </div>
             </SettingRow>
 
-            {effectiveAudioSource === "system" && !isMacOS() && (
+            {effectiveAudioSource === "system" && (
               <SettingRow
                 label={t("settings.clips.audio.exclude")}
                 description={t(
@@ -638,7 +637,7 @@ export function ClipsTab() {
               </SettingRow>
             )}
 
-            {effectiveAudioSource === "system" && (
+            {effectiveAudioSource === "system" && !isMacOS() && (
               <SettingRow
                 label={t("settings.clips.audio.device")}
                 description={t("settings.clips.audio.device.description")}
@@ -723,20 +722,18 @@ export function ClipsTab() {
                   />
                 </SettingRow>
 
-                {!isMacOS() && (
-                  <SettingRow
-                    label={t("settings.clips.audio.microphone_denoise")}
-                    description={t("settings.clips.audio.microphone_denoise.description")}
-                    searchKeywords={kw("settings.clips.audio.microphone_denoise", "rauschen", "noise", "luefter", "fan", "tastatur", "hintergrund")}
-                    disabled={!clips.enabled}
-                  >
-                    <ToggleSwitch
-                      checked={clips.microphone_denoise}
-                      onChange={(microphone_denoise) => patch({ microphone_denoise })}
-                      disabled={!clips.enabled || saving}
-                    />
-                  </SettingRow>
-                )}
+                <SettingRow
+                  label={t("settings.clips.audio.microphone_denoise")}
+                  description={t("settings.clips.audio.microphone_denoise.description")}
+                  searchKeywords={kw("settings.clips.audio.microphone_denoise", "rauschen", "noise", "luefter", "fan", "tastatur", "hintergrund")}
+                  disabled={!clips.enabled}
+                >
+                  <ToggleSwitch
+                    checked={clips.microphone_denoise}
+                    onChange={(microphone_denoise) => patch({ microphone_denoise })}
+                    disabled={!clips.enabled || saving}
+                  />
+                </SettingRow>
               </>
             )}
           </>

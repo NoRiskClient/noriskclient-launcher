@@ -173,7 +173,7 @@ function ShadeChoice({
               )
             }
             className={cn(
-              "h-full aspect-square shrink-0 rounded-lg border border-white/20 transition-colors",
+              "h-full w-[46px] shrink-0 rounded-lg border border-white/20 transition-colors",
               disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:border-white/60",
             )}
             style={{ backgroundColor: toHex(value) }}

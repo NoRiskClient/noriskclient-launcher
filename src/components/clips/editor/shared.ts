@@ -1,5 +1,4 @@
 import type { ClipCorner, ClipOverlay, ClipShape, ClipTextAlign, ClipTextVertical, Span } from "../../../services/clip-service";
-import { isMacOS } from "../../../utils/platform";
 
 export const MIN_LENGTH = 0.5;
 
@@ -105,14 +104,11 @@ export const SHAPES: { choice: ClipShape; ratio: number | null; label: string }[
 
 export type Panel = "tools" | "audio" | "format";
 
-const PANELS: { id: Panel; icon: string; label: string; hint: string }[] = [
+export const PANELS: { id: Panel; icon: string; label: string; hint: string }[] = [
   { id: "tools", icon: "solar:widget-bold", label: "clips.editor.tools", hint: "clips.editor.tools.hint" },
   { id: "audio", icon: "solar:soundwave-bold", label: "clips.editor.audio", hint: "clips.editor.audio.hint" },
   { id: "format", icon: "solar:smartphone-bold", label: "clips.editor.shape.label", hint: "clips.editor.shape.hint" },
 ];
-
-export const FULL_EDITOR = !isMacOS();
-export const OFFERED_PANELS = FULL_EDITOR ? PANELS : PANELS.filter((entry) => entry.id === "audio");
 
 export interface LaneWindow {
   start: number | null;

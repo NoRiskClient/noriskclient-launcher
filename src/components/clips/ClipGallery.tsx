@@ -32,10 +32,9 @@ import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
 import { VerticalExport } from "./VerticalExport";
-import { useClipEngineEvents } from "./useClipEngineEvents";
+import { clipFailure, useClipEngineEvents } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { trackEvent } from "../../services/analytics-service";
-import { isMacOS } from "../../utils/platform";
 
 export type ClipSort = "newest" | "oldest" | "largest";
 
@@ -140,10 +139,10 @@ export function ClipGallery({
       } catch (e) {
         gifDone(clip.path);
         console.error("Could not start the GIF export", e);
-        toast.error(parseErrorMessage(e));
+        toast.error(clipFailure(e, t));
       }
     },
-    [gifDone],
+    [gifDone, t],
   );
 
   const setFavourite = useCallback(
@@ -440,9 +439,7 @@ function ClipCard({
     { id: "edit", label: t("clips.gallery.edit"), icon: "solar:scissors-bold", onClick: onEdit },
     { id: "rename", label: t("clips.gallery.rename"), icon: "solar:pen-bold", onClick: onRename },
     { id: "vertical", label: t("clips.gallery.vertical"), icon: "solar:smartphone-bold", onClick: onVertical },
-    ...(isMacOS()
-      ? []
-      : [{ id: "gif", label: t("clips.gallery.gif"), icon: "solar:gallery-bold", onClick: onGif }]),
+    { id: "gif", label: t("clips.gallery.gif"), icon: "solar:gallery-bold", onClick: onGif },
     { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: onReveal },
     {
       id: "delete",

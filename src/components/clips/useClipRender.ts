@@ -10,8 +10,7 @@ import {
   type TrackCut,
   type TrackLevel,
 } from "../../services/clip-service";
-import { parseErrorMessage } from "../../utils/error-utils";
-import { useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
+import { clipFailure, useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
 import type { Translate } from "./editor/shared";
 
 interface RenderProgress {
@@ -114,10 +113,10 @@ export function useClipRender({ path, onDone, onTrim, t }: Options) {
       } catch (e) {
         console.error("Could not render the clip", e);
         finish();
-        toast.error(parseErrorMessage(e));
+        toast.error(clipFailure(e, t));
       }
     },
-    [finish, onTrim, path],
+    [finish, onTrim, path, t],
   );
 
   const percent =

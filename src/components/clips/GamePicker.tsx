@@ -9,7 +9,6 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { listOpenApps, listScreens, type OpenApp, type ScreenInfo } from "../../services/clip-service";
 import type { OtherGame, OtherScreen } from "../../types/launcherConfig";
 import { cn } from "../../lib/utils";
-import { isMacOS } from "../../utils/platform";
 
 interface Props {
   value: OtherGame | null;
@@ -36,7 +35,7 @@ export function GamePicker({
   const [screens, setScreens] = useState<ScreenInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
-  const offerScreens = Boolean(onScreen) && !isMacOS();
+  const offerScreens = Boolean(onScreen);
   const [view, setView] = useState<"apps" | "screens">(screen ? "screens" : "apps");
   const showing = offerScreens ? view : "apps";
 

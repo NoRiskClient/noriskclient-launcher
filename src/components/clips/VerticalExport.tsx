@@ -8,8 +8,7 @@ import { Modal } from "../ui/Modal";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useThemeStore } from "../../store/useThemeStore";
 import { exportVertical, samePath } from "../../services/clip-service";
-import { useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
-import { parseErrorMessage } from "../../utils/error-utils";
+import { clipFailure, useClipEngineEvents, writeFailed } from "./useClipEngineEvents";
 import { cn } from "../../lib/utils";
 
 const RATIO = 9 / 16;
@@ -57,7 +56,7 @@ export function VerticalExport({ src, path, onClose, onDone, t }: Props) {
       await exportVertical(path);
     } catch (e) {
       console.error("Could not start the vertical export", e);
-      setStage({ kind: "failed", why: parseErrorMessage(e) });
+      setStage({ kind: "failed", why: clipFailure(e, t) });
     }
   };
 

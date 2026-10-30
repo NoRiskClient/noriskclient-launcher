@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 
 func shifted(_ sample: CMSampleBuffer, by origin: CMTime) throws -> CMSampleBuffer {
     var count = 0
@@ -112,8 +113,16 @@ func temporaryDirectory() throws -> URL {
     return dir
 }
 
+func clipDestination(config: Settings, reason: [String: Any]) -> (url: URL, stamp: String) {
+    let dir = URL(fileURLWithPath: config.output_dir, isDirectory: true)
+    let stamp = String(Int(Date().timeIntervalSince1970))
+    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && ($0.isLetter || $0.isNumber) ? String($0).lowercased() : "_" }.joined()
+    return (dir.appendingPathComponent("\(stamp)_\(slug)-\(UUID().uuidString.prefix(8)).mp4"), stamp)
+}
+
 @available(macOS 15.0, *)
-func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, reason: [String: Any]) async throws {
+func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, reason: [String: Any],
+               to named: (url: URL, stamp: String)) async throws {
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
     let raw = temp.appendingPathComponent("capture.mov")
     let labels = try await writeSamples(samples, to: raw)
@@ -150,11 +159,8 @@ func saveMedia(_ samples: Samples, config: Settings, width: Int, height: Int, re
             stem.isEnabled = false
         }
     }
-    let dir = URL(fileURLWithPath: config.output_dir, isDirectory: true)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    let stamp = String(Int(Date().timeIntervalSince1970))
-    let slug = (reason["value"] as? String ?? "clip").map { $0.isASCII && ($0.isLetter || $0.isNumber) ? String($0).lowercased() : "_" }.joined()
-    let destination = dir.appendingPathComponent("\(stamp)_\(slug)-\(UUID().uuidString.prefix(8)).mp4")
+    let (destination, stamp) = named
+    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
     try await export(composition, to: destination)
     let tracks: [[String: Any]] = audio.isEmpty ? [] : [["label": "Mix", "stream": 0, "adjustable": false, "peaks": []]] + labels.enumerated().map { index, label in
         ["label": label, "stream": index + 1, "adjustable": true, "peaks": audioPeaks(audio[index])]
@@ -210,58 +216,271 @@ func editMedia(_ message: [String: Any]) async throws {
     }
     guard let path = message["destination"] as? String else { throw failure("The export destination is missing.") }
     let destination = URL(fileURLWithPath: path)
-    let vertical = message["type"] as? String == "export_vertical"
-    let start = vertical ? 0 : (message["start_seconds"] as? NSNumber)?.doubleValue ?? 0
-    let end = vertical ? duration : min(duration, (message["end_seconds"] as? NSNumber)?.doubleValue ?? duration)
-    guard start.isFinite, end.isFinite, start >= 0, end > start else { throw failure("The trim range is outside the clip.") }
-    let range = CMTimeRange(start: seconds(start), end: seconds(end))
+    let render = message["type"] as? String == "export_vertical"
+    let start = max(0, message.number("start_seconds") ?? 0), end = min(duration, message.number("end_seconds") ?? duration)
+    guard end - start >= 0.5 else { throw failure("A trimmed clip has to be at least 0.5 seconds long.") }
+    let timeline = Timeline(start: start, end: end, removed: render ? spans(message["removed"]) : [])
+    let pictureStart = min(max(message.number("video_start_seconds") ?? start, start), end)
+    let pictureEnd = max(min(max(message.number("video_end_seconds") ?? end, start), end), pictureStart)
     let composition = AVMutableComposition()
-    guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first else { throw failure("The clip has no video track.") }
-    let video = try await addTrack(sourceVideo, to: composition, range: range)
+    guard let sourceVideo = (try await asset.loadTracks(withMediaType: .video)).first,
+          let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+    else { throw failure("The clip has no video track.") }
+    let pieces = timeline.kept(pictureStart, pictureEnd)
+    for piece in pieces {
+        try await place(sourceVideo, into: video, from: piece.from, to: piece.to, at: timeline.out(piece.from))
+    }
+    guard !video.segments.isEmpty else { throw failure("No frames fall inside the trimmed range.") }
     let temp = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: temp) }
-    let levels: [(stream: Int, volume: Int)] = (message["levels"] as? [[String: Any]] ?? []).compactMap { level in
-        guard let stream = (level["stream"] as? NSNumber)?.intValue,
-              let volume = (level["volume"] as? NSNumber)?.intValue else { return nil }
-        return (stream: stream, volume: volume)
+    var mixed: AVAsset?
+    defer { withExtendedLifetime(mixed) {} }
+    if !audio.isEmpty {
+        mixed = try await soundtrack(audio, levels: trackLevels(message["levels"]), muted: render ? message["muted"] : nil,
+                                     timeline: timeline, into: composition, temp: temp)
     }
-    let changed = levels.contains { $0.volume != 100 }
-    if changed && !audio.isEmpty {
-        let stems = audio.count > 1 ? Array(audio.dropFirst()) : audio
-        let offset = audio.count > 1 ? 1 : 0
-        let gains = stems.indices.map { index -> Float in
-            Float(min(200, max(0, levels.first { $0.stream == index + offset }?.volume ?? 100))) / 100
-        }
-        let mixed = temp.appendingPathComponent("mix.m4a")
-        try await makeMix(stems, range: range, gains: gains, to: mixed)
-        let mixedAsset = AVURLAsset(url: mixed)
-        defer { withExtendedLifetime(mixedAsset) {} }
-        for track in try await mixedAsset.loadTracks(withMediaType: .audio) {
-            _ = try await addTrack(track, to: composition, range: CMTimeRange(start: .zero, duration: range.duration))
-        }
-    } else if let master = audio.first { _ = try await addTrack(master, to: composition, range: range) }
-    var videoComposition: AVMutableVideoComposition?
-    let sourceSize = try await sourceVideo.load(.naturalSize)
     let sourceTransform = try await sourceVideo.load(.preferredTransform)
-    let sourceBounds = CGRect(origin: .zero, size: sourceSize).applying(sourceTransform)
-    var width = Int(sourceBounds.width), height = Int(sourceBounds.height)
-    if vertical {
-        let scale = min(width / 18, height / 32)
-        guard scale > 0 else { throw failure("The video is too small for a vertical crop.") }
-        width = scale * 18; height = scale * 32
-        let vc = AVMutableVideoComposition()
+    video.preferredTransform = sourceTransform
+    var videoComposition: AVMutableVideoComposition?
+    var width = 0, height = 0
+    if render {
+        let sourceBounds = CGRect(origin: .zero, size: try await sourceVideo.load(.naturalSize)).applying(sourceTransform)
+        let ratio = shapeRatio(message["shape"] as? String) ?? (Int(sourceBounds.width), Int(sourceBounds.height))
+        let crop = centreCrop(width: Int(sourceBounds.width), height: Int(sourceBounds.height), ratio: ratio)
+        guard crop.width > 0, crop.height > 0 else { throw failure("The video is too small for a \(ratio.0):\(ratio.1) crop.") }
+        width = crop.width; height = crop.height
+        let fps = try await sourceVideo.load(.nominalFrameRate)
+        let painter = Painter(overlays: message["overlays"], blanked: spans(message["blanked"]),
+                              width: Int(sourceBounds.width), height: Int(sourceBounds.height))
+        let frame = CGRect(x: crop.left, y: Int(sourceBounds.height) - crop.top - crop.height, width: crop.width, height: crop.height)
+        let black = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: frame.size))
+        let vc = try await AVMutableVideoComposition.videoComposition(with: composition) { request in
+            let at = request.compositionTime.seconds
+            guard let piece = pieces.first(where: { at >= timeline.out($0.from) && at < timeline.out($0.from) + $0.to - $0.from }) else {
+                return request.finish(with: black, context: nil)
+            }
+            let painted = painter.paint(request.sourceImage, at: piece.from + at - timeline.out(piece.from))
+            request.finish(with: painted.cropped(to: frame).transformed(by: CGAffineTransform(translationX: -frame.minX, y: -frame.minY)), context: nil)
+        }
         vc.renderSize = CGSize(width: width, height: height)
-        vc.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, (try await sourceVideo.load(.nominalFrameRate)))))
-        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
-        layer.setTransform(sourceTransform.concatenating(CGAffineTransform(
-            translationX: -sourceBounds.minX - (sourceBounds.width - CGFloat(width)) / 2,
-            y: -sourceBounds.minY - (sourceBounds.height - CGFloat(height)) / 2)), at: .zero)
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: range.duration); instruction.layerInstructions = [layer]
-        vc.instructions = [instruction]; videoComposition = vc
+        vc.frameDuration = CMTime(value: 1, timescale: CMTimeScale(fps.isFinite && fps >= 1 ? fps.rounded() : 60))
+        videoComposition = vc
     }
-    try await export(composition, to: destination, preset: vertical ? AVAssetExportPresetHighestQuality : AVAssetExportPresetPassthrough,
-        video: videoComposition, progress: vertical ? source : nil)
-    var result: [String: Any] = ["path": path, "source": source, "duration_seconds": range.duration.seconds, "size_bytes": fileSize(destination)]
-    if vertical { result["width"] = width; result["height"] = height } else { result["start_seconds"] = start; result["end_seconds"] = end }
-    emit(vertical ? "clip_exported" : "clip_trimmed", result)
+    try await export(composition, to: destination, preset: render ? AVAssetExportPresetHighestQuality : AVAssetExportPresetPassthrough,
+        video: videoComposition, progress: render ? source : nil)
+    var result: [String: Any] = ["path": path, "source": source, "duration_seconds": composition.duration.seconds, "size_bytes": fileSize(destination)]
+    if render { result["width"] = width; result["height"] = height } else { result["start_seconds"] = start; result["end_seconds"] = end }
+    emit(render ? "clip_exported" : "clip_trimmed", result)
+}
+
+extension Double {
+    var finite: Double? { isFinite ? self : nil }
+}
+
+extension Dictionary where Key == String, Value == Any {
+    func number(_ key: String) -> Double? { (self[key] as? NSNumber)?.doubleValue.finite }
+}
+
+struct Span { var from: Double, to: Double }
+
+func spans(_ value: Any?, stream: Int? = nil) -> [Span] {
+    (value as? [[String: Any]] ?? []).compactMap { span in
+        if let stream, (span["stream"] as? NSNumber)?.intValue != stream { return nil }
+        guard let from = span.number("startSeconds"), let to = span.number("endSeconds"), to > from else { return nil }
+        return Span(from: from, to: to)
+    }
+}
+
+func merged(_ spans: [Span]) -> [Span] {
+    var result: [Span] = []
+    for span in spans.filter({ $0.to > $0.from }).sorted(by: { $0.from < $1.from }) {
+        if let last = result.last, span.from <= last.to { result[result.count - 1].to = max(last.to, span.to) } else { result.append(span) }
+    }
+    return result
+}
+
+struct Timeline {
+    let start: Double, end: Double, gaps: [Span]
+
+    init(start: Double, end: Double, removed: [Span]) {
+        self.start = start; self.end = end
+        gaps = merged(removed.map { Span(from: max($0.from, start), to: min($0.to, end)) })
+    }
+
+    func out(_ time: Double) -> Double {
+        var removed = 0.0
+        for gap in gaps {
+            if time < gap.from { break }
+            if time < gap.to { return gap.from - removed - start }
+            removed += gap.to - gap.from
+        }
+        return time - removed - start
+    }
+
+    func kept(_ from: Double, _ to: Double) -> [Span] {
+        var pieces: [Span] = [], cursor = from
+        for gap in gaps where gap.to > cursor && gap.from < to {
+            if gap.from > cursor { pieces.append(Span(from: cursor, to: gap.from)) }
+            cursor = gap.to
+        }
+        if to > cursor { pieces.append(Span(from: cursor, to: to)) }
+        return pieces
+    }
+}
+
+struct Level {
+    let stream: Int, volume: Int, offset: Double, from: Double?, to: Double?
+    var gain: Float { Float(min(200, max(0, volume))) / 100 }
+    var changesAnything: Bool { volume != 100 || offset != 0 || from != nil || to != nil }
+}
+
+func trackLevels(_ value: Any?) -> [Level] {
+    (value as? [[String: Any]] ?? []).compactMap { level in
+        guard let stream = (level["stream"] as? NSNumber)?.intValue, let volume = (level["volume"] as? NSNumber)?.intValue else { return nil }
+        return Level(stream: stream, volume: volume, offset: level.number("offsetSeconds") ?? 0,
+                     from: level.number("startSeconds"), to: level.number("endSeconds"))
+    }
+}
+
+func shapeRatio(_ shape: String?) -> (Int, Int)? {
+    switch shape {
+    case "original": return nil
+    case "square": return (1, 1)
+    case "wide": return (21, 9)
+    default: return (9, 16)
+    }
+}
+
+func centreCrop(width: Int, height: Int, ratio: (Int, Int)) -> (left: Int, top: Int, width: Int, height: Int) {
+    let (across, down) = ratio
+    guard across > 0, down > 0 else { return (0, 0, 0, 0) }
+    if (height * across / down) & ~1 >= width {
+        let keepWidth = width & ~1
+        let keepHeight = min(keepWidth * down / across, height) & ~1
+        return (0, ((height - keepHeight) / 2) & ~1, keepWidth, keepHeight)
+    }
+    let keepHeight = height & ~1
+    let keepWidth = (keepHeight * across / down) & ~1
+    return (((width - keepWidth) / 2) & ~1, 0, keepWidth, keepHeight)
+}
+
+@available(macOS 15.0, *)
+func place(_ track: AVAssetTrack, into target: AVMutableCompositionTrack, from: Double, to: Double, at: Double) async throws {
+    let wanted = CMTimeRange(start: seconds(from), end: seconds(to))
+    let range = CMTimeRangeGetIntersection(wanted, otherRange: try await track.load(.timeRange))
+    guard range.duration > .zero else { return }
+    var when = seconds(at) + (range.start - wanted.start)
+    let tail = target.timeRange.end
+    if !target.segments.isEmpty, abs((when - tail).seconds) < 0.001 { when = tail }
+    do { try target.insertTimeRange(range, of: track, at: when) }
+    catch { throw failure("Could not insert a clip track: \(error.localizedDescription)") }
+}
+
+func hush(_ input: AVMutableAudioMixInputParameters, gain: Float, spans: [Span], until end: Double) {
+    let ramp = { (from: Double, to: Double, start: Float, finish: Float) in
+        guard to > from else { return }
+        input.setVolumeRamp(fromStartVolume: start, toEndVolume: finish, timeRange: CMTimeRange(start: seconds(from), end: seconds(to)))
+    }
+    var cursor = 0.0
+    for span in spans where span.to > cursor {
+        let from = max(span.from, cursor), fade = min(0.005, (span.to - from) / 2)
+        ramp(cursor, from, gain, gain)
+        ramp(from, from + fade, gain, 0)
+        ramp(from + fade, span.to - fade, 0, 0)
+        ramp(span.to - fade, span.to, 0, gain)
+        cursor = span.to
+    }
+    ramp(cursor, max(cursor, end), gain, gain)
+}
+
+@available(macOS 15.0, *)
+func soundtrack(_ audio: [AVAssetTrack], levels: [Level], muted: Any?, timeline: Timeline,
+                into composition: AVMutableComposition, temp: URL) async throws -> AVAsset? {
+    let master = { () async throws -> AVAsset? in
+        guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw failure("Could not create a media track.")
+        }
+        for piece in timeline.kept(timeline.start, timeline.end) {
+            try await place(audio[0], into: track, from: piece.from, to: piece.to, at: timeline.out(piece.from))
+        }
+        if track.segments.isEmpty { composition.removeTrack(track) }
+        return nil
+    }
+    let hushed = !spans(muted).isEmpty
+    guard hushed || levels.contains(where: \.changesAnything) else { return try await master() }
+    let stems: [(stream: Int, track: AVAssetTrack)] = audio.count > 1
+        ? audio.indices.dropFirst().map { ($0, audio[$0]) }
+        : (spans(muted, stream: 0).isEmpty ? [] : [(0, audio[0])])
+    let mixing = AVMutableComposition()
+    var parameters: [AVMutableAudioMixInputParameters] = []
+    for (stream, source) in stems {
+        let level = levels.first { $0.stream == stream }
+        let gain = level?.gain ?? 1
+        guard gain > 0, let track = mixing.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+        let offset = level?.offset ?? 0
+        let from = max(level?.from ?? timeline.start, timeline.start), to = min(level?.to ?? timeline.end, timeline.end)
+        for piece in timeline.kept(from, max(from, to)) {
+            try await place(source, into: track, from: piece.from - offset, to: piece.to - offset, at: timeline.out(piece.from))
+        }
+        guard !track.segments.isEmpty else { mixing.removeTrack(track); continue }
+        let input = AVMutableAudioMixInputParameters(track: track)
+        let hushes = merged(spans(muted, stream: stream).map { Span(from: timeline.out($0.from), to: timeline.out($0.to)) })
+        hush(input, gain: gain, spans: hushes, until: track.timeRange.end.seconds)
+        parameters.append(input)
+    }
+    guard !parameters.isEmpty else { return try await master() }
+    let mix = AVMutableAudioMix(); mix.inputParameters = parameters
+    let url = temp.appendingPathComponent("mix.m4a")
+    try await export(mixing, to: url, preset: AVAssetExportPresetAppleM4A, mix: mix)
+    let mixed = AVURLAsset(url: url)
+    guard let track = try await mixed.loadTracks(withMediaType: .audio).first,
+          let target = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+    else { throw failure("The rebuilt mix has no audio.") }
+    let range = try await track.load(.timeRange)
+    try target.insertTimeRange(range, of: track, at: range.start)
+    return mixed
+}
+
+@available(macOS 15.0, *)
+func exportGif(_ message: [String: Any]) async throws {
+    guard let source = message["source"] as? String, let path = message["destination"] as? String else {
+        throw failure("The GIF source or destination is missing.")
+    }
+    let asset = AVURLAsset(url: URL(fileURLWithPath: source))
+    let duration = try await asset.load(.duration).seconds
+    guard duration.isFinite, duration > 0, let video = try await asset.loadTracks(withMediaType: .video).first else {
+        throw failure("The clip has no readable video.")
+    }
+    let delay = 8, interval = Double(delay) / 100, budget = 1000 / delay
+    let needed = max(1, Int((duration / interval).rounded(.up)))
+    let count = min(needed, budget)
+    let bounds = CGRect(origin: .zero, size: try await video.load(.naturalSize)).applying(try await video.load(.preferredTransform))
+    let sourceWidth = max(1, Int(bounds.width)), sourceHeight = max(1, Int(bounds.height))
+    let width = min(400, sourceWidth), height = sourceWidth <= 400 ? sourceHeight : max(1, sourceHeight * 400 / sourceWidth)
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: width, height: height)
+    generator.requestedTimeToleranceBefore = seconds(interval / 2)
+    generator.requestedTimeToleranceAfter = seconds(interval / 2)
+    let destination = URL(fileURLWithPath: path)
+    let part = destination.appendingPathExtension("part")
+    try? FileManager.default.removeItem(at: part)
+    guard let gif = CGImageDestinationCreateWithURL(part as CFURL, UTType.gif.identifier as CFString, count, nil) else {
+        throw failure("Could not create the GIF.")
+    }
+    CGImageDestinationSetProperties(gif, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    let frame = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: interval, kCGImagePropertyGIFUnclampedDelayTime: interval]] as CFDictionary
+    let times = (0..<count).map { CMTime(seconds: min(Double($0) * interval, duration - 0.001), preferredTimescale: 600) }
+    var written = 0
+    for await result in generator.images(for: times) {
+        guard let image = try? result.image else { continue }
+        CGImageDestinationAddImage(gif, image, frame)
+        written += 1
+        emit("export_progress", ["source": source, "done": written, "total": count])
+    }
+    guard written > 0 else { throw failure("The clip produced no frames to turn into a GIF.") }
+    guard CGImageDestinationFinalize(gif) else { try? FileManager.default.removeItem(at: part); throw failure("Could not finish the GIF.") }
+    try? FileManager.default.removeItem(at: destination)
+    try FileManager.default.moveItem(at: part, to: destination)
+    emit("gif_exported", ["path": path, "source": source, "width": width, "height": height, "frames": written,
+                          "durationSeconds": Double(written) * interval, "sizeBytes": fileSize(destination), "truncated": needed > budget])
 }
