@@ -26,13 +26,13 @@ export interface PaginationInfo {
 
 export interface CapesBrowseResponse {
   capes: CosmeticCape[];
-  pagination: PaginationInfo;
+  nextCursor: string | null;
 }
 
 // Optional interface types for function parameters
 export interface BrowseCapesOptions {
-  page?: number;
-  page_size?: number;
+  cursor?: string;
+  limit?: number;
   sort_by?: string;
   filter_by_id?: string;
   filter_has_elytra?: boolean;

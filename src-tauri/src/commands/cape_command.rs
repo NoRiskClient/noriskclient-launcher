@@ -1,5 +1,5 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::cape_api::{CapeApi, CapeUploadResponse, CapesBrowseResponse, CosmeticCape};
+use crate::minecraft::api::cape_api::{CapeApi, CapeBrowsePage, CapeBrowseQuery, CapeUploadResponse, CosmeticCape};
 use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::state::state_manager::State;
 use log::{debug, error};
@@ -12,8 +12,8 @@ use uuid::Uuid;
 // Define a struct to hold all parameters for browse_capes
 #[derive(Deserialize, Debug)]
 pub struct BrowseCapesPayload {
-    page: Option<u32>,
-    page_size: Option<u32>,
+    cursor: Option<String>,
+    limit: Option<u32>,
     sort_by: Option<String>,
     filter_has_elytra: Option<bool>,
     filter_creator: Option<String>,
@@ -29,7 +29,7 @@ pub struct BrowseCapesPayload {
 #[tauri::command]
 pub async fn browse_capes(
     payload: BrowseCapesPayload,
-) -> Result<CapesBrowseResponse, CommandError> {
+) -> Result<CapeBrowsePage, CommandError> {
     debug!("Command called: browse_capes");
     debug!("Payload: {:?}", payload);
 
@@ -94,15 +94,18 @@ pub async fn browse_capes(
         }
     };
 
+    let query = CapeBrowseQuery {
+        sort_by: payload.sort_by.as_deref(),
+        filter_has_elytra: payload.filter_has_elytra,
+        filter_creator: filter_creator_uuid.as_ref(),
+        time_frame: payload.time_frame.as_deref(),
+    };
     let result = cape_api
-        .browse_capes(
+        .browse_capes_page(
             &token_to_use,
-            payload.page,
-            payload.page_size,
-            payload.sort_by.as_deref(),
-            payload.filter_has_elytra,
-            filter_creator_uuid.as_ref(),
-            payload.time_frame.as_deref(),
+            &query,
+            payload.cursor.as_deref(),
+            payload.limit.unwrap_or(20),
             &uuid_to_use,
             is_experimental,
         )
