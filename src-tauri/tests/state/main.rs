@@ -1,4 +1,5 @@
 mod harness;
+mod config_state;
 mod content_cache_state;
 mod db;
 mod event_state;

@@ -1194,19 +1194,7 @@ impl ProcessManager {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
                     log::info!("Showing main window after process exit (hide_on_process_start = true)");
-                    if let Some(main_window) = app_handle_clone_for_monitor.get_webview_window("main") {
-                        if let Err(e) = main_window.show() {
-                            log::error!("Failed to show main window after process exit: {}", e);
-                        }
-                        if let Err(e) = main_window.unminimize() {
-                            log::error!("Failed to unminimize main window after process exit: {}", e);
-                        }
-                        if let Err(e) = main_window.set_focus() {
-                            log::error!("Failed to focus main window after process exit: {}", e);
-                        }
-                    } else {
-                        log::warn!("Main window not found, could not show it after process exit");
-                    }
+                    crate::utils::window_focus::show_main_window(&app_handle_clone_for_monitor);
                 }
             }
 

@@ -37,6 +37,10 @@ async function assertExperimentalLaunchAllowed(): Promise<boolean> {
   return true;
 }
 
+export async function closeMainWindowToTray(): Promise<boolean> {
+  return invoke<boolean>("close_main_window_to_tray");
+}
+
 export async function isMinecraftRunning(profileId: string): Promise<boolean> {
   try {
     const runningProcesses = await getRunningProcesses();

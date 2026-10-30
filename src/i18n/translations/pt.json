@@ -93,6 +93,8 @@
   "settings.open_logs.tooltip": "Abrir automaticamente a janela de logs do jogo ao iniciar o Minecraft. Útil para depurar problemas.",
   "settings.hide_window": "Ocultar Janela ao Iniciar",
   "settings.hide_window.tooltip": "Ocultar automaticamente a janela do launcher quando o Minecraft iniciar. Reduz a desordem na área de trabalho durante o jogo.",
+  "settings.close_to_tray": "Continuar em segundo plano",
+  "settings.close_to_tray.tooltip": "Fechar a janela não fecha o launcher: ele continua como um pequeno ícone ao lado do relógio na barra de tarefas (no Mac, na barra de menus em cima), por isso um jogo iniciado continua a carregar. Para o fechar de vez: clique direito no ícone e «Quit».",
   "settings.concurrent_downloads": "Downloads Simultâneos",
   "settings.concurrent_downloads.tooltip": "Número máximo de arquivos baixados simultaneamente. Valores menores reduzem o uso de banda mas tornam os downloads mais lentos.",
   "settings.concurrent_io": "Operações de E/S Simultâneas",

@@ -93,6 +93,8 @@
   "settings.open_logs.tooltip": "Automatycznie otwórz okno logów gry podczas uruchamiania Minecrafta. Przydatne do debugowania problemów.",
   "settings.hide_window": "Ukryj okno przy starcie",
   "settings.hide_window.tooltip": "Automatycznie ukryj okno launchera po uruchomieniu Minecrafta. Zmniejsza bałagan na pulpicie podczas gry.",
+  "settings.close_to_tray": "Działaj w tle",
+  "settings.close_to_tray.tooltip": "Zamknięcie okna nie wyłącza launchera: działa dalej jako mała ikona obok zegara na pasku zadań (na Macu w pasku menu u góry), więc uruchomiona gra dalej się ładuje. Aby go naprawdę zamknąć: kliknij ikonę prawym przyciskiem i wybierz „Quit”.",
   "settings.concurrent_downloads": "Równoczesne pobieranie",
   "settings.concurrent_downloads.tooltip": "Maksymalna liczba plików pobieranych jednocześnie. Niższe wartości zmniejszają użycie łącza, ale spowalniają pobieranie.",
   "settings.concurrent_io": "Równoczesne operacje I/O",

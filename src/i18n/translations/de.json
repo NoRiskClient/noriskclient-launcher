@@ -36,6 +36,8 @@
   "settings.open_logs.tooltip": "Automatisch das Spiellog-Fenster beim Starten von Minecraft öffnen. Nützlich zur Fehlersuche.",
   "settings.hide_window": "Fenster beim Start ausblenden",
   "settings.hide_window.tooltip": "Automatisch das Launcher-Fenster ausblenden wenn Minecraft startet. Reduziert Unordnung auf dem Desktop.",
+  "settings.close_to_tray": "Im Hintergrund weiterlaufen",
+  "settings.close_to_tray.tooltip": "Schließen beendet den Launcher nicht: Er läuft als kleines Symbol unten rechts neben der Uhr weiter (auf dem Mac oben in der Menüleiste), ein gestartetes Spiel lädt also weiter. Ganz beenden: Rechtsklick auf das Symbol und „Quit“.",
   "settings.concurrent_downloads": "Gleichzeitige Downloads",
   "settings.concurrent_downloads.tooltip": "Maximale Anzahl gleichzeitig heruntergeladener Dateien. Niedrigere Werte reduzieren die Bandbreitennutzung.",
   "settings.concurrent_io": "Gleichzeitige I/O-Operationen",

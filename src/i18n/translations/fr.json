@@ -93,6 +93,8 @@
   "settings.open_logs.tooltip": "Ouvrir automatiquement la fenêtre des logs du jeu au lancement de Minecraft. Utile pour déboguer les problèmes.",
   "settings.hide_window": "Masquer la Fenêtre au Lancement",
   "settings.hide_window.tooltip": "Masquer automatiquement la fenêtre du launcher quand Minecraft démarre. Réduit l'encombrement du bureau pendant le jeu.",
+  "settings.close_to_tray": "Continuer en arrière-plan",
+  "settings.close_to_tray.tooltip": "Fermer la fenêtre ne quitte pas le launcher : il continue sous forme de petite icône à côté de l'horloge dans la barre des tâches (sur Mac, dans la barre de menus en haut), un jeu lancé continue donc à charger. Pour le fermer vraiment : clic droit sur l'icône, puis « Quit ».",
   "settings.concurrent_downloads": "Téléchargements Simultanés",
   "settings.concurrent_downloads.tooltip": "Nombre maximum de fichiers téléchargés simultanément. Des valeurs plus basses réduisent l'utilisation de la bande passante mais ralentissent les téléchargements.",
   "settings.concurrent_io": "Opérations I/O Simultanées",

@@ -93,6 +93,8 @@
   "settings.open_logs.tooltip": "Minecraft başlatılırken oyun günlükleri penceresini otomatik olarak açın. Sorunları ayıklamak için kullanışlıdır.",
   "settings.hide_window": "Başlatmada Pencereyi Gizle",
   "settings.hide_window.tooltip": "Minecraft başladığında başlatıcı penceresini otomatik olarak gizleyin. Oyun sırasında masaüstü karmaşasını azaltır.",
+  "settings.close_to_tray": "Arka planda çalışmaya devam et",
+  "settings.close_to_tray.tooltip": "Pencereyi kapatmak başlatıcıyı kapatmaz: görev çubuğunda saatin yanında küçük bir simge olarak çalışmaya devam eder (Mac’te üstteki menü çubuğunda), böylece başlattığın oyun yüklenmeye devam eder. Tamamen kapatmak için simgeye sağ tıklayıp “Quit” seç.",
   "settings.concurrent_downloads": "Eşzamanlı İndirmeler",
   "settings.concurrent_downloads.tooltip": "Aynı anda indirilen maksimum dosya sayısı. Düşük değerler bant genişliği kullanımını azaltır ancak indirmeleri yavaşlatır.",
   "settings.concurrent_io": "Eşzamanlı G/Ç İşlemleri",

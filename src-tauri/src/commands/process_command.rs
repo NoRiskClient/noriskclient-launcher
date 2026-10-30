@@ -6,6 +6,20 @@ use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
 
+#[tauri::command]
+pub async fn close_main_window_to_tray(app: tauri::AppHandle) -> Result<bool, CommandError> {
+    if !crate::state::config_state::closes_to_tray() {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| AppError::Other("Main window not found".into()))?;
+    window
+        .hide()
+        .map_err(|e| AppError::Other(format!("Failed to hide the main window: {e}")))?;
+    Ok(true)
+}
+
 const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
 pub const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
 pub const LOG_TAIL_BYTES: u64 = 1024 * 1024;

@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
@@ -406,6 +407,8 @@ pub struct LauncherConfig {
     pub hooks: Hooks,
     #[serde(default = "default_hide_on_process_start")]
     pub hide_on_process_start: bool,
+    #[serde(default)]
+    pub close_to_tray: bool,
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
     #[serde(default)]
@@ -520,6 +523,7 @@ impl Default for LauncherConfig {
             last_played_profile: None,
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
+            close_to_tray: false,
             global_memory_settings: default_global_memory_settings(),
             global_custom_jvm_args: None,
             custom_game_directory: None,
@@ -579,6 +583,7 @@ impl ConfigManager {
                 // Update the stored config
                 let mut config = self.config.write().await;
                 *config = loaded_config.clone();
+                CLOSE_TO_TRAY.store(loaded_config.close_to_tray, Ordering::Relaxed);
 
                 // Update cache
                 update_custom_game_dir(loaded_config.custom_game_directory);
@@ -623,6 +628,9 @@ impl ConfigManager {
                             }
                             if let Some(hide) = obj.get("hide_on_process_start").and_then(|v| v.as_bool()) {
                                 migrated_config.hide_on_process_start = hide;
+                            }
+                            if let Some(tray) = obj.get("close_to_tray").and_then(|v| v.as_bool()) {
+                                migrated_config.close_to_tray = tray;
                             }
                             if let Some(analytics) = obj.get("enable_analytics").and_then(|v| v.as_bool()) {
                                 migrated_config.enable_analytics = analytics;
@@ -679,6 +687,7 @@ impl ConfigManager {
                         info!("Migration completed, saving migrated configuration");
                         let mut config = self.config.write().await;
                         *config = migrated_config.clone();
+                        CLOSE_TO_TRAY.store(migrated_config.close_to_tray, Ordering::Relaxed);
                         drop(config); // Release lock before save
 
                         // Save the migrated config
@@ -830,6 +839,12 @@ impl ConfigManager {
                         current.hide_on_process_start, new_config.hide_on_process_start
                     );
                 }
+                if current.close_to_tray != new_config.close_to_tray {
+                    info!(
+                        "Changing close to tray: {} -> {}",
+                        current.close_to_tray, new_config.close_to_tray
+                    );
+                }
                 if current.global_memory_settings.min != new_config.global_memory_settings.min
                     || current.global_memory_settings.max != new_config.global_memory_settings.max {
                     info!(
@@ -863,6 +878,7 @@ impl ConfigManager {
                     );
                 }
 
+                CLOSE_TO_TRAY.store(new_config.close_to_tray, Ordering::Relaxed);
                 // Update config while preserving version
                 *config = LauncherConfig {
                     version,
@@ -877,6 +893,7 @@ impl ConfigManager {
                     last_played_profile: new_config.last_played_profile,
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
+                    close_to_tray: new_config.close_to_tray,
                     global_memory_settings: new_config.global_memory_settings,
                     global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
                     custom_game_directory: new_config.custom_game_directory.clone(),
@@ -944,6 +961,12 @@ fn apply_log_level(level: LogLevel) {
         return;
     }
     crate::logging::set_log_level(level.into());
+}
+
+static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(false);
+
+pub fn closes_to_tray() -> bool {
+    CLOSE_TO_TRAY.load(Ordering::Relaxed)
 }
 
 pub fn default_config_path() -> PathBuf {

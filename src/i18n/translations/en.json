@@ -36,6 +36,8 @@
   "settings.open_logs.tooltip": "Automatically open the game logs window when launching Minecraft. Useful for debugging issues.",
   "settings.hide_window": "Hide Window on Launch",
   "settings.hide_window.tooltip": "Automatically hide the launcher window when Minecraft starts. Reduces desktop clutter during gameplay.",
+  "settings.close_to_tray": "Keep Running in the Background",
+  "settings.close_to_tray.tooltip": "Closing the window does not quit the launcher: it keeps running as a small icon next to the clock in your taskbar (on Mac, in the menu bar at the top), so a game you start keeps loading. Right-click that icon and choose Quit to close it for real.",
   "settings.concurrent_downloads": "Concurrent Downloads",
   "settings.concurrent_downloads.tooltip": "Maximum number of files downloaded simultaneously. Lower values reduce bandwidth usage but slow downloads.",
   "settings.concurrent_io": "Concurrent I/O Operations",

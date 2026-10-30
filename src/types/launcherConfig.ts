@@ -157,6 +157,7 @@ export interface LauncherConfig {
   concurrent_io_limit: number; // usize
   hooks: Hooks;
   hide_on_process_start: boolean;
+  close_to_tray: boolean;
   global_memory_settings: MemorySettings;
   global_custom_jvm_args: string | null; // Option<String> - Global JVM args for standard profiles
   custom_game_directory: string | null; // Option<PathBuf>
