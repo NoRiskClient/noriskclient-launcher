@@ -282,7 +282,10 @@ export function LogViewerCore({
   useEffect(() => {
     selectionAnchorIndexRef.current = null;
     setSelectionRange(null);
-    window.getSelection()?.removeAllRanges();
+    const selection = window.getSelection();
+    if (selection?.anchorNode && logContainerRef.current?.contains(selection.anchorNode)) {
+      selection.removeAllRanges();
+    }
   }, [searchTerm, levelFilters, selectedLogPath]);
 
   useEffect(() => {
