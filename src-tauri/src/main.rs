@@ -17,7 +17,7 @@ use utils::updater_utils;
 use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::font_command::list_system_fonts;
 use crate::commands::process_command::{
-    close_main_window_to_tray, fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
+    fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
     get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
     set_discord_state, stop_process,
 };
@@ -182,7 +182,7 @@ async fn main() {
                 return;
             }
 
-            utils::window_focus::show_main_window(app);
+            utils::main_window::show(app);
         }))
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
@@ -190,12 +190,7 @@ async fn main() {
         .plugin(tauri_plugin_cli::init())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" && state::config_state::closes_to_tray() {
-                    api.prevent_close();
-                    if let Err(e) = window.hide() {
-                        error!("Failed to hide the main window on close: {}", e);
-                    }
-                }
+                utils::main_window::close_requested(window, api);
             }
         })
         .plugin(tauri_plugin_dialog::init())
@@ -222,17 +217,8 @@ async fn main() {
                 .tooltip("NoRisk Client Launcher")
                 .icon(app.default_window_icon().unwrap().clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => utils::window_focus::show_main_window(app),
-                    "quit" => {
-                        if app.get_webview_window("clip_editor").is_some() {
-                            use tauri::Emitter;
-                            if app.emit_to("main", "quit_requested", ()).is_err() {
-                                app.exit(0);
-                            }
-                        } else {
-                            app.exit(0);
-                        }
-                    }
+                    "show" => utils::main_window::show(app),
+                    "quit" => utils::main_window::quit(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| match event {
@@ -240,32 +226,11 @@ async fn main() {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
-                    } => {
-                        let app = tray.app_handle();
-                        match app.get_webview_window("main") {
-                            Some(window) => {
-                                let is_visible = window.is_visible().unwrap_or(false);
-                                let is_minimized = window.is_minimized().unwrap_or(false);
-
-                                if is_visible && !is_minimized {
-                                    if let Err(e) = window.hide() {
-                                        error!("Tray click: Failed to hide window: {}", e);
-                                    }
-                                } else {
-                                    utils::window_focus::show_main_window(app);
-                                }
-                            }
-                            None => {
-                                error!("Tray click: Main window not found - application in inconsistent state");
-                            }
-                        }
-                    }
+                    } => utils::main_window::toggle(tray.app_handle()),
                     TrayIconEvent::DoubleClick {
                         button: MouseButton::Left,
                         ..
-                    } => {
-                        utils::window_focus::show_main_window(tray.app_handle());
-                    }
+                    } => utils::main_window::show(tray.app_handle()),
                     _ => {}
                 })
                 .build(app)?;
@@ -538,13 +503,6 @@ async fn main() {
                         }
                     });
                 });
-
-                // --- Handle window close request (from taskbar, etc.) ---
-                main_window.listen("tauri://close-requested", move |_event| {
-                    info!("Window close requested via system (taskbar, etc.). Exiting application.");
-                    utils::screen_time::report_before_exit();
-                    std::process::exit(0);
-                });
             } else {
                 error!("Could not get main window handle to attach focus listener!");
             }
@@ -572,7 +530,6 @@ async fn main() {
             abort_profile_launch,
             is_profile_launching,
             get_processes,
-            close_main_window_to_tray,
             get_process,
             get_processes_by_profile,
             stop_process,
@@ -909,7 +866,7 @@ async fn main() {
 
                 #[cfg(target_os = "macos")]
                 if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
-                    utils::window_focus::show_main_window(app_handle);
+                    utils::main_window::show(app_handle);
                 }
 
                 #[cfg(target_os = "macos")]

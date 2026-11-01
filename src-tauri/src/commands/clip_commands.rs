@@ -616,7 +616,7 @@ pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError>
     Ok(())
 }
 
-const EDITOR_LABEL: &str = "clip_editor";
+pub const EDITOR_LABEL: &str = "clip_editor";
 
 #[derive(Serialize, Clone)]
 pub struct EditorClip {

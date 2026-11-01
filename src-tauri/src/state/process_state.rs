@@ -1194,7 +1194,7 @@ impl ProcessManager {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
                     log::info!("Showing main window after process exit (hide_on_process_start = true)");
-                    crate::utils::window_focus::show_main_window(&app_handle_clone_for_monitor);
+                    crate::utils::main_window::show(&app_handle_clone_for_monitor);
                 }
             }
 
