@@ -19,10 +19,6 @@ import {
   type PermissionCacheState,
 } from "../../services/permission-service";
 import {
-  fetchTesterQueueCount,
-  openTesterWindow,
-} from "../../services/tester-service";
-import {
   listProfileBackups,
   restoreProfileBackup,
   type ProfileBackupInfo,
@@ -581,32 +577,6 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
     ? new Date(permissions.last_fetched).toLocaleString()
     : null;
 
-  const canTest = nodes.includes("norisk.tester");
-  const [queueCount, setQueueCount] = useState<number | null>(null);
-  const [opening, setOpening] = useState(false);
-
-  useEffect(() => {
-    if (!canTest) {
-      setQueueCount(null);
-      return;
-    }
-    fetchTesterQueueCount()
-      .then(({ count }) => setQueueCount(count))
-      .catch(() => setQueueCount(null));
-  }, [canTest, permissions]);
-
-  const handleOpenTester = async () => {
-    setOpening(true);
-    try {
-      await openTesterWindow();
-    } catch (e) {
-      logError(`Failed to open tester window: ${e}`);
-      toast.error(t("debug.testing.tester_open_failed", { error: String(e) }));
-    } finally {
-      setOpening(false);
-    }
-  };
-
   return (
     <div className="space-y-3">
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
@@ -633,35 +603,6 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
           />
         </button>
       </div>
-
-      {canTest && (
-        <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
-          <Icon icon="solar:test-tube-bold" className="w-5 h-5 text-amber-300 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-minecraft">{t("debug.testing.tester_queue")}</div>
-            <div className="text-xs text-white/40 font-sans truncate">
-              {queueCount === null
-                ? t("debug.testing.tester_open_hint")
-                : queueCount === 0
-                  ? t("debug.testing.tester_caught_up")
-                  : t("debug.testing.tester_waiting", { count: queueCount })}
-            </div>
-          </div>
-          <button
-            onClick={handleOpenTester}
-            disabled={opening}
-            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-            title={t("debug.testing.tester_open_title")}
-          >
-            {opening ? (
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
-            ) : (
-              <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
-            )}
-            {t("debug.testing.tester_open")}
-          </button>
-        </div>
-      )}
 
       <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
         {nodes.length === 0 ? (

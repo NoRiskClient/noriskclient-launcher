@@ -8,8 +8,7 @@
     "minecraft_log_window",
     "single_log_window_*",
     "updater",
-    "chat_*",
-    "tester_window"
+    "chat_*"
   ],
   "permissions": [
     "core:default",
