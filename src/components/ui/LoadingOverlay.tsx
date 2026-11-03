@@ -206,7 +206,7 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
       <div
         ref={mergedRef}
         className={cn(
-          "absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm transition-opacity",
+          "glass-scrim absolute inset-0 z-10 flex items-center justify-center backdrop-blur-sm transition-opacity",
           className,
         )}
         style={{ backgroundColor: "rgba(0, 0, 0, 0.7)" }}
@@ -215,7 +215,7 @@ export const LoadingOverlay = forwardRef<HTMLDivElement, LoadingOverlayProps>(
         <div
           ref={contentRef}
           className={cn(
-            "relative overflow-hidden rounded-md backdrop-blur-md",
+            "glass-panel relative overflow-hidden rounded-md backdrop-blur-md",
             shadowDepth !== "none" && "border-2 border-b-4",
             sizeStyles.container,
           )}

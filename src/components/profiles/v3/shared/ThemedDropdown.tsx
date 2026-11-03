@@ -136,7 +136,7 @@ export function ThemedDropdown({
             left: pos.left,
             ...(pos.width ? { minWidth: pos.width, width: pos.width } : {}),
           }}
-          className={`${pos.width ? "" : `w-max ${maxWidth}`} rounded-md border shadow-2xl z-[1001] py-1 ${scrollClass} ${className}`}
+          className={`glass-panel ${pos.width ? "" : `w-max ${maxWidth}`} rounded-md border shadow-2xl z-[1001] py-1 ${scrollClass} ${className}`}
         >
           {children}
         </div>
@@ -152,7 +152,7 @@ export function ThemedDropdown({
       <div className="fixed inset-0 z-10" onClick={onClose} />
       <div
         style={panelStyle}
-        className={`absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}
+        className={`glass-panel absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}
       >
         {children}
       </div>

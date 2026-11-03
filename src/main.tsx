@@ -1,5 +1,5 @@
 import "./polyfills";
-import { initializeClipSupport } from "./utils/platform";
+import { disableBackdropBlurOnLinux, initializeClipSupport } from "./utils/platform";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";
@@ -8,6 +8,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ClipOverlay } from "./components/overlay/ClipOverlay";
 import i18n from "./i18n/i18n";
 import "./styles/globals.css";
+
+disableBackdropBlurOnLinux();
 
 const isOverlay = (() => {
   try {

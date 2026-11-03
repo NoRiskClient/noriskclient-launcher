@@ -78,7 +78,7 @@ export function FriendsSidebar() {
     <>
       <div
         className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300",
+          "glass-scrim fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300",
           isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={handleClose}
@@ -92,7 +92,7 @@ export function FriendsSidebar() {
       >
         <div
           className={cn(
-            "h-full flex flex-col transition-all duration-300 ease-out overflow-hidden backdrop-blur-md",
+            "glass-panel h-full flex flex-col transition-all duration-300 ease-out overflow-hidden backdrop-blur-md",
             (activeChatFriend || isSettingsOpen) ? "w-[380px] opacity-100" : "w-0 opacity-0"
           )}
           style={{
@@ -106,7 +106,7 @@ export function FriendsSidebar() {
         </div>
 
         <div
-          className="w-96 h-full flex flex-col backdrop-blur-md"
+          className="glass-panel w-96 h-full flex flex-col backdrop-blur-md"
           style={{
             background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
             borderLeft: `2px solid ${accentColor.value}60`,

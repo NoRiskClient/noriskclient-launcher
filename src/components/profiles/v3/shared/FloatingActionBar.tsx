@@ -43,7 +43,7 @@ export function FloatingActionBar({
           WebkitBackdropFilter: "blur(16px)",
           boxShadow: `0 12px 32px -10px rgba(0,0,0,0.5)`,
         }}
-        className={`flex items-center h-11 rounded-xl border overflow-hidden whitespace-nowrap transition-opacity duration-200 ease-out ${
+        className={`glass-panel flex items-center h-11 rounded-xl border overflow-hidden whitespace-nowrap transition-opacity duration-200 ease-out ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       >

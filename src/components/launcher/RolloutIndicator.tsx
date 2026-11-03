@@ -166,7 +166,7 @@ export function RolloutIndicator() {
       {open &&
         createPortal(
           <div
-            className="fixed z-[1000] w-[20rem] animate-slide-up-fade-in border border-b-2 rounded-md overflow-hidden"
+            className="glass-panel fixed z-[1000] w-[20rem] animate-slide-up-fade-in border border-b-2 rounded-md overflow-hidden"
             style={{
               left: pos.x,
               top: pos.top,

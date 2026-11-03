@@ -258,17 +258,19 @@ export const getToastVariantStyles = (variant: ToastVariant, accentColor: string
     case "success":
       return {
         backgroundColor: "rgba(16, 185, 129, 0.3)",
+        "--glass-tint": "rgb(16, 185, 129)",
         borderColor: "rgba(16, 185, 129, 0.8)",
         borderBottomColor: "#059669",
         color: "#d1fae5",
-      };
+      } as React.CSSProperties;
     case "error":
       return {
         backgroundColor: "rgba(239, 68, 68, 0.3)",
+        "--glass-tint": "rgb(239, 68, 68)",
         borderColor: "rgba(239, 68, 68, 0.8)",
         borderBottomColor: "#dc2626",
         color: "#fee2e2",
-      };
+      } as React.CSSProperties;
     default:
       return {
         backgroundColor: `${accentColor}30`,
@@ -299,7 +301,7 @@ export const getToastBaseStyles = (config: ToastStyleConfig): React.CSSPropertie
   };
 };
 
-export const TOAST_BASE_CLASSES = "font-smallcaps tracking-wider text-shadow-sm";
+export const TOAST_BASE_CLASSES = "glass-panel font-smallcaps tracking-wider text-shadow-sm";
 
 export const MENU_PANEL_CLASSES =
   "bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden";

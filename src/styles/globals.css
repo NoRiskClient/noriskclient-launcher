@@ -547,9 +547,30 @@ nav button:not(.no-radius),
   border-radius: 0px !important;
 }
 
-/* Backdrop blur which also works on Linux */
-.backdrop-blur-md-anyos {
-    backdrop-filter: blur(12px);
+html.no-backdrop-blur *,
+html.no-backdrop-blur *::before,
+html.no-backdrop-blur *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+html.no-backdrop-blur [class*="backdrop-blur"],
+html.no-backdrop-blur [style*="backdrop-filter"] {
+    isolation: isolate;
+}
+
+html.no-backdrop-blur .glass-panel {
+    background-color: #101014 !important;
+}
+
+@supports (background-color: color-mix(in srgb, red 14%, black)) {
+    html.no-backdrop-blur .glass-panel {
+        background-color: color-mix(in srgb, var(--glass-tint, rgb(var(--accent-rgb))) 14%, #0c0c10) !important;
+    }
+}
+
+html.no-backdrop-blur .glass-scrim {
+    background-color: rgba(0, 0, 0, 0.85) !important;
 }
 
 @keyframes nrc-claim-glow {

@@ -121,12 +121,12 @@ export function Modal({
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md glass-scrim"
       onClick={handleBackdropClick}
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "glass-panel relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
