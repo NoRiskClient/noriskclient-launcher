@@ -659,7 +659,6 @@
   "profiles.deleteSuccess": "Profil erfolgreich gelöscht!",
   "profiles.deleteError": "Profil konnte nicht gelöscht werden: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" ist ein NoRisk Profil. Gelöscht bleibt es weg, auch nach einem Neustart. Du kannst es unter Einstellungen, Debug wiederherstellen.",
-  "profiles.deleteNoRiskProfileTypeName": "Gib {{name}} ein, um es zu löschen",
   "profiles.openingFolder": "Ordner wird geöffnet...",
   "profiles.openFolderSuccess": "Ordner geöffnet!",
   "profiles.openFolderError": "Ordner konnte nicht geöffnet werden: {{error}}",

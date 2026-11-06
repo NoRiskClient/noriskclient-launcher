@@ -685,7 +685,6 @@
   "profiles.deleteSuccess": "Perfil excluído com sucesso!",
   "profiles.deleteError": "Falha ao excluir perfil: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" é um perfil NoRisk. Depois de excluído, ele não volta, nem depois de reiniciar. Você pode recuperá-lo em Configurações, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Digite {{name}} para excluí-lo",
   "profiles.openingFolder": "Abrindo pasta...",
   "profiles.openFolderSuccess": "Pasta aberta!",
   "profiles.openFolderError": "Falha ao abrir pasta: {{error}}",

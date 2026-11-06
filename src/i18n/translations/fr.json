@@ -685,7 +685,6 @@
   "profiles.deleteSuccess": "Profil supprimé avec succès !",
   "profiles.deleteError": "Échec de la suppression du profil: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "« {{name}} » est un profil NoRisk. Une fois supprimé, il ne revient pas, même après un redémarrage. Tu peux le récupérer dans Paramètres, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Tape {{name}} pour le supprimer",
   "profiles.openingFolder": "Ouverture du dossier...",
   "profiles.openFolderSuccess": "Dossier ouvert !",
   "profiles.openFolderError": "Échec de l'ouverture du dossier: {{error}}",

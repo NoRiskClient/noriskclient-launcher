@@ -685,7 +685,6 @@
   "profiles.deleteSuccess": "Profil başarıyla silindi!",
   "profiles.deleteError": "Profil silinemedi: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" bir NoRisk profili. Silindikten sonra yeniden başlatsan bile geri gelmez. Ayarlar, Debug altından geri getirebilirsin.",
-  "profiles.deleteNoRiskProfileTypeName": "Silmek için {{name}} yaz",
   "profiles.openingFolder": "Klasör açılıyor...",
   "profiles.openFolderSuccess": "Klasör açıldı!",
   "profiles.openFolderError": "Klasör açılamadı: {{error}}",

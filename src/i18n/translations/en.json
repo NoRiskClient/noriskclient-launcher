@@ -659,7 +659,6 @@
   "profiles.deleteSuccess": "Profile deleted successfully!",
   "profiles.deleteError": "Failed to delete profile: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" is a NoRisk profile. Once deleted it stays gone, even after a restart. You can bring it back under Settings, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Type {{name}} to delete it",
   "profiles.openingFolder": "Opening folder...",
   "profiles.openFolderSuccess": "Folder opened!",
   "profiles.openFolderError": "Failed to open folder: {{error}}",

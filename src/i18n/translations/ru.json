@@ -687,7 +687,6 @@
   "profiles.deleteSuccess": "Профиль успешно удалён!",
   "profiles.deleteError": "Не удалось удалить профиль: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "«{{name}}» это профиль NoRisk. После удаления он не вернётся, даже после перезапуска. Вернуть его можно в Настройки, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Введите {{name}}, чтобы удалить его",
   "profiles.openingFolder": "Открытие папки...",
   "profiles.openFolderSuccess": "Папка открыта!",
   "profiles.openFolderError": "Не удалось открыть папку: {{error}}",

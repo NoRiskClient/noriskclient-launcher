@@ -685,7 +685,6 @@
   "profiles.deleteSuccess": "¡Perfil eliminado exitosamente!",
   "profiles.deleteError": "Error al eliminar perfil: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" es un perfil de NoRisk. Una vez eliminado no vuelve, ni siquiera al reiniciar. Puedes recuperarlo en Ajustes, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Escribe {{name}} para eliminarlo",
   "profiles.openingFolder": "Abriendo carpeta...",
   "profiles.openFolderSuccess": "¡Carpeta abierta!",
   "profiles.openFolderError": "Error al abrir carpeta: {{error}}",

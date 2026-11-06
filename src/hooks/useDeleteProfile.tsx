@@ -21,9 +21,6 @@ export function useDeleteProfile() {
       message: noRisk
         ? t("profiles.deleteNoRiskProfileMessage", { name })
         : t("profiles.deleteConfirmMessage", { name }),
-      requireTypedText: noRisk ? name : undefined,
-      inputLabel: noRisk ? t("profiles.deleteNoRiskProfileTypeName", { name }) : undefined,
-      inputPlaceholder: noRisk ? name : undefined,
       confirmText: t("profiles.deleteConfirm"),
       cancelText: t("profiles.cancelAction"),
       type: "danger",

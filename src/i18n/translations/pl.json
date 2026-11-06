@@ -687,7 +687,6 @@
   "profiles.deleteSuccess": "Profil usunięty pomyślnie!",
   "profiles.deleteError": "Nie udało się usunąć profilu: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" to profil NoRisk. Po usunięciu nie wróci, nawet po restarcie. Możesz go przywrócić w Ustawienia, Debug.",
-  "profiles.deleteNoRiskProfileTypeName": "Wpisz {{name}}, aby go usunąć",
   "profiles.openingFolder": "Otwieranie folderu...",
   "profiles.openFolderSuccess": "Folder otwarty!",
   "profiles.openFolderError": "Nie udało się otworzyć folderu: {{error}}",

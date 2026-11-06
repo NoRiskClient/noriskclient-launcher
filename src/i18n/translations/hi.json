@@ -694,7 +694,6 @@
   "profiles.deleteSuccess": "प्रोफ़ाइल सफलतापूर्वक हटाई गई!",
   "profiles.deleteError": "प्रोफ़ाइल हटाने में विफल: {{error}}",
   "profiles.deleteNoRiskProfileMessage": "\"{{name}}\" एक NoRisk प्रोफ़ाइल है। हटाने के बाद यह रीस्टार्ट के बाद भी वापस नहीं आएगी। आप इसे Settings, Debug में वापस ला सकते हैं।",
-  "profiles.deleteNoRiskProfileTypeName": "हटाने के लिए {{name}} लिखें",
   "profiles.openingFolder": "फ़ोल्डर खुल रहा है...",
   "profiles.openFolderSuccess": "फ़ोल्डर खुल गया!",
   "profiles.openFolderError": "फ़ोल्डर खोलने में विफल: {{error}}",
