@@ -2,7 +2,7 @@ use noriskclient_launcher_v3_lib::state::profile_state::*;
 use noriskclient_launcher_v3_lib::utils::profile_utils::{
     ContentType, GenericModrinthInfo, LocalContentItem,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bool) -> Mod {
@@ -560,5 +560,47 @@ fn an_editable_copy_of_a_standard_profile_is_persisted() {
     assert!(
         should_persist(&profile, &HashSet::new()),
         "a user's editable copy carries their changes and must be written"
+    );
+}
+
+#[test]
+fn a_new_standard_profile_gets_a_copy() {
+    let standard = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(standard, &HashMap::new(), &HashSet::new()),
+        StandardProfileSync::Create
+    );
+}
+
+#[test]
+fn a_standard_profile_the_user_removed_does_not_come_back() {
+    let standard = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(standard, &HashMap::new(), &HashSet::from([standard])),
+        StandardProfileSync::Skip
+    );
+}
+
+#[test]
+fn removing_one_standard_profile_leaves_the_others_alone() {
+    let removed = Uuid::new_v4();
+    let other = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(other, &HashMap::new(), &HashSet::from([removed])),
+        StandardProfileSync::Create
+    );
+}
+
+#[test]
+fn an_existing_copy_keeps_getting_updates() {
+    let standard = Uuid::new_v4();
+    let copy = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(
+            standard,
+            &HashMap::from([(standard, copy)]),
+            &HashSet::from([standard])
+        ),
+        StandardProfileSync::Update(copy)
     );
 }

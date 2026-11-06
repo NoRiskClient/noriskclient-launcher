@@ -1430,3 +1430,43 @@ async fn a_profiles_file_from_before_sync_packs_upgrades_without_losing_anything
     assert_eq!(profile.playtime_seconds, 0);
     assert!(profile.preferred_account_id.is_none());
 }
+
+#[tokio::test]
+async fn a_removed_standard_profile_is_remembered() {
+    let store = store().await;
+    let removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    assert_eq!(
+        store.removed_standard_profiles().await.unwrap(),
+        HashSet::from([removed])
+    );
+}
+
+#[tokio::test]
+async fn removing_the_same_standard_profile_twice_keeps_one_entry() {
+    let store = store().await;
+    let removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    assert_eq!(store.removed_standard_profiles().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn restoring_one_standard_profile_keeps_the_others_removed() {
+    let store = store().await;
+    let restored = Uuid::new_v4();
+    let still_removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(restored).await.unwrap();
+    store.remember_removed_standard_profile(still_removed).await.unwrap();
+    store.forget_removed_standard_profile(restored).await.unwrap();
+    assert_eq!(
+        store.removed_standard_profiles().await.unwrap(),
+        HashSet::from([still_removed])
+    );
+}
+
+#[tokio::test]
+async fn a_fresh_store_has_no_removed_standard_profiles() {
+    let store = store().await;
+    assert!(store.removed_standard_profiles().await.unwrap().is_empty());
+}

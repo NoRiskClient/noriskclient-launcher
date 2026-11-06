@@ -884,6 +884,27 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
 }
 
 #[tauri::command]
+pub async fn list_removed_standard_profiles() -> Result<Vec<Profile>, CommandError> {
+    let state = State::get().await?;
+    let removed = state.profile_manager.removed_standard_profile_ids().await?;
+    Ok(state
+        .norisk_version_manager
+        .get_config()
+        .await
+        .profiles
+        .into_iter()
+        .filter(|profile| removed.contains(&profile.id))
+        .collect())
+}
+
+#[tauri::command]
+pub async fn restore_standard_profile(id: Uuid) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state.profile_manager.restore_standard_profile(id).await?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
     let state = State::get().await?;
     Ok(state.profile_manager.list_profile_backups().await?)

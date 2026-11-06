@@ -16,7 +16,7 @@ import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { ActionButtons, type ActionButton } from "../ui/ActionButtons";
 import { useNavigate } from "react-router-dom";
 import * as ProfileService from "../../services/profile-service";
-import { useConfirmDialog } from "../../hooks/useConfirmDialog";
+import { useDeleteProfile } from "../../hooks/useDeleteProfile";
 import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { ExportProfileModal } from "../profiles/ExportProfileModal";
@@ -40,7 +40,7 @@ export function ProfilesTabV2() {
     fetchProfiles,
   } = useProfileStore();
   const navigate = useNavigate();
-  const { confirm, confirmDialog } = useConfirmDialog();
+  const { requestDelete, deleteDialog } = useDeleteProfile();
   const { openModal: openWizard } = useProfileWizardStore();
   const { isPinned, pinnedProfileIds } = usePinnedProfilesStore();
   
@@ -181,40 +181,9 @@ export function ProfilesTabV2() {
     navigate("/profiles");
   };
 
-  const handleDeleteProfile = async (
-    profileId: string,
-    profileName: string,
-  ) => {
-    console.log(
-      "[ProfilesTabV2] handleDeleteProfile called for:",
-      profileId,
-      profileName,
-    );
-    
-    // Find the profile to check if it's a standard version
-    const profile = profiles.find(p => p.id === profileId);
-    
-    const confirmed = await confirm({
-      title: t('profiles.deleteProfileTitle'),
-      message: t('profiles.deleteConfirmMessageSimple', { name: profileName }),
-      confirmText: t('profiles.deleteConfirm'),
-      cancelText: t('profiles.cancelAction'),
-      type: "danger",
-      fullscreen: true,
-    });
-
-    if (confirmed) {
-      const deletePromise = useProfileStore.getState().deleteProfile(profileId);
-      toast.promise(deletePromise, {
-        loading: t('profiles.deletingProfile', { name: profileName }),
-        success: () => {
-          fetchProfiles();
-          return t('profiles.deleteSuccess', { name: profileName });
-        },
-        error: (err) =>
-          t('profiles.deleteError', { error: parseErrorMessage(err) }),
-      });
-    }
+  const handleDeleteProfile = (profileId: string) => {
+    const profile = profiles.find((p) => p.id === profileId);
+    if (profile) requestDelete(profile);
   };
 
   const handleOpenFolder = async (profile: Profile) => {
@@ -479,7 +448,7 @@ export function ProfilesTabV2() {
       </div>
 
       {/* Modals from ProfilesTab.tsx */}
-      {confirmDialog}
+      {deleteDialog}
     </div>
   );
 }

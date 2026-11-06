@@ -53,7 +53,7 @@ import { Button } from "../../ui/buttons/Button";
 import { ProfileIconV2 } from "../ProfileIconV2";
 import { ExportProfileModal } from "../ExportProfileModal";
 import { ModpackVersionsModal } from "../../modals/ModpackVersionsModal";
-import { ConfirmDeleteDialog } from "../../modals/ConfirmDeleteDialog";
+import { useDeleteProfile } from "../../../hooks/useDeleteProfile";
 import { SettingsContextMenu, type ContextMenuItem } from "../../ui/SettingsContextMenu";
 import { Tooltip } from "../../ui/Tooltip";
 
@@ -123,9 +123,7 @@ export function ProfileDetailViewV3({
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Delete modal state
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { requestDelete, deleteDialog } = useDeleteProfile();
 
   const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
     const source = profile.modpack_info?.source;
@@ -179,39 +177,11 @@ export function ProfileDetailViewV3({
     }
   }, [handleQuickPlayLaunch, t]);
 
-  const handleDeleteProfile = useCallback(() => {
-    if (currentProfile.is_standard_version) {
-      toast.error(t('profiles.cannotDeleteStandard'));
-      return;
+  const handleDeleteProfile = useCallback(async () => {
+    if (await requestDelete(currentProfile)) {
+      navigate("/profiles");
     }
-    setIsDeleteModalOpen(true);
-  }, [currentProfile, t]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    setIsDeleting(true);
-    try {
-      const deletePromise = useProfileStore.getState().deleteProfile(currentProfile.id);
-      await toast.promise(deletePromise, {
-        loading: t('profiles.deletingProfile', { name: currentProfile.name }),
-        success: () => {
-          fetchProfiles();
-          navigate("/profiles");
-          setIsDeleteModalOpen(false);
-          return t('profiles.deleteSuccess', { name: currentProfile.name });
-        },
-        error: (err) =>
-          t('profiles.deleteError', { error: parseErrorMessage(err) }),
-      });
-    } catch (error) {
-      console.error("[V3] Delete failed:", error);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [currentProfile, fetchProfiles, navigate, t]);
-
-  const handleCancelDelete = useCallback(() => {
-    setIsDeleteModalOpen(false);
-  }, []);
+  }, [currentProfile, navigate, requestDelete]);
 
   const handleOpenExportModal = useCallback(() => {
     showModal(`export-profile-${currentProfile.id}`, (
@@ -803,19 +773,7 @@ export function ProfileDetailViewV3({
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
-      <ConfirmDeleteDialog
-        isOpen={isDeleteModalOpen}
-        itemName={currentProfile.name}
-        onClose={handleCancelDelete}
-        onConfirm={handleConfirmDelete}
-        isDeleting={isDeleting}
-        title={t('profiles.deleteProfileTitle')}
-        message={
-          <p className="text-white/80 font-minecraft">
-            {t('profiles.deleteConfirmMessage', { name: currentProfile.name })}
-          </p>
-        }
-      />
+      {deleteDialog}
 
     </div>
   );

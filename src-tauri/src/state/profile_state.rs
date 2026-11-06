@@ -1081,6 +1081,9 @@ impl ProfileManager {
 
         self.store.delete_profile(id).await?;
         self.persisted.lock().await.remove(&id);
+        if let Some(source_id) = profile_to_delete.as_ref().and_then(|p| p.source_standard_profile_id) {
+            self.store.remember_removed_standard_profile(source_id).await?;
+        }
         info!(
             "Successfully removed profile entry {} from configuration.",
             id
@@ -3093,32 +3096,38 @@ impl ProfileManager {
             }
         }
 
+        let removed = self.store.removed_standard_profiles().await?;
+
         let mut copies_created = 0;
         let mut copies_updated = 0;
 
         for standard_profile in standard_profiles {
-            if let Some(existing_copy_id) = existing_copies_by_source_id.get(&standard_profile.id) {
-                // Update existing copy with forced fields
-                match self.update_copy_with_forced_fields(*existing_copy_id, &standard_profile).await {
-                    Ok(updated) => {
-                        if updated {
-                            info!("ProfileManager: Updated forced fields for copy {} of standard profile '{}'", existing_copy_id, standard_profile.name);
-                            copies_updated += 1;
+            match standard_profile_sync_action(standard_profile.id, &existing_copies_by_source_id, &removed) {
+                StandardProfileSync::Skip => {
+                    info!("ProfileManager: Skipping standard profile '{}', the user removed it", standard_profile.name);
+                }
+                StandardProfileSync::Update(existing_copy_id) => {
+                    match self.update_copy_with_forced_fields(existing_copy_id, &standard_profile).await {
+                        Ok(updated) => {
+                            if updated {
+                                info!("ProfileManager: Updated forced fields for copy {} of standard profile '{}'", existing_copy_id, standard_profile.name);
+                                copies_updated += 1;
+                            }
+                        }
+                        Err(e) => {
+                            warn!("ProfileManager: Failed to update copy {} for standard profile '{}': {}", existing_copy_id, standard_profile.name, e);
                         }
                     }
-                    Err(e) => {
-                        warn!("ProfileManager: Failed to update copy {} for standard profile '{}': {}", existing_copy_id, standard_profile.name, e);
-                    }
                 }
-            } else {
-                // Create new copy
-                match self.create_editable_copy_from_standard(&standard_profile).await {
-                    Ok(new_id) => {
-                        info!("ProfileManager: Created editable copy {} for standard profile '{}'", new_id, standard_profile.name);
-                        copies_created += 1;
-                    }
-                    Err(e) => {
-                        warn!("ProfileManager: Failed to create copy for standard profile '{}': {}", standard_profile.name, e);
+                StandardProfileSync::Create => {
+                    match self.create_editable_copy_from_standard(&standard_profile).await {
+                        Ok(new_id) => {
+                            info!("ProfileManager: Created editable copy {} for standard profile '{}'", new_id, standard_profile.name);
+                            copies_created += 1;
+                        }
+                        Err(e) => {
+                            warn!("ProfileManager: Failed to create copy for standard profile '{}': {}", standard_profile.name, e);
+                        }
                     }
                 }
             }
@@ -3126,6 +3135,21 @@ impl ProfileManager {
 
         info!("ProfileManager: Standard profile sync complete. Created {} new copies, updated {} existing copies", copies_created, copies_updated);
         Ok(())
+    }
+
+    pub async fn removed_standard_profile_ids(&self) -> Result<HashSet<Uuid>> {
+        let mut removed = self.store.removed_standard_profiles().await?;
+        for profile in self.profiles.read().await.values() {
+            if let Some(source_id) = profile.source_standard_profile_id {
+                removed.remove(&source_id);
+            }
+        }
+        Ok(removed)
+    }
+
+    pub async fn restore_standard_profile(&self, standard_id: Uuid) -> Result<()> {
+        self.store.forget_removed_standard_profile(standard_id).await?;
+        self.sync_standard_profiles().await
     }
 
     async fn ensure_profiles_loaded(&self) -> Result<()> {
@@ -3705,6 +3729,25 @@ impl PostInitializationHandler for ProfileManager {
 }
 
 const PRE_MIGRATION_SNAPSHOT: &str = "pre-profiles";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StandardProfileSync {
+    Create,
+    Update(Uuid),
+    Skip,
+}
+
+pub fn standard_profile_sync_action(
+    standard_id: Uuid,
+    copies_by_source: &HashMap<Uuid, Uuid>,
+    removed: &HashSet<Uuid>,
+) -> StandardProfileSync {
+    match copies_by_source.get(&standard_id) {
+        Some(copy_id) => StandardProfileSync::Update(*copy_id),
+        None if removed.contains(&standard_id) => StandardProfileSync::Skip,
+        None => StandardProfileSync::Create,
+    }
+}
 
 pub fn should_persist(profile: &Profile, transient: &HashSet<Uuid>) -> bool {
     if transient.contains(&profile.id) || profile.path.starts_with("noriskclient/temp/") {

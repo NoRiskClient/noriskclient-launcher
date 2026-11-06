@@ -743,6 +743,7 @@ async fn write_profile(
 }
 
 pub const META_SOURCE: &str = "profiles_source";
+const REMOVED_STANDARD_PROFILE_PREFIX: &str = "removed_standard_profile:";
 pub const SOURCE_SQLITE: &str = "sqlite";
 
 #[derive(Debug, Default, PartialEq)]
@@ -762,6 +763,33 @@ impl ProfileStore {
         sqlx::query("INSERT OR REPLACE INTO app_meta (key, value) VALUES (?1, ?2)")
             .bind(key)
             .bind(value)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn removed_standard_profiles(&self) -> Result<HashSet<Uuid>> {
+        let pool = self.pool().await?;
+        let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM app_meta WHERE key LIKE ?1")
+            .bind(format!("{}%", REMOVED_STANDARD_PROFILE_PREFIX))
+            .fetch_all(&pool)
+            .await?;
+        Ok(keys
+            .iter()
+            .filter_map(|key| key.strip_prefix(REMOVED_STANDARD_PROFILE_PREFIX))
+            .filter_map(|id| Uuid::parse_str(id).ok())
+            .collect())
+    }
+
+    pub async fn remember_removed_standard_profile(&self, id: Uuid) -> Result<()> {
+        self.set_meta(&format!("{}{}", REMOVED_STANDARD_PROFILE_PREFIX, id), "1")
+            .await
+    }
+
+    pub async fn forget_removed_standard_profile(&self, id: Uuid) -> Result<()> {
+        let pool = self.pool().await?;
+        sqlx::query("DELETE FROM app_meta WHERE key = ?1")
+            .bind(format!("{}{}", REMOVED_STANDARD_PROFILE_PREFIX, id))
             .execute(&pool)
             .await?;
         Ok(())

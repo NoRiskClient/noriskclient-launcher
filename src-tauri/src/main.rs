@@ -522,6 +522,8 @@ async fn main() {
             list_profiles,
             list_profile_backups,
             restore_profile_backup,
+            commands::profile_command::list_removed_standard_profiles,
+            commands::profile_command::restore_standard_profile,
             get_profile_store_status,
             reimport_profiles_from_legacy_json,
             search_profiles,
