@@ -149,7 +149,7 @@ async fn add_jar(
                 &platform,
                 &project_id,
                 &version_id,
-                entry.associated_loader.map(|l| l.as_str().to_string()),
+                entry.primary_loader().map(|l| l.as_str().to_string()),
                 entry
                     .game_versions
                     .as_ref()

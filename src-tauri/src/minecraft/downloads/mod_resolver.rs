@@ -3,9 +3,10 @@ use crate::integrations::norisk_packs::{self, NoriskModSourceDefinition, NoriskM
 use crate::state::profile_state::{
     self, CustomModInfo, Mod, ModLoader, ModSource, NoriskModIdentifier, Profile,
 };
+use async_zip::tokio::read::seek::ZipFileReader;
 use log::{debug, info, trace, warn};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use tokio::fs;
@@ -79,6 +80,7 @@ pub struct ModOutcome {
     pub filename: Option<String>,
     pub version: Option<String>,
     pub overridden_by: Option<String>,
+    pub jar_loaders: Vec<ModLoader>,
 }
 
 impl ModOutcome {
@@ -122,6 +124,14 @@ impl ModResolutionReport {
 
     pub fn profile_mod(&self, id: &Uuid) -> Option<&ModOutcome> {
         self.profile.get(id)
+    }
+
+    pub fn jar_loaders(&self) -> HashMap<Uuid, Vec<ModLoader>> {
+        self.profile
+            .iter()
+            .filter(|(_, outcome)| !outcome.jar_loaders.is_empty())
+            .map(|(id, outcome)| (*id, outcome.jar_loaders.clone()))
+            .collect()
     }
 
     fn outcomes_mut(&mut self) -> impl Iterator<Item = &mut ModOutcome> {
@@ -411,9 +421,9 @@ async fn resolve_pack_entry(
     outcome
 }
 
-async fn resolve_profile_mod(
+pub async fn resolve_profile_mod(
     mod_info: &Mod,
-    profile: &Profile,
+    profile_loader: ModLoader,
     minecraft_version: &str,
     mod_cache_dir: &PathBuf,
     final_mods: &mut HashMap<String, TargetMod>,
@@ -435,25 +445,11 @@ async fn resolve_profile_mod(
         return ModOutcome::skipped(ModResolutionStatus::GameVersionMismatch);
     }
 
-    let profile_loader = profile.loader;
-    match mod_info.associated_loader {
-        Some(mod_loader) => {
-            if mod_loader != profile_loader {
-                debug!(
-                    "Skipping profile mod '{}' (intended for loader {:?}) because profile loader is {:?}",
-                    mod_name, mod_loader, profile_loader
-                );
-                return ModOutcome::skipped(ModResolutionStatus::LoaderMismatch);
-            }
-        }
-        None => {
-            debug!(
-                "Skipping profile mod '{}' because it lacks an associated loader.",
-                mod_name
-            );
-            return ModOutcome::skipped(ModResolutionStatus::NoAssociatedLoader);
-        }
-    }
+    let mut loader_skip = match mod_info.supports_loader(profile_loader) {
+        Some(true) => None,
+        Some(false) => Some(ModResolutionStatus::LoaderMismatch),
+        None => Some(ModResolutionStatus::NoAssociatedLoader),
+    };
 
     let (mod_type_str, project_id) = match &mod_info.source {
         ModSource::Modrinth { project_id, .. } => ("profile Modrinth", Some(project_id.as_str())),
@@ -489,6 +485,9 @@ async fn resolve_profile_mod(
     let filename = match profile_state::get_profile_mod_filename(&mod_info.source) {
         Ok(filename) => filename,
         Err(e) => {
+            if let Some(status) = loader_skip {
+                return ModOutcome::skipped(status);
+            }
             warn!(
                 "Could not determine filename for profile mod '{}': {}. Skipping.",
                 mod_name, e
@@ -498,6 +497,31 @@ async fn resolve_profile_mod(
         }
     };
     outcome.filename = Some(filename.clone());
+
+    if loader_skip.is_some() && mod_info.known_mod_loaders().is_none() {
+        let found = jar_loaders(&mod_cache_dir.join(&filename)).await;
+        if !found.is_empty() {
+            info!(
+                "Read loaders {:?} from the jar of profile mod '{}'",
+                found, mod_name
+            );
+            loader_skip = (!found.contains(&profile_loader))
+                .then_some(ModResolutionStatus::LoaderMismatch);
+            outcome.jar_loaders = found;
+        }
+    }
+
+    if let Some(status) = loader_skip {
+        debug!(
+            "Skipping profile mod '{}' because it does not support loader {:?}",
+            mod_name, profile_loader
+        );
+        return ModOutcome {
+            status,
+            jar_loaders: outcome.jar_loaders,
+            ..Default::default()
+        };
+    }
 
     outcome.status = try_add_mod_to_final_list(
         canonical_key,
@@ -513,6 +537,25 @@ async fn resolve_profile_mod(
     .await;
 
     outcome
+}
+
+pub async fn jar_loaders(jar: &Path) -> Vec<ModLoader> {
+    let Ok(file) = fs::File::open(jar).await else {
+        return Vec::new();
+    };
+    let Ok(zip) = ZipFileReader::with_tokio(tokio::io::BufReader::new(file)).await else {
+        return Vec::new();
+    };
+    let names: Vec<&str> = zip
+        .file()
+        .entries()
+        .iter()
+        .filter_map(|entry| entry.filename().as_str().ok())
+        .collect();
+    ModLoader::MODDED
+        .into_iter()
+        .filter(|loader| loader.jar_manifest().map_or(false, |m| names.contains(&m)))
+        .collect()
 }
 
 // --- Helper function to resolve the final list of mods (Focus on Modrinth) ---
@@ -577,7 +620,7 @@ pub async fn resolve_target_mods(
     for mod_info in extra_mods.iter().chain(profile.mods.iter()) {
         let outcome = resolve_profile_mod(
             mod_info,
-            profile,
+            profile.loader,
             minecraft_version,
             mod_cache_dir,
             &mut final_mods,
@@ -774,6 +817,3 @@ pub async fn build_forge_add_mods_meta(
     fs::write(&meta_file_path, meta_contents).await?;
     Ok(meta_file_path)
 }
-
-
-

@@ -66,7 +66,10 @@ pub struct Mod {
     pub version: Option<String>,      // Optional: Could be inferred
     pub game_versions: Option<Vec<String>>, // Changed: List of supported Minecraft versions
     pub file_name_override: Option<String>, // Optional: To store the actual filename on disk if needed
-    pub associated_loader: Option<ModLoader>, // Optional: Tracks the loader this mod was originally intended for
+    #[deprecated(note = "use `mod_loaders`, `supports_loader` or `primary_loader`")]
+    pub associated_loader: Option<ModLoader>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mod_loaders: Vec<ModLoader>,
     /// Origin modpack identifier in format: "platform:project_id[:version_id]"
     /// Example: "modrinth:AANobbMI:tFw0iWAk" or "curseforge:12345:67890"
     /// None for manually added mods
@@ -93,6 +96,45 @@ impl Mod {
             }
             _ => true,
         }
+    }
+
+    #[allow(deprecated)]
+    pub fn known_mod_loaders(&self) -> Option<&[ModLoader]> {
+        let first = self.mod_loaders.first()?;
+        self.associated_loader
+            .map_or(true, |stored| stored == *first)
+            .then_some(self.mod_loaders.as_slice())
+    }
+
+    #[allow(deprecated)]
+    pub fn supports_loader(&self, loader: ModLoader) -> Option<bool> {
+        match self.known_mod_loaders() {
+            Some(loaders) => Some(loaders.contains(&loader)),
+            None => self.associated_loader.map(|stored| stored == loader),
+        }
+    }
+
+    #[allow(deprecated)]
+    pub fn primary_loader(&self) -> Option<ModLoader> {
+        self.known_mod_loaders()
+            .and_then(|loaders| loaders.first().copied())
+            .or(self.associated_loader)
+    }
+
+    #[allow(deprecated)]
+    pub fn set_mod_loaders(&mut self, loaders: Vec<ModLoader>) {
+        self.associated_loader = loaders.first().copied();
+        self.mod_loaders = loaders;
+    }
+
+    pub fn set_mod_loaders_with_primary(&mut self, mut loaders: Vec<ModLoader>, primary: ModLoader) {
+        loaders.retain(|loader| *loader != primary);
+        loaders.insert(0, primary);
+        self.set_mod_loaders(loaders);
+    }
+
+    pub fn set_loader_names<S: AsRef<str>>(&mut self, names: &[S]) {
+        self.set_mod_loaders(ModLoader::parse_all(names));
     }
 }
 
@@ -279,6 +321,28 @@ impl ModLoader {
             _ => Err(AppError::Other(format!("Invalid mod loader: {}", s))),
         }
     }
+
+    pub const MODDED: [ModLoader; 4] = [Self::Fabric, Self::Quilt, Self::Forge, Self::NeoForge];
+
+    pub fn parse_all<S: AsRef<str>>(loaders: &[S]) -> Vec<ModLoader> {
+        let mut parsed = Vec::new();
+        for loader in loaders.iter().filter_map(|s| ModLoader::from_str(s.as_ref()).ok()) {
+            if !parsed.contains(&loader) {
+                parsed.push(loader);
+            }
+        }
+        parsed
+    }
+
+    pub fn jar_manifest(&self) -> Option<&'static str> {
+        match *self {
+            Self::Vanilla => None,
+            Self::Forge => Some("META-INF/mods.toml"),
+            Self::Fabric => Some("fabric.mod.json"),
+            Self::Quilt => Some("quilt.mod.json"),
+            Self::NeoForge => Some("META-INF/neoforge.mods.toml"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -446,7 +510,8 @@ pub(crate) fn mod_from_payload(
     source: ModSource,
     force_include_versions: Vec<String>,
 ) -> Mod {
-    Mod {
+    #[allow(deprecated)]
+    let mut entry = Mod {
         extra: Default::default(),
         id: Uuid::new_v4(),
         source,
@@ -455,14 +520,14 @@ pub(crate) fn mod_from_payload(
         version: payload.version_number.clone(),
         game_versions: payload.game_versions.clone(),
         file_name_override: None,
-        associated_loader: payload
-            .loaders
-            .clone()
-            .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions,
-    }
+    };
+    entry.set_loader_names(payload.loaders.as_deref().unwrap_or_default());
+    entry
 }
 
 pub fn replace_mod_with_payload(
@@ -475,10 +540,7 @@ pub fn replace_mod_with_payload(
     existing.version = payload.version_number.clone();
     existing.game_versions = payload.game_versions.clone();
     existing.file_name_override = None;
-    existing.associated_loader = payload
-        .loaders
-        .clone()
-        .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok()));
+    existing.set_loader_names(payload.loaders.as_deref().unwrap_or_default());
     existing.enabled = true;
 }
 
@@ -591,8 +653,9 @@ fn apply_unified_version_to_mod(
     {
         m.force_include_versions.push(profile_mc_version.to_string());
     }
-    if let Some(loader) = v.loaders.first().and_then(|s| ModLoader::from_str(s).ok()) {
-        m.associated_loader = Some(loader);
+    let loaders = ModLoader::parse_all(&v.loaders);
+    if !loaders.is_empty() {
+        m.set_mod_loaders(loaders);
     }
     if m.display_name.is_none() {
         m.display_name = Some(v.name.clone());
@@ -1157,7 +1220,8 @@ impl ProfileManager {
                             _ => Vec::new(),
                         };
 
-                        let new_mod = Mod {
+                        #[allow(deprecated)]
+                        let mut new_mod = Mod {
                             id: Uuid::new_v4(),
                             source: source.clone(),
                             enabled: true,
@@ -1165,14 +1229,14 @@ impl ProfileManager {
                             version: version_number.clone(),
                             game_versions: game_versions.clone(),
                             file_name_override: None,
-                            associated_loader: loaders
-                                .clone()
-                                .and_then(|l| l.first().and_then(|s| ModLoader::from_str(s).ok())),
+                            associated_loader: None,
+                            mod_loaders: Vec::new(),
                             modpack_origin: None, // Manually added mod
                             updates_enabled: true, // Updates enabled by default
                             force_include_versions,
                             extra: Default::default(),
                         };
+                        new_mod.set_loader_names(loaders.as_deref().unwrap_or_default());
                         touched = Some(new_mod.id);
                         profile.mods.push(new_mod);
                     } else {
@@ -1739,6 +1803,42 @@ impl ProfileManager {
         Ok(touched.len())
     }
 
+    pub async fn store_jar_loaders(
+        &self,
+        profile_id: Uuid,
+        found: &HashMap<Uuid, Vec<ModLoader>>,
+    ) -> Result<()> {
+        let (touched, _) = self
+            .edit_mods(profile_id, |profile| {
+                let mut touched = Vec::new();
+                for entry in profile.mods.iter_mut() {
+                    if let Some(loaders) = found.get(&entry.id) {
+                        if entry.known_mod_loaders().is_none() {
+                            match entry.primary_loader().filter(|p| loaders.contains(p)) {
+                                Some(primary) => {
+                                    entry.set_mod_loaders_with_primary(loaders.clone(), primary)
+                                }
+                                None => entry.set_mod_loaders(loaders.clone()),
+                            }
+                            touched.push(entry.id);
+                        }
+                    }
+                }
+                touched
+            })
+            .await?;
+
+        self.save_mods(profile_id, &touched).await?;
+        if !touched.is_empty() {
+            info!(
+                "Stored jar loaders for {} mod(s) in profile {}",
+                touched.len(),
+                profile_id
+            );
+        }
+        Ok(())
+    }
+
     pub async fn set_mods_updates_enabled(
         &self,
         profile_id: Uuid,
@@ -2110,10 +2210,7 @@ impl ProfileManager {
                                 .force_include_versions
                                 .push(profile_mc_version.clone());
                         }
-                        mod_to_update.associated_loader = new_version_details
-                            .loaders
-                            .first()
-                            .and_then(|s| ModLoader::from_str(s).ok());
+                        mod_to_update.set_loader_names(&new_version_details.loaders);
 
                         info!("Mod instance {} updated successfully in memory.", mod_id);
                     }

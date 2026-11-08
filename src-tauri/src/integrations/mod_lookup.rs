@@ -1,5 +1,5 @@
 use crate::integrations::{curseforge, modrinth, unified_mod};
-use crate::state::profile_state::{mod_project_key, Mod, ModLoader, ModSource};
+use crate::state::profile_state::{mod_project_key, Mod, ModSource};
 use crate::utils::hash_utils;
 use dashmap::DashMap;
 use log::{debug, info, warn};
@@ -23,6 +23,7 @@ fn fresh_copy(entry: &Mod) -> Mod {
     copy
 }
 
+#[allow(deprecated)]
 pub fn mod_from_modrinth_version(
     version: &modrinth::ModrinthVersion,
     sha1: Option<String>,
@@ -33,7 +34,7 @@ pub fn mod_from_modrinth_version(
         .find(|entry| entry.primary)
         .or_else(|| version.files.first())?;
 
-    Some(Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source: ModSource::Modrinth {
             project_id: version.project_id.clone(),
@@ -47,19 +48,20 @@ pub fn mod_from_modrinth_version(
         version: Some(version.version_number.clone()),
         game_versions: Some(version.game_versions.clone()),
         file_name_override: None,
-        associated_loader: version
-            .loaders
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    })
+    };
+    entry.set_loader_names(&version.loaders);
+    Some(entry)
 }
 
+#[allow(deprecated)]
 pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
-    Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source: ModSource::CurseForge {
             project_id: file.mod_id.to_string(),
@@ -78,14 +80,17 @@ pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
         version: None,
         game_versions: Some(file.game_versions.clone()),
         file_name_override: None,
-        associated_loader: unified_mod::extract_loaders_from_game_versions(&file.game_versions)
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    }
+    };
+    entry.set_loader_names(&unified_mod::extract_loaders_from_game_versions(
+        &file.game_versions,
+    ));
+    entry
 }
 
 #[derive(Debug, Clone)]
@@ -423,6 +428,7 @@ pub async fn identify_jar(path: &Path) -> Option<Mod> {
         .and_then(|item| item.resolved)
 }
 
+#[allow(deprecated)]
 pub fn mod_from_unified_version(
     version: &unified_mod::UnifiedVersion,
     display_name: String,
@@ -452,7 +458,7 @@ pub fn mod_from_unified_version(
         },
     };
 
-    Some(Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source,
         enabled: true,
@@ -460,13 +466,13 @@ pub fn mod_from_unified_version(
         version: Some(version.version_number.clone()),
         game_versions: Some(version.game_versions.clone()),
         file_name_override: None,
-        associated_loader: version
-            .loaders
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    })
+    };
+    entry.set_loader_names(&version.loaders);
+    Some(entry)
 }

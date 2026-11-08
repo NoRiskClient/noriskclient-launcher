@@ -194,6 +194,13 @@ fn content_type_to_string(content_type: &ContentType) -> &'static str {
     }
 }
 
+fn supports_target_loader(installed_mod: &crate::state::profile_state::Mod, target_loader: &str) -> bool {
+    crate::state::profile_state::ModLoader::from_str(target_loader)
+        .ok()
+        .and_then(|loader| installed_mod.supports_loader(loader))
+        .unwrap_or(true)
+}
+
 /// Helper function to install a Modrinth content pack from a ModrinthVersion
 pub async fn install_modrinth_content(
     profile_id: Uuid,
@@ -469,10 +476,7 @@ pub async fn check_content_installed(params: CheckContentParams) -> Result<Conte
                     match_game_version =
                         installed_versions.contains(&target_game_version.to_string());
                 }
-                let mut match_loader = true;
-                if let Some(installed_loader_enum) = &installed_mod.associated_loader {
-                    match_loader = installed_loader_enum.as_str() == target_loader_str;
-                }
+                let match_loader = supports_target_loader(installed_mod, target_loader_str);
 
                 if match_project
                     && match_version
@@ -1605,10 +1609,7 @@ async fn process_mod_requests(
             if let Some(installed_versions) = &installed_mod.game_versions {
                 match_game_version = installed_versions.contains(&target_game_version.to_string());
             }
-            let mut match_loader = true;
-            if let Some(installed_loader_enum) = &installed_mod.associated_loader {
-                match_loader = installed_loader_enum.as_str() == target_loader_str;
-            }
+            let match_loader = supports_target_loader(installed_mod, target_loader_str);
 
             if match_project
                 && match_version
@@ -2304,7 +2305,7 @@ impl LocalContentLoader {
                     norisk_info: None,
                     fallback_version: mod_item.version.clone(),
                     id: Some(mod_item.id.to_string()), // Set the ID from ModProfileEntry
-                    associated_loader: mod_item.associated_loader.clone(), // Populate associated_loader
+                    associated_loader: mod_item.primary_loader(),
                     modpack_origin: mod_item.modpack_origin.clone(), // Übernimm ModPack-Origin
                     updates_enabled: Some(mod_item.updates_enabled), // Übernimm Update-Einstellung
                 });

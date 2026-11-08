@@ -180,6 +180,7 @@ fn parse_optional_uuid(raw: Option<String>) -> Option<Uuid> {
     }
 }
 
+#[allow(deprecated)]
 pub fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
     let raw_profile: String = row.get("profile_id");
     let profile_id = Uuid::parse_str(&raw_profile)
@@ -203,6 +204,7 @@ pub fn row_to_mod(row: &sqlx::sqlite::SqliteRow) -> Result<(Uuid, Mod)> {
             game_versions: json_option(row.get("game_versions"), "mod game versions"),
             file_name_override: row.get("file_name_override"),
             associated_loader: loader_raw.as_deref().and_then(tag_into),
+            mod_loaders: json_into(&row.get::<String, _>("mod_loaders"), "mod loaders"),
             modpack_origin: row.get("modpack_origin"),
             updates_enabled: row.get::<i64, _>("updates_enabled") != 0,
             force_include_versions: json_into(
@@ -565,6 +567,7 @@ impl ProfileStore {
     }
 }
 
+#[allow(deprecated)]
 async fn write_mod(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     profile_id: &str,
@@ -578,8 +581,8 @@ async fn write_mod(
             profile_id, id, ordinal, source, source_type, project_id, version_id,
             file_name, enabled, display_name, version, game_versions,
             file_name_override, associated_loader, modpack_origin, updates_enabled,
-            force_include_versions, extra
-        ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
+            force_include_versions, extra, mod_loaders
+        ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
         ON CONFLICT (profile_id, id) DO UPDATE SET
             ordinal = excluded.ordinal,
             source = excluded.source,
@@ -596,7 +599,8 @@ async fn write_mod(
             modpack_origin = excluded.modpack_origin,
             updates_enabled = excluded.updates_enabled,
             force_include_versions = excluded.force_include_versions,
-            extra = excluded.extra
+            extra = excluded.extra,
+            mod_loaders = excluded.mod_loaders
         "#,
     )
     .bind(profile_id)
@@ -617,6 +621,7 @@ async fn write_mod(
     .bind(entry.updates_enabled as i64)
     .bind(json_of(&entry.force_include_versions)?)
     .bind(json_of(&entry.extra)?)
+    .bind(json_of(&entry.mod_loaders)?)
     .execute(&mut **tx)
     .await?;
     Ok(())

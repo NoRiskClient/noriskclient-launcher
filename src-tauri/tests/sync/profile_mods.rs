@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 const MC: &str = "1.21.11";
 
+#[allow(deprecated)]
 fn modrinth_mod(project_id: &str, enabled: bool) -> Mod {
     Mod {
         id: Uuid::new_v4(),
@@ -26,6 +27,7 @@ fn modrinth_mod(project_id: &str, enabled: bool) -> Mod {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),

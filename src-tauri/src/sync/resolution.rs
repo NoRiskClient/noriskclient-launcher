@@ -301,7 +301,7 @@ pub fn apply_resolution(
         .or_else(|| base.version.clone());
     out.file_name_override = None;
     out.game_versions = Some(vec![mc_version.to_string()]);
-    out.associated_loader = Some(loader);
+    out.set_mod_loaders(vec![loader]);
     out
 }
 

@@ -5,6 +5,7 @@ use noriskclient_launcher_v3_lib::utils::profile_utils::{
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+#[allow(deprecated)]
 fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bool) -> Mod {
     Mod {
         id: Uuid::new_v4(),
@@ -21,6 +22,7 @@ fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bo
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -191,6 +193,7 @@ fn replacing_keeps_the_entry_identity_and_user_choices() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn local_mods_never_match_a_platform_project() {
     let mods = vec![Mod {
         id: Uuid::new_v4(),
@@ -203,6 +206,7 @@ fn local_mods_never_match_a_platform_project() {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -405,6 +409,7 @@ fn adding_a_field_to_profile_must_break_this_test() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn adding_a_field_to_mod_must_break_this_test() {
     let entry = Mod {
         id: Uuid::new_v4(),
@@ -417,6 +422,7 @@ fn adding_a_field_to_mod_must_break_this_test() {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -432,6 +438,7 @@ fn adding_a_field_to_mod_must_break_this_test() {
         game_versions: _,
         file_name_override: _,
         associated_loader: _,
+        mod_loaders: _,
         modpack_origin: _,
         updates_enabled: _,
         force_include_versions: _,

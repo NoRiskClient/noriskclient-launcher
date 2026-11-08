@@ -835,6 +835,22 @@ pub async fn install_minecraft_version(
         .await?
     });
 
+    let jar_loaders = mod_resolution.jar_loaders();
+    if !jar_loaders.is_empty() {
+        if let Err(e) = state
+            .profile_manager
+            .store_jar_loaders(profile.id, &jar_loaders)
+            .await
+        {
+            warn!(
+                "Could not store jar loaders for {} mod(s) in profile '{}': {}",
+                jar_loaders.len(),
+                profile.name,
+                e
+            );
+        }
+    }
+
     emit_progress_event(
         &state,
         EventType::SyncingMods,

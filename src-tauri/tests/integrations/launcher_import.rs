@@ -597,8 +597,9 @@ async fn jars_are_found_one_directory_deep() {
     );
 }
 
+#[allow(deprecated)]
 fn modrinth_mod(game_versions: Vec<&str>, loader: Option<ModLoader>) -> Mod {
-    Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source: ModSource::Modrinth {
             project_id: "u6dRKJwZ".to_string(),
@@ -612,12 +613,15 @@ fn modrinth_mod(game_versions: Vec<&str>, loader: Option<ModLoader>) -> Mod {
         version: None,
         game_versions: Some(game_versions.into_iter().map(str::to_string).collect()),
         file_name_override: None,
-        associated_loader: loader,
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    }
+    };
+    entry.set_mod_loaders(loader.into_iter().collect());
+    entry
 }
 
 #[test]
@@ -626,7 +630,8 @@ fn an_imported_mod_is_pinned_to_the_loader_it_actually_ran_on() {
 
     resolve::pin_to_profile(&mut entry, ModLoader::NeoForge, "1.21.1");
 
-    assert_eq!(entry.associated_loader, Some(ModLoader::NeoForge));
+    assert_eq!(entry.primary_loader(), Some(ModLoader::NeoForge));
+    assert_eq!(entry.mod_loaders, vec![ModLoader::NeoForge, ModLoader::Forge]);
     assert_eq!(entry.force_include_versions, vec!["1.21.1".to_string()]);
 }
 
@@ -636,7 +641,7 @@ fn a_matching_game_version_needs_no_force_include() {
 
     resolve::pin_to_profile(&mut entry, ModLoader::Fabric, "1.21.1");
 
-    assert_eq!(entry.associated_loader, Some(ModLoader::Fabric));
+    assert_eq!(entry.primary_loader(), Some(ModLoader::Fabric));
     assert!(entry.force_include_versions.is_empty());
 }
 
