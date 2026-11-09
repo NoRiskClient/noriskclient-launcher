@@ -7,7 +7,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../components/ui/Modal";
 import { Button } from "../components/ui/buttons/Button";
-import { Input } from "../components/ui/Input";
+import { SearchStyleInput } from "../components/ui/Input";
 import { StatusMessage } from "../components/ui/StatusMessage";
 
 interface ConfirmOptions {
@@ -19,6 +19,7 @@ interface ConfirmOptions {
   inputPlaceholder?: string;
   inputInitialValue?: string;
   inputRequired?: boolean;
+  requireTypedText?: string;
   type?: "confirm" | "input" | "warning" | "danger";
   icon?: string;
   fullscreen?: boolean;
@@ -42,11 +43,18 @@ export function useConfirmDialog() {
     return () => setIsMounted(false);
   }, []);
 
+  const showsInput = options.type === "input" || options.requireTypedText !== undefined;
+
+  const validate = (value: string, opts: ConfirmOptions) =>
+    opts.requireTypedText !== undefined
+      ? value.trim().toLowerCase() === opts.requireTypedText.trim().toLowerCase()
+      : !opts.inputRequired || !!value.trim();
+
   const confirm = (options: ConfirmOptions): Promise<string | boolean> => {
     return new Promise((resolve) => {
       setOptions({ ...options, fullscreen: options.fullscreen ?? true });
       setInputValue(options.inputInitialValue || "");
-      setIsValid(!options.inputRequired || !!options.inputInitialValue);
+      setIsValid(validate(options.inputInitialValue || "", options));
       settle(false);
       pending.current = resolve;
       setIsOpen(true);
@@ -80,7 +88,7 @@ export function useConfirmDialog() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
-    setIsValid(!options.inputRequired || !!value.trim());
+    setIsValid(validate(value, options));
   };
 
   useEffect(() => {
@@ -117,7 +125,7 @@ export function useConfirmDialog() {
         ref={confirmButtonRef}
         variant={options.type === "danger" ? "destructive" : "default"}
         onClick={handleConfirm}
-        disabled={options.type === "input" && !isValid}
+        disabled={showsInput && !isValid}
         size="md"
         className="text-base"
       >
@@ -139,7 +147,7 @@ export function useConfirmDialog() {
 
   const renderContent = () => (
     <div
-      className={options.type === "input" ? "p-6 space-y-6" : "px-6 pt-6"}
+      className={showsInput ? "p-6 space-y-6" : "px-6 pt-6"}
       onClick={(e) => e.stopPropagation()}
     >
       {options.message && (
@@ -149,17 +157,18 @@ export function useConfirmDialog() {
         />
       )}
 
-      {options.type === "input" && (
-        <div className="space-y-4">
+      {showsInput && (
+        <div>
           {options.inputLabel && (
-            <p className="text-lg font-minecraft">{options.inputLabel}</p>
+            <label className="block text-base font-smallcaps text-white mb-2">
+              {options.inputLabel}
+            </label>
           )}
-          <Input
+          <SearchStyleInput
             value={inputValue}
             onChange={handleInputChange}
             placeholder={options.inputPlaceholder}
-            className="text-base py-3"
-            error={!isValid ? t('common.field_required') : undefined}
+            error={!isValid && options.requireTypedText === undefined ? t('common.field_required') : undefined}
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
