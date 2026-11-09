@@ -20,7 +20,7 @@ import { SyncPackCard } from "./SyncPackCard";
 import { parseSelectionKey, selectionKey } from "./SyncPackRow";
 import * as SyncPackService from "../../services/sync-pack-service";
 import type { SyncPackEntryRef } from "../../services/sync-pack-service";
-import { FloatingActionBar, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
+import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../profiles/v3/shared/FloatingActionBar";
 import { useSyncPacks } from "./useSyncPacks";
 import { BetaNotice } from "../ui/BetaNotice";
 
@@ -208,6 +208,14 @@ export function SyncPacksPage() {
       tone: "danger",
     },
   ];
+
+  const allSelected = selection.size > 0 && selection.size === selectableKeys.length;
+  const selectAllUndo = useSelectAllUndo(
+    allSelected,
+    () => new Set(selection),
+    setSelection,
+    () => setSelection(new Set(selectableKeys)),
+  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative select-none">
@@ -419,8 +427,9 @@ export function SyncPacksPage() {
         count={selection.size}
         totalCount={selectableKeys.length}
         accent={accentColor.value}
-        allSelected={selection.size > 0 && selection.size === selectableKeys.length}
-        onSelectAll={() => setSelection(new Set(selectableKeys))}
+        allSelected={allSelected}
+        onSelectAll={selectAllUndo.onSelectAll}
+        onRestore={selectAllUndo.onRestore}
         onClear={() => setSelection(new Set())}
         actions={fabActions}
       />

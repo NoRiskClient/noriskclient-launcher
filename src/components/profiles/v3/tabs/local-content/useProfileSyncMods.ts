@@ -191,6 +191,7 @@ export function useProfileSyncMods(profile: Profile, enabled: boolean) {
     remove,
     openPack,
     selection,
+    setSelection,
     selectedMods,
     toggleSelected,
     selectAll,

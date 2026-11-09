@@ -28,7 +28,7 @@ import { BrowseContentSideSheetV3 } from "../BrowseContentSideSheetV3";
 import { preloadIcons } from "../../../../lib/icon-utils";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
-import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { SearchWithFilters } from "../../../ui/SearchWithFilters";
 import { ContentActionButtons, type ContentActionButton } from "../../../ui/ContentActionButtons";
 import type { DropdownOption } from "../../../ui/CustomDropdown";
@@ -413,6 +413,21 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     return () => window.removeEventListener("keydown", onKey);
   }, [hasSelection]);
 
+  const allSelected =
+    manager.areAllFilteredSelected && visibleSyncMods.every((entry) => sync.selection.has(syncModKey(entry)));
+  const selectAllUndo = useSelectAllUndo(
+    allSelected,
+    () => ({ local: new Set(manager.selectedItemIds), synced: new Set(sync.selection) }),
+    (previous) => {
+      manager.setSelectedItemIds(previous.local);
+      sync.setSelection(previous.synced);
+    },
+    () => {
+      manager.handleSelectAllToggle(true);
+      sync.selectAll(visibleSyncMods);
+    },
+  );
+
   const batchBusy = manager.isBatchToggling || !!batchProgress;
   const fabActions: FABActionConfig[] = [
     { icon: "solar:play-bold",  label: t("profiles.v3.fab.enable"),  onClick: handleBatchEnable,  disabled: batchBusy },
@@ -681,11 +696,9 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         count={selectionCount}
         totalCount={visibleItems.length + visibleSyncMods.length}
         accent={accentColor.value}
-        allSelected={manager.areAllFilteredSelected && visibleSyncMods.every((entry) => sync.selection.has(syncModKey(entry)))}
-        onSelectAll={() => {
-          manager.handleSelectAllToggle(true);
-          sync.selectAll(visibleSyncMods);
-        }}
+        allSelected={allSelected}
+        onSelectAll={selectAllUndo.onSelectAll}
+        onRestore={selectAllUndo.onRestore}
         onClear={() => clearSelectionRef.current()}
         batchProgress={batchProgress}
         actions={fabActions}
