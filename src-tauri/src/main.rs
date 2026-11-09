@@ -128,7 +128,7 @@ use commands::nrc_commands::{check_update_available_command, download_and_instal
 
 // Import Content commands
 use commands::content_command::{
-    bulk_toggle_mod_updates, install_content_to_profile, install_local_content_to_profile,
+    bulk_toggle_mod_updates, copy_contents_to_profile, install_content_to_profile, install_local_content_to_profile,
     switch_content_version, toggle_content_from_profile, toggle_contents_from_profile,
     update_contents_from_profile,
     uninstall_contents_from_profile,
@@ -691,6 +691,7 @@ async fn main() {
             get_all_profiles_and_last_played,
             get_local_content,
             install_local_content_to_profile,
+            copy_contents_to_profile,
             switch_content_version,
             commands::minecraft_command::get_face_avatar,
             commands::skin_render_command::get_cached_skin_render,

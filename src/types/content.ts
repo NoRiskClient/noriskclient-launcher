@@ -118,4 +118,24 @@ export interface BulkModUpdateEntry {
   updates_enabled: boolean; // Whether updates should be enabled for this mod
 }
 
+export interface CopyContentItem {
+  id: string | null;
+  path: string;
+  name: string;
+}
+
+export interface CopyContentsRequest {
+  source_profile_id: string;
+  target_profile_id: string;
+  content_type: ContentType;
+  items: CopyContentItem[];
+}
+
+export interface CopyContentsResult {
+  copied: string[];
+  already_there: string[];
+  incompatible: string[];
+  failed: string[];
+}
+
 // Represents a NoriskMod item as expected by the backend for add/remove operations

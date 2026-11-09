@@ -1708,6 +1708,23 @@ impl ProfileManager {
         self.persisted.lock().await.remove(&profile_id);
     }
 
+    pub async fn add_copied_mods(&self, profile_id: Uuid, mods: Vec<Mod>) -> Result<()> {
+        let mut ids = Vec::new();
+        {
+            let mut profiles = self.profiles.write().await;
+            let profile = profiles
+                .get_mut(&profile_id)
+                .ok_or(AppError::ProfileNotFound(profile_id))?;
+            for entry in mods {
+                if find_mod_by_project(&profile.mods, &entry.source).is_none() {
+                    ids.push(entry.id);
+                    profile.mods.push(entry);
+                }
+            }
+        }
+        self.save_mods(profile_id, &ids).await
+    }
+
     async fn save_mods(&self, profile_id: Uuid, mod_ids: &[Uuid]) -> Result<()> {
         if mod_ids.is_empty() {
             return Ok(());

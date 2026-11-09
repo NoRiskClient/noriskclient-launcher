@@ -159,7 +159,7 @@ async fn download_content(
 }
 
 /// Helper function to get the correct directory for a specific content type
-async fn get_content_directory(profile: &Profile, content_type: &ContentType) -> Result<PathBuf> {
+pub async fn get_content_directory(profile: &Profile, content_type: &ContentType) -> Result<PathBuf> {
     match content_type {
         ContentType::ResourcePack => resourcepack_utils::get_resourcepacks_dir(profile).await,
         ContentType::ShaderPack => shaderpack_utils::get_shaderpacks_dir(profile).await,
