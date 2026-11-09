@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
@@ -19,16 +20,25 @@ interface FloatingActionBarProps {
   accent: string;
   allSelected: boolean;
   onSelectAll: () => void;
+  onRestore?: () => void;
   onClear: () => void;
   actions: FABActionConfig[];
   batchProgress?: { current: number; total: number } | null;
 }
 
-export function FloatingActionBar({
-  visible, count, totalCount, accent, allSelected,
-  onSelectAll, onClear, actions, batchProgress,
-}: FloatingActionBarProps) {
+export function FloatingActionBar(props: FloatingActionBarProps) {
+  const lastVisible = useRef(props);
+  if (props.visible) lastVisible.current = props;
+  const {
+    count, totalCount, allSelected, onSelectAll, onRestore, onClear, actions, batchProgress,
+  } = lastVisible.current;
+  const { visible, accent } = props;
   const { t } = useTranslation();
+  const toggle = !allSelected
+    ? { onClick: onSelectAll, icon: "solar:check-square-linear", label: t("profiles.v3.fab.selectAll") }
+    : onRestore
+      ? { onClick: onRestore, icon: "solar:undo-left-linear", label: t("profiles.v3.fab.selectPrevious") }
+      : { onClick: onClear, icon: "solar:close-square-linear", label: t("profiles.v3.fab.selectNone") };
   return (
     <div
       className={`absolute left-1/2 -translate-x-1/2 z-30 transition-[bottom] duration-200 ease-out ${
@@ -60,14 +70,15 @@ export function FloatingActionBar({
                 <span style={{ color: accent }}>{count}</span>
                 <span className="text-white/40"> / {totalCount}</span>
               </span>
-              {!allSelected && (
-                <button
-                  onClick={onSelectAll}
-                  className="h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-white/55 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  {t("profiles.v3.fab.all")}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={toggle.onClick}
+                style={{ borderColor: `${accent}99`, backgroundColor: `${accent}33` }}
+                className="h-7 pl-1.5 pr-2.5 rounded-md border flex items-center gap-1.5 text-xs font-minecraft text-white whitespace-nowrap transition-[filter] hover:brightness-125"
+              >
+                <Icon icon={toggle.icon} className="w-4 h-4" />
+                {toggle.label}
+              </button>
             </>
           )}
         </div>
@@ -107,3 +118,27 @@ const FabButton: React.FC<FABActionConfig> = ({ icon, label, tone, onClick, disa
     </button>
   );
 };
+
+export function useSelectAllUndo<S>(
+  allSelected: boolean,
+  snapshot: () => S,
+  restore: (previous: S) => void,
+  selectAll: () => void,
+) {
+  const [previous, setPrevious] = useState<S | null>(null);
+
+  useEffect(() => {
+    if (!allSelected) setPrevious(null);
+  }, [allSelected]);
+
+  return {
+    onSelectAll: () => {
+      setPrevious(snapshot());
+      selectAll();
+    },
+    onRestore: previous === null ? undefined : () => {
+      restore(previous);
+      setPrevious(null);
+    },
+  };
+}
