@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { compareByLastPlayed } from "../../utils/profile-sort";
 
 // A vertical virtualizer row: a version-section divider header, or a row of up to N cards.
 type VirtualRow =
@@ -245,15 +246,8 @@ export function ProfilesTabV2() {
         switch (sortBy) {
           case "name":
             return a.name.localeCompare(b.name);
-          case "last_played": {
-            const at = a.last_played ? new Date(a.last_played).getTime() : 0;
-            const bt = b.last_played ? new Date(b.last_played).getTime() : 0;
-            if (bt !== at) return bt - at;
-            const ac = new Date(a.created).getTime();
-            const bc = new Date(b.created).getTime();
-            if (bc !== ac) return bc - ac;
-            return a.name.localeCompare(b.name);
-          }
+          case "last_played":
+            return compareByLastPlayed(a, b);
           case "date_created":
             return new Date(b.created).getTime() - new Date(a.created).getTime();
           case "version_newest":
