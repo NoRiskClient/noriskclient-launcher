@@ -42,10 +42,13 @@ export function LoginRequiredModal({
   const { startLogin } = useAddMinecraftAccount();
 
   // Resume the launch the moment an account becomes active. Guarded by a ref so
-  // a re-render after closing cannot fire it twice.
+  // a re-render after closing cannot fire it twice. The account present at open
+  // is ignored: it is the one the backend just rejected, so only a fresh sign-in
+  // (a new store entry) may resume.
   const resumedRef = useRef(false);
+  const rejectedAccountRef = useRef(activeAccount);
   useEffect(() => {
-    if (!activeAccount || resumedRef.current) return;
+    if (!activeAccount || activeAccount === rejectedAccountRef.current || resumedRef.current) return;
     resumedRef.current = true;
     onClose();
     onAuthenticated?.();

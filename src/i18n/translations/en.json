@@ -196,6 +196,7 @@
   "launch.abort_requested": "Launch cancellation requested.",
   "launch.abort_failed": "Cancellation request failed: {{error}}",
   "launch.failed": "Launch initiation failed: {{error}}",
+  "launch.failed_short": "Launch failed",
   "launch.cancel_failed": "Failed to cancel launch",
   "launch.polling_error": "Polling error: {{error}}",
   "launch.starting": "Starting!",

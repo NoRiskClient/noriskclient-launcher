@@ -229,6 +229,7 @@
   "launch.abort_requested": "Richiesta annullamento avvio.",
   "launch.abort_failed": "Richiesta di annullamento fallita: {{error}}",
   "launch.failed": "Inizializzazione avvio fallita: {{error}}",
+  "launch.failed_short": "Avvio non riuscito",
   "launch.cancel_failed": "Impossibile annullare l'avvio",
   "launch.polling_error": "Errore di polling: {{error}}",
   "launch.starting": "Avvio!",

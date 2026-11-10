@@ -229,6 +229,7 @@
   "launch.abort_requested": "Zażądano anulowania uruchomienia.",
   "launch.abort_failed": "Żądanie anulowania nie powiodło się: {{error}}",
   "launch.failed": "Inicjalizacja uruchomienia nie powiodła się: {{error}}",
+  "launch.failed_short": "Uruchomienie nie powiodło się",
   "launch.cancel_failed": "Nie udało się anulować uruchomienia",
   "launch.polling_error": "Błąd odpytywania: {{error}}",
   "launch.starting": "URUCHAMIANIE!",

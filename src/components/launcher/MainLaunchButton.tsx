@@ -137,6 +137,7 @@ export function MainLaunchButton({
     const actionText = isButtonLaunching ? "Stop" : "Launch";
 
     let statusSubText: string | null | undefined = null;
+    let statusTooltip: string | null | undefined = null;
     let statusColorClass = "opacity-85";
 
     if (transientSuccessActive && buttonStatusMessage === t('launch.starting')) {
@@ -149,7 +150,10 @@ export function MainLaunchButton({
           ? "opacity-90 text-white"
           : "opacity-75";
     } else if (buttonStatusMessage && launchState === LaunchState.ERROR) {
-      statusSubText = buttonStatusMessage;
+      // Raw backend errors are far too long for the button; the full text stays
+      // in the toast and the tooltip.
+      statusSubText = t('launch.failed_short');
+      statusTooltip = buttonStatusMessage;
       statusColorClass = "text-red-400";
     } else if (buttonStatusMessage) {
       statusSubText = buttonStatusMessage;
@@ -158,18 +162,19 @@ export function MainLaunchButton({
 
     const displaySubText = statusSubText || selectedVersionLabel;
     return (
-      <div className="w-full flex flex-col items-center justify-center leading-none -translate-y-[5px]">
+      <div className="w-full min-w-0 flex flex-col items-center justify-center leading-none -translate-y-[5px]">
         <span className="text-3xl text-center">{actionText}</span>
         {displaySubText && (
           <span
             className={cn(
-              "text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
+              "block max-w-full text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
               isButtonLaunching ? "max-w-64" : "",
               statusColorClass
             )}
             style={isButtonLaunching ? { maxWidth: "16rem" } : undefined}
             title={
-              typeof displaySubText === "string" ? displaySubText : undefined
+              statusTooltip ??
+              (typeof displaySubText === "string" ? displaySubText : undefined)
             }
           >
             {displaySubText}

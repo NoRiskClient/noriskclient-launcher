@@ -229,6 +229,7 @@
   "launch.abort_requested": "Annulation du lancement demandée.",
   "launch.abort_failed": "Échec de la demande d'annulation: {{error}}",
   "launch.failed": "Échec de l'initiation du lancement: {{error}}",
+  "launch.failed_short": "Échec du lancement",
   "launch.cancel_failed": "Échec de l'annulation du lancement",
   "launch.polling_error": "Erreur de polling: {{error}}",
   "launch.starting": "Démarrage !",

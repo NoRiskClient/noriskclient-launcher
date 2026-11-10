@@ -252,7 +252,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
           }}>{icon}</span>
         )}
-        <span className="transition-transform duration-200" style={{
+        <span className="min-w-0 max-w-full transition-transform duration-200" style={{
           transform: isHovered && !disabled ? "scale(1.05)" : "scale(1)",
         }}>
           {children}

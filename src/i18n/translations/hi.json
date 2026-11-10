@@ -231,6 +231,7 @@
   "launch.abort_requested": "लॉन्च रद्दीकरण का अनुरोध किया गया।",
   "launch.abort_failed": "रद्दीकरण अनुरोध विफल: {{error}}",
   "launch.failed": "लॉन्च प्रारंभ विफल: {{error}}",
+  "launch.failed_short": "लॉन्च विफल",
   "launch.cancel_failed": "लॉन्च रद्द करने में विफल",
   "launch.polling_error": "पोलिंग त्रुटि: {{error}}",
   "launch.starting": "शुरू हो रहा है!",

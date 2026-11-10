@@ -196,6 +196,7 @@
   "launch.abort_requested": "Startabbruch angefordert.",
   "launch.abort_failed": "Abbruchanfrage fehlgeschlagen: {{error}}",
   "launch.failed": "Start fehlgeschlagen: {{error}}",
+  "launch.failed_short": "Start fehlgeschlagen",
   "launch.cancel_failed": "Start konnte nicht abgebrochen werden",
   "launch.polling_error": "Abfragefehler: {{error}}",
   "launch.starting": "Startet!",

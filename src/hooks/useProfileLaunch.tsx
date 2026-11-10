@@ -17,7 +17,7 @@ import { MigrationInfo } from "../types/profile";
 import * as SyncPackService from "../services/sync-pack-service";
 import { needsAdoptConfirm } from "../types/syncPacks";
 import { AdoptPreviewModal } from "../components/sync-packs/AdoptPreviewModal";
-import { requireMinecraftAccount } from "../lib/require-account";
+import { openLoginRequiredPrompt, requireMinecraftAccount } from "../lib/require-account";
 import { useProfileStore } from "../store/profile-store";
 
 interface UseProfileLaunchOptions {
@@ -200,11 +200,29 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
   // Sign-in gate. Without an account the backend aborts the launch with a bare
   // NoCredentialsError, so catch it here and offer the sign-in instead; the
   // prompt calls `retry` once an account is active so the click still lands.
+  const getProfileName = () =>
+    useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name;
+
   const hasAccountOrPrompt = (retry: () => void): boolean =>
-    requireMinecraftAccount({
-      profileName: useProfileStore.getState().profiles.find((p) => p.id === profileId)?.name,
-      onAuthenticated: retry,
-    });
+    requireMinecraftAccount({ profileName: getProfileName(), onAuthenticated: retry });
+
+  // The gate above only sees the store, so a cached account whose session the
+  // backend can no longer use still gets here; route that case to the sign-in too.
+  const handleLaunchFailure = (err: any, retry: () => void) => {
+    console.error("Failed to launch profile:", err);
+    if (err?.kind === "NoCredentialsError") {
+      finalizeButtonLaunch(profileId);
+      openLoginRequiredPrompt({ profileName: getProfileName(), onAuthenticated: retry });
+      return;
+    }
+    const launchErrorMsg =
+      typeof err === "string"
+        ? err
+        : err.message || err.toString() || "Unknown error during launch.";
+    toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
+    setLaunchError(profileId, launchErrorMsg);
+    onLaunchError?.(launchErrorMsg);
+  };
 
   // Actual launch function
   const performLaunch = async (migrationInfo?: MigrationInfo) => {
@@ -213,14 +231,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     try {
       await ProcessService.launch(profileId, quickPlaySingleplayer, quickPlayMultiplayer, migrationInfo, skipLastPlayedUpdate);
     } catch (err: any) {
-      console.error("Failed to launch profile:", err);
-      const launchErrorMsg =
-        typeof err === "string"
-          ? err
-          : err.message || err.toString() || "Unknown error during launch.";
-      toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-      setLaunchError(profileId, launchErrorMsg);
-      onLaunchError?.(launchErrorMsg);
+      handleLaunchFailure(err, () => handleLaunch());
     }
   };
 
@@ -318,7 +329,8 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         return;
       }
 
-      if (!hasAccountOrPrompt(() => handleQuickPlayLaunch(singleplayer, multiplayer, overrides))) return;
+      const retry = () => handleQuickPlayLaunch(singleplayer, multiplayer, overrides);
+      if (!hasAccountOrPrompt(retry)) return;
       if (!(await ensureSyncConfirmed())) return;
 
       if (overrides) {
@@ -333,14 +345,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             overrides,
           );
         } catch (err: any) {
-          console.error("Failed to launch profile with overrides:", err);
-          const launchErrorMsg =
-            typeof err === "string"
-              ? err
-              : err.message || err.toString() || "Unknown error during launch.";
-          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-          setLaunchError(profileId, launchErrorMsg);
-          onLaunchError?.(launchErrorMsg);
+          handleLaunchFailure(err, retry);
         }
         return;
       }
@@ -355,14 +360,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           try {
             await ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
           } catch (err: any) {
-            console.error("Failed to launch profile:", err);
-            const launchErrorMsg =
-              typeof err === "string"
-                ? err
-                : err.message || err.toString() || "Unknown error during launch.";
-            toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-            setLaunchError(profileId, launchErrorMsg);
-            onLaunchError?.(launchErrorMsg);
+            handleLaunchFailure(err, retry);
           }
           return;
         }
@@ -376,19 +374,8 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             onLaunch={() => {
               hideModal(`group-migration-${profileId}-quickplay`);
               initiateButtonLaunch(profileId);
-
-              try {
-                ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
-              } catch (err: any) {
-                console.error("Failed to launch profile:", err);
-                const launchErrorMsg =
-                  typeof err === "string"
-                    ? err
-                    : err.message || err.toString() || "Unknown error during launch.";
-                toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-                setLaunchError(profileId, launchErrorMsg);
-                onLaunchError?.(launchErrorMsg);
-              }
+              ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate)
+                .catch((err) => handleLaunchFailure(err, retry));
             }}
             onMigrate={() => {
               console.log(`[useProfileLaunch] Starting migration for quickplay ${profileId}`, migrationInfo);
@@ -401,7 +388,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
                 initiateButtonLaunch(profileId);
                 await ProcessService.launch(profileId, singleplayer, multiplayer, migrationInfo, skipLastPlayedUpdate);
               };
-              performQuickPlayLaunch();
+              performQuickPlayLaunch().catch((err) => handleLaunchFailure(err, retry));
             }}
             profileId={profileId}
           />
@@ -413,14 +400,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         try {
           await ProcessService.launch(profileId, singleplayer, multiplayer, undefined, skipLastPlayedUpdate);
         } catch (err: any) {
-          console.error("Failed to launch profile:", err);
-          const launchErrorMsg =
-            typeof err === "string"
-              ? err
-              : err.message || err.toString() || "Unknown error during launch.";
-          toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
-          setLaunchError(profileId, launchErrorMsg);
-          onLaunchError?.(launchErrorMsg);
+          handleLaunchFailure(err, retry);
         }
       }
     };

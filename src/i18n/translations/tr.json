@@ -229,6 +229,7 @@
   "launch.abort_requested": "Başlatma iptali istendi.",
   "launch.abort_failed": "İptal isteği başarısız: {{error}}",
   "launch.failed": "Başlatma başlatılamadı: {{error}}",
+  "launch.failed_short": "Başlatma başarısız",
   "launch.cancel_failed": "Başlatma iptal edilemedi",
   "launch.polling_error": "Yoklama hatası: {{error}}",
   "launch.starting": "BAŞLATILIYOR!",
