@@ -10,12 +10,34 @@ import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types/profile";
+import type { LocalContentType } from "../../../hooks/useLocalContentManager";
 
 export type NavKey =
   | "mods" | "resourcepacks" | "shaderpacks" | "datapacks" | "nrc"
   | "worlds" | "screenshots" | "logs";
 
-export const CONTENT_NAV_KEYS: NavKey[] = ["mods", "resourcepacks", "shaderpacks", "datapacks", "nrc"];
+export interface ContentTab {
+  key: NavKey;
+  contentType: LocalContentType;
+  icon: string;
+  labelKey: string;
+  nameKey: string;
+  pluralKey: string;
+  addKey: string;
+}
+
+export const CONTENT_TABS: ContentTab[] = [
+  { key: "mods", contentType: "Mod", icon: "solar:bolt-bold-duotone", labelKey: "profiles.content.mods", nameKey: "profiles.content.mod", pluralKey: "profiles.content.mods", addKey: "profiles.content.addMods" },
+  { key: "resourcepacks", contentType: "ResourcePack", icon: "solar:gallery-bold-duotone", labelKey: "profiles.content.resourcePacks", nameKey: "profiles.content.resourcePack", pluralKey: "profiles.content.resourcePacks", addKey: "profiles.content.addResourcePacks" },
+  { key: "shaderpacks", contentType: "ShaderPack", icon: "solar:sun-bold-duotone", labelKey: "profiles.content.shaderPacks", nameKey: "profiles.content.shaderPack", pluralKey: "profiles.content.shaderPacks", addKey: "profiles.content.addShaderPacks" },
+  { key: "datapacks", contentType: "DataPack", icon: "solar:database-bold-duotone", labelKey: "profiles.content.dataPacks", nameKey: "profiles.content.dataPack", pluralKey: "profiles.content.dataPacks", addKey: "profiles.content.addDataPacks" },
+  { key: "nrc", contentType: "NoRiskMod", icon: "solar:shield-check-bold-duotone", labelKey: "profiles.content.noriskClient", nameKey: "profiles.content.noriskMod", pluralKey: "profiles.content.noriskMods", addKey: "profiles.content.addNoriskMods" },
+];
+
+export const contentTabOf = (key: NavKey) => CONTENT_TABS.find((tab) => tab.key === key);
+
+export const navKeyOf = (contentType: LocalContentType) =>
+  CONTENT_TABS.find((tab) => tab.contentType === contentType)?.key ?? "mods";
 
 interface NavItem {
   key: NavKey;
@@ -43,13 +65,12 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
   const groups: NavGroup[] = [
     {
       labelKey: "profiles.tabs.content",
-      items: [
-        { key: "mods",          icon: "solar:bolt-bold-duotone",         labelKey: "profiles.content.mods",          count: modCount },
-        { key: "resourcepacks", icon: "solar:gallery-bold-duotone",      labelKey: "profiles.content.resourcePacks" },
-        { key: "shaderpacks",   icon: "solar:sun-bold-duotone",          labelKey: "profiles.content.shaderPacks" },
-        { key: "datapacks",     icon: "solar:database-bold-duotone",     labelKey: "profiles.content.dataPacks" },
-        { key: "nrc",           icon: "solar:shield-check-bold-duotone", labelKey: "profiles.content.noriskClient" },
-      ],
+      items: CONTENT_TABS.map(({ key, icon, labelKey }) => ({
+        key,
+        icon,
+        labelKey,
+        count: key === "mods" ? modCount : undefined,
+      })),
     },
     {
       labelKey: "profiles.v3.leftRail.world",

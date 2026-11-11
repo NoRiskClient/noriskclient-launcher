@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { Modal } from "../../../../ui/Modal";
 import { Button } from "../../../../ui/buttons/Button";
@@ -10,11 +11,12 @@ import { ProfileIconV2 } from "../../../ProfileIconV2";
 import { useThemeStore } from "../../../../../store/useThemeStore";
 import { useProfileStore } from "../../../../../store/profile-store";
 import { loaderIconSrc } from "../../../../../lib/loader-icons";
-import { compareByLastPlayed } from "../../../../../utils/profile-sort";
+import { compareByRecentActivity } from "../../../../../utils/profile-sort";
 import { copyContentsToProfile } from "../../../../../services/content-service";
 import type { Profile } from "../../../../../types/profile";
 import type { ContentType } from "../../../../../types/content";
 import type { LocalContentType } from "../../../../../hooks/useLocalContentManager";
+import { navKeyOf } from "../../ProfileLeftRailV3";
 import {
   CopyResultList,
   ItemIcon,
@@ -43,6 +45,7 @@ export function CopyContentDialog({
   onCopied,
 }: CopyContentDialogProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const accent = useThemeStore((s) => s.accentColor.value);
   const profiles = useProfileStore((s) => s.profiles);
   const [targetIds, setTargetIds] = useState<Set<string>>(() => new Set());
@@ -55,7 +58,7 @@ export function CopyContentDialog({
     () =>
       profiles
         .filter((p) => p.id !== sourceProfile.id && !p.is_standard_version)
-        .sort(compareByLastPlayed),
+        .sort(compareByRecentActivity),
     [profiles, sourceProfile.id],
   );
   const visibleTargets = useMemo(() => {
@@ -113,11 +116,29 @@ export function CopyContentDialog({
   const shownItems = items.slice(0, MAX_CHIPS);
   const hiddenCount = items.length - shownItems.length;
 
+  const openProfile = (profile: Profile) => {
+    onCopied();
+    navigate(`/profiles/${profile.id}`, { state: { nav: navKeyOf(contentType) } });
+  };
+
+  const single = outcomes?.length === 1 && outcomes[0].result ? outcomes[0] : undefined;
+
   const footer = outcomes ? (
-    <div className="flex justify-end">
-      <Button variant="success" onClick={onCopied}>
-        {t("profiles.v3.copy.done")}
-      </Button>
+    <div className="flex justify-end items-center gap-3">
+      {single ? (
+        <>
+          <Button variant="secondary" onClick={onCopied}>
+            {t("common.close")}
+          </Button>
+          <Button variant="success" onClick={() => openProfile(single.profile)}>
+            {t("profiles.v3.copy.open", { profile: single.profile.name })}
+          </Button>
+        </>
+      ) : (
+        <Button variant="success" onClick={onCopied}>
+          {t("profiles.v3.copy.done")}
+        </Button>
+      )}
     </div>
   ) : (
     <div className="flex justify-end items-center gap-3">
@@ -232,7 +253,11 @@ export function CopyContentDialog({
     >
       {outcomes ? (
         <div className="px-6 pt-5 flex-1 overflow-y-auto custom-scrollbar">
-          <CopyResultList outcomes={outcomes} items={items} />
+          <CopyResultList
+            outcomes={outcomes}
+            items={items}
+            onOpen={outcomes.length > 1 ? openProfile : undefined}
+          />
         </div>
       ) : (
         selection

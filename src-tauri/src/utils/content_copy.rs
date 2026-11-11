@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use crate::state::profile_state::{find_mod_by_project, Mod, Profile};
+use crate::state::profile_state::{find_mod_by_project, Mod, ModLoader, Profile};
 use crate::state::state_manager::State;
 use crate::sync::resolution::{apply_resolution, platform_of, resolve_online};
 use crate::utils::path_utils::copy_dir_recursively;
@@ -18,6 +18,7 @@ pub enum ModCopy {
     Resolve,
     AlreadyThere,
     AsFile,
+    Inactive,
 }
 
 pub fn plan_mod_copy(entry: &Mod, source: &Profile, target: &Profile) -> ModCopy {
@@ -27,7 +28,9 @@ pub fn plan_mod_copy(entry: &Mod, source: &Profile, target: &Profile) -> ModCopy
     if find_mod_by_project(&target.mods, &entry.source).is_some() {
         return ModCopy::AlreadyThere;
     }
-    if source.game_version == target.game_version && source.loader == target.loader {
+    if target.loader == ModLoader::Vanilla {
+        ModCopy::Inactive
+    } else if source.game_version == target.game_version && source.loader == target.loader {
         ModCopy::Keep
     } else {
         ModCopy::Resolve
@@ -100,15 +103,15 @@ pub struct CopyContentsRequest {
 pub struct CopyContentsResult {
     pub copied: Vec<String>,
     pub already_there: Vec<String>,
-    pub incompatible: Vec<String>,
+    pub inactive: Vec<String>,
     pub failed: Vec<String>,
 }
 
 enum Outcome {
     Added(Mod),
+    AddedInactive(Mod),
     Copied,
     AlreadyThere,
-    Incompatible,
     Failed,
 }
 
@@ -116,8 +119,8 @@ impl CopyContentsResult {
     fn record(&mut self, name: String, outcome: &Outcome) {
         match outcome {
             Outcome::Added(_) | Outcome::Copied => self.copied.push(name),
+            Outcome::AddedInactive(_) => self.inactive.push(name),
             Outcome::AlreadyThere => self.already_there.push(name),
-            Outcome::Incompatible => self.incompatible.push(name),
             Outcome::Failed => self.failed.push(name),
         }
     }
@@ -127,6 +130,7 @@ async fn copy_mod_entry(entry: &Mod, plan: ModCopy, target: &Profile) -> Outcome
     match plan {
         ModCopy::AlreadyThere => Outcome::AlreadyThere,
         ModCopy::Keep => Outcome::Added(copied_mod(entry)),
+        ModCopy::Inactive => Outcome::AddedInactive(copied_mod(entry)),
         ModCopy::Resolve => {
             match resolve_online(&entry.source, &target.game_version, target.loader).await {
                 Ok(resolved) => Outcome::Added(copied_mod(&apply_resolution(
@@ -140,7 +144,7 @@ async fn copy_mod_entry(entry: &Mod, plan: ModCopy, target: &Profile) -> Outcome
                         "No version of {:?} fits {}: {}",
                         entry.display_name, target.name, e
                     );
-                    Outcome::Incompatible
+                    Outcome::AddedInactive(copied_mod(entry))
                 }
             }
         }
@@ -222,7 +226,7 @@ pub async fn copy_contents(request: CopyContentsRequest) -> Result<CopyContentsR
         };
 
         result.record(item.name, &outcome);
-        if let Outcome::Added(copy) = outcome {
+        if let Outcome::Added(copy) | Outcome::AddedInactive(copy) = outcome {
             target.mods.push(copy.clone());
             new_mods.push(copy);
         }

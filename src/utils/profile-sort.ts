@@ -9,3 +9,8 @@ export function compareByLastPlayed(a: Profile, b: Profile): number {
     a.name.localeCompare(b.name)
   );
 }
+
+export function compareByRecentActivity(a: Profile, b: Profile): number {
+  const activity = (p: Profile) => Math.max(timeOf(p.last_played), timeOf(p.created));
+  return activity(b) - activity(a) || a.name.localeCompare(b.name);
+}

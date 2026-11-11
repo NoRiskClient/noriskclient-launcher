@@ -134,7 +134,7 @@ export interface CopyContentsRequest {
 export interface CopyContentsResult {
   copied: string[];
   already_there: string[];
-  incompatible: string[];
+  inactive: string[];
   failed: string[];
 }
 

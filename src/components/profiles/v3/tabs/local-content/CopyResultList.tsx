@@ -17,12 +17,12 @@ export interface TargetOutcome {
   result: CopyContentsResult | null;
 }
 
-type Status = "copied" | "alreadyThere" | "incompatible" | "failed";
+type Status = "copied" | "alreadyThere" | "inactive" | "failed";
 
 const STATUS_STYLE: Record<Status, { icon: string; className: string }> = {
   copied: { icon: "solar:check-circle-bold", className: "text-emerald-400" },
   alreadyThere: { icon: "solar:check-read-linear", className: "text-white/40" },
-  incompatible: { icon: "solar:danger-triangle-bold", className: "text-amber-400" },
+  inactive: { icon: "solar:clock-circle-bold", className: "text-amber-400" },
   failed: { icon: "solar:close-circle-bold", className: "text-red-400" },
 };
 
@@ -30,7 +30,7 @@ function summaryParts(t: TFunction, result: CopyContentsResult): string {
   return [
     result.copied.length > 0 && t("profiles.v3.copy.copied", { count: result.copied.length }),
     result.already_there.length > 0 && t("profiles.v3.copy.alreadyThere", { count: result.already_there.length }),
-    result.incompatible.length > 0 && t("profiles.v3.copy.incompatible", { count: result.incompatible.length }),
+    result.inactive.length > 0 && t("profiles.v3.copy.inactive", { count: result.inactive.length }),
     result.failed.length > 0 && t("profiles.v3.copy.failed", { count: result.failed.length }),
   ]
     .filter(Boolean)
@@ -38,13 +38,13 @@ function summaryParts(t: TFunction, result: CopyContentsResult): string {
 }
 
 function statusOf(result: CopyContentsResult, name: string): Status {
-  if (result.incompatible.includes(name)) return "incompatible";
+  if (result.inactive.includes(name)) return "inactive";
   if (result.failed.includes(name)) return "failed";
   if (result.already_there.includes(name)) return "alreadyThere";
   return "copied";
 }
 
-const STATUS_ORDER: Status[] = ["incompatible", "failed", "copied", "alreadyThere"];
+const STATUS_ORDER: Status[] = ["inactive", "failed", "copied", "alreadyThere"];
 
 export function ItemIcon({ iconUrl, size }: { iconUrl: string | null; size: "sm" | "md" }) {
   const box = size === "sm" ? "w-5 h-5" : "w-7 h-7";
@@ -59,7 +59,15 @@ export function ItemIcon({ iconUrl, size }: { iconUrl: string | null; size: "sm"
   );
 }
 
-export function CopyResultList({ outcomes, items }: { outcomes: TargetOutcome[]; items: CopyContentEntry[] }) {
+export function CopyResultList({
+  outcomes,
+  items,
+  onOpen,
+}: {
+  outcomes: TargetOutcome[];
+  items: CopyContentEntry[];
+  onOpen?: (profile: Profile) => void;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -75,12 +83,22 @@ export function CopyResultList({ outcomes, items }: { outcomes: TargetOutcome[];
           <section key={profile.id} className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
               <ProfileIconV2 profile={profile} size="sm" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm text-white font-minecraft normal-case truncate">{profile.name}</div>
                 <div className={`text-xs font-minecraft normal-case ${result ? "text-white/50" : "text-red-400"}`}>
                   {result ? summaryParts(t, result) : t("profiles.v3.copy.status.failed")}
                 </div>
               </div>
+              {onOpen && result && (
+                <button
+                  type="button"
+                  onClick={() => onOpen(profile)}
+                  className="flex items-center gap-1.5 flex-shrink-0 rounded-md border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white/80 font-minecraft normal-case transition-colors hover:border-white/25 hover:bg-black/30 hover:text-white"
+                >
+                  {t("profiles.v3.copy.openShort")}
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             <div className="flex flex-col gap-1">
               {rows.map(({ item, status }) => (

@@ -84,6 +84,20 @@ fn another_version_resolves_a_matching_one() {
 }
 
 #[test]
+fn a_vanilla_target_keeps_the_mod_for_a_later_loader_switch() {
+    let source = profile("1.21.11", "fabric", vec![modrinth("sodium")]);
+
+    assert_eq!(
+        plan_mod_copy(
+            only_mod(&source),
+            &source,
+            &profile("1.21.11", "vanilla", vec![])
+        ),
+        ModCopy::Inactive
+    );
+}
+
+#[test]
 fn a_project_the_target_already_has_is_skipped() {
     let source = profile("1.21.11", "fabric", vec![modrinth("sodium")]);
     let target = profile("1.21.4", "fabric", vec![modrinth("sodium")]);
