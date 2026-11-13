@@ -50,6 +50,11 @@ impl NrcRequest {
         self
     }
 
+    pub fn header(mut self, name: &str, value: impl AsRef<str>) -> Self {
+        self.builder = self.builder.header(name, value.as_ref());
+        self
+    }
+
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.builder = self.builder.timeout(timeout);
         self

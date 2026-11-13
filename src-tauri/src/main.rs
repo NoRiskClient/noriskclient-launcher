@@ -366,6 +366,8 @@ async fn main() {
                     utils::trash_utils::reap_temp_profiles().await;
                 });
 
+                tauri::async_runtime::spawn_blocking(utils::game_sessions::remove_stale);
+
                 tauri::async_runtime::spawn(async {
                     if let Err(e) =
                         commands::skin_render_command::prune_skin_renders(30).await
@@ -853,6 +855,8 @@ async fn main() {
             commands::clip_commands::clip_open_editor,
             commands::clip_commands::clip_editor_current,
             commands::clip_commands::clip_editor_close,
+            commands::share::share_clip,
+            commands::share::share_screenshot,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

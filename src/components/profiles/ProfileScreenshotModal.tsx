@@ -12,11 +12,13 @@ import { Image as TauriImage } from "@tauri-apps/api/image";
 import { revealItemInDir } from "../../utils/opener-utils";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { useShareUpload } from "../../hooks/useShareUpload";
 
 interface ProfileScreenshotModalProps {
   isOpen: boolean;
   onClose: () => void;
   screenshot: ActualScreenshotInfo | null;
+  profileId: string;
   onScreenshotDeleted: (deletedPath: string) => void;
 }
 
@@ -24,9 +26,11 @@ export function ProfileScreenshotModal({
   isOpen,
   onClose,
   screenshot,
+  profileId,
   onScreenshotDeleted,
 }: ProfileScreenshotModalProps) {
   const { t } = useTranslation();
+  const { share, isSharing } = useShareUpload();
   const [isModalImageLoaded, setIsModalImageLoaded] = useState(false);
   const [isCopyingImage, setIsCopyingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -141,6 +145,15 @@ export function ProfileScreenshotModal({
         {/* Action Buttons - Visual Only */}
         {isModalImageLoaded && ( // Show buttons only when image is loaded
           <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+            <IconButton
+              icon={isSharing(screenshot.path) ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:cloud-upload-bold" />}
+              title={t('screenshots.share')}
+              onClick={() => void share({ kind: "screenshot", path: screenshot.path, profileId })}
+              disabled={isSharing(screenshot.path)}
+              variant="flat"
+              size="sm"
+              className="rounded-md w-9 h-9 flex items-center justify-center"
+            />
             <IconButton
               icon={isCopyingImage ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:copy-bold-duotone" />}
               title={t('screenshots.copy_image')}

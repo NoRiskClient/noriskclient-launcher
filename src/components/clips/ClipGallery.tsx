@@ -14,6 +14,7 @@ import { Modal } from "../ui/Modal";
 import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
+import { useShareUpload } from "../../hooks/useShareUpload";
 import {
   deleteClip,
   exportGif,
@@ -57,6 +58,7 @@ export function ClipGallery({
 }: ClipGalleryProps) {
   const { t } = useTranslation();
   const { confirm, confirmDialog } = useConfirmDialog();
+  const { share, isSharing } = useShareUpload();
 
   const [clips, setClips] = useState<ClipEntry[] | null>(null);
   const [usage, setUsage] = useState<ClipStorageUsage | null>(null);
@@ -335,7 +337,7 @@ export function ClipGallery({
                 key={clip.path}
                 clip={clip}
                 index={index}
-                busy={busy === clip.path || gifting.includes(clip.path)}
+                busy={busy === clip.path || gifting.includes(clip.path) || isSharing(clip.path)}
                 onPlay={() => {
                   setSelected(clip);
                   void trackEvent("clip_played", { duration_s: clip.durationSeconds });
@@ -350,6 +352,7 @@ export function ClipGallery({
                 onThumbnail={refresh}
                 onVertical={() => setVertical(clip)}
                 onGif={() => void makeGif(clip)}
+                onShare={() => void share({ kind: "clip", path: clip.path })}
                 t={t}
               />
             ))}
@@ -363,6 +366,8 @@ export function ClipGallery({
           clip={selected}
           onClose={() => setSelected(null)}
           onVertical={() => setVertical(selected)}
+          sharing={isSharing(selected.path)}
+          onShare={() => void share({ kind: "clip", path: selected.path })}
           t={t}
         />
       )}
@@ -407,6 +412,7 @@ function ClipCard({
   onThumbnail,
   onVertical,
   onGif,
+  onShare,
   t,
 }: {
   clip: ClipEntry;
@@ -421,6 +427,7 @@ function ClipCard({
   onThumbnail: () => void;
   onVertical: () => void;
   onGif: () => void;
+  onShare: () => void;
   t: Translate;
 }) {
   const accentColor = useThemeStore((state) => state.accentColor);
@@ -438,6 +445,7 @@ function ClipCard({
   const menuItems: ContextMenuItem<ClipEntry>[] = [
     { id: "edit", label: t("clips.gallery.edit"), icon: "solar:scissors-bold", onClick: onEdit },
     { id: "rename", label: t("clips.gallery.rename"), icon: "solar:pen-bold", onClick: onRename },
+    { id: "share", label: t("clips.gallery.share"), icon: "solar:cloud-upload-bold", onClick: onShare },
     { id: "vertical", label: t("clips.gallery.vertical"), icon: "solar:smartphone-bold", onClick: onVertical },
     { id: "gif", label: t("clips.gallery.gif"), icon: "solar:gallery-bold", onClick: onGif },
     { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: onReveal },
@@ -555,9 +563,11 @@ function ClipCard({
           {clip.name}
         </span>
         <div className="flex items-center gap-2 text-xs font-minecraft text-white/60 min-w-0">
-          {clip.game && (
+          {(clip.server ?? clip.game) && (
             <>
-              <span className="truncate">{clip.game}</span>
+              <span className="truncate normal-case" title={clip.server ?? undefined}>
+                {clip.server ?? clip.game}
+              </span>
               <span className="w-px h-3 bg-white/30 shrink-0" />
             </>
           )}
@@ -571,7 +581,7 @@ function ClipCard({
 }
 
 const MENU_WIDTH = 176;
-const MENU_HEIGHT = 220;
+const MENU_HEIGHT = 250;
 
 function formatLength(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
@@ -583,11 +593,15 @@ function ClipPlayer({
   clip,
   onClose,
   onVertical,
+  sharing,
+  onShare,
   t,
 }: {
   clip: ClipEntry;
   onClose: () => void;
   onVertical: () => void;
+  sharing: boolean;
+  onShare: () => void;
   t: Translate;
 }) {
   const src = useMemo(() => convertFileSrc(clip.path), [clip.path]);
@@ -606,6 +620,20 @@ function ClipPlayer({
 
   const footer = (
     <div className="flex items-center justify-end gap-3">
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={
+          <Icon
+            icon={sharing ? "svg-spinners:ring-resize" : "solar:cloud-upload-bold"}
+            className="w-4 h-4"
+          />
+        }
+        onClick={onShare}
+        disabled={sharing}
+      >
+        {t("clips.gallery.share")}
+      </Button>
       <Button
         variant="secondary"
         size="sm"
@@ -632,6 +660,7 @@ function ClipPlayer({
       titleIcon={<Icon icon="solar:videocamera-record-bold" className="w-5 h-5" />}
       titleSubtitle={
         <span className="font-minecraft text-xs text-white/60">
+          {clip.server && <span className="normal-case">{clip.server} · </span>}
           {formatWhen(clip.createdAt, t)} · {formatBytes(clip.sizeBytes)}
         </span>
       }

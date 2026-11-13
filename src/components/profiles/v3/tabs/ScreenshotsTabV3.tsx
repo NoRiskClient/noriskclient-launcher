@@ -301,6 +301,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         isOpen={modalScreenshot !== null}
         onClose={() => setModalScreenshot(null)}
         screenshot={modalScreenshot}
+        profileId={profile.id}
         onScreenshotDeleted={handleScreenshotDeleted}
       />
     </div>

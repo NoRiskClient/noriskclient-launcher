@@ -21,6 +21,7 @@ pub mod export_utils;
 pub mod hash_utils;
 pub mod capture_runtime;
 pub mod clip_library;
+pub mod mp4_probe;
 pub mod clip_overlay;
 #[cfg(windows)]
 pub mod hotkey_hook;
@@ -29,6 +30,7 @@ pub mod main_window;
 pub mod window_focus;
 pub mod screens;
 pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-only
+pub mod game_sessions;
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it
 pub mod screen_time;
 #[cfg(windows)]
