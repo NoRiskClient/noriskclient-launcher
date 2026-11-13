@@ -113,6 +113,17 @@ pub fn write_mp4(
     track: &TrackInfo,
     audio: &[AudioTrack],
 ) -> Result<WrittenClip> {
+    write_mp4_with(clip, path, track, audio, false)
+}
+
+/// `faststart`: the index goes in front of the frames, so a browser can start playing at once.
+pub fn write_mp4_with(
+    clip: &Clip,
+    path: &Path,
+    track: &TrackInfo,
+    audio: &[AudioTrack],
+    faststart: bool,
+) -> Result<WrittenClip> {
     if clip.packets.is_empty() {
         bail!("refusing to write an empty clip");
     }
@@ -127,7 +138,7 @@ pub fn write_mp4(
         .sum();
     room_for(path, bytes)?;
 
-    let mut written = staged(path, |part| mux(clip, part, path, track, audio))?;
+    let mut written = staged(path, |part| mux(clip, part, path, track, audio, faststart))?;
     written.path = path.to_path_buf();
     Ok(written)
 }
@@ -138,6 +149,7 @@ fn mux(
     named: &Path,
     track: &TrackInfo,
     audio: &[AudioTrack],
+    faststart: bool,
 ) -> Result<WrittenClip> {
     let path_c = CString::new(path.to_string_lossy().as_ref())
         .context("clip path contains an interior nul")?;
@@ -157,6 +169,15 @@ fn mux(
         }
 
         let mut guard = FormatGuard::new(format_ctx);
+
+        if faststart {
+            // The second pass reopens the url, which has to be the file being written.
+            ff::av_freep(std::ptr::addr_of_mut!((*format_ctx).url).cast());
+            (*format_ctx).url = ff::av_strdup(path_c.as_ptr());
+            if (*format_ctx).url.is_null() {
+                bail!("could not name the MP4 output");
+            }
+        }
 
         let stream = ff::avformat_new_stream(format_ctx, std::ptr::null());
         if stream.is_null() {
@@ -263,7 +284,12 @@ fn mux(
 
         (*format_ctx).avoid_negative_ts = ff::AVFMT_AVOID_NEG_TS_DISABLED;
 
-        let rc = ff::avformat_write_header(format_ctx, std::ptr::null_mut());
+        let mut options: *mut ff::AVDictionary = std::ptr::null_mut();
+        if faststart {
+            ff::av_dict_set(&mut options, c"movflags".as_ptr(), c"+faststart".as_ptr(), 0);
+        }
+        let rc = ff::avformat_write_header(format_ctx, &mut options);
+        ff::av_dict_free(&mut options);
         if rc < 0 {
             bail!("avformat_write_header failed: {}", av_error(rc));
         }
@@ -542,6 +568,58 @@ mod tests {
             "90 frames at 60 fps should be 1.5s, got {:.2}s",
             written.duration_seconds
         );
+    }
+
+    fn top_level_boxes(path: &Path) -> Vec<String> {
+        let bytes = std::fs::read(path).unwrap();
+        let mut names = Vec::new();
+        let mut at = 0usize;
+        while at + 8 <= bytes.len() {
+            let size = u32::from_be_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+            names.push(String::from_utf8_lossy(&bytes[at + 4..at + 8]).into_owned());
+            if size < 8 {
+                break;
+            }
+            at += size;
+        }
+        names
+    }
+
+    #[test]
+    fn faststart_puts_the_index_before_the_frames() {
+        let Some((packets, extradata)) = encode_with_b_frames(30) else {
+            eprintln!("libx264 is not in this FFmpeg build; skipping");
+            return;
+        };
+        let mut ring = RingBuffer::new(30.0, 90_000);
+        for packet in &packets {
+            ring.push(packet.clone());
+        }
+        let clip = ring.extract_around(ring.newest_pts(), 100.0, 0.0).unwrap();
+        let track = TrackInfo {
+            width: WIDTH as u32,
+            height: HEIGHT as u32,
+            fps: FPS as u32,
+            time_base_den: 90_000,
+            codec: ClipCodec::H264,
+            extradata,
+        };
+
+        let dir = scratch("faststart");
+        let index_of = |boxes: &[String], name: &str| boxes.iter().position(|b| b == name).unwrap();
+        for (faststart, moov_first) in [(true, true), (false, false)] {
+            let path = dir.join(format!("{faststart}.mp4"));
+            write_mp4_with(&clip, &path, &track, &[], faststart).expect("muxing failed");
+            let boxes = top_level_boxes(&path);
+            assert_eq!(
+                index_of(&boxes, "moov") < index_of(&boxes, "mdat"),
+                moov_first,
+                "faststart {faststart}: {boxes:?}"
+            );
+            assert_eq!(crate::trim::read(&path).expect("demuxing failed").video.len(), packets.len());
+        }
+        assert_eq!(names_in(&dir).len(), 2, "nothing half-written may stay behind");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn scratch(name: &str) -> PathBuf {

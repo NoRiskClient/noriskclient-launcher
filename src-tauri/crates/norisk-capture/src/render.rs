@@ -10,7 +10,7 @@ use crate::buffer::{Clip, Packet};
 use crate::codec::{planar_420, shown_at, Decoder, Frame};
 use crate::encoder::hw::av_error;
 use crate::encoder::video::TIME_BASE_DEN;
-use crate::writer::{write_mp4, TrackInfo};
+use crate::writer::{write_mp4_with, TrackInfo};
 
 type Ratio = (i64, i64);
 
@@ -225,7 +225,10 @@ fn render_with(
     let feed = to_decode(&clip.video, picture_start, picture_end);
     let crop = (left, right, top, bottom);
     let mut decoder = Decoder::open(&clip.track)?;
-    let (mut encoder, name) = Encoder::open(width, height, clip.track.fps, encoders)?;
+    let bitrate = request
+        .bitrate_kbps
+        .map_or(DEFAULT_BITRATE, |kbps| i64::from(kbps.clamp(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS)) * 1000);
+    let (mut encoder, name) = Encoder::open(width, height, clip.track.fps, bitrate, encoders)?;
     *used = Some(name);
 
     let gaps = Gaps::new(&request.removed, clip.first_pts, want_start, want_end);
@@ -322,7 +325,7 @@ fn render_with(
         extradata,
     };
 
-    let written = write_mp4(&cut, destination, &track, &audio)
+    let written = write_mp4_with(&cut, destination, &track, &audio, request.faststart)
         .with_context(|| format!("could not write {}", destination.display()))?;
 
     Ok(VerticalResult {
@@ -429,6 +432,9 @@ struct Encoder {
     packet: *mut ff::AVPacket,
 }
 
+const DEFAULT_BITRATE: i64 = 8_000_000;
+const MIN_BITRATE_KBPS: u32 = 500;
+const MAX_BITRATE_KBPS: u32 = 200_000;
 const CPU_ENCODER: &std::ffi::CStr = c"libx264";
 const HARDWARE_ENCODERS: [&std::ffi::CStr; 2] = [c"h264_nvenc", c"h264_amf"];
 const RENDER_ENCODERS: [&std::ffi::CStr; 3] =
@@ -448,10 +454,11 @@ impl Encoder {
         width: u32,
         height: u32,
         fps: u32,
+        bitrate: i64,
         encoders: &[&'static std::ffi::CStr],
     ) -> Result<(Self, &'static std::ffi::CStr)> {
         for &name in encoders {
-            match Self::open_with(Some(name), width, height, fps) {
+            match Self::open_with(Some(name), width, height, fps, bitrate) {
                 Ok(opened) => {
                     log::info!("Rendering with {}", name.to_string_lossy());
                     return Ok(opened);
@@ -459,7 +466,7 @@ impl Encoder {
                 Err(e) => log::debug!("{} cannot render here: {e:#}", name.to_string_lossy()),
             }
         }
-        let (encoder, name) = Self::open_with(None, width, height, fps)?;
+        let (encoder, name) = Self::open_with(None, width, height, fps, bitrate)?;
         log::info!("Rendering with FFmpeg's default H.264 encoder, {}", name.to_string_lossy());
         Ok((encoder, name))
     }
@@ -469,6 +476,7 @@ impl Encoder {
         width: u32,
         height: u32,
         fps: u32,
+        bitrate: i64,
     ) -> Result<(Self, &'static std::ffi::CStr)> {
         unsafe {
             let codec = match name {
@@ -508,7 +516,7 @@ impl Encoder {
                 den: 1,
             };
             (*context).gop_size = (fps * 2) as i32;
-            (*context).bit_rate = 8_000_000;
+            (*context).bit_rate = bitrate;
             (*context).color_primaries = crate::encoder::video::COLOR_PRIMARIES;
             (*context).color_trc = crate::encoder::video::COLOR_TRANSFER;
             (*context).colorspace = crate::encoder::video::COLOR_SPACE;
@@ -1222,5 +1230,47 @@ mod render_tests {
             println!("sound {sound:.3}s");
             assert!((sound - wanted).abs() < 0.1, "the sound runs {sound:.3}s, not {wanted:.3}s");
         }
+    }
+
+    #[test]
+    #[ignore = "needs a real clip in NRC_TEST_CLIP"]
+    fn a_share_copy_is_h264_at_the_same_size_with_only_the_mix_and_the_index_first() {
+        let source = std::path::PathBuf::from(std::env::var("NRC_TEST_CLIP").unwrap());
+        let destination = std::env::temp_dir().join("nrc-share-render-test.mp4");
+        let _ = std::fs::remove_file(&destination);
+
+        let original = crate::trim::read(&source).unwrap();
+        let request = norisk_ipc::ExportVerticalRequest {
+            source,
+            destination: destination.clone(),
+            shape: norisk_ipc::ClipShape::Original,
+            bitrate_kbps: Some(6_000),
+            faststart: true,
+            ..Default::default()
+        };
+        let result = super::render(&request, |_, _| {}).unwrap();
+
+        let written = crate::trim::read(&destination).unwrap();
+        println!(
+            "{:?} {}x{} @{} with {} track(s) -> H.264 {}x{} @{}, {:.1} MB -> {}",
+            original.track.codec,
+            original.track.width,
+            original.track.height,
+            original.track.fps,
+            original.audio.len(),
+            written.track.width,
+            written.track.height,
+            written.track.fps,
+            result.size_bytes as f64 / 1e6,
+            destination.display(),
+        );
+        assert_eq!(written.track.codec, norisk_ipc::ClipCodec::H264);
+        assert_eq!((written.track.width, written.track.height), (original.track.width & !1, original.track.height & !1));
+        assert_eq!(written.track.fps, original.track.fps);
+        assert_eq!(written.audio.len(), original.audio.len().min(1));
+
+        let bytes = std::fs::read(&destination).unwrap();
+        let at = |name: &[u8]| bytes.windows(4).position(|w| w == name).unwrap();
+        assert!(at(b"moov") < at(b"mdat"), "the index is not in front");
     }
 }
