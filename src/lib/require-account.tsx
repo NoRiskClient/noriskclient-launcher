@@ -24,6 +24,16 @@ interface RequireAccountOptions {
 export function requireMinecraftAccount(options: RequireAccountOptions = {}): boolean {
   if (useMinecraftAuthStore.getState().activeAccount) return true;
 
+  openLoginRequiredPrompt(options);
+  return false;
+}
+
+/**
+ * Opens the sign-in prompt unconditionally. Used when the backend rejects a
+ * launch for missing credentials although the store still holds an account,
+ * e.g. a cached account whose session could not be refreshed.
+ */
+export function openLoginRequiredPrompt(options: RequireAccountOptions = {}): void {
   const { openModal, closeModal } = useGlobalModalStore.getState();
   openModal(
     LOGIN_REQUIRED_MODAL_ID,
@@ -33,5 +43,4 @@ export function requireMinecraftAccount(options: RequireAccountOptions = {}): bo
       onAuthenticated={options.onAuthenticated}
     />,
   );
-  return false;
 }

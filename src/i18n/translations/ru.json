@@ -229,6 +229,7 @@
   "launch.abort_requested": "Запрошена отмена запуска.",
   "launch.abort_failed": "Запрос на отмену не удался: {{error}}",
   "launch.failed": "Ошибка запуска: {{error}}",
+  "launch.failed_short": "Ошибка запуска",
   "launch.cancel_failed": "Не удалось отменить запуск",
   "launch.polling_error": "Ошибка опроса: {{error}}",
   "launch.starting": "Запуск!",

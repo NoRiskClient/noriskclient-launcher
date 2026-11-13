@@ -229,6 +229,7 @@
   "launch.abort_requested": "Cancelamento de inicialização solicitado.",
   "launch.abort_failed": "Solicitação de cancelamento falhou: {{error}}",
   "launch.failed": "Falha ao iniciar: {{error}}",
+  "launch.failed_short": "Falha ao iniciar",
   "launch.cancel_failed": "Falha ao cancelar inicialização",
   "launch.polling_error": "Erro de polling: {{error}}",
   "launch.starting": "Iniciando!",
