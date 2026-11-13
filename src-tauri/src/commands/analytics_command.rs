@@ -30,15 +30,14 @@ pub struct TrackEventResponse {
     pub message: Option<String>,
 }
 
-const ANALYTICS_URL: &str = "https://analytics-api-staging.norisk.gg/api/track";
-
-fn analytics_url() -> String {
+fn analytics_url(is_experimental: bool) -> String {
     if cfg!(debug_assertions) {
         if let Ok(url) = std::env::var("NRC_ANALYTICS_URL") {
             return url;
         }
     }
-    ANALYTICS_URL.to_string()
+    let host = if is_experimental { "api-staging.norisk.gg" } else { "api.norisk.gg" };
+    format!("https://{host}/api/v1/analytics/track")
 }
 
 static FRONTEND_IDENTITY: Mutex<Option<(String, String)>> = Mutex::new(None);
@@ -98,18 +97,20 @@ pub async fn track_with_frontend_identity(event_type: &str, properties: Value) -
 }
 
 async fn send_event(event: AnalyticsEvent) -> Result<bool, String> {
-    match state_manager::State::get().await {
+    let is_experimental = match state_manager::State::get().await {
         Ok(state) => {
-            if !state.config_manager.get_config().await.enable_analytics {
+            let config = state.config_manager.get_config().await;
+            if !config.enable_analytics {
                 debug!("[Analytics] Disabled - skipping {}", event.event_type);
                 return Ok(false);
             }
+            config.is_experimental
         }
         Err(e) => {
             debug!("[Analytics] State unavailable - skipping {}: {}", event.event_type, e);
             return Ok(false);
         }
-    }
+    };
 
     let request_body = TrackEventRequest { events: vec![event] };
 
@@ -119,7 +120,7 @@ async fn send_event(event: AnalyticsEvent) -> Result<bool, String> {
         .map_err(|e| format!("client build: {}", e))?;
 
     let response = client
-        .post(analytics_url())
+        .post(analytics_url(is_experimental))
         .json(&request_body)
         .send()
         .await
