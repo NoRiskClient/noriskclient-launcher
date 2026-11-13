@@ -26,7 +26,6 @@ if (process.platform === "darwin") {
   const targetIndex = process.argv.indexOf("--target");
   const target = targetIndex >= 0 ? process.argv[targetIndex + 1] : null;
   const triple = target || readHostTriple();
-  const captureTargetDir = path.join(srcTauri, "target", "capture");
   execFileSync(
     "cargo",
     [
@@ -35,14 +34,13 @@ if (process.platform === "darwin") {
       "norisk-capture",
       ...(profile === "release" ? ["--release"] : []),
       ...(target ? ["--target", target] : []),
-      "--target-dir",
-      captureTargetDir,
     ],
     { cwd: srcTauri, stdio: "inherit" },
   );
   fs.mkdirSync(staging, { recursive: true });
   const source = path.join(
-    captureTargetDir,
+    srcTauri,
+    "target",
     ...(target ? [target] : []),
     profile,
     "norisk-capture",
