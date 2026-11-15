@@ -4,6 +4,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
 use crate::minecraft::api::mc_api::MinecraftApiService;
+use crate::minecraft::api::NoRiskApi;
 use crate::minecraft::downloads::java_download::JavaDownloadService;
 use crate::minecraft::downloads::mc_assets_download::MinecraftAssetsDownloadService;
 use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
@@ -154,6 +155,34 @@ pub async fn install_minecraft_version(
 
     let total_start = Instant::now();
     let summary = Arc::new(LaunchSummary::default());
+
+    // The pack config request only waits on the network. It is sent now and applied further
+    // down, where the refresh has always happened, so it runs alongside the local checks and
+    // nothing sees the new config earlier than before.
+    let pack_config_request = match (&profile.selected_norisk_pack_id, credentials.as_ref()) {
+        (Some(pack_id), Some(creds)) => {
+            match creds.norisk_credentials.get_token_for_mode(is_experimental_mode) {
+                Ok(token) => Some(tokio::spawn(async move {
+                    NoRiskApi::get_modpacks(&token, is_experimental_mode).await
+                })),
+                Err(token_err) => {
+                    warn!(
+                        "Could not obtain Norisk token for pack '{}' to update configuration: {}. Will proceed with cached version.",
+                        pack_id, token_err
+                    );
+                    None
+                }
+            }
+        }
+        (Some(pack_id), None) => {
+            error!(
+                "A Norisk pack ('{}') is selected, but no credentials were provided. Cannot attempt to update pack configuration.",
+                pack_id
+            );
+            None
+        }
+        (None, _) => None,
+    };
 
     // <--- HARDCODED TEST ERROR (50% CHANCE) --- >
     let should_throw_error = {
@@ -426,40 +455,50 @@ pub async fn install_minecraft_version(
         );
     }
 
-    // Download libraries
     let libraries_service = MinecraftLibrariesDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads)
         .with_stats(summary.libraries.clone());
-    timed_step(&state, &summary, EventType::DownloadingLibraries, profile.id, "libraries", || async {
-        libraries_service.download_libraries(&piston_meta.libraries).await
-    }).await?;
-
-    // Extract natives
     let natives_service = MinecraftNativesDownloadService::new();
     let cache_natives = launcher_config.cache_natives_extraction;
-    timed_step(&state, &summary, EventType::ExtractingNatives, profile.id, "natives", || async {
-        natives_service.extract_natives(&piston_meta.libraries, version_id, cache_natives).await
-    }).await?;
-
-    // Download MC assets (handles progress events internally)
     let assets_service = MinecraftAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads)
         .with_stats(summary.assets.clone());
-    summary_phase!(summary, "assets", {
-        assets_service
-            .download_assets_with_progress(&piston_meta.asset_index, profile.id)
-            .await?
-    });
-
-    // Download NoRiskClient assets (handles progress events internally)
     let norisk_assets_service = NoriskClientAssetsDownloadService::new()
         .with_concurrent_downloads(launcher_config.concurrent_downloads)
         .with_stats(summary.nrc_assets.clone());
-    summary_phase!(summary, "nrc assets", {
-        norisk_assets_service
-            .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
-            .await?
-    });
+
+    // Libraries, natives and MC assets (the last handles progress events internally)
+    let vanilla_steps = async {
+        timed_step(&state, &summary, EventType::DownloadingLibraries, profile.id, "libraries", || async {
+            libraries_service.download_libraries(&piston_meta.libraries).await
+        }).await?;
+
+        timed_step(&state, &summary, EventType::ExtractingNatives, profile.id, "natives", || async {
+            natives_service.extract_natives(&piston_meta.libraries, version_id, cache_natives).await
+        }).await?;
+
+        summary_phase!(summary, "assets", {
+            assets_service
+                .download_assets_with_progress(&piston_meta.asset_index, profile.id)
+                .await
+        })
+    };
+
+    // NoRiskClient assets (handles progress events internally)
+    let norisk_assets_step = async {
+        summary_phase!(summary, "nrc assets", {
+            norisk_assets_service
+                .download_nrc_assets_for_profile(&profile, credentials.as_ref(), is_experimental_mode)
+                .await
+        })
+    };
+
+    // The NoRisk assets start with a network request for their manifest and touch none of
+    // the files the vanilla steps touch, so the two run side by side instead of in a row.
+    // A failure is still reported in the order the steps used to run in.
+    let (vanilla_result, norisk_assets_result) = tokio::join!(vanilla_steps, norisk_assets_step);
+    vanilla_result?;
+    norisk_assets_result?;
 
     NoriskNativesDownloadService::install_in_background(&FFMPEG);
 
@@ -605,52 +644,31 @@ pub async fn install_minecraft_version(
     final_game_args.extend(profile.settings.extra_game_args.clone());
     launch_params = launch_params.with_additional_game_args(final_game_args);
 
-    // --- Fetch Norisk Config Once if a pack is selected ---
+    // --- Apply the Norisk config requested at the top, if a pack is selected ---
     let loaded_norisk_config: Option<NoriskModpacksConfig> = if let Some(pack_id) =
         &profile.selected_norisk_pack_id
     {
-        info!(
-            "Fetching Norisk config because pack '{}' is selected. Attempting to refresh first.",
-            pack_id
-        );
-        if let Some(creds) = credentials.as_ref() {
-            match creds
-                .norisk_credentials
-                .get_token_for_mode(is_experimental_mode)
-            {
-                Ok(norisk_token_value) => {
-                    info!("Attempting to update Norisk pack configuration using obtained token for pack '{}'...", pack_id);
-                    if let Err(update_err) = state
-                        .norisk_pack_manager
-                        .fetch_and_update_config(&norisk_token_value, is_experimental_mode)
-                        .await
-                    {
-                        warn!(
-                                "Failed to update Norisk pack '{}' configuration: {}. Will proceed with cached version.",
-                                pack_id, update_err
-                            );
-                    } else {
-                        info!(
-                            "Successfully updated Norisk pack '{}' configuration from API.",
-                            pack_id
-                        );
-                    }
-                }
-                Err(token_err) => {
-                    warn!(
-                            "Could not obtain Norisk token for pack '{}' to update configuration: {}. Will proceed with cached version.",
-                            pack_id, token_err
-                        );
-                }
-            }
-        } else {
-            error!(
-                    "A Norisk pack ('{}') is selected, but no credentials were provided. Cannot attempt to update pack configuration.",
+        if let Some(request) = pack_config_request {
+            let refreshed = match request.await {
+                Ok(Ok(new_config)) => state.norisk_pack_manager.update_config(new_config).await,
+                Ok(Err(fetch_err)) => Err(fetch_err),
+                Err(join_err) => Err(AppError::Other(format!(
+                    "Pack config request did not finish: {}",
+                    join_err
+                ))),
+            };
+            match refreshed {
+                Ok(()) => info!(
+                    "Successfully updated Norisk pack '{}' configuration from API.",
                     pack_id
-                );
+                ),
+                Err(update_err) => warn!(
+                    "Failed to update Norisk pack '{}' configuration: {}. Will proceed with cached version.",
+                    pack_id, update_err
+                ),
+            }
         }
-        // No need to clone state here, it's still valid in this scope
-        // Always attempt to get the config, which will be the latest if updated, or cached otherwise.
+        // The latest config if the refresh went through, the cached one otherwise.
         Some(state.norisk_pack_manager.get_config().await)
     } else {
         None
