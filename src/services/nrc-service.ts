@@ -96,30 +96,45 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
       .then(() => logInfo("User permissions refreshed on mount"))
       .catch((error) => logError(`Failed to refresh permissions: ${error}`));
 
-    try {
-      await refreshNoriskPacks();
-      console.log("Norisk Packs updated successfully on mount!");
-      nrcPacksSuccess = true;
-    } catch (error) {
-      console.error("Failed to refresh Norisk Packs on mount:", error);
-    }
+    // What is already on disk is enough to show the profile list and the Play button. The
+    // two refreshes only bring it up to date, and offline they never arrive.
+    const profilesFromDisk = useProfileStore.getState().fetchProfiles();
 
-    try {
-      const standardProfiles = await refreshStandardVersions();
-      console.log("Standard Versions updated successfully on mount!");
-      // Store the standard profiles in the profile store
-      useProfileStore.setState({ standardProfiles });
-      standardVersionsSuccess = true;
-    } catch (error) {
-      console.error("Failed to refresh Standard Versions on mount:", error);
-    }
+    const packsRefresh = refreshNoriskPacks()
+      .then(() => {
+        console.log("Norisk Packs updated successfully on mount!");
+        nrcPacksSuccess = true;
+      })
+      .catch((error) => {
+        console.error("Failed to refresh Norisk Packs on mount:", error);
+      });
 
-    // Fetch profiles from the store after NRC data is refreshed
+    const standardVersionsRefresh = refreshStandardVersions()
+      .then((standardProfiles) => {
+        console.log("Standard Versions updated successfully on mount!");
+        // Store the standard profiles in the profile store
+        useProfileStore.setState({ standardProfiles });
+        standardVersionsSuccess = true;
+      })
+      .catch((error) => {
+        console.error("Failed to refresh Standard Versions on mount:", error);
+      });
+
+    await Promise.all([profilesFromDisk, packsRefresh, standardVersionsRefresh]);
+
+    // Fetch profiles again after NRC data is refreshed
     // This ensures the profile list (including standard versions) and last played are up-to-date.
     if (nrcPacksSuccess || standardVersionsSuccess) { // Or simply always call it if appropriate
       try {
         console.log("Refreshing profiles state after NRC data update...");
+        // fetchProfiles selects the last played profile; a choice made while the refresh
+        // was running has to survive it.
+        const selectedId = useProfileStore.getState().selectedProfile?.id;
         await useProfileStore.getState().fetchProfiles();
+        const selected = useProfileStore.getState().profiles.find((profile) => profile.id === selectedId);
+        if (selected) {
+          useProfileStore.getState().setSelectedProfile(selected);
+        }
         console.log("Profiles state refreshed successfully.");
         // fetchProfiles setzt loading: false bei Erfolg oder Fehler
       } catch (error) {
