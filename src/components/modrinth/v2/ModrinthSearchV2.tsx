@@ -1482,8 +1482,6 @@ export function ModrinthSearchV2({
   const [quickInstallModalOpen, setQuickInstallModalOpen] = useState(false);
   const [quickInstallProject, setQuickInstallProject] = useState<UnifiedModSearchResult | any | null>(null);
   const [quickInstallVersions, setQuickInstallVersions] = useState<any[] | null>(null); // Changed to any[] to handle UnifiedVersion
-  const [quickInstallLoading, setQuickInstallLoading] = useState(false); // Loading for fetching versions for modal
-  const [quickInstallError, setQuickInstallError] = useState<string | null>(null);
   const [quickInstallingProjects, setQuickInstallingProjects] = useState<Record<string, boolean>>({}); // New state for card button loading
   const [installingModpackAsProfile, setInstallingModpackAsProfile] = useState<Record<string, boolean>>({}); // New state for modpack install loading
   const [installingVersion, setInstallingVersion] = useState<Record<string, boolean>>({}); // New state for specific version install loading
@@ -3237,8 +3235,8 @@ export function ModrinthSearchV2({
         onClose={closeQuickInstallModal}
         project={quickInstallProject}
         versions={quickInstallVersions}
-        isLoading={quickInstallLoading}
-        error={quickInstallError}
+        isLoading={false}
+        error={null}
         profiles={internalProfiles}
         selectedProfileId={selectedProfile?.id}
         installStatus={installStatus}

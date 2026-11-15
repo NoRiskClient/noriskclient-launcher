@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { useThemeStore } from '../../store/useThemeStore';
 import { 
-  getVariantColors,
   getBorderRadiusClass,
   createRadiusStyle,
   getAccessibilityProps
@@ -41,11 +40,9 @@ export function ThemedSurface({
   ariaLabel,
 }: ThemedSurfaceProps) {
   const accentColorValue = useThemeStore((state) => state.accentColor.value);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
   const [isSurfaceHovered, setIsSurfaceHovered] = useState(false);
 
-  const colors = getVariantColors("default", accentColor);
   const radiusClass = getBorderRadiusClass(borderRadius);
   const accessibilityProps = getAccessibilityProps({
     label: ariaLabel

@@ -207,7 +207,6 @@ export function ProfileIcon({
   const displaySpinner = showLoading || isUpdating;
 
   const effectiveIconClassName = cn(iconClassName, displaySpinner && "opacity-50");
-  const displayPlaceholderIcon = displaySpinner ? "eos-icons:loading" : placeholderIcon;
   const hasImage = imageUrl && hasLoadedImage && !isLoading;
   const shouldShowPlaceholder = !banner?.source && !isLoading;
   

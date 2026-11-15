@@ -64,8 +64,6 @@ export function CapeBrowser(): JSX.Element {
   const [isEquippingCapeId, setIsEquippingCapeId] = useState<string | null>(
     null,
   );
-  const [isUploading, setIsUploading] = useState(false);
-  const [isUnequipping, setIsUnequipping] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<CapeFiltersData>({
     sortBy: "",
@@ -196,12 +194,6 @@ export function CapeBrowser(): JSX.Element {
     { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
   ];
 
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [previewImagePath, setPreviewImagePath] = useState<string | null>(null);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [showElytraPreview, setShowElytraPreview] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
 
 
   // Helper function to format and translate error messages
@@ -218,7 +210,6 @@ export function CapeBrowser(): JSX.Element {
   };
 
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
   const nextCursorRef = useRef<string | null>(null);
   const { activeAccount } = useMinecraftAuthStore();
@@ -661,7 +652,6 @@ export function CapeBrowser(): JSX.Element {
   };
 
   const handleUnequipCape = async (alsoUnequipVanillaCape = false) => {
-    setIsUnequipping(true);
     setIsEquippingCapeId(NO_CAPE_ID);
     try {
       await Promise.all([
@@ -676,7 +666,6 @@ export function CapeBrowser(): JSX.Element {
       toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
     } finally {
       setIsEquippingCapeId(null);
-      setIsUnequipping(false);
     }
   };
 
@@ -730,11 +719,8 @@ export function CapeBrowser(): JSX.Element {
       });
       if (!selectedFile) return;
       const filePath = selectedFile as string;
-      setPreviewImagePath(filePath);
       try {
         const imageUrl = convertFileSrc(filePath);
-        setPreviewImageUrl(imageUrl);
-        setShowPreviewModal(true);
 
         showModal('upload-cape-modal', (
           <UploadCapeModal
@@ -776,13 +762,6 @@ export function CapeBrowser(): JSX.Element {
 
   const handleCancelUpload = () => {
     hideModal('upload-cape-modal');
-    setPreviewImagePath(null);
-    setPreviewImageUrl(null);
-    setShowPreviewModal(false);
-    setShowElytraPreview(false);
-    setUploadError(null);
-    setUploadWarning(null);
-    setIsUploading(false);
   };
 
 

@@ -27,7 +27,6 @@ export function NewsSection({ className }: NewsSectionProps) {
     posts,
     error,
     setPosts,
-    setLoading,
     setError,
     isCacheValid,
   } = useNewsStore();

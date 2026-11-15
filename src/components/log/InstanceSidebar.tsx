@@ -96,9 +96,6 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
   };
 }
 
-import { loaderIconSrc } from "../../lib/loader-icons";
-const getLoaderIcon = loaderIconSrc;
-
 // Get status color
 const getStatusColor = (status: InstanceStatus): string => {
   switch (status) {

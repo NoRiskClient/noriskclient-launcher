@@ -53,7 +53,6 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
     title,
     ...props
   }, ref) => {
-    const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
       const accentColor = useThemeStore((state) => state.accentColor);
     const borderRadius = useThemeStore((state) => state.borderRadius);    const handleClick = () => {
@@ -120,8 +119,6 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
             {...accessibilityProps}            disabled={disabled}
             onClick={onClick || handleClick}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}className={cn(
               "relative flex-shrink-0 flex items-center justify-center backdrop-blur-md",

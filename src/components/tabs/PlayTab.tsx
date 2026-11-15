@@ -52,9 +52,6 @@ export function PlayTab() {
     setSelectedProfile(profileToSelect);
   };
 
-  const currentDisplayProfile =
-    storeSelectedProfile || (profiles.length > 0 ? profiles[0] : null);
-
   const versions = profiles.map((profile) => ({
     id: profile.id,
     label: `${profile.name}`,

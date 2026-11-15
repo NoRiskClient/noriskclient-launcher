@@ -4,7 +4,6 @@ import type { Profile } from "../../types/profile";
 import { ExportSettingsTab } from "./settings/ExportSettingsTab";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
-import { useThemeStore } from "../../store/useThemeStore";
 import { Icon } from "@iconify/react";
 import { Checkbox } from "../ui/Checkbox";
 
@@ -20,7 +19,6 @@ export function ExportProfileModal({
   onClose,
 }: ExportProfileModalProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const [exportAction, setExportAction] = useState<{
     handleExport: () => Promise<void>;

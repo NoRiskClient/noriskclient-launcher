@@ -39,7 +39,6 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
   ) => {
     const badgeRef = useRef<HTMLElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const isClickable = !!onClick && !disabled;

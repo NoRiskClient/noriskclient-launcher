@@ -64,19 +64,10 @@ export function JavaSettingsTab({
     JavaInstallation[]
   >([]);
   const [isDetectingJava, setIsDetectingJava] = useState(false);
-  const [javaDetectionError, setJavaDetectionError] = useState<string | null>(
-    null,
-  );
   const [customJavaPathInput, setCustomJavaPathInput] = useState(
     editedProfile.settings?.java_path || "",
   );
   const [isValidatingJavaPath, setIsValidatingJavaPath] = useState(false);
-  const [validationResult, setValidationResult] = useState<
-    "valid" | "invalid" | "error" | null
-  >(null);
-  const [validationMessage, setValidationMessage] = useState<string | null>(
-    null,
-  );
   
   // Global memory settings for standard profiles
   const [globalMemorySettings, setGlobalMemorySettingsState] = useState<MemorySettings | null>(null);
@@ -123,9 +114,6 @@ export function JavaSettingsTab({
 
   const detectJavaInstallations = async () => {
     setIsDetectingJava(true);
-    setJavaDetectionError(null);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const installations: JavaInstallation[] = await invoke(
         "detect_java_installations_command",
@@ -149,7 +137,6 @@ export function JavaSettingsTab({
       console.error("Error detecting Java installations:", error);
       const errorMessage =
         parseErrorMessage(error);
-      setJavaDetectionError(errorMessage); // Store for internal reference if needed
       toast.error(t('java.detect_failed', { error: errorMessage }));
       setDetectedJavaInstallations([]);
     } finally {
@@ -240,14 +227,11 @@ export function JavaSettingsTab({
       return;
     }
     setIsValidatingJavaPath(true);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const isValid: boolean = await invoke("validate_java_path_command", {
         path: currentPath,
       });
       if (isValid) {
-        setValidationResult("valid");
         toast.success(t('java.path_valid'));
         updateProfile({
           settings: {
@@ -257,12 +241,10 @@ export function JavaSettingsTab({
           },
         });
       } else {
-        setValidationResult("invalid");
         toast.error(t('java.path_invalid'));
       }
     } catch (error: any) {
       console.error(`Error validating Java path ${currentPath}:`, error);
-      setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
         ? t('java.path_not_exist')
         : error?.message || parseErrorMessage(error);
@@ -311,7 +293,6 @@ export function JavaSettingsTab({
 
   const handleJavaPathInputChange = (newPath: string) => {
     setCustomJavaPathInput(newPath);
-    setValidationResult(null);
   };
 
   const handleDetectedJavaListItemClick = (installation: JavaInstallation) => {
@@ -353,7 +334,6 @@ export function JavaSettingsTab({
       updateProfile({
         settings: { ...editedProfile.settings, use_custom_java_path: false },
       });
-      setValidationResult(null);
     }
   };
 

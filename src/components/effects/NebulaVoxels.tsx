@@ -305,7 +305,6 @@ export function NebulaVoxels({
 
       // Calculate effective animation time (excluding paused periods)
       const effectiveTimestamp = timestamp - totalPausedDurationRef.current;
-      const elapsed = effectiveTimestamp - lastFrameTimeRef.current;
       
       // Temporarily remove frameInterval check to debug
       // if (elapsed < frameInterval) return;

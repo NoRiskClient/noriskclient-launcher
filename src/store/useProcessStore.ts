@@ -96,11 +96,6 @@ function createDefaultParserState(): ParserState {
   };
 }
 
-function trimLogTail<T>(logs: T[], maxEntries: number): T[] {
-  if (logs.length <= maxEntries) return logs;
-  return logs.slice(logs.length - maxEntries);
-}
-
 function appendBounded<T>(existing: T[], entries: T[], maxEntries: number): T[] {
   if (entries.length === 0) return existing;
   if (entries.length >= maxEntries) return entries.slice(entries.length - maxEntries);

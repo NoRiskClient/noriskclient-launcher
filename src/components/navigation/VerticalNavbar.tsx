@@ -6,7 +6,6 @@ import { Logo } from "../ui/Logo";
 import { NavButton } from "../ui/nav/NavButton";
 import { NavTooltip } from "../ui/nav/NavTooltip";
 import { CreditsModal } from "../modals/CreditsModal";
-import * as ConfigService from "../../services/launcher-config-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { createPortal } from "react-dom";
 
@@ -37,7 +36,6 @@ export function VerticalNavbar({
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [appVersion, setAppVersion] = useState<string | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
   const showNavLabels = useThemeStore((state) => state.showNavLabels);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -54,19 +52,6 @@ export function VerticalNavbar({
       setActive(activeItem);
     }
   }, [activeItem]);
-
-  useEffect(() => {
-    const fetchVersion = async () => {
-      try {
-        const fetchedVersion = await ConfigService.getAppVersion();
-        setAppVersion(`v${fetchedVersion}`);
-      } catch (error) {
-        console.error("Failed to fetch app version:", error);
-        setAppVersion("v?.?.?");
-      }
-    };
-    fetchVersion();
-  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {

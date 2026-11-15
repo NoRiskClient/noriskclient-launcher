@@ -73,7 +73,7 @@ export function UploadCapeModal({
     setUploadWarning(null);
 
     try {
-      const result = await uploadCape(previewImagePath);
+      await uploadCape(previewImagePath);
 
       toast.success(t('capes.capeUploadedSuccess'));
 

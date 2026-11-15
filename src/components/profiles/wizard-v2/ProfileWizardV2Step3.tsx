@@ -65,7 +65,6 @@ export function ProfileWizardV2Step3({
     const { packs: noriskPacks, loading: packsLoading } = usePacks();
     const [packCompatibilityWarning, setPackCompatibilityWarning] = useState<string | null>(null);
     const [showYellowWarning, setShowYellowWarning] = useState(false);
-    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
     const [useSharedMinecraftFolder, setUseSharedMinecraftFolder] = useState(
         defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
     ); // Default to true when group exists and is not "modpacks"

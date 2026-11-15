@@ -24,13 +24,6 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   description?: string;
 }
 
-interface RippleType {
-  x: number;
-  y: number;
-  size: number;
-  id: number;
-}
-
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {

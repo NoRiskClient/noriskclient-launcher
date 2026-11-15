@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 
-import { useThemeStore } from "../../store/useThemeStore";
 import { useVersionOptions } from "../../hooks/useVersionOptions";
 import { ModPlatform } from "../../types/unified";
 import type {
@@ -47,7 +46,6 @@ export function SyncPackModRow({
   onSetOverride,
 }: SyncPackModRowProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
   const [isExpanded, setIsExpanded] = useState(false);
   const versionOptions = useVersionOptions();
 

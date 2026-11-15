@@ -6,7 +6,6 @@ import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { Button } from "../ui/buttons/Button";
 import type { UnifiedModpackVersionsResponse, UnifiedVersion, ModpackSwitchRequest } from "../../types/unified";
-import { UnifiedVersionType } from "../../types/unified";
 import type { ModPackSource } from "../../types/profile";
 import UnifiedService from "../../services/unified-service";
 import * as ProfileService from "../../services/profile-service";
@@ -23,19 +22,6 @@ interface ModpackVersionsModalProps {
   onVersionSwitch?: (version: UnifiedVersion) => void;
   onSwitchComplete?: () => void;
   isSwitching?: boolean;
-}
-
-function getVersionTypeIcon(type: UnifiedVersionType): string {
-  switch (type) {
-    case UnifiedVersionType.Release:
-      return "solar:tag-bold";
-    case UnifiedVersionType.Beta:
-      return "solar:test-tube-bold";
-    case UnifiedVersionType.Alpha:
-      return "solar:test-tube-bold";
-    default:
-      return "solar:tag-bold";
-  }
 }
 
 function formatDate(dateString: string): string {

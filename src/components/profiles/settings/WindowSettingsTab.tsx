@@ -18,7 +18,6 @@ export function WindowSettingsTab({
   updateProfile,
 }: WindowSettingsTabProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );

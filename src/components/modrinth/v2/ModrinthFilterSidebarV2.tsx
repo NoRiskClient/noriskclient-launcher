@@ -41,7 +41,6 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   activeCount = 0
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen || activeCount > 0);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 

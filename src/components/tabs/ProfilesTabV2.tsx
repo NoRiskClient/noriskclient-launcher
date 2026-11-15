@@ -173,12 +173,6 @@ export function ProfilesTabV2() {
   }, [fetchProfiles]);
 
   // Handler functions from ProfilesTab.tsx
-  const handleCreateProfile = () => {
-    console.log("[ProfilesTabV2] handleCreateProfile called.");
-    fetchProfiles();
-    navigate("/profiles");
-  };
-
   const handleDeleteProfile = (profileId: string) => {
     const profile = profiles.find((p) => p.id === profileId);
     if (profile) requestDelete(profile);

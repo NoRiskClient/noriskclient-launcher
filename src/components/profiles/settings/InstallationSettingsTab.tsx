@@ -45,7 +45,6 @@ export function InstallationSettingsTab({
   const [searchQuery, setSearchQuery] = useState("");
 
   const resolvedLoaderVersion = useResolvedLoaderVersion(editedProfile, refreshTrigger);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );

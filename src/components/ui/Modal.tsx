@@ -44,9 +44,6 @@ export function Modal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
   const [isClosing, setIsClosing] = useState(false);
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

@@ -4,8 +4,6 @@ import type {
 } from "../../../types/modrinth";
 import type { UnifiedModSearchResult, UnifiedVersion } from "../../../types/unified";
 
-// Unified project card supporting both Modrinth and CurseForge
-type CompatibleProject = UnifiedModSearchResult;
 import type { AccentColor } from "../../../store/useThemeStore";
 import type { ContentInstallStatus } from "../../../types/profile";
 import { ActionButton } from "../../ui/ActionButton";

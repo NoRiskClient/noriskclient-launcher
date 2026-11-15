@@ -133,7 +133,6 @@ export function LiquidChrome({
 
     function resize() {
       const rect = container.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       renderer.setSize(rect.width, rect.height);
       const resUniform = program.uniforms.uResolution.value as Float32Array;
       resUniform[0] = gl.canvas.width;

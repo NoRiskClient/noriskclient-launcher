@@ -2,7 +2,7 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
-import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
+import type { TexturesData } from "../../types/minecraft";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
@@ -321,7 +321,6 @@ export function SkinsTab() {
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
 
   useEffect(() => { setDiscordState("Browsing Skins"); }, []);
-  const [skinData, setSkinData] = useState<MinecraftProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [localSkins, setLocalSkins] = useState<MinecraftSkin[]>([]);
   const [localSkinsLoading, setLocalSkinsLoading] = useState<boolean>(false);
@@ -347,7 +346,6 @@ export function SkinsTab() {
 
     try {
       const data = await MinecraftSkinService.getUserSkinData();
-      setSkinData(data);
 
       if (data?.properties) {
         const texturesProp = data.properties.find(
