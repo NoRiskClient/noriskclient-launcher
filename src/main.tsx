@@ -6,7 +6,7 @@ import { I18nextProvider } from "react-i18next";
 import { router } from "./lib/router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ClipOverlay } from "./components/overlay/ClipOverlay";
-import i18n from "./i18n/i18n";
+import i18n, { i18nReady } from "./i18n/i18n";
 import "./styles/globals.css";
 
 disableBackdropBlurOnLinux();
@@ -31,4 +31,7 @@ const render = () => ReactDOM.createRoot(document.getElementById("root") as HTML
   </I18nextProvider>,
 );
 
-initializeClipSupport().catch((error) => console.error("Could not check clip support", error)).finally(render);
+Promise.all([
+  i18nReady,
+  initializeClipSupport().catch((error) => console.error("Could not check clip support", error)),
+]).finally(render);
