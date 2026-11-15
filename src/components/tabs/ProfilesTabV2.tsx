@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";

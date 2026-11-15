@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { NewsSection } from "../news/NewsSection";
 import { ErrorMessage } from "../ui/ErrorMessage";

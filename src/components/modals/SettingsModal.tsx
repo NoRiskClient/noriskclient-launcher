@@ -1,5 +1,3 @@
-"use client";
-
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { SettingsTab } from "../tabs/SettingsTab";
 

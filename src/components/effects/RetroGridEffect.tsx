@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useWindowFocus } from "../../hooks/useWindowFocus";

@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { useThemeStore } from '../../store/useThemeStore';

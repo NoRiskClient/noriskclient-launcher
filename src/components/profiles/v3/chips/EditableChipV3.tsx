@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * EditableChipV3 — Inline-edit chip built on top of `ThemedDropdown` so it
  * inherits the V3 accent-tinted popover recipe used everywhere else

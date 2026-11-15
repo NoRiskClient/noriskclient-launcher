@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ProfileDetailViewV3 — Redesign des Profile-Detail-Views.
  *

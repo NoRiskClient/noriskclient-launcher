@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { setDiscordState } from '../../../utils/discordRpc';
 import { logInfo } from '../../../utils/logging-utils';

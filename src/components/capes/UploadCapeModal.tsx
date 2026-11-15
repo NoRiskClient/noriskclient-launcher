@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";

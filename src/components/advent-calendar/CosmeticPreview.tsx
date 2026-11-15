@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef, useEffect, useState, Suspense, Component, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Canvas, useFrame } from "@react-three/fiber";

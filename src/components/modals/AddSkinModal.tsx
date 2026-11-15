@@ -1,5 +1,3 @@
-"use client";
-
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";

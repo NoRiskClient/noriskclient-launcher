@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ExportPackFormat, Profile } from "../../../types/profile"; // Adjust path as needed

@@ -1,5 +1,3 @@
-"use client";
-
 import { Component, type ReactNode } from "react";
 
 import { getWebGLSupport } from "@noriskclient/nrc-skin-renderer";

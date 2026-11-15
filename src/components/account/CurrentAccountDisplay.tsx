@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";

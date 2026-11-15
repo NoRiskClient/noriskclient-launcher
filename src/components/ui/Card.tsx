@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, type ReactNode, useRef, useState } from "react";
 import { cn } from "../../lib/utils";

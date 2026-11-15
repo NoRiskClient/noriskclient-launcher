@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import type { Profile } from "../../../types/profile";
 import { useThemeStore } from "../../../store/useThemeStore";

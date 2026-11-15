@@ -1,5 +1,3 @@
-"use client";
-
 import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";

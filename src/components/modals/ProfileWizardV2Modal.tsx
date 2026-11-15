@@ -1,5 +1,3 @@
-"use client";
-
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";

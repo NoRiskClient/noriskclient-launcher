@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { TabHeader } from "../ui/TabHeader";
 import { TabContent } from "../ui/TabContent";

@@ -1,5 +1,3 @@
-"use client";
-
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { CrashCard } from "./common";

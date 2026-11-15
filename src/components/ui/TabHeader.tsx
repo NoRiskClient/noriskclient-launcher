@@ -1,5 +1,3 @@
-"use client";
-
 import type { ReactNode } from "react";
 import { useRef } from "react";
 import { Icon } from "@iconify/react";

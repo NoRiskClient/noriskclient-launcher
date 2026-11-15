@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
