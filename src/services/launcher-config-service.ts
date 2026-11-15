@@ -8,7 +8,6 @@ import type { LauncherConfig, MemorySettings } from "../types/launcherConfig";
 export async function getLauncherConfig(): Promise<LauncherConfig> {
   try {
     const config = await invoke<LauncherConfig>("get_launcher_config");
-    console.log("[LauncherConfigService] Fetched config:", config);
     return config;
   } catch (error) {
     console.error("[LauncherConfigService] Failed to get launcher config:", error);
@@ -31,7 +30,6 @@ export async function setLauncherConfig(config: LauncherConfig): Promise<Launche
     const updatedConfig = await invoke<LauncherConfig>("set_launcher_config", {
       config: config, // Ensure this matches the argument name in the Rust command handler
     });
-    console.log("[LauncherConfigService] Saved config:", updatedConfig);
     return updatedConfig;
   } catch (error) {
     console.error("[LauncherConfigService] Failed to set launcher config:", error);

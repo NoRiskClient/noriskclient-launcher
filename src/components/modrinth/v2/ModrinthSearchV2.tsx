@@ -2951,16 +2951,11 @@ export function ModrinthSearchV2({
 
   // Helper function to get NoRisk status for a project
   const getProjectNoRiskStatus = (project: UnifiedModSearchResult): 'blocked' | 'warning' | null => {
-    console.log('[getProjectNoRiskStatus] Checking project:', project.title, 'ID:', project.project_id);
-    console.log('[getProjectNoRiskStatus] Config loaded:', blockedModsConfigLoaded);
-    
     if (!blockedModsConfigLoaded) {
-      console.log('[getProjectNoRiskStatus] Config not loaded yet, returning null');
       return null;
     }
     
     const result = getModNoRiskStatus('', project.project_id, null);
-    console.log('[getProjectNoRiskStatus] Result for', project.project_id, ':', result);
     return result;
   };
 
