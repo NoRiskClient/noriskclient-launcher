@@ -68,6 +68,30 @@ async fn fetch_updates() -> Result<Vec<LegalDocumentUpdate>> {
     Ok(LegalApi::get_updates(is_experimental).await?)
 }
 
+static REQUESTED_AT_STARTUP: std::sync::Mutex<
+    Option<tokio::task::JoinHandle<Result<Vec<LegalDocumentUpdate>>>>,
+> = std::sync::Mutex::new(None);
+
+/// The frontend renders nothing before `get_legal_status` has answered, and that answer waits
+/// for this request. Sending it while the launcher is still starting means it is usually back
+/// by the time the frontend asks.
+pub fn request_updates_at_startup() {
+    *REQUESTED_AT_STARTUP.lock().unwrap_or_else(|e| e.into_inner()) =
+        Some(tokio::spawn(fetch_updates()));
+}
+
+/// The answer to the startup request the first time, a fresh request after that.
+async fn updates() -> Result<Vec<LegalDocumentUpdate>> {
+    let requested = REQUESTED_AT_STARTUP.lock().unwrap_or_else(|e| e.into_inner()).take();
+    match requested {
+        Some(request) => match request.await {
+            Ok(updates) => updates,
+            Err(_) => fetch_updates().await,
+        },
+        None => fetch_updates().await,
+    }
+}
+
 fn accepted_version(doc: &LegalDocumentUpdate) -> u32 {
     doc.version.max(doc.acknowledgement_version.unwrap_or(0))
 }
@@ -170,7 +194,7 @@ fn pending_document(
 
 #[command]
 pub async fn get_legal_status(locale: String, accepted_legacy_terms: bool) -> Result<LegalStatus> {
-    let updates = match fetch_updates().await {
+    let updates = match updates().await {
         Ok(updates) => updates,
         Err(e) => {
             warn!("Skipping the legal check, updates could not be fetched: {:?}", e);

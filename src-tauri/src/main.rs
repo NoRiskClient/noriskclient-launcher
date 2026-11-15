@@ -281,6 +281,8 @@ async fn main() {
                 }
                 info!("State initialization finished successfully.");
 
+                commands::legal_commands::request_updates_at_startup();
+
                 // Sweep last session's throwaway temp profiles into the trash
                 // (non-blocking, best-effort). The trash's purge_expired retention
                 // then deletes them for good. See utils::trash_utils.
