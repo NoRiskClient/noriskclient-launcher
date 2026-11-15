@@ -11,7 +11,6 @@ import type {
 import type { AccentColor } from '../../../store/useThemeStore';
 import { useThemeStore } from '../../../store/useThemeStore';
 import { Icon } from '@iconify/react';
-import { SearchWithFilters } from '../../ui/SearchWithFilters';
 import { CheckboxV2 } from '../../ui/CheckboxV2';
 import { gsap } from "gsap";
 

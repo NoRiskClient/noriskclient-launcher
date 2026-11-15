@@ -7,9 +7,6 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { gsap } from "gsap";
 import { ThemedSurface } from "./ThemedSurface";
 import { 
-  getSizeClasses,
-  getBorderRadiusClass,
-  getAccessibilityProps,
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
@@ -55,14 +52,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
     const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
-    const sizeClasses = getSizeClasses(size, "input");
-    const radiusClass = getBorderRadiusClass();
-    const accessibilityProps = getAccessibilityProps({
-      label,
-      description,
-      error,
-      disabled
-    });    const mergedRef = (node: HTMLInputElement) => {
+    const mergedRef = (node: HTMLInputElement) => {
       if (ref) {
         if (typeof ref === "function") {
           ref(node);

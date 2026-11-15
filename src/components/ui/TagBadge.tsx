@@ -2,13 +2,9 @@ import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { ThemedSurface } from "./ThemedSurface";
 import { 
   getVariantColors, 
-  getSizeClasses,
-  getBorderRadiusClass,
   getAccessibilityProps,
-  getTextSizeClass,
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";

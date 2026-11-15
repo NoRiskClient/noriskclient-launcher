@@ -379,13 +379,6 @@
   dependencies:
     "@iconify/types" "*"
 
-"@iconify-json/noto@^1.2.7":
-  version "1.2.7"
-  resolved "https://registry.yarnpkg.com/@iconify-json/noto/-/noto-1.2.7.tgz#207d98e37eae8bfd2af422eaf561f018e1d0fda8"
-  integrity sha512-2pNHliXnMLpnepNTZwR9hPBSl6GmhIfXPnudFCHY5v9pJhmA7LoVb/pFY0qLDY/k+3ikET8RXRf7XFxc/pHObA==
-  dependencies:
-    "@iconify/types" "*"
-
 "@iconify-json/ph@^1.2.2":
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/@iconify-json/ph/-/ph-1.2.2.tgz#eac734e80f4639df6ade990690a825540b4259c4"

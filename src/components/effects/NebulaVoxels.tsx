@@ -71,9 +71,6 @@ export function NebulaVoxels({
       qualityLevel === "low" ? 0.3 : qualityLevel === "high" ? 0.8 : 0.5;
     const adjustedCubeCount = Math.floor(cubeCount * qualityMultiplier);
     const adjustedSpeed = speed * qualityMultiplier;
-    const targetFps =
-      qualityLevel === "low" ? 15 : qualityLevel === "high" ? 30 : 24;
-    const frameInterval = 1000 / targetFps;
 
     const hexToRgb = (hex: string) => {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

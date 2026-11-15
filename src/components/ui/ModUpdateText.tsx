@@ -1,4 +1,3 @@
-import React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { UnifiedVersion } from "../../types/unified";

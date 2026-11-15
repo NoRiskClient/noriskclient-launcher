@@ -10,7 +10,6 @@ import type { ContentInstallStatus } from "../../../types/profile";
 import { Icon } from "@iconify/react";
 import { ActionButton } from "../../ui/ActionButton";
 import { TagBadge } from "../../ui/TagBadge";
-import { gsap } from "gsap";
 import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
 import { Tooltip } from "../../ui/Tooltip";
 

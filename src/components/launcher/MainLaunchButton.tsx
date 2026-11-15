@@ -9,7 +9,6 @@ import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { RolloutIndicator } from "./RolloutIndicator";
 
-import { useThemeStore } from "../../store/useThemeStore";
 import { useVersionSelectionStore } from "../../store/version-selection-store";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 
@@ -109,26 +108,12 @@ export function MainLaunchButton({
     await hookHandleLaunch();
   };
 
-  const handleVersionChange = (version: string) => {
-    if (isButtonLaunching) return;
-    if (onVersionChange) {
-      onVersionChange(version);
-    }
-  };
-
   const handleOpenModal = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isButtonLaunching) return;
 
     // Navigate to profiles tab instead of opening modal
     navigate("/profiles");
-  };
-
-  const getMainButtonIcon = () => {
-    if (isButtonLaunching) {
-      return <Icon icon="solar:stop-bold" width="24" height="24" />;
-    }
-    return <Icon icon="solar:play-bold" width="24" height="24" />;
   };
 
   const renderLaunchButtonContent = () => {

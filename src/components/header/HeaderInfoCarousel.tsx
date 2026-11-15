@@ -5,7 +5,6 @@ import {
   getUniquePlayers24h,
   type UniquePlayersResponse,
 } from "../../services/nrc-service";
-import { parseErrorMessage } from "../../utils/error-utils";
 
 interface HeaderInfoCarouselProps {
   version: string | null;

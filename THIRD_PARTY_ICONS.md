@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 320 icons from the sets below. The artwork is redistributed
+The launcher bundles 319 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -59,12 +59,6 @@ GENERATED — run `yarn icons` to refresh.
 - 4 icons used of 46
 - Author: [Utkarsh Verma](https://github.com/n3r4zzurr0/svg-spinners)
 - Licence: [MIT](https://github.com/n3r4zzurr0/svg-spinners/blob/main/LICENSE) (`MIT`)
-
-## Noto Emoji (`noto`)
-
-- 1 icon used of 3710
-- Author: [Google Inc](https://github.com/googlefonts/noto-emoji)
-- Licence: [Apache 2.0](https://github.com/googlefonts/noto-emoji/blob/main/svg/LICENSE) (`Apache-2.0`)
 
 ## Lucide (`lucide`)
 

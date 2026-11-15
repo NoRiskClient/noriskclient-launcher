@@ -17,7 +17,6 @@ import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
 import { useTranslation } from "react-i18next";
-import { ThemedSurface } from "../../ui/ThemedSurface";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
 

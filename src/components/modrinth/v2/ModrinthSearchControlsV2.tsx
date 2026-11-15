@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ModrinthProjectType,
@@ -7,11 +7,8 @@ import { UnifiedSortType, ModPlatform } from "../../../types/unified";
 // Profile type will be defined locally
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import { GroupTabs, type GroupTab } from "../../ui/GroupTabs";
-import { IconButton } from "../../ui/buttons/IconButton";
 import { TagBadge } from "../../ui/TagBadge";
 import { Icon } from "@iconify/react";
-import { useDisplayContextStore } from "../../../store/useDisplayContextStore";
-import { useThemeStore } from "../../../store/useThemeStore";
 import { cn } from "../../../lib/utils";
 
 // Define Profile type locally, similar to ModrinthSearchV2.tsx
@@ -86,20 +83,6 @@ export const ModrinthSearchControlsV2: React.FC<
   onModSourceChange,
 }) => {
   const { t } = useTranslation();
-  const globalDisplayContext = useDisplayContextStore((state) => state.context);
-  const effectiveDisplayContext =
-    overrideDisplayContext || globalDisplayContext;
-  const accentColor = useThemeStore((state) => state.accentColor);
-  const filtersContainerRef = useRef<HTMLDivElement>(null);
-
-  const isDetailView = effectiveDisplayContext === "detail";
-  const buttonSize = isDetailView
-    ? isSidebarVisible
-      ? "xs"
-      : "sm"
-    : !isSidebarVisible
-      ? "lg"
-      : "sm";
 
   // Calculate total number of active filters
   const totalFilters =

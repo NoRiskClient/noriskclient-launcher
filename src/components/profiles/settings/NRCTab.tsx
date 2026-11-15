@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types/profile";
-import { invoke } from "@tauri-apps/api/core";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { Button } from "../../ui/buttons/Button";
@@ -9,7 +8,6 @@ import { gsap } from "gsap";
 import { toast } from "react-hot-toast";
 import * as ProfileService from "../../../services/profile-service";
 import { parseErrorMessage } from "../../../utils/error-utils";
-import type { NoriskModpacksConfig, NoriskPackDefinition } from "../../../types/noriskPacks";
 import { PackPicker } from "../PackPicker";
 import { loadPacks, usePacks } from "../../../hooks/usePacks";
 
@@ -32,7 +30,6 @@ export function NRCTab({
   const [showYellowWarning, setShowYellowWarning] = useState(false);
   const [checkingCompatibility, setCheckingCompatibility] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
@@ -49,7 +46,6 @@ export function NRCTab({
   }, [isBackgroundAnimationEnabled]);
 
 
-  const selectedPackId = editedProfile.selected_norisk_pack_id || "";
 
   // Check pack compatibility when selection changes
   useEffect(() => {

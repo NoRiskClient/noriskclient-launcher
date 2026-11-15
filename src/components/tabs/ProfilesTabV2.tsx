@@ -17,7 +17,6 @@ import * as ProfileService from "../../services/profile-service";
 import { useDeleteProfile } from "../../hooks/useDeleteProfile";
 import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";

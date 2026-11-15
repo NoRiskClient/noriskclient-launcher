@@ -1,13 +1,11 @@
 import type React from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
 import { StatusMessage } from "../ui/StatusMessage";
 import { SignedOutState } from "../account/SignedOutState";
@@ -317,7 +315,6 @@ export function SkinsTab() {
     activeAccount,
     isLoading: accountLoading,
     error: accountError,
-    initializeAccounts,
   } = useMinecraftAuthStore();
   const { showModal, hideModal } = useGlobalModal();
   const { t } = useTranslation();
@@ -335,7 +332,6 @@ export function SkinsTab() {
   const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const filteredSkins = useMemo(() => {
     if (!debouncedSearch.trim()) return localSkins;

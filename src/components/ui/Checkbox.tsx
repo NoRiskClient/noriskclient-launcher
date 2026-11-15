@@ -4,7 +4,6 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { 
-  getSizeClasses,
   getBorderRadiusClass,
   createRadiusStyle,
   getVariantColors,
@@ -57,7 +56,6 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
       const accentColor = useThemeStore((state) => state.accentColor);
-    const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const borderRadius = useThemeStore((state) => state.borderRadius);    const handleClick = () => {
       if (!disabled) {
         const event = {

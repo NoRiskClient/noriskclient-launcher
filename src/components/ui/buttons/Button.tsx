@@ -5,7 +5,6 @@ import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { 
   getVariantColors,
-  getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
   createRadiusStyle,

@@ -12,7 +12,6 @@ import { Label } from "../ui/./Label";
 import { Dropdown } from "../ui/./dropdown/Dropdown";
 import { DropdownHeader } from "../ui/./dropdown/DropdownHeader";
 import { DropdownFooter } from "../ui/./dropdown/DropdownFooter";
-import { useThemeStore } from "../../store/useThemeStore";
 import { invoke } from "@tauri-apps/api/core";
 
 interface RunningInstancesIndicatorProps {
@@ -33,7 +32,6 @@ export function RunningInstancesIndicator({
     new Set(),
   );
   const buttonRef = useRef<HTMLDivElement>(null);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const fetchProcesses = useCallback(async () => {
     setError(null);
@@ -58,10 +56,6 @@ export function RunningInstancesIndicator({
       clearInterval(intervalId);
     };
   }, [fetchProcesses]);
-
-  const handleToggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
 
   const handleCloseDropdown = () => {
     setIsDropdownOpen(false);

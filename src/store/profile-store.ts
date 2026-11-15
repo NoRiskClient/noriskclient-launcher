@@ -3,7 +3,6 @@ import type {
   CreateProfileParams,
   Profile,
   UpdateProfileParams,
-  AllProfilesAndLastPlayed,
 } from "../types/profile";
 import * as ProfileService from "../services/profile-service";
 import type { FileNode } from "../types/fileSystem";

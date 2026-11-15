@@ -25,19 +25,6 @@ interface ModpackVersionsModalProps {
   isSwitching?: boolean;
 }
 
-function getVersionTypeColor(type: UnifiedVersionType): string {
-  switch (type) {
-    case UnifiedVersionType.Release:
-      return "text-green-400";
-    case UnifiedVersionType.Beta:
-      return "text-yellow-400";
-    case UnifiedVersionType.Alpha:
-      return "text-red-400";
-    default:
-      return "text-gray-400";
-  }
-}
-
 function getVersionTypeIcon(type: UnifiedVersionType): string {
   switch (type) {
     case UnifiedVersionType.Release:

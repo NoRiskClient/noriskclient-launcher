@@ -5,7 +5,7 @@ import { useGLTF, OrbitControls, Center, Resize, Html, ContactShadows } from "@r
 import * as THREE from "three";
 import { extendGLTFLoaderForTauri } from "../../utils/tauri-gltf-loader";
 import { WebGLBoundary } from "../WebGLBoundary";
-import { logInfo, logError } from "../../utils/logging-utils";
+import { logInfo } from "../../utils/logging-utils";
 
 interface CosmeticPreviewProps {
   modelPath: string;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
@@ -7,7 +7,7 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { CurseForgeService } from "../../services/curseforge-service";
 import type { ModrinthProject } from "../../types/modrinth";
 import type { CurseForgeMod } from "../../types/curseforge";
-import type { UnifiedProjectDetails, UnifiedGalleryImage, UnifiedProjectLinks, UnifiedTeamMember, UnifiedProjectDependency } from "../../types/unified";
+import type { UnifiedProjectDetails, UnifiedTeamMember, UnifiedProjectDependency } from "../../types/unified";
 import { UnifiedDependencyType } from "../../types/unified";
 import { ModPlatform } from "../../types/unified";
 import { ModDetailHeader } from "./ModDetailHeader";

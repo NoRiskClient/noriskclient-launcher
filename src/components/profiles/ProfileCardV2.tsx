@@ -1,4 +1,3 @@
-import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -394,7 +393,6 @@ export function ProfileCardV2({
     // Grid layout (more compact, similar to ProfileCard.tsx)
   if (layoutMode === "grid" || layoutMode === "compact") {
     const isCompact = layoutMode === "compact";
-    const iconSize = isCompact ? 16 : 20; // Smaller icons for compact mode
     const padding = isCompact ? "p-3" : "p-4"; // Less padding for compact mode
     const gap = isCompact ? "gap-2" : "gap-3"; // Smaller gaps for compact mode
     

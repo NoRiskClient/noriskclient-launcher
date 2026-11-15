@@ -7,7 +7,6 @@ import type { LocalContentItem } from "../../../../../hooks/useLocalContentManag
 import type { UnifiedVersion } from "../../../../../types/unified";
 import { formatFileSize } from "../../../../../utils/format-file-size";
 import { Tooltip } from "../../../../ui/Tooltip";
-import { ModUpdateText } from "../../../../ui/ModUpdateText";
 import { ToggleSwitch } from "../../../../ui/ToggleSwitch";
 import { CheckboxV2 } from "../../../../ui/CheckboxV2";
 import { ThemedDropdown, ThemedDropdownItem, ThemedDropdownDivider } from "../../shared/ThemedDropdown";

@@ -37,9 +37,6 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   const cardRef = useRef<HTMLDivElement>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
   const [isHovered, setIsHovered] = useState(false);
 
   const mergedRef = (node: HTMLDivElement) => {

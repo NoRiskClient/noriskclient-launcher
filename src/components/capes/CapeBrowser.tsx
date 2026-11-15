@@ -21,9 +21,6 @@ import type { CapeFiltersData } from "./CapeFilters";
 import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Modal } from "../ui/Modal";
-import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -94,7 +91,7 @@ export function CapeBrowser(): JSX.Element {
     showOwnedOnly ? setMyPagination : setAllPagination;
 
   const accentColor = useThemeStore((state) => state.accentColor);
-  const { favoriteCapeIds, isFavorite } = useCapeFavoritesStore();
+  const { favoriteCapeIds } = useCapeFavoritesStore();
   const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape } = useVanillaCapeStore();
 
   // Computed loading states based on current filter or search
