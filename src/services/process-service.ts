@@ -37,23 +37,6 @@ async function assertExperimentalLaunchAllowed(): Promise<boolean> {
   return true;
 }
 
-export async function isMinecraftRunning(profileId: string): Promise<boolean> {
-  try {
-    const runningProcesses = await getRunningProcesses();
-    // Assuming ProcessMetadata has a field like 'profile_id' or 'profileId'
-    // Adjust 'proc.profile_id' if the actual field name is different
-    const processesForProfile = runningProcesses.filter(proc => proc.profile_id === profileId);
-    return processesForProfile.length > 0;
-  } catch (error) {
-    console.error(`[ProcessService] Error in isMinecraftRunning for profile ${profileId}:`, error);
-    return false; // Assume not running on error
-  }
-}
-
-export async function killMinecraft(profileId: string): Promise<void> {
-  return invoke<void>("kill_minecraft", { profileId });
-}
-
 export async function launch(
   id: string,
   quickPlaySingleplayer?: string,
@@ -115,21 +98,6 @@ export async function stopProcess(processId: string): Promise<void> {
   } catch (error) {
     console.error(`[ProcessService] Failed to stop process ${processId}:`, error);
     // Re-throw or handle as needed
-    throw error; 
-  }
-}
-
-/**
- * Opens a dedicated log viewer window for the specified process ID.
- */
-export async function openLogWindow(processId: string): Promise<void> {
-  console.debug(`[ProcessService] Requesting log window for process ID: ${processId}`);
-  try {
-    // Pass processId (Uuid as string) to the Rust command
-    await invoke<void>("open_log_window", { processId });
-  } catch (error) {
-    console.error(`[ProcessService] Failed to open log window for process ID ${processId}:`, error);
-    // Handle or re-throw as appropriate
     throw error; 
   }
 }

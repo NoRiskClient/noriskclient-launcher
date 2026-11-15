@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Outlet,
   useLocation,
   useNavigate,
-  useOutletContext,
 } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ThemeInitializer } from "./components/ThemeInitializer";
@@ -33,10 +32,6 @@ import { useLaunchStateStore } from "./store/launch-state-store";
 import { useGlobalModal } from "./hooks/useGlobalModal";
 import { Modal } from "./components/ui/Modal";
 import { refreshNrcDataOnMount } from "./services/nrc-service";
-import {
-  getLauncherConfig,
-  setProfileGroupingPreference,
-} from "./services/launcher-config-service";
 import * as ConfigService from "./services/launcher-config-service";
 import { useGlobalDragAndDrop } from './hooks/useGlobalDragAndDrop';
 import { loadIcons } from '@iconify/react';
@@ -64,11 +59,6 @@ import { useSettingsModalStore } from "./store/settings-modal-store";
 import { useSkinStore } from "./store/useSkinStore";
 import { invalidatePlayerAppearance } from "./services/cosmetic-cache";
 import { useTranslation } from "react-i18next";
-
-export type ProfilesTabContext = {
-  currentGroupingCriterion: string;
-  onGroupingChange: (newCriterion: string) => void;
-};
 
 export function App() {
   const { t } = useTranslation();
@@ -111,9 +101,6 @@ export function App() {
   useEffect(() => {
     setScreenTimeTab(screenTimeTab);
   }, [screenTimeTab]);
-
-  const [currentGroupingCriterion, setCurrentGroupingCriterion] =
-      useState<string>("none");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -411,35 +398,6 @@ export function App() {
     preloadIcons().catch(console.error);
   }, []);
 
-  useEffect(() => {
-    getLauncherConfig()
-        .then((config) => {
-          if (config && config.profile_grouping_criterion) {
-            setCurrentGroupingCriterion(config.profile_grouping_criterion);
-          } else {
-            setCurrentGroupingCriterion("none");
-          }
-        })
-        .catch((err) => {
-          console.error(
-              "Failed to get initial profile grouping from config:",
-              err,
-          );
-          setCurrentGroupingCriterion("none");
-        });
-  }, []);
-
-  const handleProfileGroupingChange = async (newCriterion: string) => {
-    setCurrentGroupingCriterion(newCriterion);
-    try {
-      await setProfileGroupingPreference(newCriterion);
-      console.log("[App.tsx] Grouping preference saved successfully.");
-    } catch (error) {
-      console.error("[App.tsx] Failed to save grouping preference:", error);
-      toast.error(t('app.errors.save_grouping'));
-    }
-  };
-
   // Analytics consent banner handlers
   const handleAnalyticsAccept = async () => {
     try {
@@ -554,11 +512,6 @@ export function App() {
     }
   };
 
-  const profilesTabContext: ProfilesTabContext = {
-    currentGroupingCriterion,
-    onGroupingChange: handleProfileGroupingChange,
-  };
-
   useGlobalDragAndDrop();
 
   return (
@@ -579,7 +532,7 @@ export function App() {
         <NotificationModal />
         {ready && (
           <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
-            <Outlet context={profilesTabContext} />
+            <Outlet />
           </AppLayout>
         )}
         <LegalUpdateBanner />
@@ -593,8 +546,4 @@ export function App() {
       </div>
     </FlagsmithProvider>
   );
-}
-
-export function useProfilesTabContext() {
-  return useOutletContext<ProfilesTabContext>();
 }
