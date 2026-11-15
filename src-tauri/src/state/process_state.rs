@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::Arc;
-use sysinfo::{Pid, ProcessesToUpdate, System};
+use sysinfo::{CpuRefreshKind, Pid, ProcessesToUpdate, System};
 use tauri::Manager;
 use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
@@ -1483,7 +1483,11 @@ impl ProcessManager {
         let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
         log::trace!("Starting periodic metrics collector task.");
 
-        let mut sys = System::new_all();
+        // Only the CPU count is needed up front; the loop refreshes the processes it reports
+        // on. System::new_all() also listed every process on the machine, which kept a worker
+        // thread busy for 0.5 to 1.1 s right while the launcher was starting.
+        let mut sys = System::new();
+        sys.refresh_cpu_list(CpuRefreshKind::nothing());
 
         // Get number of CPU cores for normalizing CPU usage (sysinfo reports per-core %)
         let num_cpus = sys.cpus().len().max(1) as f32;
