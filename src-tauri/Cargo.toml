@@ -98,7 +98,6 @@ url = "2.5.4"
 tauri-plugin-fs = "2.4.5"
 fast_image_resize = { version = "5.1.4", features = ["image"] }
 image = "0.25.1"
-notify = "8.0.0"
 futures-lite = "2.6.0"
 tauri-plugin-process = "2.3.1"
 urlencoding = "2.1.3"
