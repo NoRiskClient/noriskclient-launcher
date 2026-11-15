@@ -222,34 +222,6 @@ pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<
     Err(AppError::PngNotFoundInArchive(archive_path.to_path_buf()))
 }
 
-pub async fn get_jar_icon_test() {
-    // Verwende einen Raw-String für den Windows-Pfad
-    let path_str = r"C:\Users\sheesh\AppData\Roaming\norisk\NoRiskClientV3\meta\mod_cache\§fAbsolute §7[§f16x§7]§8.zip";
-    let archive_path = Path::new(path_str);
-
-    match find_first_png_in_archive_as_base64(archive_path).await {
-        Ok(base64_icon) => {
-            log::debug!(
-                "Erstes PNG als Base64 gefunden (erste 50 Zeichen): {}...",
-                &base64_icon[..50.min(base64_icon.len())]
-            );
-            // Hier kannst du den base64_icon String verwenden
-        }
-        Err(AppError::PngNotFoundInArchive(path)) => {
-            log::debug!("Fehler: Kein PNG im Archiv gefunden: {:?}", path);
-        }
-        Err(AppError::FileNotFound(path)) => {
-            log::debug!("Fehler: Archivdatei nicht gefunden: {:?}", path);
-        }
-        Err(AppError::ArchiveReadError(msg)) => {
-            log::debug!("Fehler beim Lesen des Archivs: {}", msg);
-        }
-        Err(e) => {
-            log::debug!("Ein unerwarteter Fehler ist aufgetreten: {}", e);
-        }
-    }
-}
-
 
 /// Reads the content of a file into a string, replacing invalid UTF-8 sequences.
 ///

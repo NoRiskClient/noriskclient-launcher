@@ -384,12 +384,6 @@ async fn main() {
 
                     std::process::exit(1);
                 }
-
-                // --- Test Unified Mod Search ---
-                //debug_utils::debug_unified_mod_search().await;
-
-                // --- Test Unified Mod Versions ---
-                //debug_utils::debug_unified_mod_versions().await;
             });
 
             tauri::WebviewWindowBuilder::from_config(&app_handle, &app.config().app.windows[0])?

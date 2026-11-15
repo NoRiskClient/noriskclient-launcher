@@ -29,13 +29,6 @@ pub enum Architecture {
 }
 
 impl OperatingSystem {
-    pub fn get_path_separator(&self) -> Result<&'static str> {
-        Ok(match self {
-            OperatingSystem::WINDOWS => ";",
-            OperatingSystem::LINUX | OperatingSystem::OSX => ":",
-            _ => return Err(AppError::JavaDownload("Invalid OS".to_string())),
-        })
-    }
 
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {

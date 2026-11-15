@@ -96,23 +96,4 @@ impl WordPressApi {
         Self::get_blog_posts(Some("21,2"), Some(10), Some(1)).await
     }
 
-    /// Fetches only news posts (category 21)
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
-    pub async fn get_news() -> Result<Vec<BlogPost>> {
-        trace!("[WordPress API] Fetching news posts");
-        Self::get_blog_posts(Some("21"), Some(10), Some(1)).await
-    }
-
-    /// Fetches only changelog posts (category 2)
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Vec<BlogPost>>` - A vector of blog posts or an error
-    pub async fn get_changelogs() -> Result<Vec<BlogPost>> {
-        trace!("[WordPress API] Fetching changelog posts");
-        Self::get_blog_posts(Some("2"), Some(10), Some(1)).await
-    }
 }

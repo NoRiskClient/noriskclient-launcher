@@ -547,13 +547,6 @@ impl CurseForgeFileRelationType {
         }
     }
 
-    pub fn is_required(&self) -> bool {
-        matches!(self, CurseForgeFileRelationType::RequiredDependency)
-    }
-
-    pub fn should_install(&self) -> bool {
-        matches!(self, CurseForgeFileRelationType::RequiredDependency | CurseForgeFileRelationType::Include)
-    }
 }
 
 // Enum for hash algorithms used in CurseForge file hashes
@@ -779,37 +772,6 @@ pub async fn get_file_details(mod_id: u32, file_id: u32) -> Result<CurseForgeFil
     log::debug!("Successfully retrieved file details for file ID {}", file_id);
 
     Ok(file_response.data)
-}
-
-/// Get basic information about a mod
-pub async fn get_mod_info(mod_id: u32) -> Result<CurseForgeMod> {
-    let url = format!("{}/mods/{}", CURSEFORGE_API_BASE_URL, mod_id);
-
-    log::info!("Getting CurseForge mod info: mod_id={}", mod_id);
-
-    let response = HTTP_CLIENT
-        .get(&url)
-        .header("x-api-key", CURSEFORGE_API_KEY)
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to get CurseForge mod info: {}", e)))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        log::error!("CurseForge mod info API error ({}): {}", status, error_text);
-        return Err(AppError::Other(format!("CurseForge API error {}: {}", status, error_text)));
-    }
-
-    let mod_response: CurseForgeModResponse = response
-        .json()
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to parse CurseForge mod info: {}", e)))?;
-
-    log::debug!("Successfully retrieved mod info for mod ID {}", mod_id);
-
-    Ok(mod_response.data)
 }
 
 /// Response structure for CurseForge changelog API

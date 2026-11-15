@@ -913,11 +913,3 @@ pub async fn invalidate_java_cache() {
     let mut cache = JAVA_INSTALLATIONS.write().await;
     *cache = None;
 }
-
-/// Returns the executable name for Java based on the current OS
-pub fn get_java_executable_name() -> &'static str {
-    match OS {
-        OperatingSystem::WINDOWS => "java.exe",
-        _ => "java",
-    }
-}

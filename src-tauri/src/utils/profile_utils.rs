@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use crate::integrations::modrinth::{ModrinthProjectType, ModrinthVersion};
+use crate::integrations::modrinth::ModrinthProjectType;
 use crate::integrations::norisk_packs;
 use crate::integrations::unified_mod::ModPlatform;
 use crate::state::content_cache_state::{CacheBehaviour, FileHashEntry};
@@ -199,39 +199,6 @@ fn supports_target_loader(installed_mod: &crate::state::profile_state::Mod, targ
         .ok()
         .and_then(|loader| installed_mod.supports_loader(loader))
         .unwrap_or(true)
-}
-
-/// Helper function to install a Modrinth content pack from a ModrinthVersion
-pub async fn install_modrinth_content(
-    profile_id: Uuid,
-    version: &ModrinthVersion,
-    content_type: ContentType,
-) -> Result<()> {
-    // Find the primary file
-    let primary_file = version.files.iter().find(|f| f.primary).ok_or_else(|| {
-        AppError::ModrinthPrimaryFileNotFound {
-            version_id: version.id.clone(),
-        }
-    })?;
-
-    // Get SHA1 hash if available
-    let sha1_hash = primary_file.hashes.sha1.clone();
-
-    // Add the content to the profile
-    add_modrinth_content_to_profile(
-        profile_id,
-        version.project_id.clone(),
-        version.id.clone(),
-        primary_file.filename.clone(),
-        primary_file.url.clone(),
-        sha1_hash,
-        Some(version.name.clone()),
-        Some(version.version_number.clone()),
-        content_type,
-    )
-    .await?;
-
-    Ok(())
 }
 
 // --- Struct for command parameters ---

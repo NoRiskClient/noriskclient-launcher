@@ -2470,12 +2470,6 @@ pub async fn check_for_group_migration_command(profile_id: Uuid) -> Result<Migra
 }
 
 
-#[tauri::command]
-pub async fn purge_trash(max_age_seconds: Option<u64>) -> Result<u64, CommandError> {
-    let secs = max_age_seconds.unwrap_or(120);
-    let removed = crate::utils::trash_utils::purge_expired(secs).await?;
-    Ok(removed)
-}
 // === Symlink Commands ===
 
 #[derive(Debug, Deserialize)]
@@ -2634,38 +2628,6 @@ pub async fn get_profile_disk_size(profile_id: Uuid) -> Result<u64, CommandError
     }
     let size = path_utils::calculate_dir_size_recursively(&path).await?;
     Ok(size)
-}
-
-#[tauri::command]
-pub async fn get_profile_folders(profile_id: Uuid) -> Result<Vec<String>, CommandError> {
-    let state = State::get().await?;
-
-    let profile = state
-        .profile_manager
-        .get_profile(profile_id)
-        .await?;
-
-    let instance_path = state
-        .profile_manager
-        .calculate_instance_path_for_profile(&profile)?;
-
-    let mut folders = Vec::new();
-    if let Ok(mut entries) = tokio::fs::read_dir(&instance_path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry
-                .file_type()
-                .await
-                .map(|ft| ft.is_dir())
-                .unwrap_or(false)
-            {
-                if let Some(name) = entry.file_name().to_str() {
-                    folders.push(name.to_string());
-                }
-            }
-        }
-    }
-
-    Ok(folders)
 }
 
 // ---------------------------------------------------------------------------
