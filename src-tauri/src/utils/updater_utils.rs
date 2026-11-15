@@ -265,7 +265,7 @@ pub fn emit_status(
 /// # Returns
 ///
 /// * `Result<WebviewWindow>` - The created Tauri webview window instance or an error.
-pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
+pub fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
     trace!("Creating updater window...");
     let window = WebviewWindowBuilder::new(
         app_handle,
@@ -460,11 +460,12 @@ async fn handle_update(
 ///
 /// * `app_handle` - The Tauri AppHandle.
 /// * `is_beta_channel` - `true` to check the beta channel, `false` for stable.
-/// * `updater_window` - An optional WebviewWindow handle to show the updater window.
+/// * `updater_window` - Resolves to the updater window, if there is one. Only awaited when an
+///   update is found, so the check does not have to wait for the window to exist.
 pub async fn check_for_updates(
     app_handle: AppHandle,
     is_beta_channel: bool,
-    updater_window: Option<WebviewWindow>,
+    updater_window: impl std::future::Future<Output = Option<WebviewWindow>>,
 ) {
     let current_version = app_handle.package_info().version.to_string();
     let channel = if is_beta_channel { "Beta" } else { "Stable" };
@@ -588,7 +589,7 @@ pub async fn check_for_updates(
                 update.body.as_deref().unwrap_or_default()
             );
 
-            if let Some(win) = &updater_window {
+            if let Some(win) = &updater_window.await {
                 info!("Update found. Showing updater window...");
                 if let Err(e) = win.show() {
                     error!("Failed to show updater window: {}", e);
