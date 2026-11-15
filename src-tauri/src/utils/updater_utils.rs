@@ -9,6 +9,10 @@ use tauri_plugin_updater::UpdaterExt;
 use tokio::time::{sleep, Duration};
 
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+/// The check at startup holds back the main window, and nothing is on screen while it runs.
+/// Past this it gives way: the launcher opens, and the check the frontend makes on its own
+/// offers the update from inside the app.
+const STARTUP_UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
 const UPDATE_CHECK_CACHE_TTL: Duration = Duration::from_secs(60);
 
 struct CachedUpdateCheck {
@@ -557,12 +561,12 @@ pub async fn check_for_updates(
 
     info!("Updater built successfully. Checking for updates...");
 
-    let check_result = match tokio::time::timeout(UPDATE_CHECK_TIMEOUT, updater.check()).await {
+    let check_result = match tokio::time::timeout(STARTUP_UPDATE_CHECK_TIMEOUT, updater.check()).await {
         Ok(result) => result,
         Err(_) => {
             warn!(
                 "Update check for {} channel timed out after {:?}. Continuing without updating.",
-                channel, UPDATE_CHECK_TIMEOUT
+                channel, STARTUP_UPDATE_CHECK_TIMEOUT
             );
             emit_status(
                 &app_handle,
