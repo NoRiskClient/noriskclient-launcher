@@ -3,8 +3,9 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
 use log::debug;
+use std::collections::HashMap;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs::File;
 
 /// Writes `contents` to `path` atomically: readers see either the previous file or the
@@ -41,6 +42,57 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     tmp.as_file().sync_all().map_err(AppError::Io)?;
     tmp.persist(path).map_err(|e| AppError::Io(e.error))?;
     Ok(())
+}
+
+pub struct TreeEntry {
+    pub path: PathBuf,
+    /// `None` for a directory.
+    pub size: Option<u64>,
+}
+
+/// Lists everything below `root`, files with their size.
+///
+/// One blocking walk on purpose: tokio's `read_dir` sends every entry and every `metadata`
+/// call to the blocking pool on its own, and across the thousands of files of an asset
+/// tree those round trips cost far more than the disk access they wrap.
+pub async fn scan_tree(root: &Path) -> Vec<TreeEntry> {
+    let root = root.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let mut entries = Vec::new();
+        let mut pending = vec![root];
+        while let Some(dir) = pending.pop() {
+            let Ok(reader) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in reader.flatten() {
+                let Ok(metadata) = entry.metadata() else {
+                    continue;
+                };
+                let path = entry.path();
+                if metadata.is_dir() {
+                    pending.push(path.clone());
+                    entries.push(TreeEntry { path, size: None });
+                } else {
+                    entries.push(TreeEntry { path, size: Some(metadata.len()) });
+                }
+            }
+        }
+        entries
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// Maps every object of a content-addressed store (`<objects>/<xx>/<hash>`) to its size.
+pub async fn scan_object_store(objects_dir: &Path) -> HashMap<String, u64> {
+    scan_tree(objects_dir)
+        .await
+        .into_iter()
+        .filter_map(|entry| {
+            let hash = entry.path.file_name()?.to_string_lossy().into_owned();
+            Some((hash, entry.size?))
+        })
+        .collect()
 }
 
 /// Helper function to read a specific zip entry by index and encode it as Base64
