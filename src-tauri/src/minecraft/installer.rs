@@ -28,6 +28,7 @@ use super::modloader::ModloaderFactory;
 use crate::minecraft::downloads::MinecraftLoggingDownloadService;
 use crate::utils::mc_utils;
 use crate::utils::system_info::Architecture;
+use crate::utils::verified_files;
 use tokio::fs as async_fs;
 
 async fn emit_progress_event(
@@ -756,6 +757,11 @@ pub async fn install_minecraft_version(
             "No Norisk Pack selected for profile '{}', skipping pack download.",
             profile.name
         );
+    }
+
+    // Keep what this launch verified, so the next one does not check it again
+    if let Err(e) = verified_files::save().await {
+        warn!("Could not save the verified files record: {}", e);
     }
 
     // --- Step: Resolve final mod list for syncing ---

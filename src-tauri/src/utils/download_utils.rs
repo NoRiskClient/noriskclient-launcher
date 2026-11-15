@@ -2,6 +2,7 @@ use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::hash_utils;
+use crate::utils::verified_files;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use futures::stream::StreamExt;
 use log::{debug, error, trace, warn};
@@ -528,15 +529,18 @@ impl DownloadUtils {
             }
         }
 
-        // Check SHA1 hash (slower - reads entire file)
+        // Check SHA1 hash (slower - reads entire file), unless this exact file already matched it
         if let Some(expected_sha1) = config.expected_sha1.as_ref().filter(|_| config.hash_existing_files) {
-            let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
-            if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
-                debug!(
-                    "SHA1 mismatch for existing file {:?}: expected {}, got {}",
-                    target_path, expected_sha1, calculated_hash
-                );
-                return Ok(false);
+            if !verified_files::is_verified(target_path, Some(expected_sha1)).await {
+                let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
+                if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
+                    debug!(
+                        "SHA1 mismatch for existing file {:?}: expected {}, got {}",
+                        target_path, expected_sha1, calculated_hash
+                    );
+                    return Ok(false);
+                }
+                verified_files::mark_verified(target_path, Some(expected_sha1)).await;
             }
         }
 
@@ -614,6 +618,10 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
+        }
+
+        if let Some(expected_sha1) = &config.expected_sha1 {
+            verified_files::mark_verified(target_path, Some(expected_sha1)).await;
         }
 
         trace!("Downloaded file passed all verifications: {:?}", target_path);
