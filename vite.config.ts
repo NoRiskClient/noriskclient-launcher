@@ -12,11 +12,17 @@ const skinRendererVersion = pkg.dependencies['@noriskclient/nrc-skin-renderer'];
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [react()],
 
   define: {
     __SKIN_RENDERER_VERSION__: JSON.stringify(skinRendererVersion),
+  },
+
+  esbuild: {
+    // A release build has no dev tools and nothing forwards the console to the log file,
+    // so these calls only cost time there. `yarn dev` keeps them.
+    pure: command === "build" ? ["console.log", "console.debug"] : [],
   },
 
   resolve: {
