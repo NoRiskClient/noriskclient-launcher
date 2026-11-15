@@ -1211,11 +1211,34 @@ impl MinecraftAuthStore {
 
         // Refresh on the Minecraft token's own expiry (12h buffer, Prism-style); None = legacy
         // account → refresh once to populate the field.
-        let mc_stale = match creds.mc_access_token_expires {
+        let is_stale = |creds: &Credentials| match creds.mc_access_token_expires {
             Some(exp) => exp <= Utc::now() + Duration::hours(12),
             None => true,
         };
-        if mc_stale {
+        if is_stale(creds) {
+            // Every command that needs the account asks for this at the same moment when the
+            // launcher starts, and each one used to run the whole refresh chain. Now one does.
+            // The others wait here, then take what it stored...
+            static REFRESHING: Mutex<()> = Mutex::const_new(());
+            let _refreshing = REFRESHING.lock().await;
+            if let Some(stored) = self.get_account_by_id(creds.id).await? {
+                if !is_stale(&stored) {
+                    return Ok(Some(stored));
+                }
+            }
+            // ...or learn that it could not reach the servers a moment ago, and keep the
+            // cached credentials as it did instead of timing out once more each.
+            const RETRY_PAUSE: std::time::Duration = std::time::Duration::from_secs(5);
+            static UNREACHABLE: std::sync::Mutex<Option<(Uuid, std::time::Instant)>> =
+                std::sync::Mutex::new(None);
+            let gave_up_just_now = UNREACHABLE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_some_and(|(id, at)| id == creds.id && at.elapsed() < RETRY_PAUSE);
+            if gave_up_just_now {
+                return Ok(None);
+            }
+
             info!("[Token Check] Minecraft token stale or nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
@@ -1248,6 +1271,8 @@ impl MinecraftAuthStore {
                         if is_offline_error(&err) {
                             emit_offline_mode(&creds.username).await;
                         }
+                        *UNREACHABLE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                            Some((creds.id, std::time::Instant::now()));
                         return Ok(None);
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
