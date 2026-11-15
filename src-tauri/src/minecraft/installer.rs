@@ -20,7 +20,6 @@ use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
 use log::{error, info, trace, warn};
-use rand::Rng;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -183,20 +182,6 @@ pub async fn install_minecraft_version(
         }
         (None, _) => None,
     };
-
-    // <--- HARDCODED TEST ERROR (50% CHANCE) --- >
-    let should_throw_error = {
-        let mut rng = rand::thread_rng(); // Create and use RNG in a tight scope
-        rng.gen_bool(0.5) // 0.5 means 50% probability
-    }; // rng goes out of scope here
-
-    if should_throw_error {
-        info!("[InstallTest] Randomly decided to throw test error.");
-        //return Err(AppError::Unknown("Testfehler (50% Chance) für das Error-Handling!".to_string()));
-    } else {
-        info!("[InstallTest] Randomly decided NOT to throw test error. Proceeding normally.");
-    }
-    // <--- END HARDCODED TEST ERROR --- >
 
     // Execute migration if provided
     if let Some(migration) = &migration_info {
