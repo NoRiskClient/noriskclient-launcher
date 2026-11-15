@@ -1,6 +1,5 @@
 use crate::error::Result;
 use crate::state::process_state::ProcessMetadata;
-use dashmap::DashMap;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -93,42 +92,19 @@ pub struct ProcessMetricsPayload {
 }
 
 #[derive(Clone)]
-pub struct EventInfo {
-    pub event_type: EventType,
-    pub target_id: Option<Uuid>,
-    pub start_time: std::time::SystemTime,
-}
-
-#[derive(Clone)]
 pub struct EventState {
     app: Option<Arc<tauri::AppHandle>>,
-    active_events: DashMap<Uuid, EventInfo>,
 }
 
 impl EventState {
     pub fn new(app: Option<Arc<tauri::AppHandle>>) -> Self {
         info!("Initializing EventState...");
-        let state = Self {
-            app,
-            active_events: DashMap::new(),
-        };
+        let state = Self { app };
         info!("Successfully initialized EventState.");
         state
     }
 
     pub async fn emit(&self, payload: EventPayload) -> Result<()> {
-        // Track the event if it's a new one
-        if !self.active_events.contains_key(&payload.event_id) {
-            self.active_events.insert(
-                payload.event_id,
-                EventInfo {
-                    event_type: payload.event_type.clone(),
-                    target_id: payload.target_id,
-                    start_time: std::time::SystemTime::now(),
-                },
-            );
-        }
-
         // Emit the event to the frontend
         if let Some(app) = &self.app {
             app.emit("state_event", payload)
@@ -161,18 +137,6 @@ impl EventState {
             error: None,
         };
         self.emit(payload).await
-    }
-
-    pub async fn complete_event(&self, event_id: Uuid) -> Result<()> {
-        self.active_events.remove(&event_id);
-        Ok(())
-    }
-
-    pub fn get_active_events(&self) -> Vec<(Uuid, EventInfo)> {
-        self.active_events
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect()
     }
 }
 
