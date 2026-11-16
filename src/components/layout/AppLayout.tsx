@@ -37,8 +37,10 @@ import { useFriendsStore } from "../../store/friends-store";
 import { useClipsStore } from "../../store/clips-store";
 import { closeClipEditorThen } from "../../services/clip-service";
 import { useChatStore } from "../../store/chat-store";
-import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
-import type { UpdateInfo } from "../../types/updater";
+import { checkUpdateAvailable, downloadAndInstallUpdate, getLauncherUpdate } from "../../services/nrc-service";
+import type { LauncherUpdate } from "../../types/updater";
+import { listen } from "@tauri-apps/api/event";
+import { useUpdateReminder } from "../../hooks/use-update-reminder";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { SettingsModal } from "../modals/SettingsModal";
@@ -435,7 +437,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<LauncherUpdate | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdateClick = async () => {
@@ -501,10 +503,14 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
 
   const checkForUpdates = async () => {
     try {
+      const ready = await getLauncherUpdate();
+      if (ready) {
+        setAvailableUpdate(ready);
+        return;
+      }
       const updateInfo = await checkUpdateAvailable();
       if (updateInfo) {
-        console.log("Update available:", updateInfo);
-        setAvailableUpdate(updateInfo);
+        setAvailableUpdate((current) => current ?? { ...updateInfo, ready: false });
       }
     } catch (error) {
       console.error("Failed to check for updates:", error);
@@ -515,16 +521,16 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     fetchVersion();
     checkForUpdates();
 
-    // Check for updates every 4 hours (4 * 60 * 60 * 1000 = 14,400,000 ms)
-    const updateCheckInterval = setInterval(() => {
-      console.log("Performing scheduled update check...");
-      checkForUpdates();
-    }, 4 * 60 * 60 * 1000);
+    const unlisten = listen<LauncherUpdate>("launcher_update", (event) => {
+      setAvailableUpdate(event.payload);
+    });
 
     return () => {
-      clearInterval(updateCheckInterval);
+      unlisten.then((stop) => stop());
     };
   }, []);
+
+  useUpdateReminder(availableUpdate, handleUpdateClick);
 
   return (
     <div
@@ -550,7 +556,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               NoRiskClient
             </h1>
             {availableUpdate && (
-              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
+              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t(availableUpdate.ready ? 'header.update.tooltip_ready' : 'header.update.tooltip_available', { version: availableUpdate.version })}>
                 <div
                   className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                   onClick={handleUpdateClick}

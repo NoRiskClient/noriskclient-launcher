@@ -1,6 +1,6 @@
 [package]
 name = "noriskclient-launcher-v3"
-version = "0.6.31-beta.2"
+version = "0.6.31-beta.3"
 description = "A Tauri App"
 authors = ["NoRiskk"]
 edition = "2021"
@@ -118,7 +118,7 @@ opt-level = "z" # Optimize for size ("s" is another option)
 codegen-units = 1 # Reduce number of codegen units to increase optimizations
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.9.0"
+tauri-plugin-updater = "2.14.1"
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.58"
@@ -128,13 +128,17 @@ features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_System_Threading",
     "Win32_Graphics_Gdi",
+    "Networking_Connectivity",
 ]
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2.3.7", features = ["deep-link"] }
 tauri-plugin-deep-link = "2"
 tauri-plugin-cli = "2"
-tauri = { version = "2.9.5", features = [ "tray-icon" ] }
+tauri = { version = "2.9.5", features = ["macos-private-api", "protocol-asset", "tray-icon" ] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["tokio"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 norisk-capture = { path = "crates/norisk-capture" }

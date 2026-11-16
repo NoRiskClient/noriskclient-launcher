@@ -291,7 +291,7 @@ jobs:
           
           cd - > /dev/null
           
-          yarn tauri signer sign "$BUNDLE_DIR/$APPIMAGE"
+          yarn tauri signer sign --app-version "$(node -p "require('./src-tauri/tauri.conf.json').version")" "$BUNDLE_DIR/$APPIMAGE"
           
           cd "$BUNDLE_DIR"
           rm -rf squashfs-root appimagetool-x86_64.AppImage
@@ -360,7 +360,7 @@ jobs:
           TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: |
           echo "Re-signing EXE for Tauri updater after code signing..."
-          yarn tauri signer sign "${{ steps.find_exe.outputs.EXE_PATH }}"
+          yarn tauri signer sign --app-version "$(node -p "require('./src-tauri/tauri.conf.json').version")" "${{ steps.find_exe.outputs.EXE_PATH }}"
           echo "Re-signing complete."
         shell: bash
 
