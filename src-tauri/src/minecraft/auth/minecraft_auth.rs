@@ -96,14 +96,6 @@ pub struct NoRiskToken {
 }
 
 impl NoRiskCredentials {
-    pub async fn get_token(&self) -> Result<String> {
-        Ok(self
-            .production
-            .as_ref()
-            .ok_or(AppError::NoCredentialsError)?
-            .value
-            .clone())
-    }
 
     /// Gets the appropriate NoRisk token based on the experimental mode setting.
     ///

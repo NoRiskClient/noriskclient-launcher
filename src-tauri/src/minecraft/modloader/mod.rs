@@ -222,19 +222,6 @@ impl ModloaderFactory {
         })
     }
 
-    pub fn create_installer(
-        modloader: &ModLoader,
-        java_path: PathBuf,
-    ) -> Box<dyn ModloaderInstaller> {
-        match modloader {
-            ModLoader::Fabric => Box::new(FabricInstaller::new()),
-            ModLoader::Quilt => Box::new(QuiltInstaller::new()),
-            ModLoader::Forge => Box::new(ForgeInstaller::new(java_path)),
-            ModLoader::NeoForge => Box::new(NeoForgeInstaller::new(java_path)),
-            ModLoader::Vanilla => Box::new(VanillaInstaller),
-        }
-    }
-
     pub fn create_installer_with_config(
         modloader: &ModLoader,
         java_path: PathBuf,

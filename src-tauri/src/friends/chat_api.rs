@@ -119,27 +119,6 @@ impl ChatApi {
             .await
     }
 
-    pub async fn mark_message_received(
-        norisk_token: &str,
-        chat_id: &str,
-        message_id: &str,
-        is_experimental: bool,
-    ) -> Result<()> {
-        let base_url = NoRiskApi::get_api_base(is_experimental);
-        let url = format!("{}/messaging/chat/{}/messages/received", base_url, chat_id);
-
-        debug!("[Chat API] Marking message {} as received", message_id);
-
-        let mut body = std::collections::HashMap::new();
-        body.insert("messageId", message_id);
-
-        nrc_post(&url)
-            .bearer(norisk_token)
-            .json_body(&body)
-            .expect_success("Chat mark received")
-            .await
-    }
-
     pub async fn add_reaction(
         norisk_token: &str,
         message_id: &str,

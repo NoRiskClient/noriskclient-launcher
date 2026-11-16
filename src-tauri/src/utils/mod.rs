@@ -12,7 +12,6 @@ macro_rules! measure_time {
 
 pub mod content_copy;
 pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von DataPacks
-pub mod debug_utils;
 pub mod disk_space_utils; // Disk space utility for checking available space before downloads
 pub mod download_utils; // Central download utility for robust file downloads
 pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan cleanup (trash)

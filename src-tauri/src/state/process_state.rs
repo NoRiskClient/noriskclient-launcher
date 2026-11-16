@@ -13,7 +13,7 @@ use dashmap::DashMap;
 use log;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use sysinfo::{CpuRefreshKind, Pid, ProcessesToUpdate, System};
@@ -25,15 +25,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{interval, Duration};
 use uuid::Uuid;
 
-// NEUE Imports für notify
-use notify::{
-    Config as NotifyConfig, Event as NotifyEvent, EventKind as NotifyEventKind,
-    RecommendedWatcher, RecursiveMode, Watcher,
-};
-use tokio::sync::mpsc; // Für den Channel
-
 const PROCESSES_FILENAME: &str = "processes.json";
-const NOTIFY_EVENT_CHANNEL_BUFFER: usize = 100;
 
 pub struct ProcessManager {
     app_handle: Arc<tauri::AppHandle>,
@@ -42,8 +34,6 @@ pub struct ProcessManager {
     save_lock: Mutex<()>,
     launching_processes: Arc<DashMap<Uuid, JoinHandle<()>>>,
 
-    notify_event_tx: mpsc::Sender<CrashReportNotification>,
-    active_watchers: Arc<RwLock<HashMap<Uuid, RecommendedWatcher>>>,
     crash_report_contents: Arc<DashMap<Uuid, String>>,
 }
 
@@ -282,14 +272,6 @@ struct Process {
     metadata: ProcessMetadata,
 }
 
-// Kapselt die Nachricht, die vom notify event handler zum ProcessManager geschickt wird
-#[derive(Debug)]
-#[allow(dead_code)]
-struct CrashReportNotification {
-    process_id: Uuid,
-    file_path: PathBuf,
-}
-
 impl ProcessManager {
     pub async fn new(
         processes_file_path: PathBuf,
@@ -302,13 +284,7 @@ impl ProcessManager {
         let processes = Arc::new(RwLock::new(HashMap::new()));
         let save_lock = Mutex::new(());
         let launching_processes = Arc::new(DashMap::new());
-        let active_watchers = Arc::new(RwLock::new(HashMap::new()));
         let crash_report_contents = Arc::new(DashMap::new());
-
-        // Create the channel. The receiver part (rx) will be handled/stored or recreated
-        // appropriately when its consuming task is spawned in on_state_ready.
-        let (notify_event_tx, _notify_event_rx_placeholder) =
-            mpsc::channel::<CrashReportNotification>(NOTIFY_EVENT_CHANNEL_BUFFER);
 
         Ok(Self {
             app_handle: Arc::clone(&app_handle),
@@ -316,115 +292,11 @@ impl ProcessManager {
             processes_file_path,
             save_lock,
             launching_processes,
-            notify_event_tx, // Store the sender
-            active_watchers,
             crash_report_contents,
-            // notify_event_rx: Mutex::new(Some(notify_event_rx_placeholder)), // Example of how to store rx
         })
     }
 
-    #[allow(dead_code)]
-    async fn process_crash_report_events(
-        _app_handle: Arc<tauri::AppHandle>,
-        mut receiver: mpsc::Receiver<CrashReportNotification>,
-    ) {
-        log::info!("Starting crash report event processor task.");
-        let global_state_res = State::get().await;
-
-        let event_state_clone = match global_state_res {
-            Ok(s) => s.event_state.clone(),
-            Err(e) => {
-                log::error!("Crash report event processor failed to get global state: {}. Task cannot proceed.", e);
-                return;
-            }
-        };
-
-        while let Some(notification) = receiver.recv().await {
-            log::info!(
-                "Received new crash report notification for process {}: {:?}",
-                notification.process_id,
-                notification.file_path
-            );
-            match tokio::fs::read_to_string(&notification.file_path).await {
-                Ok(content) => {
-                    let file_name = notification
-                        .file_path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy();
-                    let message_to_log = format!("[CRASH REPORT - {}]:\\n{}", file_name, content);
-
-                    // Store the crash report content
-                    if let Ok(global_state) = State::get().await {
-                        global_state
-                            .process_manager
-                            .crash_report_contents
-                            .insert(notification.process_id, content.clone());
-                        log::info!(
-                            "Stored crash report content for process {} in ProcessManager.",
-                            notification.process_id
-                        );
-
-                        // Emit new event with crash report content
-                        let crash_report_available_payload =
-                            crate::state::event_state::CrashReportContentAvailablePayload {
-                                process_id: notification.process_id,
-                                content: content.clone(), // Clone content for the new event
-                            };
-                        let event_payload = EventPayload {
-                            event_id: Uuid::new_v4(),
-                            event_type: EventType::CrashReportContentAvailable,
-                            target_id: Some(notification.process_id),
-                            message: serde_json::to_string(&crash_report_available_payload).unwrap_or_else(|e| {
-                                log::error!("Failed to serialize CrashReportContentAvailablePayload for {}: {}", notification.process_id, e);
-                                String::from("{ \"error\": \"serialization failed\" }")
-                            }),
-                            progress: None,
-                            error: None,
-                        };
-                        if let Err(e) = global_state.event_state.emit(event_payload).await {
-                            log::error!("Failed to emit CrashReportContentAvailable event for process {}: {}", notification.process_id, e);
-                        }
-                    } else {
-                        log::error!("Failed to get global state to store/emit crash report content for process {}.", notification.process_id);
-                    }
-
-                    let report_event_payload = EventPayload {
-                        event_id: Uuid::new_v4(),
-                        event_type: EventType::MinecraftOutput,
-                        target_id: Some(notification.process_id),
-                        message: message_to_log,
-                        progress: None,
-                        error: None,
-                    };
-                    if let Err(e) = event_state_clone.emit(report_event_payload).await {
-                        log::error!(
-                            "Failed to emit crash report as MinecraftOutput for process {}: {}",
-                            notification.process_id,
-                            e
-                        );
-                    } else {
-                        log::info!(
-                            "Successfully emitted crash report for process {} to UI.",
-                            notification.process_id
-                        );
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to read content of new crash report {:?} for process {}: {}",
-                        notification.file_path,
-                        notification.process_id,
-                        e
-                    );
-                }
-            }
-        }
-        log::info!("Crash report event processor task finished.");
-    }
-
-    // Kombinierte Funktion zum Laden von Prozessen und Starten der Watcher für bereits laufende Prozesse
-    async fn load_processes_and_watchers(&self) -> Result<()> {
+    async fn load_processes(&self) -> Result<()> {
         let file_path = &self.processes_file_path;
         if !file_path.exists() {
             log::info!(
@@ -484,53 +356,6 @@ impl ProcessManager {
                             metadata.id
                         );
 
-                        // Watcher für diesen geladenen, laufenden Prozess starten
-                        log::info!(
-                            "Attempting to get global state for process {} to start watcher.",
-                            metadata.id
-                        );
-                        match State::get().await {
-                            Ok(global_state) => {
-                                log::info!(
-                                    "Successfully got global state for process {}.",
-                                    metadata.id
-                                );
-                                log::info!(
-                                    "Attempting to get instance path for profile {} (process {}).",
-                                    metadata.profile_id,
-                                    metadata.id
-                                );
-                                match global_state
-                                    .profile_manager
-                                    .get_profile_instance_path(metadata.profile_id)
-                                    .await
-                                {
-                                    Ok(instance_path) => {
-                                        log::info!("Successfully got instance path {:?} for profile {} (process {}).", instance_path, metadata.profile_id, metadata.id);
-                                        let crash_reports_path =
-                                            instance_path.join("crash-reports");
-                                        log::info!("Attempting to start crash report watcher for process {} on path {:?}.", metadata.id, crash_reports_path);
-                                        if let Err(e) = self
-                                            .start_crash_report_watcher(
-                                                metadata.id,
-                                                &crash_reports_path,
-                                            )
-                                            .await
-                                        {
-                                            log::error!("Failed to start crash report watcher for loaded process {}: {}", metadata.id, e);
-                                        } else {
-                                            log::info!("Successfully started or confirmed crash report watcher for process {}.", metadata.id);
-                                        }
-                                    }
-                                    Err(e) => {
-                                        log::warn!("Could not get instance path for loaded process {} to start watcher: {}", metadata.id, e);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("Failed to get global state for process {} to start watcher: {}. Watcher not started.", metadata.id, e);
-                            }
-                        }
                         loaded_count += 1;
                     } else {
                         log::warn!(
@@ -593,126 +418,7 @@ impl ProcessManager {
         Ok(())
     }
 
-    // NEUE Hilfsfunktion zum Starten eines Watchers für einen bestimmten Prozess und Pfad
-    async fn start_crash_report_watcher(
-        &self,
-        process_id: Uuid,
-        path_to_watch: &Path,
-    ) -> Result<()> {
-        if !path_to_watch.exists() {
-            // Versuche das Verzeichnis zu erstellen, falls es nicht existiert (z.B. crash-reports)
-            if let Err(e) = async_fs::create_dir_all(path_to_watch).await {
-                log::error!(
-                    "Failed to create directory {:?} for watcher: {}. Watcher not started.",
-                    path_to_watch,
-                    e
-                );
-                return Err(AppError::Io(e));
-            }
-            log::info!(
-                "Created directory {:?} for crash report watcher.",
-                path_to_watch
-            );
-        } else if !path_to_watch.is_dir() {
-            log::error!(
-                "Path {:?} is not a directory. Watcher not started for process {}.",
-                path_to_watch,
-                process_id
-            );
-            return Err(AppError::Other(format!(
-                "Path {:?} is not a directory",
-                path_to_watch
-            )));
-        }
 
-        let tx_clone = self.notify_event_tx.clone();
-        let path_buf_clone = path_to_watch.to_path_buf(); // Klonen für den Handler
-
-        let event_handler = move |res: notify::Result<NotifyEvent>| {
-            match res {
-                Ok(event) => {
-                    log::trace!("Received notify event: {:?}", event);
-                    if matches!(event.kind, NotifyEventKind::Create(_)) {
-                        // Nur auf Create-Events reagieren
-                        for path in event.paths {
-                            if path.is_file()
-                                && path.file_name().map_or(false, |name| {
-                                    name.to_string_lossy().starts_with("crash-")
-                                        && name.to_string_lossy().ends_with(".txt")
-                                })
-                            {
-                                log::info!(
-                                    "Crash report file created: {:?} for process {}",
-                                    path,
-                                    process_id
-                                );
-                                let notification = CrashReportNotification {
-                                    process_id,
-                                    file_path: path.clone(),
-                                };
-                                // Sende im blockierenden Kontext, wenn nötig, oder verwende try_send
-                                if let Err(e) = tx_clone.try_send(notification) {
-                                    log::error!(
-                                        "Failed to send crash report notification from watcher: {}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "Error in crash report watcher for process {}: {:?}",
-                        process_id,
-                        e
-                    );
-                }
-            }
-        };
-
-        let mut watcher = RecommendedWatcher::new(event_handler, NotifyConfig::default())
-            .map_err(|e| AppError::Other(format!("Failed to create file watcher: {}", e)))?;
-
-        watcher
-            .watch(&path_buf_clone, RecursiveMode::NonRecursive) // Nur den Ordner selbst, nicht rekursiv
-            .map_err(|e| {
-                AppError::Other(format!("Failed to watch path {:?}: {}", path_buf_clone, e))
-            })?;
-
-        log::info!(
-            "Started crash report watcher for process {} on path {:?}",
-            process_id,
-            path_buf_clone
-        );
-
-        // Watcher in der Map speichern
-        let mut watchers_map = self.active_watchers.write().await;
-        watchers_map.insert(process_id, watcher); // Watcher wird hier verschoben
-
-        Ok(())
-    }
-
-    // NEUE Hilfsfunktion zum Stoppen und Entfernen eines Watchers
-    async fn stop_crash_report_watcher(&self, process_id: Uuid) {
-        let mut watchers_map = self.active_watchers.write().await;
-        if let Some(_watcher) = watchers_map.remove(&process_id) {
-            // Explizites unwatch ist bei notify v6 nicht immer nötig, wenn der Watcher gedroppt wird.
-            // Aber um sicherzugehen und Pfade zu entfernen, falls der Watcher mehrere Pfade überwacht (hier nicht der Fall).
-            // Da wir den Pfad nicht separat speichern, lassen wir unwatch weg und verlassen uns auf drop.
-            // watcher.unwatch(path_to_unwatch).ok(); // Pfad müsste hier bekannt sein
-            log::info!(
-                "Stopped and removed crash report watcher for process {}",
-                process_id
-            );
-        } else {
-            log::warn!(
-                "No active crash report watcher found to stop for process {}",
-                process_id
-            );
-        }
-        // Der Watcher wird gedroppt, wenn er aus der Map entfernt wird und hier aus dem Scope geht.
-    }
 
     pub async fn start_process(
         &self,
@@ -865,43 +571,6 @@ impl ProcessManager {
             processes_map.insert(process_id, process_entry);
         }
 
-        // Watcher für Crash-Reports starten
-        // Hier brauchen wir den globalen State für den ProfileManager
-        if let Ok(global_state) = State::get().await {
-            match global_state
-                .profile_manager
-                .get_profile_instance_path(profile_id)
-                .await
-            {
-                Ok(instance_path) => {
-                    let crash_reports_path = instance_path.join("crash-reports");
-                    if let Err(e) = self
-                        .start_crash_report_watcher(process_id, &crash_reports_path)
-                        .await
-                    {
-                        log::error!(
-                            "Failed to start crash report watcher for new process {}: {}",
-                            process_id,
-                            e
-                        );
-                        // Prozessstart nicht unbedingt abbrechen, aber loggen.
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "Could not get instance path for new process {} to start watcher: {}",
-                        process_id,
-                        e
-                    );
-                }
-            }
-        } else {
-            log::error!(
-                "Could not get global state to start watcher for new process {}.",
-                process_id
-            );
-        }
-
         // --- BEGIN Discord State Update ---
         match State::get().await {
             Ok(state) => {
@@ -963,26 +632,9 @@ impl ProcessManager {
         self.schedule_auto_open_log_window(process_id);
 
         let processes_arc_clone = Arc::clone(&self.processes);
-        // Klon für active_watchers und den Manager selbst (oder dessen relevante Teile)
-        let _active_watchers_clone_for_monitor = Arc::clone(&self.active_watchers);
-        // Der Monitor-Task benötigt eine Möglichkeit, stop_crash_report_watcher aufzurufen.
-        // Da stop_crash_report_watcher &self benötigt und wir nicht den ganzen ProcessManager übergeben wollen,
-        // wäre es besser, wenn der Monitor-Task eine Nachricht an den ProcessManager sendet oder
-        // eine einfachere ID-basierte Stoppfunktion aufruft.
-        // Fürs Erste: Wir müssen den Watcher entfernen, wenn der Prozess endet.
-        // Der einfachste Weg ist, die process_id zu kennen und dann von außerhalb (periodic_process_check)
-        // oder wenn der state.process_manager.stop_crash_report_watcher(process_id) aufgerufen wird.
-        // Die stop_crash_report_watcher Funktion ist async, der Monitor-Task ist async.
-        // Wir können Arc<ProcessManager> übergeben, aber das ist oft nicht ideal wegen Zyklen.
-        // Alternative: Der Monitor-Task entfernt nur aus processes, und periodic_process_check räumt Watcher auf.
-        // ODER: Der Monitor Task sendet eine "ProcessEnded" Nachricht, auf die der PM reagiert.
-
         let app_handle_clone_for_monitor = Arc::clone(&self.app_handle);
 
         tokio::spawn(async move {
-            // State holen, um Zugriff auf den ProcessManager für das Stoppen des Watchers zu haben.
-            // Das ist etwas umständlich. Besser wäre es, wenn stop_crash_report_watcher
-            // keine &self Referenz auf den ProcessManager bräuchte oder der Task nur die ID meldet.
             let state_for_monitor_res = State::get().await;
 
             log::info!(
@@ -1214,13 +866,7 @@ impl ProcessManager {
                 );
             }
 
-            // Watcher stoppen NACHDEM der Prozess aus der Hauptmap entfernt wurde.
-            // periodic_process_check wird den Watcher sonst nicht als verwaist erkennen.
             if let Ok(state) = state_for_monitor_res {
-                state
-                    .process_manager
-                    .stop_crash_report_watcher(process_id)
-                    .await;
                 if let Err(e) = state.process_manager.save_processes().await {
                     log::error!("Monitor task for process {} failed to save processes state after removal: {}. In-memory map updated, but persistence failed.", process_id, e);
                 } else {
@@ -1242,7 +888,7 @@ impl ProcessManager {
                 // Notify Discord that game has stopped
                 state.discord_manager.notify_game_stop(process_id).await;
             } else {
-                log::error!("Monitor task for process {} could not get state to stop watcher or save processes.", process_id);
+                log::error!("Monitor task for process {} could not get state to save processes.", process_id);
             }
 
             log::debug!("Monitor task finished for process {}", process_id);
@@ -1295,12 +941,6 @@ impl ProcessManager {
 
         drop(processes_map);
 
-        // Watcher stoppen, bevor der Prozess tatsächlich beendet wird, oder nachdem der Kill-Befehl gesendet wurde.
-        // Da der Monitor-Task den Watcher beim regulären Exit stoppt, ist es hier vielleicht nicht
-        // zwingend nötig, es sei denn, der Monitor-Task würde nicht korrekt laufen.
-        // Aber für Konsistenz und falls der Kill erfolgreich ist und der Monitor nicht schnell genug ist:
-        self.stop_crash_report_watcher(process_id).await;
-
         if let Err(e) = self.save_processes().await {
             log::error!(
                 "Failed to save processes state after initiating stop for {}: {}",
@@ -1343,22 +983,19 @@ impl ProcessManager {
     async fn periodic_process_check(
         _app_handle: Arc<tauri::AppHandle>,
         processes_arc: Arc<RwLock<HashMap<Uuid, Process>>>,
-        active_watchers_arc: Arc<RwLock<HashMap<Uuid, RecommendedWatcher>>>,
-        _notify_tx: mpsc::Sender<CrashReportNotification>,
     ) {
         let mut interval = interval(Duration::from_secs(10));
-        log::trace!("Starting periodic process and watcher checker task.");
+        log::trace!("Starting periodic process checker task.");
 
         loop {
             interval.tick().await;
-            log::trace!("Running periodic process and watcher check...");
+            log::trace!("Running periodic process check...");
 
             let mut pids_to_check_in_map: Vec<(Uuid, u32)> = Vec::new();
             {
                 let processes_map_reader = processes_arc.read().await;
                 if processes_map_reader.is_empty() {
                     log::trace!("No managed processes to check, skipping process poll.");
-                    // Weiter, um verwaiste Watcher zu prüfen
                 } else {
                     pids_to_check_in_map = processes_map_reader
                         .iter()
@@ -1369,7 +1006,7 @@ impl ProcessManager {
 
             let global_state_res = State::get().await;
             if global_state_res.is_err() {
-                log::error!("Periodic check: Failed to get global state. Cannot manage watchers or save state. Retrying next cycle.");
+                log::error!("Periodic check: Failed to get global state. Cannot save state. Retrying next cycle.");
                 continue;
             }
             let global_state = global_state_res.unwrap();
@@ -1388,41 +1025,6 @@ impl ProcessManager {
                     if sys.process(Pid::from(pid as usize)).is_none() {
                         log::warn!("Periodic check found managed process {} (PID: {}) no longer running. Marking for removal.", id, pid);
                         dead_process_ids_from_map.push(id);
-                    } else {
-                        // Prozess läuft noch, stelle sicher, dass ein Watcher existiert, falls er aus irgendeinem Grund fehlt
-                        let watchers_map_reader = active_watchers_arc.read().await;
-                        let has_watcher = watchers_map_reader.contains_key(&id);
-                        drop(watchers_map_reader);
-
-                        if !has_watcher {
-                            log::warn!("Periodic check: Process {} is running but has no watcher. Attempting to start one.", id);
-                            // Profile ID aus der process map holen
-                            let profile_id_opt = {
-                                let proc_map_reader = processes_arc.read().await;
-                                proc_map_reader.get(&id).map(|p| p.metadata.profile_id)
-                            };
-                            if let Some(profile_id) = profile_id_opt {
-                                if let Ok(instance_path) = global_state
-                                    .profile_manager
-                                    .get_profile_instance_path(profile_id)
-                                    .await
-                                {
-                                    let crash_reports_path = instance_path.join("crash-reports");
-                                    // start_crash_report_watcher benötigt &self, also rufen wir es über global_state.process_manager auf
-                                    if let Err(e) = global_state
-                                        .process_manager
-                                        .start_crash_report_watcher(id, &crash_reports_path)
-                                        .await
-                                    {
-                                        log::error!("Periodic check: Failed to restart watcher for process {}: {}", id, e);
-                                    }
-                                } else {
-                                    log::warn!("Periodic check: Could not get instance path for running process {} to restart watcher.", id);
-                                }
-                            } else {
-                                log::warn!("Periodic check: Could not get profile_id for running process {} to restart watcher.", id);
-                            }
-                        }
                     }
                 }
             }
@@ -1447,33 +1049,6 @@ impl ProcessManager {
                 }
             }
 
-            // Jetzt Watcher aufräumen: Entferne Watcher für Prozesse, die nicht mehr in der `processes_arc` Map sind
-            // (entweder weil sie gerade entfernt wurden oder nie da waren, aber ein Watcher existiert)
-            let mut orphaned_watcher_ids: Vec<Uuid> = Vec::new();
-            {
-                let watchers_map_reader = active_watchers_arc.read().await;
-                let processes_map_reader = processes_arc.read().await; // Erneut lesen für aktuellen Stand
-                for watcher_process_id in watchers_map_reader.keys() {
-                    if !processes_map_reader.contains_key(watcher_process_id) {
-                        orphaned_watcher_ids.push(*watcher_process_id);
-                    }
-                }
-            } // Reader freigeben
-
-            if !orphaned_watcher_ids.is_empty() {
-                log::warn!(
-                    "Periodic check found {} orphaned watchers. Removing them: {:?}",
-                    orphaned_watcher_ids.len(),
-                    orphaned_watcher_ids
-                );
-                // stop_crash_report_watcher benötigt &self, also über global_state.process_manager
-                for id in orphaned_watcher_ids {
-                    global_state
-                        .process_manager
-                        .stop_crash_report_watcher(id)
-                        .await;
-                }
-            }
         }
     }
 
@@ -1902,25 +1477,15 @@ impl PostInitializationHandler for ProcessManager {
     async fn on_state_ready(&self, app_handle: Arc<tauri::AppHandle>) -> Result<()> {
         log::trace!("ProcessManager: on_state_ready called. Performing post-initialization tasks.");
 
-        // For process_crash_report_events: The task requires the receive end of an mpsc channel.
-        // The most robust way is to initialize tx and rx in `new`, store rx in `self` (e.g., Arc<Mutex<Option<Receiver>>>)
-        // and then .take() it here. For now, we will skip spawning this specific task here to simplify the deadlock fix.
-        // This can be revisited. The deadlock was caused by `load_processes_and_watchers` calling `State::get()` too early.
-
-        // This was the critical call causing deadlock issues
-        self.load_processes_and_watchers().await?;
-        log::trace!("ProcessManager: Finished load_processes_and_watchers.");
+        self.load_processes().await?;
+        log::trace!("ProcessManager: Finished load_processes.");
 
         let manager_clone_periodic_check_processes = Arc::clone(&self.processes);
-        let manager_clone_periodic_check_watchers = Arc::clone(&self.active_watchers);
         let app_handle_for_periodic_check = Arc::clone(&app_handle);
-        let notify_tx_for_periodic_check = self.notify_event_tx.clone();
 
         tokio::spawn(Self::periodic_process_check(
             app_handle_for_periodic_check,
             manager_clone_periodic_check_processes,
-            manager_clone_periodic_check_watchers,
-            notify_tx_for_periodic_check,
         ));
         log::trace!("ProcessManager: Spawned periodic_process_check task.");
 

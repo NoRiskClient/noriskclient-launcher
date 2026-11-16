@@ -1,4 +1,3 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::ProfileState;
@@ -11,7 +10,6 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::env;
 use std::path::PathBuf;
 use tauri::Manager; // Required for app_handle.get_window() and window.emit()
 use tokio::fs;
@@ -994,111 +992,4 @@ impl NoriskModpacksConfig {
         })
     }
 
-    /// Prints the resolved mod list for each pack defined in the configuration.
-    /// Useful for debugging the inheritance and exclusion logic.
-    pub fn print_resolved_packs(&self) -> Result<()> {
-        info!("Printing resolved packs...");
-        // Collect pack IDs to avoid borrowing issues while iterating and resolving
-        let pack_ids: Vec<String> = self.packs.keys().cloned().collect();
-
-        for pack_id in pack_ids {
-            match self.get_resolved_pack_definition(&pack_id) {
-                Ok(resolved_pack) => {
-                    // Use debug logging for potentially large output
-                    debug!("--- Resolved Pack: '{}' ---", resolved_pack.display_name);
-                    debug!("  Description: {}", resolved_pack.description);
-                    if let Some(inherits) = &resolved_pack.inherits_from {
-                        debug!("  Inherits From: {:?}", inherits);
-                    }
-                    if let Some(excludes) = &resolved_pack.exclude_mods {
-                        debug!("  Excludes Mods: {:?}", excludes);
-                    }
-
-                    let mod_ids: Vec<&str> =
-                        resolved_pack.mods.iter().map(|m| m.id.as_str()).collect();
-                    debug!("  Final Mods ({}): {:?}", mod_ids.len(), mod_ids);
-
-                    // Example of printing more details (optional)
-                    // for mod_def in resolved_pack.mods {
-                    //     debug!("    - Mod ID: {}, Source Type: {:?}, Compatibility Keys: {:?}",
-                    //            mod_def.id,
-                    //            mod_def.source, // This might be verbose
-                    //            mod_def.compatibility.keys().collect::<Vec<_>>()
-                    //     );
-                    // }
-                    println!(
-                        "Resolved Pack: '{}' - Final Mod IDs: {:?}",
-                        resolved_pack.display_name, mod_ids
-                    );
-                }
-                Err(e) => {
-                    error!("Failed to resolve pack '{}': {}", pack_id, e);
-                    // Decide if you want to continue or return the error
-                    // For a print function, continuing might be acceptable.
-                    // return Err(e);
-                }
-            }
-        }
-        info!("Finished printing resolved packs.");
-        Ok(())
-    }
-}
-
-/// Copies a dummy/test `test_norisk_modpacks.json` from the project's source directory
-/// (assuming a development environment structure) to the launcher's root directory
-/// as `norisk_modpacks.json` if it doesn't already exist.
-///
-/// Note: This path resolution using CARGO_MANIFEST_DIR might not work correctly
-/// in a packaged production build. Consider using Tauri's resource resolver for that.
-pub async fn load_dummy_modpacks() -> Result<()> {
-    let target_dir = LAUNCHER_DIRECTORY.root_dir();
-    let target_file = target_dir.join("norisk_modpacks.json");
-
-    // Only copy if the target file doesn't exist
-    if target_file.exists() {
-        //info!("Target modpacks file {:?} already exists. Skipping dummy loading.", target_file);
-        //return Ok(());
-    }
-
-    // --- Path resolution based on CARGO_MANIFEST_DIR ---
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // Assuming the project root is one level above the crate's manifest (src-tauri)
-    let project_root = manifest_dir.parent().ok_or_else(|| {
-        AppError::Other("Failed to get parent directory of CARGO_MANIFEST_DIR".to_string())
-    })?;
-
-    // Use the test file as the source
-    let source_path = project_root.join("minecraft-data/nrc/norisk_modpacks.json");
-    // --- End path resolution ---
-
-    if source_path.exists() {
-        info!("Found dummy modpacks source at: {:?}", source_path);
-        // Ensure the target directory exists
-        fs::create_dir_all(&target_dir).await.map_err(|e| {
-            error!("Failed to create target directory {:?}: {}", target_dir, e);
-            AppError::Io(e)
-        })?;
-
-        // Copy the file
-        fs::copy(&source_path, &target_file).await.map_err(|e| {
-            error!(
-                "Failed to copy dummy modpacks from {:?} to {:?}: {}",
-                source_path, target_file, e
-            );
-            AppError::Io(e)
-        })?;
-        info!("Successfully copied dummy modpacks to {:?}", target_file);
-    } else {
-        error!(
-            "Dummy modpacks source file not found at expected path: {:?}",
-            source_path
-        );
-        // Use a more general error as it's not a Tauri resource issue anymore
-        return Err(AppError::Other(format!(
-            "Source file not found for dummy modpacks: {}",
-            source_path.display()
-        )));
-    }
-
-    Ok(())
 }

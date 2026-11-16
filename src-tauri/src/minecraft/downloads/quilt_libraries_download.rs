@@ -26,60 +26,6 @@ impl QuiltLibrariesDownloadService {
         self.concurrent_downloads = count;
     }
 
-    pub fn print_version_info(&self, version: &QuiltVersionInfo) {
-        trace!("=== Quilt Version ===");
-        trace!("Loader:");
-        trace!("  - Version: {}", version.loader.version);
-        trace!("  - Build: {}", version.loader.build);
-        trace!("  - Maven: {}", version.loader.maven);
-        trace!("  - Stable: {}", version.loader.stable);
-        trace!("  - Separator: {}", version.loader.separator);
-
-        trace!("Intermediary:");
-        trace!("  - Version: {}", version.intermediary.version);
-        trace!("  - Maven: {}", version.intermediary.maven);
-        trace!("  - Stable: {}", version.intermediary.stable);
-
-        trace!("Launcher Meta:");
-        trace!("  - Version: {}", version.launcher_meta.version);
-        if let Some(min_java) = version.launcher_meta.min_java_version {
-            trace!("  - Min Java Version: {}", min_java);
-        }
-        trace!(
-            "  - Main Class (Client): {}",
-            version.launcher_meta.main_class.get_client()
-        );
-        trace!(
-            "  - Main Class (Server): {}",
-            version.launcher_meta.main_class.get_server()
-        );
-
-        trace!("Libraries:");
-        self.print_libraries(&version.launcher_meta.libraries.common, "Common Libraries");
-        self.print_libraries(&version.launcher_meta.libraries.client, "Client Libraries");
-        self.print_libraries(&version.launcher_meta.libraries.server, "Server Libraries");
-        if let Some(dev_libs) = &version.launcher_meta.libraries.development {
-            self.print_libraries(dev_libs, "Development Libraries");
-        }
-    }
-
-    fn print_libraries(&self, libraries: &[QuiltLibrary], title: &str) {
-        trace!("  {}:", title);
-        for lib in libraries {
-            trace!("    - Name: {}", lib.name);
-            if let Some(url) = &lib.url {
-                trace!("      URL: {}", url);
-            }
-            if let Some(size) = lib.size {
-                trace!("      Size: {} bytes", size);
-            }
-            if let Some(sha1) = &lib.sha1 {
-                trace!("      SHA1: {}", sha1);
-            }
-            trace!("");
-        }
-    }
-
     fn create_library_from_maven(&self, maven: &str) -> QuiltLibrary {
         QuiltLibrary {
             name: maven.to_string(),

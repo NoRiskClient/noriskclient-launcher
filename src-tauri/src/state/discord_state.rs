@@ -415,12 +415,6 @@ impl DiscordManager {
         }
     }
 
-    /// Cleanup launcher state file (called on shutdown)
-    pub fn cleanup_launcher_file() {
-        let file = LAUNCHER_DIRECTORY.meta_dir().join("discord").join("launcher.json");
-        std::fs::remove_file(&file).ok();
-    }
-
     // --- Public API ---
 
     pub async fn set_enabled(&self, enabled: bool) -> Result<()> {
@@ -472,10 +466,6 @@ impl DiscordManager {
             debug!("Clearing Discord idle start timestamp.");
             *timestamp_lock = None;
         }
-    }
-
-    pub async fn get_current_state(&self) -> DiscordState {
-        self.current_state.read().await.clone()
     }
 
     pub async fn is_enabled(&self) -> bool {
