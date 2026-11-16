@@ -12,7 +12,7 @@ import type { PromoOutlineConfig } from '@noriskclient/nrc-skin-renderer/postfx'
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StaticTooltip } from '../ui/Tooltip';
-import { toast } from 'sonner';
+import { toast } from 'react-hot-toast';
 import { isWorldCupEventActive } from '../../data/worldcup-event';
 import type { LaunchOverrides } from '../../services/process-service';
 

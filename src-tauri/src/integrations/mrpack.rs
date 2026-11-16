@@ -231,10 +231,11 @@ pub async fn process_mrpack(pack_path: PathBuf) -> Result<(Profile, ModrinthInde
     Ok((profile, manifest))
 }
 
-fn is_manifest_mod_path(path: &str) -> bool {
-    let norm = path.replace('\\', "/");
+pub fn is_manifest_mod_path(path: &str) -> bool {
+    let norm = path.replace('\\', "/").to_ascii_lowercase();
     let trimmed = norm.trim_start_matches("./");
     trimmed.starts_with("mods/")
+        && (trimmed.ends_with(".jar") || trimmed.ends_with(".jar.disabled"))
 }
 
 fn sanitize_manifest_relative_path(path: &str) -> Option<PathBuf> {

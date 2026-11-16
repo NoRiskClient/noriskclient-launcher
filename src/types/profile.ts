@@ -189,7 +189,6 @@ export interface NoriskModIdentifier {
 }
 
 export interface NoriskInformation {
-  keep_local_assets: boolean;
   is_experimental: boolean;
   is_main_version?: boolean;
 }

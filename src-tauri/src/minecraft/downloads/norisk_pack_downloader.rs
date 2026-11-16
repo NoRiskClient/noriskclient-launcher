@@ -3,6 +3,7 @@ use crate::error::{AppError, Result};
 use crate::integrations::norisk_packs::{self, NoriskModSourceDefinition, NoriskModpacksConfig};
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
+use crate::utils::verified_files;
 use futures::stream::{iter, StreamExt};
 use log::{error, info, trace, warn};
 use std::path::PathBuf;
@@ -259,6 +260,13 @@ impl NoriskPackDownloadService {
         expected_sha1: Option<&str>,
         stats: Option<Arc<DownloadStats>>,
     ) -> Result<()> {
+        if expected_sha1.is_none() && verified_files::is_verified(target_path, None).await {
+            if let Some(stats) = &stats {
+                stats.record_cached();
+            }
+            return Ok(());
+        }
+
         // Explicit hash wins; else best-effort Maven `.sha1` sidecar (None = ZIP heuristic fallback).
         let resolved_sha1 = match expected_sha1 {
             Some(hash) => Some(hash.to_string()),
@@ -270,11 +278,16 @@ impl NoriskPackDownloadService {
             .with_retries(3)
             .with_stats(stats);
 
-        if let Some(hash) = resolved_sha1 {
-            config = config.with_sha1(hash);
+        if let Some(hash) = &resolved_sha1 {
+            config = config.with_sha1(hash.clone());
         }
 
-        DownloadUtils::download_file(url, target_path, config).await
+        DownloadUtils::download_file(url, target_path, config).await?;
+
+        if resolved_sha1.is_none() {
+            verified_files::mark_verified(target_path, None).await;
+        }
+        Ok(())
     }
 
 
