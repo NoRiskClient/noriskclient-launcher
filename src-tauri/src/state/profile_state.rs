@@ -250,8 +250,6 @@ fn default_true() -> bool {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NoriskInformation {
     #[serde(default)]
-    pub keep_local_assets: bool,
-    #[serde(default)]
     pub is_experimental: bool,
     #[serde(default = "default_true")]
     pub copy_initial_mc_data: bool,

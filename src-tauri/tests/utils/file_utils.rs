@@ -1,32 +1,28 @@
-use noriskclient_launcher_v3_lib::utils::file_utils::{scan_object_store, scan_tree};
+use noriskclient_launcher_v3_lib::utils::file_utils::{scan_files, scan_object_store};
 use std::fs;
 
 #[tokio::test]
-async fn scan_tree_lists_files_with_sizes_and_every_directory() {
+async fn scan_files_lists_every_nested_file_with_its_size() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     fs::create_dir_all(root.join("a/b")).unwrap();
     fs::write(root.join("top.txt"), b"1234").unwrap();
     fs::write(root.join("a/b/deep.bin"), b"12").unwrap();
 
-    let listing = scan_tree(root).await;
+    let files = scan_files(root).await;
 
-    assert_eq!(listing.files.len(), 2);
-    assert_eq!(listing.files[&root.join("top.txt")], 4);
-    assert_eq!(listing.files[&root.join("a/b/deep.bin")], 2);
-    let mut dirs = listing.dirs.clone();
-    dirs.sort();
-    assert_eq!(dirs, vec![root.join("a"), root.join("a/b")]);
+    assert_eq!(files.len(), 2);
+    assert_eq!(files[&root.join("top.txt")], 4);
+    assert_eq!(files[&root.join("a/b/deep.bin")], 2);
 }
 
 #[tokio::test]
-async fn scan_tree_of_missing_root_is_empty() {
+async fn scan_files_of_missing_root_is_empty() {
     let dir = tempfile::tempdir().unwrap();
 
-    let listing = scan_tree(&dir.path().join("missing")).await;
+    let files = scan_files(&dir.path().join("missing")).await;
 
-    assert!(listing.files.is_empty());
-    assert!(listing.dirs.is_empty());
+    assert!(files.is_empty());
 }
 
 #[tokio::test]

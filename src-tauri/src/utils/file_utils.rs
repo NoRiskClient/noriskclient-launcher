@@ -44,21 +44,15 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     Ok(())
 }
 
-#[derive(Default)]
-pub struct TreeListing {
-    pub files: HashMap<PathBuf, u64>,
-    pub dirs: Vec<PathBuf>,
-}
-
-pub async fn scan_tree(root: &Path) -> TreeListing {
+pub async fn scan_files(root: &Path) -> HashMap<PathBuf, u64> {
     let root = root.to_path_buf();
-    tokio::task::spawn_blocking(move || scan_tree_sync(root))
+    tokio::task::spawn_blocking(move || scan_files_sync(root))
         .await
         .unwrap_or_default()
 }
 
-fn scan_tree_sync(root: PathBuf) -> TreeListing {
-    let mut listing = TreeListing::default();
+fn scan_files_sync(root: PathBuf) -> HashMap<PathBuf, u64> {
+    let mut files = HashMap::new();
     let mut pending = vec![root];
     while let Some(dir) = pending.pop() {
         let reader = match std::fs::read_dir(&dir) {
@@ -75,20 +69,18 @@ fn scan_tree_sync(root: PathBuf) -> TreeListing {
             };
             let path = entry.path();
             if metadata.is_dir() {
-                pending.push(path.clone());
-                listing.dirs.push(path);
+                pending.push(path);
             } else {
-                listing.files.insert(path, metadata.len());
+                files.insert(path, metadata.len());
             }
         }
     }
-    listing
+    files
 }
 
 pub async fn scan_object_store(objects_dir: &Path) -> HashMap<String, u64> {
-    scan_tree(objects_dir)
+    scan_files(objects_dir)
         .await
-        .files
         .into_iter()
         .filter_map(|(path, size)| Some((path.file_name()?.to_string_lossy().into_owned(), size)))
         .collect()
