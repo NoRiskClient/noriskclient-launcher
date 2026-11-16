@@ -16,6 +16,8 @@ const LIMITS_TIMEOUT: Duration = Duration::from_secs(5);
 #[serde(rename_all = "camelCase")]
 pub struct MediaLimits {
     pub max_video_bytes: u64,
+    #[serde(default)]
+    pub max_text_bytes: Option<u64>,
 }
 
 #[derive(Serialize)]

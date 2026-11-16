@@ -19,11 +19,12 @@ import { actionColor, actionIcon, actionLabel, actionVariant, look, statusMessag
 
 interface Props {
   result: CrashCheckResult;
+  logUrl: string;
   profileId?: string; // present => real apply on this profile; absent (debug preview) => local toggle
   onClose: () => void;
 }
 
-export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
+export function CrashAnalysisModal({ result, logUrl, profileId, onClose }: Props) {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
   // index -> revert token (null = local-only toggle). Presence = applied.
@@ -258,7 +259,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
 
         {!hasActions && (
           <div className="flex flex-wrap gap-3">
-            <LogLinks logId={result.logId} openTextKey="crash_analysis.open_crash_log" />
+            <LogLinks url={logUrl} openTextKey="crash_analysis.open_crash_log" />
           </div>
         )}
 
@@ -280,7 +281,7 @@ export function CrashAnalysisModal({ result, profileId, onClose }: Props) {
               <Fact label={t("crash_analysis.fact.mod")} value={result.culpritMods.join(", ") || null} />
               <Fact label={t("crash_analysis.fact.type")} value={result.classification} />
               <div className="flex flex-wrap gap-2 p-3">
-                <LogLinks logId={result.logId} openTextKey="crash_analysis.open_log" />
+                <LogLinks url={logUrl} openTextKey="crash_analysis.open_log" />
               </div>
             </div>
           )}
@@ -300,9 +301,8 @@ function Fact({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-function LogLinks({ logId, openTextKey }: { logId: string; openTextKey: string }) {
+function LogLinks({ url, openTextKey }: { url: string; openTextKey: string }) {
   const { t } = useTranslation();
-  const url = `https://mclo.gs/${logId}`;
   const copy = () =>
     writeText(url)
       .then(() => toast.success(t("crash_analysis.toast.link_copied")))

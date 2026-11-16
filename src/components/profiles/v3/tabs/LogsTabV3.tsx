@@ -20,7 +20,7 @@ import {
   getLogFileContent,
   getProfileLogFiles,
   openLogFileDirectory,
-  uploadLogToMclogs,
+  uploadLog,
   parseLogLinesFromString,
   LOG_LEVELS,
   type LogLevel,
@@ -184,11 +184,11 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   }, [selectedPath]);
 
   const handleUpload = useCallback(async () => {
-    if (!rawContent || isUploading) return;
+    if (!rawContent || !selectedPath || isUploading) return;
     setIsUploading(true);
     try {
       const url = await toast.promise(
-        uploadLogToMclogs(rawContent),
+        uploadLog(rawContent, getFilename(selectedPath)),
         {
           loading: t("profiles.v3.logs.uploading"),
           success: (u: string) => t("profiles.v3.logs.uploadSuccess", { url: u }),
@@ -203,7 +203,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
     } finally {
       if (mountedRef.current) setIsUploading(false);
     }
-  }, [rawContent, isUploading, t]);
+  }, [rawContent, selectedPath, isUploading, t]);
 
   const scrollToBottom = useCallback(() => {
     if (virtuosoRef.current && visibleLines.length > 0) {

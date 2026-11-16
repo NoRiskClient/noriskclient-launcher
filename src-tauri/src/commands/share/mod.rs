@@ -1,4 +1,5 @@
 mod convert;
+mod logfile;
 mod upload;
 
 use std::path::{Path, PathBuf};
@@ -13,6 +14,17 @@ use crate::error::{AppError, CommandError};
 use crate::minecraft::api::share_api::{Share, ShareApi, UploadRequest};
 use crate::state::State;
 use upload::Progress;
+
+/// What goes up beside the medium.
+#[derive(Default)]
+struct About<'a> {
+    server: Option<&'a str>,
+}
+
+enum Payload<'a> {
+    File(&'a Path),
+    Text(String),
+}
 
 fn refused(key: &str, message: impl Into<String>) -> CommandError {
     CommandError {
@@ -52,7 +64,9 @@ pub async fn share_clip(
     };
     let upload = converted.as_ref().map_or(clip.as_path(), |c| c.path());
     let name = file_name(&clip);
-    share(&ctx, &progress, upload, &name, server.as_deref(), "video", "video/mp4").await
+    let payload = Payload::File(upload);
+    let about = About { server: server.as_deref(), ..About::default() };
+    share(&ctx, &progress, payload, &name, about, "video", "video/mp4").await
 }
 
 #[tauri::command]
@@ -85,7 +99,33 @@ pub async fn share_screenshot(
     };
     let progress = Progress::new(&app, &progress_id);
     let ctx = account_ctx(None).await?;
-    share(&ctx, &progress, &screenshot, &file_name(&screenshot), None, "image", content_type).await
+    let name = file_name(&screenshot);
+    // As the client saved it: who is on it rides along in the PNG and the server reads it there.
+    share(&ctx, &progress, Payload::File(&screenshot), &name, About::default(), "image", content_type).await
+}
+
+/// Logs go up redacted, and with their middle cut out when they are too big.
+#[tauri::command]
+pub async fn share_log(app: AppHandle, content: String, name: String) -> Result<Share, CommandError> {
+    let ctx = account_ctx(None).await?;
+    let max_bytes = ShareApi::limits(ctx.is_experimental)
+        .await
+        .inspect_err(|e| log::warn!("Could not read the upload limits: {e}"))
+        .ok()
+        .and_then(|limits| limits.max_text_bytes)
+        .unwrap_or(logfile::DEFAULT_MAX_BYTES);
+    let text = tokio::task::spawn_blocking(move || logfile::prepare(&content, max_bytes as usize))
+        .await
+        .map_err(AppError::Task)?;
+    if text.trim().is_empty() {
+        return Err(refused("share.errors.empty_log", "the log is empty"));
+    }
+    let name = match name.trim() {
+        "" => "latest.log",
+        name => name,
+    };
+    let progress = Progress::new(&app, "log");
+    share(&ctx, &progress, Payload::Text(text), name, About::default(), "text", "text/plain").await
 }
 
 fn file_name(path: &Path) -> String {
@@ -112,13 +152,16 @@ fn inside_screenshots(folder: &Path, path: &Path) -> crate::error::Result<PathBu
 async fn share(
     ctx: &AccountCtx,
     progress: &Progress<'_>,
-    path: &Path,
+    payload: Payload<'_>,
     name: &str,
-    server: Option<&str>,
+    about: About<'_>,
     kind: &'static str,
     content_type: &'static str,
 ) -> Result<Share, CommandError> {
-    let size = tokio::fs::metadata(path).await.map_err(AppError::Io)?.len();
+    let size = match &payload {
+        Payload::File(path) => tokio::fs::metadata(path).await.map_err(AppError::Io)?.len(),
+        Payload::Text(text) => text.len() as u64,
+    };
 
     progress.report("uploading", 0, size);
     let ticket = ShareApi::start_upload(
@@ -133,15 +176,21 @@ async fn share(
     )
     .await?;
 
-    let file = tokio::fs::File::open(path).await.map_err(AppError::Io)?;
-    let sent = Arc::new(AtomicU64::new(0));
-    let put = ShareApi::put_file(&ticket, size, upload::file_body(file, size, sent.clone()));
-    upload::watch_upload(put, &sent, size, |bytes| progress.report("uploading", bytes, size)).await?;
+    match payload {
+        Payload::File(path) => {
+            let file = tokio::fs::File::open(path).await.map_err(AppError::Io)?;
+            let sent = Arc::new(AtomicU64::new(0));
+            let put = ShareApi::put_file(&ticket, size, upload::file_body(file, size, sent.clone()));
+            upload::watch_upload(put, &sent, size, |bytes| progress.report("uploading", bytes, size))
+                .await?;
+        }
+        Payload::Text(text) => ShareApi::put_file(&ticket, size, text.into()).await?,
+    }
 
     progress.report("checking", size, size);
     let medium = ShareApi::complete_upload(&ctx.token, ctx.is_experimental, &ticket.id).await?;
     let share =
-        ShareApi::create_share(&ctx.token, ctx.is_experimental, &medium.id, server).await?;
+        ShareApi::create_share(&ctx.token, ctx.is_experimental, &medium.id, about.server).await?;
 
     log::info!("Shared {name} as {}", share.page_url);
     crate::commands::analytics_command::track("media_shared", serde_json::json!({ "kind": kind }));

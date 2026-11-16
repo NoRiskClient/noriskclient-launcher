@@ -46,7 +46,6 @@ use commands::minecraft_command::{
     remove_skin,
     reset_skin,
     update_skin_properties,
-    upload_log_to_mclogs_command,
     upload_skin,
 };
 use commands::profile_command::{
@@ -590,7 +589,6 @@ async fn main() {
             open_profile_folder,
             import_profile,
             preview_import_pack,
-            upload_log_to_mclogs_command,
             get_fabric_loader_versions,
             get_forge_versions,
             get_neoforge_versions,
@@ -857,6 +855,7 @@ async fn main() {
             commands::clip_commands::clip_editor_close,
             commands::share::share_clip,
             commands::share::share_screenshot,
+            commands::share::share_log,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

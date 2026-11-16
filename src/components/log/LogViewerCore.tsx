@@ -7,7 +7,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useLogSettingsStore } from "../../store/useLogSettingsStore";
 import { LogEntry, LogLevel } from "../../store/useProcessStore";
 import { openExternalUrl } from "../../services/tauri-service";
-import { uploadLogToMclogs } from "../../services/log-service";
+import { uploadLog } from "../../services/log-service";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -481,8 +481,8 @@ export function LogViewerCore({
         .map((log) => formatLogLineForCopy(log, true))
         .join("\n");
 
-      // Use Tauri backend command instead of direct fetch (CSP blocked in production)
-      const url = await uploadLogToMclogs(logText);
+      const name = selectedLogPath?.split(/[\\/]/).pop() || "latest.log";
+      const url = await uploadLog(logText, name);
 
       await writeText(url);
       toast.success(t('logs.uploaded_url_copied'));

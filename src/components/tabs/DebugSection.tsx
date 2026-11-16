@@ -10,7 +10,7 @@ import {
   listAllMcLogs,
   listProcessLogs,
   getLogFileContent,
-  uploadLogToMclogs,
+  uploadLog,
   type FileInfo,
 } from "../../services/log-service";
 import {
@@ -106,7 +106,7 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
     setUploadingFile(file.path);
     try {
       const content = await getLogFileContent(file.path);
-      const url = await uploadLogToMclogs(content);
+      const url = await uploadLog(content, file.name);
       await writeText(url);
       toast.success(t("debug.uploaded_copied"));
     } catch (e) {

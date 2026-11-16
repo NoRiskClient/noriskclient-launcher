@@ -22,6 +22,11 @@ export interface ShareProgress {
   total: number;
 }
 
+/** Redacts and, when too big, shortens the log in the launcher before it goes up. */
+export async function shareLog(content: string, name: string): Promise<Share> {
+  return invoke<Share>("share_log", { content, name });
+}
+
 export async function shareMedia(target: ShareTarget, progressId: string): Promise<Share> {
   if (target.kind === "clip") {
     return invoke<Share>("share_clip", { path: target.path, progressId });
@@ -51,12 +56,14 @@ const KNOWN_ERRORS = new Set([
   "nrc.media.error.broken_file",
   "nrc.media.error.rate_limited",
   "nrc.media.error.upload_missing",
+  "nrc.media.error.unsupported_text",
   "nrc.share.error.rate_limited",
   "nrc.share.error.banned",
   "nrc.share.error.media",
   "nrc.share.error.server",
   "share.errors.convert_failed",
   "share.errors.converted_too_large",
+  "share.errors.empty_log",
 ]);
 
 /** The translation key for a failed share. */

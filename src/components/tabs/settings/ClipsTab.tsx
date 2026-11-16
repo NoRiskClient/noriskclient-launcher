@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { getLogFileContent, listLauncherLogs, uploadLogToMclogs } from "../../../services/log-service";
+import { getLogFileContent, listLauncherLogs, uploadLog } from "../../../services/log-service";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { Select } from "../../ui/Select";
@@ -982,7 +982,7 @@ function ShareCaptureLog({
         toast.error(t("settings.clips.support.missing"));
         return;
       }
-      const url = await uploadLogToMclogs(await getLogFileContent(log.path));
+      const url = await uploadLog(await getLogFileContent(log.path), log.name);
       await writeText(url);
       toast.success(t("settings.clips.support.uploaded"));
     } catch (e) {
