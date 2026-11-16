@@ -470,6 +470,11 @@ pub async fn check_update_available_command(app: AppHandle) -> Result<Option<cra
 }
 
 #[tauri::command]
+pub fn get_launcher_update_command() -> Option<crate::utils::background_updater::LauncherUpdate> {
+    crate::utils::background_updater::ready_update()
+}
+
+#[tauri::command]
 pub async fn download_and_install_update_command(app: AppHandle) -> Result<(), CommandError> {
     debug!("Executing download_and_install_update_command");
 

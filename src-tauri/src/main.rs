@@ -125,7 +125,7 @@ use commands::vanilla_cape_command::{
 use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_news_and_changelogs_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_launcher_update_command, get_news_and_changelogs_command};
 
 // Import Content commands
 use commands::content_command::{
@@ -643,6 +643,7 @@ async fn main() {
             get_app_version,
             get_news_and_changelogs_command,
             check_update_available_command,
+            get_launcher_update_command,
             download_and_install_update_command,
             get_modrinth_tags_command,
             clear_content_cache_command,

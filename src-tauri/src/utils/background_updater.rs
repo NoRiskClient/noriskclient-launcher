@@ -3,7 +3,7 @@ use crate::error::{AppError, Result};
 use crate::state::state_manager::State;
 use crate::utils::file_utils::write_atomic_sync;
 use crate::utils::metered_network;
-use crate::utils::updater_utils;
+use crate::utils::updater_utils::{self, UpdateInfo};
 use log::{error, info, warn};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
-use tauri::{AppHandle, WebviewWindow};
+use tauri::{AppHandle, Emitter, WebviewWindow};
 use tauri_plugin_updater::Update;
 
 const CHECK_INTERVAL_SECS: std::ops::RangeInclusive<u64> = 5 * 60..=15 * 60;
@@ -21,7 +21,17 @@ const PACKAGE_FILE: &str = "package";
 pub struct PendingUpdate {
     pub update: Update,
     pub bytes: Vec<u8>,
+    info: UpdateInfo,
 }
+
+#[derive(Clone, Serialize)]
+pub struct LauncherUpdate {
+    #[serde(flatten)]
+    pub info: UpdateInfo,
+    pub ready: bool,
+}
+
+const LAUNCHER_UPDATE_EVENT: &str = "launcher_update";
 
 #[derive(Debug, PartialEq)]
 pub struct DownloadedUpdate {
@@ -39,6 +49,19 @@ static PENDING: Mutex<Option<PendingUpdate>> = Mutex::new(None);
 
 fn pending() -> MutexGuard<'static, Option<PendingUpdate>> {
     PENDING.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+pub fn ready_update() -> Option<LauncherUpdate> {
+    pending().as_ref().map(|p| LauncherUpdate {
+        info: p.info.clone(),
+        ready: true,
+    })
+}
+
+fn announce(app: &AppHandle, info: UpdateInfo, ready: bool) {
+    if let Err(e) = app.emit(LAUNCHER_UPDATE_EVENT, LauncherUpdate { info, ready }) {
+        warn!("[Updater] Could not tell the window about update: {}", e);
+    }
 }
 
 pub fn take_pending() -> Option<PendingUpdate> {
@@ -119,12 +142,13 @@ async fn download_latest(app: &AppHandle, beta_channel: bool) -> Result<()> {
     let Some(found) = updater_utils::check_update_available_detailed(app, beta_channel).await? else {
         return Ok(());
     };
-    let update = found.update;
+    let (update, info) = (found.update, found.update_info);
     if pending().as_ref().is_some_and(|p| p.update.version == update.version) {
         return Ok(());
     }
     if metered_network::is_metered().await {
         info!("[Updater] Update {} found, waiting for an unmetered connection to download it", update.version);
+        announce(app, info, false);
         return Ok(());
     }
 
@@ -141,12 +165,17 @@ async fn download_latest(app: &AppHandle, beta_channel: bool) -> Result<()> {
     .await??;
 
     info!("[Updater] Update {} is ready and installs when the launcher closes", update.version);
-    *pending() = Some(PendingUpdate { update, bytes });
+    *pending() = Some(PendingUpdate {
+        update,
+        bytes,
+        info: info.clone(),
+    });
+    announce(app, info, true);
     Ok(())
 }
 
 pub fn install_on_exit() {
-    let Some(PendingUpdate { update, bytes }) = take_pending() else {
+    let Some(PendingUpdate { update, bytes, .. }) = take_pending() else {
         return;
     };
     let version = update.version.clone();

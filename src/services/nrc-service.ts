@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { BlogPost } from '../types/wordPress';
-import type { UpdateInfo } from '../types/updater';
+import type { LauncherUpdate, UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
 import type { AdventCalendarDay, Reward } from '../types/advent';
 import type { UserNotification } from '../types/notification';
@@ -257,6 +257,10 @@ export const resetMobileAppToken = (): Promise<string> => {
  */
 export const checkUpdateAvailable = (): Promise<UpdateInfo | null> => {
   return invoke('check_update_available_command');
+};
+
+export const getLauncherUpdate = (): Promise<LauncherUpdate | null> => {
+  return invoke('get_launcher_update_command');
 };
 
 /**
