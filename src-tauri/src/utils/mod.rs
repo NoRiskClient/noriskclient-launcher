@@ -52,7 +52,7 @@ pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-S
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks
 pub mod system_info; // <-- Hinzufügen
 pub mod updater_utils;
-pub mod verified_files; // Files whose integrity check does not need repeating
+pub mod verified_files;
 pub mod world_utils; // <-- Hinzugefügt
 pub mod trash_utils; // <-- New trash module
 pub mod backup_utils; // <-- New backup module for critical files

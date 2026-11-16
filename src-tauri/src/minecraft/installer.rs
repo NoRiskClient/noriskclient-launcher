@@ -28,7 +28,6 @@ use super::modloader::ModloaderFactory;
 use crate::minecraft::downloads::MinecraftLoggingDownloadService;
 use crate::utils::mc_utils;
 use crate::utils::system_info::Architecture;
-use crate::utils::verified_files;
 use tokio::fs as async_fs;
 
 async fn emit_progress_event(
@@ -87,6 +86,56 @@ macro_rules! summary_phase {
         $summary.record_phase(&$label.to_string(), __start.elapsed().as_millis());
         __result
     }};
+}
+
+type PackConfigRequest = tokio::task::JoinHandle<Result<NoriskModpacksConfig>>;
+
+fn request_pack_config(
+    profile: &Profile,
+    credentials: Option<&Credentials>,
+    is_experimental: bool,
+) -> Option<PackConfigRequest> {
+    let pack_id = profile.selected_norisk_pack_id.as_ref()?;
+    let Some(creds) = credentials else {
+        error!(
+            "A Norisk pack ('{}') is selected, but no credentials were provided. Cannot attempt to update pack configuration.",
+            pack_id
+        );
+        return None;
+    };
+    match creds.norisk_credentials.get_token_for_mode(is_experimental) {
+        Ok(token) => Some(tokio::spawn(async move {
+            NoRiskApi::get_modpacks(&token, is_experimental).await
+        })),
+        Err(token_err) => {
+            warn!(
+                "Could not obtain Norisk token for pack '{}' to update configuration: {}. Will proceed with cached version.",
+                pack_id, token_err
+            );
+            None
+        }
+    }
+}
+
+async fn apply_pack_config(state: &State, pack_id: &str, request: PackConfigRequest) {
+    let refreshed = match request.await {
+        Ok(Ok(new_config)) => state.norisk_pack_manager.update_config(new_config).await,
+        Ok(Err(fetch_err)) => Err(fetch_err),
+        Err(join_err) => Err(AppError::Other(format!(
+            "Pack config request did not finish: {}",
+            join_err
+        ))),
+    };
+    match refreshed {
+        Ok(()) => info!(
+            "Successfully updated Norisk pack '{}' configuration from API.",
+            pack_id
+        ),
+        Err(update_err) => warn!(
+            "Failed to update Norisk pack '{}' configuration: {}. Will proceed with cached version.",
+            pack_id, update_err
+        ),
+    }
 }
 
 pub async fn install_minecraft_version(
@@ -155,33 +204,8 @@ pub async fn install_minecraft_version(
     let total_start = Instant::now();
     let summary = Arc::new(LaunchSummary::default());
 
-    // The pack config request only waits on the network. It is sent now and applied further
-    // down, where the refresh has always happened, so it runs alongside the local checks and
-    // nothing sees the new config earlier than before.
-    let pack_config_request = match (&profile.selected_norisk_pack_id, credentials.as_ref()) {
-        (Some(pack_id), Some(creds)) => {
-            match creds.norisk_credentials.get_token_for_mode(is_experimental_mode) {
-                Ok(token) => Some(tokio::spawn(async move {
-                    NoRiskApi::get_modpacks(&token, is_experimental_mode).await
-                })),
-                Err(token_err) => {
-                    warn!(
-                        "Could not obtain Norisk token for pack '{}' to update configuration: {}. Will proceed with cached version.",
-                        pack_id, token_err
-                    );
-                    None
-                }
-            }
-        }
-        (Some(pack_id), None) => {
-            error!(
-                "A Norisk pack ('{}') is selected, but no credentials were provided. Cannot attempt to update pack configuration.",
-                pack_id
-            );
-            None
-        }
-        (None, _) => None,
-    };
+    let pack_config_request =
+        request_pack_config(&profile, credentials.as_ref(), is_experimental_mode);
 
     // Execute migration if provided
     if let Some(migration) = &migration_info {
@@ -478,9 +502,6 @@ pub async fn install_minecraft_version(
         })
     };
 
-    // The NoRisk assets start with a network request for their manifest and touch none of
-    // the files the vanilla steps touch, so the two run side by side instead of in a row.
-    // A failure is still reported in the order the steps used to run in.
     let (vanilla_result, norisk_assets_result) = tokio::join!(vanilla_steps, norisk_assets_step);
     vanilla_result?;
     norisk_assets_result?;
@@ -629,31 +650,12 @@ pub async fn install_minecraft_version(
     final_game_args.extend(profile.settings.extra_game_args.clone());
     launch_params = launch_params.with_additional_game_args(final_game_args);
 
-    // --- Apply the Norisk config requested at the top, if a pack is selected ---
     let loaded_norisk_config: Option<NoriskModpacksConfig> = if let Some(pack_id) =
         &profile.selected_norisk_pack_id
     {
         if let Some(request) = pack_config_request {
-            let refreshed = match request.await {
-                Ok(Ok(new_config)) => state.norisk_pack_manager.update_config(new_config).await,
-                Ok(Err(fetch_err)) => Err(fetch_err),
-                Err(join_err) => Err(AppError::Other(format!(
-                    "Pack config request did not finish: {}",
-                    join_err
-                ))),
-            };
-            match refreshed {
-                Ok(()) => info!(
-                    "Successfully updated Norisk pack '{}' configuration from API.",
-                    pack_id
-                ),
-                Err(update_err) => warn!(
-                    "Failed to update Norisk pack '{}' configuration: {}. Will proceed with cached version.",
-                    pack_id, update_err
-                ),
-            }
+            apply_pack_config(&state, pack_id, request).await;
         }
-        // The latest config if the refresh went through, the cached one otherwise.
         Some(state.norisk_pack_manager.get_config().await)
     } else {
         None
@@ -760,11 +762,6 @@ pub async fn install_minecraft_version(
             "No Norisk Pack selected for profile '{}', skipping pack download.",
             profile.name
         );
-    }
-
-    // Keep what this launch verified, so the next one does not check it again
-    if let Err(e) = verified_files::save().await {
-        warn!("Could not save the verified files record: {}", e);
     }
 
     // --- Step: Resolve final mod list for syncing ---

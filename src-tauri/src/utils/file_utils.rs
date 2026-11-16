@@ -2,7 +2,7 @@ use crate::error::{AppError, Result};
 use async_zip::tokio::read::seek::ZipFileReader;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
-use log::debug;
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -44,54 +44,53 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     Ok(())
 }
 
-pub struct TreeEntry {
-    pub path: PathBuf,
-    /// `None` for a directory.
-    pub size: Option<u64>,
+#[derive(Default)]
+pub struct TreeListing {
+    pub files: HashMap<PathBuf, u64>,
+    pub dirs: Vec<PathBuf>,
 }
 
-/// Lists everything below `root`, files with their size.
-///
-/// One blocking walk on purpose: tokio's `read_dir` sends every entry and every `metadata`
-/// call to the blocking pool on its own, and across the thousands of files of an asset
-/// tree those round trips cost far more than the disk access they wrap.
-pub async fn scan_tree(root: &Path) -> Vec<TreeEntry> {
+pub async fn scan_tree(root: &Path) -> TreeListing {
     let root = root.to_path_buf();
-    tokio::task::spawn_blocking(move || {
-        let mut entries = Vec::new();
-        let mut pending = vec![root];
-        while let Some(dir) = pending.pop() {
-            let Ok(reader) = std::fs::read_dir(&dir) else {
+    tokio::task::spawn_blocking(move || scan_tree_sync(root))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_tree_sync(root: PathBuf) -> TreeListing {
+    let mut listing = TreeListing::default();
+    let mut pending = vec![root];
+    while let Some(dir) = pending.pop() {
+        let reader = match std::fs::read_dir(&dir) {
+            Ok(reader) => reader,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                warn!("Could not list {}: {}", dir.display(), e);
+                continue;
+            }
+        };
+        for entry in reader.flatten() {
+            let Ok(metadata) = entry.metadata() else {
                 continue;
             };
-            for entry in reader.flatten() {
-                let Ok(metadata) = entry.metadata() else {
-                    continue;
-                };
-                let path = entry.path();
-                if metadata.is_dir() {
-                    pending.push(path.clone());
-                    entries.push(TreeEntry { path, size: None });
-                } else {
-                    entries.push(TreeEntry { path, size: Some(metadata.len()) });
-                }
+            let path = entry.path();
+            if metadata.is_dir() {
+                pending.push(path.clone());
+                listing.dirs.push(path);
+            } else {
+                listing.files.insert(path, metadata.len());
             }
         }
-        entries
-    })
-    .await
-    .unwrap_or_default()
+    }
+    listing
 }
 
-/// Maps every object of a content-addressed store (`<objects>/<xx>/<hash>`) to its size.
 pub async fn scan_object_store(objects_dir: &Path) -> HashMap<String, u64> {
     scan_tree(objects_dir)
         .await
+        .files
         .into_iter()
-        .filter_map(|entry| {
-            let hash = entry.path.file_name()?.to_string_lossy().into_owned();
-            Some((hash, entry.size?))
-        })
+        .filter_map(|(path, size)| Some((path.file_name()?.to_string_lossy().into_owned(), size)))
         .collect()
 }
 

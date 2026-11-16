@@ -8,7 +8,7 @@ use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
 use crate::state::State;
-use crate::utils::file_utils::{scan_object_store, scan_tree, write_atomic};
+use crate::utils::file_utils::{scan_object_store, scan_tree, write_atomic, TreeListing};
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
 use std::collections::{HashMap, HashSet};
@@ -201,20 +201,14 @@ impl NoriskClientAssetsDownloadService {
         )
         .await?;
 
-        // One listing of the target serves every group's copy check and the cleanup after
-        // them. Client-managed packs only place overrides, which live outside it.
-        let mut target_files: HashMap<PathBuf, u64> = HashMap::new();
-        let mut target_dirs: Vec<PathBuf> = Vec::new();
-        if !client_managed {
-            for entry in scan_tree(&target_base_dir).await {
-                match entry.size {
-                    Some(size) => {
-                        target_files.insert(entry.path, size);
-                    }
-                    None => target_dirs.push(entry.path),
-                }
-            }
-        }
+        let TreeListing {
+            files: mut target_files,
+            dirs: target_dirs,
+        } = if client_managed {
+            TreeListing::default()
+        } else {
+            scan_tree(&target_base_dir).await
+        };
 
         // --- Process Each Asset Group ---
         let mut all_expected_target_paths: HashSet<PathBuf> = HashSet::new();
@@ -542,7 +536,6 @@ impl NoriskClientAssetsDownloadService {
             .download_nrc_assets(
                 asset_id,
                 &assets,
-                is_experimental,
                 Some(profile_id),
             )
             .await)
@@ -607,13 +600,10 @@ impl NoriskClientAssetsDownloadService {
     }
 
     /// Downloads NoRisk client assets for a specific asset ID (pack or asset group).
-    /// Returns the object cache as it is afterwards (hash -> size), so the copy step does
-    /// not have to list it again.
     async fn download_nrc_assets(
         &self,
         asset_id: &str,
         assets: &NoriskAssets,
-        _is_experimental: bool,
         profile_id: Option<Uuid>,
     ) -> Result<HashMap<String, u64>> {
         trace!(
@@ -663,7 +653,6 @@ impl NoriskClientAssetsDownloadService {
 
         for (name, asset) in assets_list {
             let hash = asset.hash.clone();
-            let _size = asset.size;
 
             let hash_prefix = &hash[0..2];
             let target_path = objects_dir.join(hash_prefix).join(&hash);
@@ -996,7 +985,6 @@ impl NoriskClientAssetsDownloadService {
                     (target_base_dir.join(&name), false)
                 };
 
-                // Both sides are answered from the listings taken earlier, not from the disk
                 let source_size = match cached_objects.get(hash.as_str()) {
                     Some(&size) => size,
                     None => {
@@ -1009,7 +997,6 @@ impl NoriskClientAssetsDownloadService {
                 };
 
                 let needs_copy = if is_override {
-                    // Overrides land in the game dir, outside the scanned target
                     !fs::try_exists(&target_path).await?
                 } else {
                     match target_files.get(&target_path) {
@@ -1106,8 +1093,6 @@ impl NoriskClientAssetsDownloadService {
         Ok(event_id)
     }
 
-    /// Deletes everything in the target listing that is not present in `expected_paths`:
-    /// files first, then directories from the deepest up, so each is empty when its turn comes.
     async fn cleanup_orphan_assets(
         &self,
         target_files: &HashMap<PathBuf, u64>,

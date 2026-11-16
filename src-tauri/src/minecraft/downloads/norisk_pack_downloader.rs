@@ -260,10 +260,6 @@ impl NoriskPackDownloadService {
         expected_sha1: Option<&str>,
         stats: Option<Arc<DownloadStats>>,
     ) -> Result<()> {
-        // The sidecar is only worth a request for a jar that has not been through this check
-        // since it last changed on disk. Pack versions are immutable, so the answer cannot
-        // differ from last launch, and Modrinth's Maven publishes no sidecars at all: those
-        // requests are 404s that leave the jar on the ZIP heuristic anyway.
         if expected_sha1.is_none() && verified_files::is_verified(target_path, None).await {
             if let Some(stats) = &stats {
                 stats.record_cached();
@@ -288,7 +284,6 @@ impl NoriskPackDownloadService {
 
         DownloadUtils::download_file(url, target_path, config).await?;
 
-        // With a hash, download_file has recorded the jar already.
         if resolved_sha1.is_none() {
             verified_files::mark_verified(target_path, None).await;
         }
