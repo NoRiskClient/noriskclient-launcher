@@ -42,7 +42,7 @@ norisk-ipc = { path = "crates/norisk-ipc" }
 norisk-logging = { path = "crates/norisk-logging" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart", "gzip"] }
 tokio = { version = "1.0", features = ["full"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 thiserror = "1.0"
