@@ -20,7 +20,7 @@ export interface ShareExpiry {
   permanent?: boolean;
 }
 
-/** What payback lets the signed-in player pick; no choices while its flag is off for them. */
+/** What payback lets the signed-in player pick: up to 30 days for everyone, for good only with its flag. */
 export interface ShareChoices {
   expiryDays: number;
   expiryChoices: number[];
