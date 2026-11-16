@@ -7,6 +7,7 @@
 use noriskclient_launcher_v3_lib::*;
 use noriskclient_launcher_v3_lib::{cli, commands, logging, state, utils};
 
+use futures::FutureExt;
 use log::{error, info, trace};
 use std::sync::Arc;
 use tauri::Listener;
@@ -206,100 +207,20 @@ async fn main() {
                 return Ok(());
             }
 
-            // --- Initialize System Tray (Tauri 2.0) ---
-            let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-
-            let _tray = TrayIconBuilder::new()
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .tooltip("NoRisk Client Launcher")
-                .icon(app.default_window_icon().unwrap().clone())
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => utils::main_window::show(app),
-                    "quit" => utils::main_window::quit(app),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| match event {
-                    TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } => utils::main_window::toggle(tray.app_handle()),
-                    TrayIconEvent::DoubleClick {
-                        button: MouseButton::Left,
-                        ..
-                    } => utils::main_window::show(tray.app_handle()),
-                    _ => {}
-                })
-                .build(app)?;
-
-            // --- Deep Link Setup ---
-            // Register deep link schemes (needed for dev mode on Windows/Linux)
-            if let Err(e) = app.deep_link().register_all() {
-                error!("Failed to register deep link schemes: {}", e);
-            } else {
-                info!("Deep link schemes registered successfully.");
-            }
-
-            app.manage(utils::deep_link_utils::PendingDeepLinks::default());
-
-            let deep_link_app_handle = app_handle.clone();
-            app.deep_link().on_open_url(move |event| {
-                let handle = deep_link_app_handle.clone();
-                let urls = event.urls();
-                info!("Deep link received ({} URL(s))", urls.len());
-                tauri::async_runtime::spawn(async move {
-                    utils::deep_link_utils::handle_deep_link(&handle, urls).await;
-                });
-            });
-
-            if let Ok(Some(urls)) = app.deep_link().get_current() {
-                info!("Cold-start deep link detected ({} URL(s))", urls.len());
-                let cold_start_handle = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
-                });
-            }
-            // --- End Deep Link Setup ---
-
-            // --- Handle .noriskpack file opening on initial startup (all platforms) ---
-            // The single-instance plugin does not handle the *very first* launch with arguments.
-            // We still need to check std::env::args() here for that first launch.
-            /*info!("Checking for startup file arguments...");
-            let startup_args: Vec<String> = std::env::args().collect();
-            if startup_args.len() > 1 { // args[0] is exe path, check if there are more
-                let handle_clone = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    // Pass all startup_args; handle_noriskpack_file_paths will skip the exe path if needed
-                    norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
-                });
-            }*/
-            // --- End .noriskpack handling on startup ---
+            commands::legal_commands::request_updates_at_startup();
 
             // Task for State Init and Updater Window
+            let (windows_built, updater_window) =
+                tokio::sync::oneshot::channel::<Option<tauri::WebviewWindow>>();
             let state_init_app_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                // --- Create Updater Window (but keep hidden initially) ---
-                let updater_window = match updater_utils::create_updater_window(&state_init_app_handle).await {
-                    Ok(win) => {
-                        trace!("Updater window created successfully (initially hidden).");
-                        Some(win)
-                    }
-                    Err(e) => {
-                        error!("Failed to create updater window: {}", e);
-                        None
-                    }
-                };
+                let updater_window = updater_window.map(|built| built.ok().flatten()).shared();
 
                 // --- State Initialization ---
                 info!("Initiating state initialization...");
                 if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
                     error!("CRITICAL: Failed to initialize state: {}", e);
-                    if let Some(win) = updater_window {
-                        updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state init error.".to_string(), None);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                    if let Some(win) = updater_window.clone().await {
                         if let Err(close_err) = win.close() {
                             error!("Failed to close updater window after state init error: {}", close_err);
                         }
@@ -406,26 +327,15 @@ async fn main() {
                             trace!("Update check process has finished.");
                         } else {
                             info!("Auto-check for updates is disabled in settings. Skipping update check.");
-                            // Ensure the updater window (if created) is closed if we skip the check.
-                            if let Some(win) = updater_window {
-                                updater_utils::emit_status(&state_init_app_handle, "close", "Auto-update disabled.".to_string(), None);
-                                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await; // Give time for emit to process
-                                if let Err(close_err) = win.close() {
-                                    error!("Failed to close updater window when skipping updates: {}", close_err);
-                                }
-                            }
                         }
                     }
                     Err(e) => {
                         error!("Failed to get global state for update check: {}.", e);
-                        if let Some(win) = updater_window {
-                            updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state fetch error.".to_string(), None);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-                            if let Err(close_err) = win.close() {
-                                error!("Failed to close updater window after state fetch error: {}", close_err);
-                            }
-                        }
                     }
+                }
+
+                if let Some(win) = updater_window.await {
+                    let _ = win.close();
                 }
 
                 info!("Updater process finished. Attempting to show main window...");
@@ -481,6 +391,92 @@ async fn main() {
                 // --- Test Unified Mod Versions ---
                 //debug_utils::debug_unified_mod_versions().await;
             });
+
+            tauri::WebviewWindowBuilder::from_config(&app_handle, &app.config().app.windows[0])?
+                .build()?;
+            let updater_window = match updater_utils::create_updater_window(&app_handle) {
+                Ok(win) => {
+                    trace!("Updater window created successfully (initially hidden).");
+                    Some(win)
+                }
+                Err(e) => {
+                    error!("Failed to create updater window: {}", e);
+                    None
+                }
+            };
+            let _ = windows_built.send(updater_window);
+
+            // --- Initialize System Tray (Tauri 2.0) ---
+            let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            let _tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .tooltip("NoRisk Client Launcher")
+                .icon(app.default_window_icon().unwrap().clone())
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => utils::main_window::show(app),
+                    "quit" => utils::main_window::quit(app),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } => utils::main_window::toggle(tray.app_handle()),
+                    TrayIconEvent::DoubleClick {
+                        button: MouseButton::Left,
+                        ..
+                    } => utils::main_window::show(tray.app_handle()),
+                    _ => {}
+                })
+                .build(app)?;
+
+            // --- Deep Link Setup ---
+            // Register deep link schemes (needed for dev mode on Windows/Linux)
+            if let Err(e) = app.deep_link().register_all() {
+                error!("Failed to register deep link schemes: {}", e);
+            } else {
+                info!("Deep link schemes registered successfully.");
+            }
+
+            app.manage(utils::deep_link_utils::PendingDeepLinks::default());
+
+            let deep_link_app_handle = app_handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                let handle = deep_link_app_handle.clone();
+                let urls = event.urls();
+                info!("Deep link received ({} URL(s))", urls.len());
+                tauri::async_runtime::spawn(async move {
+                    utils::deep_link_utils::handle_deep_link(&handle, urls).await;
+                });
+            });
+
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                info!("Cold-start deep link detected ({} URL(s))", urls.len());
+                let cold_start_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
+                });
+            }
+            // --- End Deep Link Setup ---
+
+            // --- Handle .noriskpack file opening on initial startup (all platforms) ---
+            // The single-instance plugin does not handle the *very first* launch with arguments.
+            // We still need to check std::env::args() here for that first launch.
+            /*info!("Checking for startup file arguments...");
+            let startup_args: Vec<String> = std::env::args().collect();
+            if startup_args.len() > 1 { // args[0] is exe path, check if there are more
+                let handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Pass all startup_args; handle_noriskpack_file_paths will skip the exe path if needed
+                    norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
+                });
+            }*/
+            // --- End .noriskpack handling on startup ---
 
             utils::screen_time::spawn(app_handle.clone());
 

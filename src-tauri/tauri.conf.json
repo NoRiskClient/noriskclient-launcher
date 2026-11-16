@@ -203,6 +203,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
+        "create": false,
         "fullscreen": false,
         "resizable": true,
         "title": "NoRiskClient",

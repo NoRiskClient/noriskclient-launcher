@@ -68,6 +68,25 @@ async fn fetch_updates() -> Result<Vec<LegalDocumentUpdate>> {
     Ok(LegalApi::get_updates(is_experimental).await?)
 }
 
+static REQUESTED_AT_STARTUP: std::sync::Mutex<
+    Option<tauri::async_runtime::JoinHandle<Result<Vec<LegalDocumentUpdate>>>>,
+> = std::sync::Mutex::new(None);
+
+pub fn request_updates_at_startup() {
+    *REQUESTED_AT_STARTUP.lock().unwrap_or_else(|e| e.into_inner()) =
+        Some(tauri::async_runtime::spawn(fetch_updates()));
+}
+
+async fn updates() -> Result<Vec<LegalDocumentUpdate>> {
+    let requested = REQUESTED_AT_STARTUP.lock().unwrap_or_else(|e| e.into_inner()).take();
+    if let Some(request) = requested {
+        if let Ok(updates) = request.await {
+            return updates;
+        }
+    }
+    fetch_updates().await
+}
+
 fn accepted_version(doc: &LegalDocumentUpdate) -> u32 {
     doc.version.max(doc.acknowledgement_version.unwrap_or(0))
 }
@@ -170,7 +189,7 @@ fn pending_document(
 
 #[command]
 pub async fn get_legal_status(locale: String, accepted_legacy_terms: bool) -> Result<LegalStatus> {
-    let updates = match fetch_updates().await {
+    let updates = match updates().await {
         Ok(updates) => updates,
         Err(e) => {
             warn!("Skipping the legal check, updates could not be fetched: {:?}", e);
