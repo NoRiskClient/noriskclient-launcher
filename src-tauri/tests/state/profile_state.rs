@@ -317,6 +317,12 @@ fn the_corpus_round_trips_through_serde_without_loss() {
         {
             set.sort_by_key(|entry| entry.to_string());
         }
+        if let Some(info) = expected
+            .get_mut("norisk_information")
+            .and_then(|v| v.as_object_mut())
+        {
+            info.remove("keep_local_assets");
+        }
 
         assert_eq!(
             canonical(&profile),

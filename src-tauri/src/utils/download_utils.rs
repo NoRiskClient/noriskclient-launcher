@@ -529,7 +529,7 @@ impl DownloadUtils {
             }
         }
 
-        // Check SHA1 hash (slower - reads entire file), unless this exact file already matched it
+        // Check SHA1 hash (slower - reads entire file)
         if let Some(expected_sha1) = config.expected_sha1.as_ref().filter(|_| config.hash_existing_files) {
             if !verified_files::is_verified(target_path, Some(expected_sha1)).await {
                 let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;

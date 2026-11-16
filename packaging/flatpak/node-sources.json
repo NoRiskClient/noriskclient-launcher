@@ -3135,13 +3135,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/sonner/-/sonner-2.0.3.tgz",
-        "sha512": "9e34381e1b7dda6d2c32aa875432f7d95d8eba7f56d7e3c73bd343bfd1477c98d3dc94f6d881b8269a3714f432fa6a2e44a0971563beafaeefe8cac75f6cde20",
-        "dest-filename": "sonner-2.0.3.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
         "sha512": "51758c2a12cec1529bef6f0852d40f5f17d853ebac7726ed52b2bff2e184f0240cbeb84ea70bf30c1c23d108522fb31073bbc8b084811bc550f3e203431a5f40",
         "dest-filename": "source-map-js-1.2.1.tgz",
