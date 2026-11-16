@@ -207,14 +207,13 @@ async fn main() {
                 return Ok(());
             }
 
+            commands::legal_commands::request_updates_at_startup();
+
             // Task for State Init and Updater Window
-            // Neither needs a window. The task is started before the two windows are built, so
-            // it runs while WebView2 comes up instead of after it.
             let (windows_built, updater_window) =
                 tokio::sync::oneshot::channel::<Option<tauri::WebviewWindow>>();
             let state_init_app_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                // Resolves once setup has built both windows; None if the updater window failed.
                 let updater_window = updater_window.map(|built| built.ok().flatten()).shared();
 
                 // --- State Initialization ---
@@ -281,8 +280,6 @@ async fn main() {
                 }
                 info!("State initialization finished successfully.");
 
-                commands::legal_commands::request_updates_at_startup();
-
                 // Sweep last session's throwaway temp profiles into the trash
                 // (non-blocking, best-effort). The trash's purge_expired retention
                 // then deletes them for good. See utils::trash_utils.
@@ -337,10 +334,6 @@ async fn main() {
                     }
                 }
 
-                // The updater window has done its job or was never needed. It is closed from
-                // here: its own page closes it on an event, and misses that event when the
-                // check is quicker than the page load. Its page may already have done so, hence
-                // no error handling. Having it also means the main window exists by now.
                 if let Some(win) = updater_window.await {
                     let _ = win.close();
                 }
@@ -399,8 +392,6 @@ async fn main() {
                 //debug_utils::debug_unified_mod_versions().await;
             });
 
-            // Built here rather than by Tauri before setup ("create": false in tauri.conf.json),
-            // so that the task above is already running when WebView2 starts.
             tauri::WebviewWindowBuilder::from_config(&app_handle, &app.config().app.windows[0])?
                 .build()?;
             let updater_window = match updater_utils::create_updater_window(&app_handle) {
