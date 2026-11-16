@@ -856,6 +856,7 @@ async fn main() {
             commands::share::share_clip,
             commands::share::share_screenshot,
             commands::share::share_log,
+            commands::share::share_choices,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

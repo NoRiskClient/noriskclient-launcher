@@ -44,10 +44,39 @@ pub struct Medium {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ShareCreate<'a> {
     media: [&'a str; 1],
     #[serde(skip_serializing_if = "Option::is_none")]
     server: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expiry_days: Option<u32>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    permanent: bool,
+}
+
+/// What payback lets the signed-in player pick for how long a share stays up.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareChoices {
+    #[serde(default)]
+    pub expiry_days: u32,
+    #[serde(default)]
+    pub expiry_choices: Vec<u32>,
+    #[serde(default)]
+    pub permanent_choice: bool,
+    #[serde(default)]
+    pub max_pinned: u32,
+}
+
+/// How long a share stays up, as the player picked; nothing picked is payback's default.
+#[derive(Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareExpiry {
+    #[serde(default)]
+    pub days: Option<u32>,
+    #[serde(default)]
+    pub permanent: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -125,17 +154,29 @@ impl ShareApi {
             .await
     }
 
+    /// The signed-in player's own choices; without the flag there are none.
+    pub async fn choices(token: &str, is_experimental: bool) -> Result<ShareChoices> {
+        nrc_get(format!("{}/limits", Self::shares_url(is_experimental)))
+            .bearer(token)
+            .timeout(LIMITS_TIMEOUT)
+            .json::<ShareChoices>("Share limits")
+            .await
+    }
+
     pub async fn create_share(
         token: &str,
         is_experimental: bool,
         medium_id: &str,
         server: Option<&str>,
+        expiry: ShareExpiry,
     ) -> Result<Share> {
         nrc_post(Self::shares_url(is_experimental))
             .bearer(token)
             .json_body(&ShareCreate {
                 media: [medium_id],
                 server,
+                expiry_days: expiry.days,
+                permanent: expiry.permanent,
             })
             .json::<Share>("Media share")
             .await

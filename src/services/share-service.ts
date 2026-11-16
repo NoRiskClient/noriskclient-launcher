@@ -14,6 +14,20 @@ export type ShareTarget =
 
 export type SharePhase = "converting" | "uploading" | "checking";
 
+/** How long a share stays up; nothing picked is payback's default. */
+export interface ShareExpiry {
+  days?: number;
+  permanent?: boolean;
+}
+
+/** What payback lets the signed-in player pick; no choices while its flag is off for them. */
+export interface ShareChoices {
+  expiryDays: number;
+  expiryChoices: number[];
+  permanentChoice: boolean;
+  maxPinned: number;
+}
+
 /** Frames while converting (total 0 until the engine knows), bytes while uploading. */
 export interface ShareProgress {
   id: string;
@@ -27,9 +41,21 @@ export async function shareLog(content: string, name: string): Promise<Share> {
   return invoke<Share>("share_log", { content, name });
 }
 
-export async function shareMedia(target: ShareTarget, progressId: string): Promise<Share> {
+export async function getShareChoices(): Promise<ShareChoices> {
+  return invoke<ShareChoices>("share_choices");
+}
+
+export function offersChoice(choices: ShareChoices | null): choices is ShareChoices {
+  return !!choices && (choices.expiryChoices.length > 0 || choices.permanentChoice);
+}
+
+export async function shareMedia(
+  target: ShareTarget,
+  progressId: string,
+  expiry?: ShareExpiry,
+): Promise<Share> {
   if (target.kind === "clip") {
-    return invoke<Share>("share_clip", { path: target.path, progressId });
+    return invoke<Share>("share_clip", { path: target.path, progressId, expiry: expiry ?? null });
   }
   return invoke<Share>("share_screenshot", {
     profileId: target.profileId,
@@ -61,6 +87,7 @@ const KNOWN_ERRORS = new Set([
   "nrc.share.error.banned",
   "nrc.share.error.media",
   "nrc.share.error.server",
+  "nrc.share.error.pin_limit",
   "share.errors.convert_failed",
   "share.errors.converted_too_large",
   "share.errors.empty_log",

@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::commands::request_context::{account_ctx, AccountCtx};
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::share_api::{Share, ShareApi, UploadRequest};
+use crate::minecraft::api::share_api::{Share, ShareApi, ShareChoices, ShareExpiry, UploadRequest};
 use crate::state::State;
 use upload::Progress;
 
@@ -19,6 +19,7 @@ use upload::Progress;
 #[derive(Default)]
 struct About<'a> {
     server: Option<&'a str>,
+    expiry: ShareExpiry,
 }
 
 enum Payload<'a> {
@@ -40,6 +41,7 @@ pub async fn share_clip(
     app: AppHandle,
     path: PathBuf,
     progress_id: String,
+    expiry: Option<ShareExpiry>,
 ) -> Result<Share, CommandError> {
     let state = State::get().await?;
     let clips = state.config_manager.get_config().await.clips;
@@ -65,7 +67,7 @@ pub async fn share_clip(
     let upload = converted.as_ref().map_or(clip.as_path(), |c| c.path());
     let name = file_name(&clip);
     let payload = Payload::File(upload);
-    let about = About { server: server.as_deref(), ..About::default() };
+    let about = About { server: server.as_deref(), expiry: expiry.unwrap_or_default() };
     share(&ctx, &progress, payload, &name, about, "video", "video/mp4").await
 }
 
@@ -102,6 +104,13 @@ pub async fn share_screenshot(
     let name = file_name(&screenshot);
     // As the client saved it: who is on it rides along in the PNG and the server reads it there.
     share(&ctx, &progress, Payload::File(&screenshot), &name, About::default(), "image", content_type).await
+}
+
+/// How long the signed-in player may make a share last; none when payback offers no choice.
+#[tauri::command]
+pub async fn share_choices() -> Result<ShareChoices, CommandError> {
+    let ctx = account_ctx(None).await?;
+    Ok(ShareApi::choices(&ctx.token, ctx.is_experimental).await?)
 }
 
 /// Logs go up redacted, and with their middle cut out when they are too big.
@@ -190,7 +199,8 @@ async fn share(
     progress.report("checking", size, size);
     let medium = ShareApi::complete_upload(&ctx.token, ctx.is_experimental, &ticket.id).await?;
     let share =
-        ShareApi::create_share(&ctx.token, ctx.is_experimental, &medium.id, about.server).await?;
+        ShareApi::create_share(&ctx.token, ctx.is_experimental, &medium.id, about.server, about.expiry)
+            .await?;
 
     log::info!("Shared {name} as {}", share.page_url);
     crate::commands::analytics_command::track("media_shared", serde_json::json!({ "kind": kind }));

@@ -10,6 +10,7 @@ import {
   onShareProgress,
   shareErrorKey,
   shareMedia,
+  type ShareExpiry,
   type ShareTarget,
 } from "../services/share-service";
 
@@ -26,7 +27,7 @@ export function useShareUpload() {
   const paths = useSharing((state) => state.paths);
 
   const share = useCallback(
-    async (target: ShareTarget) => {
+    async (target: ShareTarget, expiry?: ShareExpiry) => {
       if (useSharing.getState().paths.includes(target.path)) return;
       markSharing(target.path, true);
 
@@ -54,7 +55,7 @@ export function useShareUpload() {
       }).catch(() => null);
 
       try {
-        const { pageUrl } = await shareMedia(target, progressId);
+        const { pageUrl } = await shareMedia(target, progressId, expiry);
         finished = true;
         const copied = await writeText(pageUrl).then(
           () => true,

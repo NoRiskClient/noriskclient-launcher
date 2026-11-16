@@ -15,6 +15,7 @@ import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContext
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useShareUpload } from "../../hooks/useShareUpload";
+import { getShareChoices, offersChoice, type ShareChoices } from "../../services/share-service";
 import {
   deleteClip,
   exportGif,
@@ -32,6 +33,7 @@ import {
 import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
+import { ShareExpiryModal } from "./ShareExpiryModal";
 import { VerticalExport } from "./VerticalExport";
 import { clipFailure, useClipEngineEvents } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -60,11 +62,22 @@ export function ClipGallery({
   const { confirm, confirmDialog } = useConfirmDialog();
   const { share, isSharing } = useShareUpload();
 
+  // With a choice from payback the player picks how long the clip stays up, else it goes up for the default.
+  const shareClip = useCallback(
+    async (clip: ClipEntry) => {
+      const choices = await getShareChoices().catch(() => null);
+      if (offersChoice(choices)) setPicking({ clip, choices });
+      else void share({ kind: "clip", path: clip.path });
+    },
+    [share],
+  );
+
   const [clips, setClips] = useState<ClipEntry[] | null>(null);
   const [usage, setUsage] = useState<ClipStorageUsage | null>(null);
   const [selected, setSelected] = useState<ClipEntry | null>(null);
   const [vertical, setVertical] = useState<ClipEntry | null>(null);
   const [renaming, setRenaming] = useState<ClipEntry | null>(null);
+  const [picking, setPicking] = useState<{ clip: ClipEntry; choices: ShareChoices } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [gifting, setGifting] = useState<string[]>([]);
   const gifs = useRef(new Set<string>());
@@ -352,7 +365,7 @@ export function ClipGallery({
                 onThumbnail={refresh}
                 onVertical={() => setVertical(clip)}
                 onGif={() => void makeGif(clip)}
-                onShare={() => void share({ kind: "clip", path: clip.path })}
+                onShare={() => void shareClip(clip)}
                 t={t}
               />
             ))}
@@ -367,8 +380,21 @@ export function ClipGallery({
           onClose={() => setSelected(null)}
           onVertical={() => setVertical(selected)}
           sharing={isSharing(selected.path)}
-          onShare={() => void share({ kind: "clip", path: selected.path })}
+          onShare={() => void shareClip(selected)}
           t={t}
+        />
+      )}
+
+      {picking && (
+        <ShareExpiryModal
+          key={picking.clip.path}
+          name={picking.clip.name}
+          choices={picking.choices}
+          onClose={() => setPicking(null)}
+          onShare={(expiry) => {
+            setPicking(null);
+            void share({ kind: "clip", path: picking.clip.path }, expiry);
+          }}
         />
       )}
 
