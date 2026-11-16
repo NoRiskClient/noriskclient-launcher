@@ -79,13 +79,12 @@ pub fn request_updates_at_startup() {
 
 async fn updates() -> Result<Vec<LegalDocumentUpdate>> {
     let requested = REQUESTED_AT_STARTUP.lock().unwrap_or_else(|e| e.into_inner()).take();
-    match requested {
-        Some(request) => match request.await {
-            Ok(updates) => updates,
-            Err(_) => fetch_updates().await,
-        },
-        None => fetch_updates().await,
+    if let Some(request) = requested {
+        if let Ok(updates) = request.await {
+            return updates;
+        }
     }
+    fetch_updates().await
 }
 
 fn accepted_version(doc: &LegalDocumentUpdate) -> u32 {
