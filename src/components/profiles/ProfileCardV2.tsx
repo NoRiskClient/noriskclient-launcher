@@ -515,7 +515,7 @@ export function ProfileCardV2({
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
             {variant === "3d" && (
-              <span className={`font-minecraft ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
+              <span className={`font-minecraft ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>{t("nav.mods")}</span>
             )}
           </button>
         </div>
@@ -560,7 +560,7 @@ export function ProfileCardV2({
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
                   className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
-                  title={pinned ? "Unpin" : "Pin to Top"}
+                  title={pinned ? t("profiles.card.unpin") : t("profiles.card.pin_to_top")}
                   data-action="pin"
                 >
                   <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />
@@ -637,8 +637,8 @@ export function ProfileCardV2({
                      />
                      <span>
                        {profile.loader === "vanilla" 
-                         ? "Vanilla" 
-                         : `${resolvedLoaderVersion?.version || profile.loader_version || "Unknown"}`
+                         ? t("common.vanilla") 
+                         : `${resolvedLoaderVersion?.version || profile.loader_version || t("common.unknown")}`
                        }
                      </span>
                    </div>
@@ -745,7 +745,7 @@ export function ProfileCardV2({
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
               className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
-              title={pinned ? "Unpin" : "Pin to Top"}
+              title={pinned ? t("profiles.card.unpin") : t("profiles.card.pin_to_top")}
               data-action="pin"
             >
               <Icon icon={pinned ? "solar:pin-bold" : "solar:pin-bold-duotone"} className="w-4 h-4" />

@@ -3,6 +3,7 @@
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import {
@@ -35,7 +36,8 @@ export interface SearchStyleInputProps
 }
 
 export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputProps>(
-  ({ className, placeholder = "Enter name for new profile", icon, error, ...props }, ref) => {
+  ({ className, placeholder, icon, error, ...props }, ref) => {
+    const { t } = useTranslation();
     const accentColor = useThemeStore((state) => state.accentColor);
 
     return (
@@ -47,7 +49,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
           <input
             ref={ref}
             type="text"
-            placeholder={placeholder}
+            placeholder={placeholder ?? t("profiles.name_placeholder_default")}
             className={cn(
               "bg-transparent text-white placeholder-white/50 font-minecraft text-lg flex-1 outline-none",
               className
@@ -79,7 +81,8 @@ export interface SearchStyleTextAreaProps
 }
 
 export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTextAreaProps>(
-  ({ className, placeholder = "Enter text...", icon, error, minHeight = "100px", ...props }, ref) => {
+  ({ className, placeholder, icon, error, minHeight = "100px", ...props }, ref) => {
+    const { t } = useTranslation();
     return (
       <div className="w-full">
         <div className="flex items-start gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
@@ -88,7 +91,7 @@ export const SearchStyleTextArea = forwardRef<HTMLTextAreaElement, SearchStyleTe
           )}
           <textarea
             ref={ref}
-            placeholder={placeholder}
+            placeholder={placeholder ?? t("common.enter_text")}
             className={cn(
               "bg-transparent text-white placeholder-white/50 font-minecraft text-sm flex-1 outline-none resize-none",
               className
@@ -127,6 +130,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -262,7 +266,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 type="button"
                 onClick={handleClear}
                 className="flex items-center justify-center w-10 h-full transition-opacity duration-200 hover:opacity-80 text-white"
-                aria-label="Clear input"
+                aria-label={t("common.clear_input")}
                 tabIndex={-1}
               >
                 <Icon icon="lucide:x" className="w-4 h-4" />

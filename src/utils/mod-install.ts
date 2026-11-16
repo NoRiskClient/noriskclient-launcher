@@ -2,6 +2,7 @@ import UnifiedService from '../services/unified-service';
 import type { UnifiedModSearchResult, UnifiedVersion } from '../types/unified';
 import type { ContentType as NrContentType, InstallContentPayload } from '../types/content';
 import { logInfo } from './logging-utils';
+import i18n from '../i18n/i18n';
 
 export interface ProfileTarget {
   gameVersion: string;
@@ -60,7 +61,7 @@ export const fetchVersions = async (
     project_id: project.project_id,
   });
   if (!response.versions?.length) {
-    throw new Error(`No versions found for ${project.title}`);
+    throw new Error(i18n.t("mod_install.no_versions_found", { title: project.title }));
   }
   return response.versions;
 };
@@ -97,7 +98,7 @@ export const selectVersion = (
 export const profileTargetFor = (version: UnifiedVersion): ProfileTarget => {
   const gameVersion = newestMinecraftVersion(version);
   if (!gameVersion) {
-    throw new Error(`${version.version_number} names no Minecraft version`);
+    throw new Error(i18n.t("mod_install.no_minecraft_version", { version: version.version_number }));
   }
   return {
     gameVersion,

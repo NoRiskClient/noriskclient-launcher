@@ -383,9 +383,9 @@ export function AdvancedTab() {
                     {t("settings.hooks.examples.title")}
                   </h4>
                   <div className="space-y-2 text-sm text-blue-200/80 font-minecraft">
-                    <p><strong>Pre-Launch:</strong> <code>echo "Starting game..."</code></p>
-                    <p><strong>Wrapper:</strong> <code>firejail</code> or <code>gamemoderun</code></p>
-                    <p><strong>Post-Exit:</strong> <code>notify-send "Game finished"</code></p>
+                    <p><strong>{t("settings.hooks.pre_launch.title")}:</strong> <code>{t("settings.hooks.examples.pre_launch")}</code></p>
+                    <p><strong>{t("settings.hooks.wrapper.title")}:</strong> <code>{t("settings.hooks.examples.wrapper")}</code> {t("common.or")} <code>{t("settings.hooks.examples.wrapper_alt")}</code></p>
+                    <p><strong>{t("settings.hooks.post_exit.title")}:</strong> <code>{t("settings.hooks.examples.post_exit")}</code></p>
                   </div>
                 </div>
               </div>

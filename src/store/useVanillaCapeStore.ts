@@ -128,7 +128,7 @@ export const useVanillaCapeStore = create<VanillaCapeState>()(
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Failed to refresh cape data";
           set({ error: errorMessage, isLoading: false });
-          toast.error(`Failed to refresh cape data: ${errorMessage}`);
+          toast.error(i18n.t("vanilla_capes.refresh_failed", { error: errorMessage }));
           console.error("Failed to refresh vanilla cape data:", error);
         }
       },

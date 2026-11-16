@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 const FALLBACK_SKIN_URL = "/skins/default_steve_full.png";
 
@@ -26,6 +27,7 @@ export function SkinViewer({
   className,
   style,
 }: SkinViewerProps) {
+  const { t } = useTranslation();
   const [hasError, setHasError] = useState(false);
 
   // Reset error state if skinUrl changes, to allow retrying if a new valid URL is provided
@@ -46,7 +48,7 @@ export function SkinViewer({
     return (
       <img
         src={fallbackUrl}
-        alt={playerName ? `${playerName}'s Skin` : "Minecraft Skin"}
+        alt={playerName ? t("skins.skin_of_named", { name: playerName }) : t("skins.minecraft_skin")}
         width={width}
         height={height}
         className={cn("object-contain rounded-md select-none", className)}
@@ -64,7 +66,7 @@ export function SkinViewer({
   return (
     <img
       src={skinUrl}
-      alt={playerName ? `${playerName}'s Skin` : "Minecraft Skin"}
+      alt={playerName ? t("skins.skin_of_named", { name: playerName }) : t("skins.minecraft_skin")}
       width={width}
       height={height}
       className={cn("object-contain rounded-md select-none", className)}

@@ -1,3 +1,4 @@
+import i18n from "../i18n/i18n";
 /**
  * Base interface for all notification content types.
  */
@@ -248,6 +249,7 @@ const TYPES = {
  * Helper to get the display message from a notification.
  */
 export function getNotificationMessage(notification: NotificationContent): string {
+  const someone = i18n.t("notifications.someone");
   switch (notification.type) {
     // Base notifications
     case TYPES.SIMPLE_TEXT:
@@ -257,60 +259,60 @@ export function getNotificationMessage(notification: NotificationContent): strin
 
     // Friend notifications
     case TYPES.FRIEND_REQUEST_RECEIVED:
-      return `${(notification as FriendRequestReceivedNotification).friend.name} sent you a friend request!`;
+      return i18n.t("notifications.friend_request_received", { name: (notification as FriendRequestReceivedNotification).friend.name });
     case TYPES.FRIEND_REQUEST_ACCEPTED:
-      return `${(notification as FriendRequestAcceptedNotification).friend.name} accepted your friend request!`;
+      return i18n.t("notifications.friend_request_accepted", { name: (notification as FriendRequestAcceptedNotification).friend.name });
 
     // Shop notifications
     case TYPES.SHOP_GIFT_RECEIVED: {
       const n = notification as ShopGiftReceivedNotification;
-      const sender = n.anonymous ? "Someone" : n.grantor.name;
-      return `${sender} gifted you "${n.shopItem.name}"!`;
+      const sender = n.anonymous ? someone : n.grantor.name;
+      return i18n.t("notifications.shop_gift_received", { sender, item: n.shopItem.name });
     }
     case TYPES.SHOP_ITEM_BOUGHT:
-      return `You purchased "${(notification as ShopItemBoughtNotification).shopItem.name}"!`;
+      return i18n.t("notifications.shop_item_bought", { item: (notification as ShopItemBoughtNotification).shopItem.name });
     case TYPES.SHOP_ITEM_EXPIRING_SOON:
-      return `Your item "${(notification as ShopItemExpiringSoonNotification).shopItem.name}" is expiring soon!`;
+      return i18n.t("notifications.shop_item_expiring_soon", { item: (notification as ShopItemExpiringSoonNotification).shopItem.name });
     case TYPES.SHOP_ITEM_EXPIRED:
-      return `Your item "${(notification as ShopItemExpiredNotification).shopItem.name}" has expired.`;
+      return i18n.t("notifications.shop_item_expired", { item: (notification as ShopItemExpiredNotification).shopItem.name });
 
     // McReal notifications
     case TYPES.MCREAL_PUNISHMENT:
-      return `You have been punished on McReal: ${(notification as McRealPunishmentNotification).reason}`;
+      return i18n.t("notifications.mcreal_punishment", { reason: (notification as McRealPunishmentNotification).reason });
     case TYPES.MCREAL_PUNISHMENT_REVOKED:
-      return "Your McReal punishment has been revoked!";
+      return i18n.t("notifications.mcreal_punishment_revoked");
     case TYPES.MCREAL_POST_COMMENTED: {
       const n = notification as McRealPostCommentedNotification;
-      const who = n.commenterInfo?.name ?? "Someone";
+      const who = n.commenterInfo?.name ?? someone;
       const preview = n.commentPreview ? `: "${n.commentPreview}"` : "";
-      return `${who} commented on your McReal post${preview}`;
+      return i18n.t("notifications.mcreal_post_commented", { who, preview });
     }
     case TYPES.MCREAL_COMMENT_COMMENTED: {
       const n = notification as McRealCommentCommentedNotification;
-      const who = n.commenterInfo?.name ?? "Someone";
+      const who = n.commenterInfo?.name ?? someone;
       const preview = n.commentPreview ? `: "${n.commentPreview}"` : "";
-      return `${who} replied to your comment${preview}`;
+      return i18n.t("notifications.mcreal_comment_commented", { who, preview });
     }
     case TYPES.MCREAL_POSTED: {
       const n = notification as McRealPostedNotification;
-      const who = n.authorInfo?.name ?? "A friend";
-      return `${who} posted on McReal!`;
+      const who = n.authorInfo?.name ?? i18n.t("notifications.a_friend");
+      return i18n.t("notifications.mcreal_posted", { who });
     }
     case TYPES.MCREAL_MENTIONED_IN_POST: {
       const n = notification as McRealMentionedInPostNotification;
-      const who = n.authorInfo?.name ?? "Someone";
-      return `${who} mentioned you in a McReal post!`;
+      const who = n.authorInfo?.name ?? someone;
+      return i18n.t("notifications.mcreal_mentioned_in_post", { who });
     }
     case TYPES.MCREAL_MENTIONED_IN_COMMENT: {
       const n = notification as McRealMentionedInCommentNotification;
-      const who = n.authorInfo?.name ?? "Someone";
+      const who = n.authorInfo?.name ?? someone;
       const preview = n.commentPreview ? `: "${n.commentPreview}"` : "";
-      return `${who} mentioned you in a comment${preview}`;
+      return i18n.t("notifications.mcreal_mentioned_in_comment", { who, preview });
     }
 
     // Fallback for unknown notification types
     default:
-      return "New notification";
+      return i18n.t("notifications.new_notification");
   }
 }
 

@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { FONT_PRESETS } from "../config/fonts";
 import { CUSTOM_FONT_ID, useFontStore } from "../store/font-store";
 import { Combobox } from "./ui/Combobox";
+import { useTranslation } from "react-i18next";
 
 interface FontSelectorProps {
   disabled?: boolean;
@@ -20,6 +21,7 @@ const COMMON_FONTS = [
 ];
 
 export function FontSelector({ disabled }: FontSelectorProps) {
+  const { t } = useTranslation();
   const { fontId, setFont, customFamily, setCustomFamily } = useFontStore();
   const presets = Object.values(FONT_PRESETS);
   const isCustom = fontId === CUSTOM_FONT_ID;
@@ -71,7 +73,7 @@ export function FontSelector({ disabled }: FontSelectorProps) {
                 className={cn("text-base transition-colors", isSelected ? "text-white" : "text-white/80")}
                 style={{ fontFamily: preset.preview }}
               >
-                {preset.name}
+                {t(`settings.font.preset.${preset.id}`, { defaultValue: preset.name })}
               </span>
               {isSelected && (
                 <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white absolute top-2 right-2" />
@@ -100,7 +102,7 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             className={cn("text-base transition-colors", isCustom ? "text-white" : "text-white/80")}
             style={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
           >
-            {customFamily?.trim() ? customFamily : "Custom"}
+            {customFamily?.trim() ? customFamily : t("settings.font.custom")}
           </span>
           {isCustom && (
             <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-white absolute top-2 right-2" />
@@ -116,11 +118,11 @@ export function FontSelector({ disabled }: FontSelectorProps) {
             options={fonts}
             disabled={disabled}
             allowClear
-            placeholder="Pick or type a font (e.g. Comic Sans MS, Inter)"
+            placeholder={t("settings.font.custom_placeholder")}
             inputStyle={customFamily ? { fontFamily: `"${customFamily}", sans-serif` } : undefined}
             optionStyle={(f) => ({ fontFamily: `"${f}", sans-serif` })}
           />
-          <span className="text-xs text-white/40 font-minecraft">{fonts.length} fonts available</span>
+          <span className="text-xs text-white/40 font-minecraft">{t("settings.font.fonts_available", { count: fonts.length })}</span>
         </div>
       )}
     </div>

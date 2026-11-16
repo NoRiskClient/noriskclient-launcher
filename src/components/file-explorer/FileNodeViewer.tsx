@@ -48,6 +48,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
   expandedNodes,
   selectedFiles,
 }) => {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -100,7 +101,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
                 onToggleExpand(node.path, e);
             }}
             className="expand-toggle-button p-0.5 mr-1 text-white/70 hover:text-white flex-shrink-0"
-            aria-label={currentIsExpanded ? 'Collapse' : 'Expand'}
+            aria-label={currentIsExpanded ? t('common.collapse') : t('common.expand')}
           >
             <Icon icon={currentIsExpanded ? "solar:alt-arrow-down-bold" : "solar:alt-arrow-right-bold"} className="w-4 h-4" />
           </button>

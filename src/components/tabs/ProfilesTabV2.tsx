@@ -147,7 +147,7 @@ export function ProfilesTabV2() {
   // Create groups array with default groups + dynamic groups
   const createGroups = (): GroupTab[] => {
     const defaultGroups: GroupTab[] = [
-      { id: "all", name: "All", count: getFilteredCountForGroup("all") },
+      { id: "all", name: t("profiles.v3.filter.all"), count: getFilteredCountForGroup("all") },
       { id: "nrc", name: "NRC", count: getFilteredCountForGroup("nrc") },
       { id: "server", name: "SERVER", count: getFilteredCountForGroup("server") },
       { id: "modpacks", name: "MODPACKS", count: getFilteredCountForGroup("modpacks") },

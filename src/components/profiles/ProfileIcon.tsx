@@ -235,10 +235,10 @@ export function ProfileIcon({
       onClick={canBeClicked ? handleIconClick : undefined}
       title={
         displaySpinner
-          ? "Processing..."
+          ? t("profiles.icon.processing")
           : hasImage
-            ? (isEditable ? "Change Profile Icon" : (profileName || "Profile Icon"))
-            : (isEditable ? "Select Profile Icon" : (profileName || "Profile Icon"))
+            ? (isEditable ? t("profiles.icon.change") : (profileName || t("profiles.icon.label")))
+            : (isEditable ? t("profiles.icon.select") : (profileName || t("profiles.icon.label")))
       }
       role={canBeClicked ? "button" : undefined}
       tabIndex={canBeClicked ? 0 : undefined}
@@ -255,7 +255,7 @@ export function ProfileIcon({
         <>
           <img
             src={imageUrl!}
-            alt={profileName ? `${profileName} icon` : "Profile Icon"}
+            alt={profileName ? t("profiles.icon.alt_named", { name: profileName }) : t("profiles.icon.label")}
             className={cn(
                 "w-full h-full object-cover transition-opacity duration-300",
                 canBeClicked && "group-hover:opacity-60"

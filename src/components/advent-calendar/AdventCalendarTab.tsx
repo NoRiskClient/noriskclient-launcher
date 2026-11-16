@@ -10,6 +10,7 @@ import { AdventRewardModal } from "./AdventRewardModal";
 import { getAdventCalendar, claimAdventCalendarDay } from "../../services/nrc-service";
 import type { Reward, AdventCalendarDay, AdventCalendarDayStatus } from "../../types/advent";
 import { toast } from "react-hot-toast";
+import i18n from "../../i18n/i18n";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import { translateApiError } from "../../utils/nrc-error-translations";
 
@@ -22,23 +23,23 @@ interface AdventDoorProps {
 }
 
 function getRewardShortLabel(reward: Reward | null, shopItemName?: string | null): string {
-  if (!reward) return "Opened";
+  if (!reward) return i18n.t("advent.door.opened");
   
   switch (reward.type) {
     case "Coins":
-      return `${reward.amount} Coins`;
+      return i18n.t("advent.coins_amount", { amount: reward.amount });
     case "ShopItem":
-      return shopItemName || "Shop Item";
+      return shopItemName || i18n.t("advent.door.shop_item");
     case "RandomShopItem":
-      return `Random ${reward.itemType}`;
+      return i18n.t("advent.door.random_item", { itemType: reward.itemType });
     case "Discount":
-      return `${reward.percentage}% Off`;
+      return i18n.t("advent.door.discount", { percentage: reward.percentage });
     case "NrcPlus":
-      return `${Math.floor(reward.duration / (1000 * 60 * 60 * 24))}d Plus`;
+      return i18n.t("advent.door.plus_days", { days: Math.floor(reward.duration / (1000 * 60 * 60 * 24)) });
     case "Theme":
-      return "Theme";
+      return i18n.t("advent.door.theme");
     default:
-      return "Opened";
+      return i18n.t("advent.door.opened");
   }
 }
 
@@ -141,7 +142,7 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
                 color: isHovered ? accentColor.value : undefined,
               }}
             >
-              Open
+              {i18n.t("advent.door.open")}
             </span>
           </>
         )}
@@ -339,10 +340,10 @@ export function AdventCalendarTab() {
             {/* Left: Title */}
             <div>
               <h1 className="font-smallcaps text-xl mb-1" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}>
-                Advent Calendar
+                {t("advent.title")}
               </h1>
               <p className="text-white/70 font-minecraft text-sm">
-                Open a door every day in December
+                {t("advent.subtitle")}
               </p>
             </div>
             

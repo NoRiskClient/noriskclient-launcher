@@ -132,7 +132,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
               if (currentProfileStateAfterPoll.isButtonLaunching) {
                 finalizeButtonLaunch(
                   profileId,
-                  currentProfileStateAfterPoll.error || "Unknown error after completion."
+                  currentProfileStateAfterPoll.error || i18n.t("launch.errors.unknown_after_completion")
                 );
               }
             } else {
@@ -145,7 +145,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         } catch (err: any) {
           console.error(`[useProfileLaunch] Error during polling is_profile_launching:`, err);
           const pollErrorMsg =
-            err.message || err.toString() || "Error while checking profile status.";
+            err.message || err.toString() || i18n.t("launch.errors.status_check_failed");
           toast.error(i18n.t('launch.polling_error', { error: pollErrorMsg }), { id: `launch-error-${profileId}` });
           finalizeButtonLaunch(profileId, pollErrorMsg);
           clearPolling();
@@ -217,7 +217,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
       const launchErrorMsg =
         typeof err === "string"
           ? err
-          : err.message || err.toString() || "Unknown error during launch.";
+          : err.message || err.toString() || i18n.t("launch.errors.unknown_during_launch");
       toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
       setLaunchError(profileId, launchErrorMsg);
       onLaunchError?.(launchErrorMsg);
@@ -250,7 +250,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
         const abortErrorMsg =
           typeof err === "string"
             ? err
-            : err.message || err.toString() || "Error during abort.";
+            : err.message || err.toString() || i18n.t("launch.errors.abort_failed");
         toast.error(i18n.t('launch.stop_failed', { message: abortErrorMsg }), { id: `launch-error-${profileId}` });
         finalizeButtonLaunch(profileId, abortErrorMsg);
       }
@@ -311,7 +311,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           const abortErrorMsg =
             typeof err === "string"
               ? err
-              : err.message || err.toString() || "Error during abort.";
+              : err.message || err.toString() || i18n.t("launch.errors.abort_failed");
           toast.error(i18n.t('launch.stop_failed', { message: abortErrorMsg }), { id: `launch-error-${profileId}` });
           finalizeButtonLaunch(profileId, abortErrorMsg);
         }
@@ -337,7 +337,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           const launchErrorMsg =
             typeof err === "string"
               ? err
-              : err.message || err.toString() || "Unknown error during launch.";
+              : err.message || err.toString() || i18n.t("launch.errors.unknown_during_launch");
           toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
           setLaunchError(profileId, launchErrorMsg);
           onLaunchError?.(launchErrorMsg);
@@ -359,7 +359,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
             const launchErrorMsg =
               typeof err === "string"
                 ? err
-                : err.message || err.toString() || "Unknown error during launch.";
+                : err.message || err.toString() || i18n.t("launch.errors.unknown_during_launch");
             toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
             setLaunchError(profileId, launchErrorMsg);
             onLaunchError?.(launchErrorMsg);
@@ -384,7 +384,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
                 const launchErrorMsg =
                   typeof err === "string"
                     ? err
-                    : err.message || err.toString() || "Unknown error during launch.";
+                    : err.message || err.toString() || i18n.t("launch.errors.unknown_during_launch");
                 toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
                 setLaunchError(profileId, launchErrorMsg);
                 onLaunchError?.(launchErrorMsg);
@@ -417,7 +417,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
           const launchErrorMsg =
             typeof err === "string"
               ? err
-              : err.message || err.toString() || "Unknown error during launch.";
+              : err.message || err.toString() || i18n.t("launch.errors.unknown_during_launch");
           toast.error(i18n.t('launch.failed', { error: launchErrorMsg }), { id: `launch-error-${profileId}` });
           setLaunchError(profileId, launchErrorMsg);
           onLaunchError?.(launchErrorMsg);

@@ -709,14 +709,14 @@ export function useLocalContentManager<T extends LocalContentItem>({
       for (const itemId of selectedItemIds) {
         const item = items.find(i => i.filename === itemId);
         if (!item) {
-          errors.push(`Could not find item ID ${itemId} to delete.`);
+          errors.push(i18n.t("content_manager.errors.item_not_found_delete", { id: itemId }));
           continue;
         }
         const payload = createUninstallPayload(item, profile.id, contentType);
         if (payload) {
           payloads.push(payload);
         } else {
-          errors.push(`Could not create uninstall payload for ${getDisplayFileName(item)}.`);
+          errors.push(i18n.t("content_manager.errors.uninstall_payload_failed", { name: getDisplayFileName(item) }));
         }
       }
 
@@ -796,14 +796,14 @@ export function useLocalContentManager<T extends LocalContentItem>({
             successfulOperations++;
           } catch (err) {
             const errorDetail = parseErrorMessage(err);
-            errors.push(`Failed to toggle ${getDisplayFileName(item)}: ${errorDetail}`);
+            errors.push(i18n.t("content_manager.errors.toggle_item_failed", { name: getDisplayFileName(item), error: errorDetail }));
           }
         } else {
           // Error already toasted by createTogglePayload if it returned null
-          errors.push(`Could not create toggle payload for ${getDisplayFileName(item)}.`);
+          errors.push(i18n.t("content_manager.errors.toggle_payload_failed", { name: getDisplayFileName(item) }));
         }
       } else {
-        errors.push(`Could not find item ID ${itemId} to toggle.`);
+        errors.push(i18n.t("content_manager.errors.item_not_found_toggle", { id: itemId }));
       }
     }
     setIsBatchToggling(false);
@@ -834,7 +834,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
         const parentPath = item.path.replace(/[\\/][^\\/]+$/, '');
         await openPath(parentPath || item.path);
       } catch (openError: any) {
-        const errorMsg = openError?.message || revealError?.message || "Failed to open item location.";
+        const errorMsg = openError?.message || revealError?.message || i18n.t("content_manager.errors.open_location_fallback");
         toast.error(i18n.t('content_manager.errors.failed_open_location', { error: errorMsg }));
       }
     }
@@ -1121,7 +1121,7 @@ export function useLocalContentManager<T extends LocalContentItem>({
             success: i18n.t('content_manager.success.updated', { name: getDisplayFileName(item), version: updateVersion.version_number }),
             error: (err: any) => {
               console.error(`Failed to update ${contentType} for ${getDisplayFileName(item)} (${platform}):`, err);
-              const errorMsg = err?.message || (typeof err === 'string' ? err : "An unknown error occurred during the update.");
+              const errorMsg = err?.message || (typeof err === 'string' ? err : i18n.t("content_manager.errors.unknown_update_error"));
               return i18n.t('content_manager.errors.update_failed', { name: getDisplayFileName(item), error: errorMsg });
             }
           },

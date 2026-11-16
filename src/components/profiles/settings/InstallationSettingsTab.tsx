@@ -388,7 +388,7 @@ export function InstallationSettingsTab({
                   />
                   <span>
                     {editedProfile.loader === "vanilla"
-                      ? "Vanilla"
+                      ? t("common.vanilla")
                       : `${editedProfile.loader} ${resolvedLoaderVersion?.version || editedProfile.loader_version || ""}`.trim()}
                   </span>
                 </div>

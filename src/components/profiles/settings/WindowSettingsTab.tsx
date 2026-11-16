@@ -174,7 +174,7 @@ export function WindowSettingsTab({
                   )}
                   onClick={() => handlePresetClick(preset)}
                 >
-                  {preset.label}
+                  {preset.label === "Default" ? t("common.default") : preset.label}
                 </Label>
               ))}
             </div>

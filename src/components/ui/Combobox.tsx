@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -31,6 +32,7 @@ export function Combobox({
   inputStyle,
   className,
 }: ComboboxProps) {
+  const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export function Combobox({
             }}
             className="text-white/40 hover:text-white"
             tabIndex={-1}
-            aria-label="Clear"
+            aria-label={t("common.clear")}
           >
             <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
           </button>
@@ -87,7 +89,7 @@ export function Combobox({
           disabled={disabled}
           className="text-white/50 hover:text-white disabled:opacity-40"
           tabIndex={-1}
-          aria-label="Toggle options"
+          aria-label={t("common.toggle_options")}
         >
           <Icon
             icon="solar:alt-arrow-down-bold"

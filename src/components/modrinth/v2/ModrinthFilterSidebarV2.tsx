@@ -389,7 +389,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                 ))
               ) : (
                 <p className="text-xs text-gray-500 italic p-1 text-center">
-                  No category options available.
+                  {t("modrinth.filters.no_category_options")}
                 </p>
               )}
             </div>

@@ -448,7 +448,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             </button>
             {project.author && (
               <p className="text-sm text-gray-400 font-minecraft mt-1">
-                by {project.author}
+                {t("modrinth.by_author", { author: project.author })}
               </p>
             )}
           </div>
@@ -469,7 +469,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             {/* Install Button + Versions Toggle */}
             <div className="flex items-center gap-1">
               <ActionButton
-                label={isInstalling ? "Installing..." : "Install"}
+                label={isInstalling ? t("modrinth.installing") : t("modrinth.install")}
                 icon={isInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
                 iconClassName={isInstalling ? "animate-spin-slow" : ""}
                 variant={isInstalling ? "secondary" : "primary"}
@@ -480,7 +480,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
               <ActionButton
                 icon={showVersions ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
                 variant="icon-only"
-                tooltip={showVersions ? "Hide Versions" : "Show Versions"}
+                tooltip={showVersions ? t("modrinth.hide_versions") : t("modrinth.show_versions")}
                 onClick={onToggleVersions}
                 size="sm"
               />
@@ -521,7 +521,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           ))}
           {project.categories.length > 4 && (
             <span className="text-xs text-white/50 font-minecraft">
-              +{project.categories.length - 4} more
+              {t("mod_detail.more_count", { count: project.categories.length - 4 })}
             </span>
           )}
         </div>

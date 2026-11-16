@@ -189,7 +189,7 @@ export function RunningInstancesIndicator({
                 className="w-6 h-6 mx-auto text-red-400 mb-2"
               />
               <p className="text-red-400 font-smallcaps text-sm">
-                Error: {error}
+                {t("common.error_with_message", { error })}
               </p>
             </div>
           ) : processes.length === 0 ? (
@@ -230,7 +230,7 @@ export function RunningInstancesIndicator({
                           !imageLoadErrors.has(process.id) ? (
                             <img
                               src={process.profile_image_url}
-                              alt={process.profile_name || "Profile Icon"}
+                              alt={process.profile_name || t("profiles.icon.label")}
                               className="w-full h-full object-cover"
                               onError={() => {
                                 setImageLoadErrors((prev) =>
@@ -241,7 +241,7 @@ export function RunningInstancesIndicator({
                           ) : (
                             <img
                               src="/icons/minecraft.png"
-                              alt="Minecraft Default Icon"
+                              alt=""
                               className="w-8 h-8"
                             />
                           )}

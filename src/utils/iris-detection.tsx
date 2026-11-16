@@ -125,7 +125,7 @@ async function installIrisFromPlatform(
   });
 
   if (!versionsResponse.versions || versionsResponse.versions.length === 0) {
-    throw new Error(`No compatible Iris versions found for ${platform}`);
+    throw new Error(i18n.t("iris.no_compatible_versions", { platform }));
   }
 
   const latestVersion = versionsResponse.versions[0];

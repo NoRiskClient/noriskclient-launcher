@@ -3,6 +3,7 @@
 import type React from "react";
 import { forwardRef } from "react";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface NewsCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
@@ -22,6 +23,7 @@ export const NewsCard = forwardRef<HTMLDivElement, NewsCardProps>(
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     return (
       <div
         ref={ref}
@@ -31,7 +33,7 @@ export const NewsCard = forwardRef<HTMLDivElement, NewsCardProps>(
       >
         <img
           src={imageUrl || "/placeholder.svg"}
-          alt={title || "News image"}
+          alt={title || t("news.image_alt")}
           className="w-full h-full object-cover"
           loading="lazy"
           onError={(e) => {

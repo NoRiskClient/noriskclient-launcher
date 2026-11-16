@@ -336,7 +336,7 @@ export function AppLayout({
       default:
         return (
           <div className="absolute inset-0 bg-red-500/20">
-            Unknown effect: {currentEffect}
+            {t("effects.unknown", { effect: currentEffect })}
           </div>
         );
     }

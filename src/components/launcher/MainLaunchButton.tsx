@@ -143,7 +143,7 @@ export function MainLaunchButton({
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {
-      statusSubText = buttonStatusMessage || "Launching...";
+      statusSubText = buttonStatusMessage || t("launch.launching");
       statusColorClass =
         buttonStatusMessage
           ? "opacity-90 text-white"

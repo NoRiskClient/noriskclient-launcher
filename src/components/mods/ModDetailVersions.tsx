@@ -548,7 +548,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                 color: accentColor.value,
               }}
             >
-              Load More ({filteredVersions.length - displayedCount} more)
+              {t("mod_detail.load_more", { count: filteredVersions.length - displayedCount })}
             </button>
           )}
         </div>
@@ -561,7 +561,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
             backgroundColor: `${accentColor.value}15`,
           }}
         >
-          No versions match the selected filters.
+          {t("mod_detail.no_versions_match_filters")}
         </div>
       )}
     </div>

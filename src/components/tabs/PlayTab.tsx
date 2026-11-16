@@ -107,7 +107,7 @@ export function PlayTab() {
         <div className="relative z-10">
           {profilesError && !loading && (
             <ErrorMessage
-              message={profilesError || "An unknown error occurred"}
+              message={profilesError || t("common.unknown_error")}
             />
           )}
 

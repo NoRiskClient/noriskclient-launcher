@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 interface PlayerHeadProps {
@@ -21,6 +22,7 @@ export function PlayerHead({
   className,
   style,
 }: PlayerHeadProps) {
+  const { t } = useTranslation();
   const avatarUrl = usePlayerAvatar({ uuid, size, overlay });
   const [hasError, setHasError] = useState(false);
 
@@ -34,7 +36,7 @@ export function PlayerHead({
     return (
       <img
         src={avatarUrl}
-        alt={username ? `${username}'s head` : "Player head"}
+        alt={username ? t("skins.player_head_named", { name: username }) : t("skins.player_head")}
         draggable={false}
         className={cn("object-cover select-none", className)}
         style={{ imageRendering: "pixelated", ...sizeStyle, ...style }}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
 import { useLauncherTheme } from "../hooks/useLauncherTheme";
 import { LAUNCHER_THEMES } from "../store/launcher-theme-store";
@@ -13,6 +14,7 @@ interface ThemeSelectorProps {
 }
 
 export function ThemeSelector({ disabled }: ThemeSelectorProps) {
+  const { t } = useTranslation();
   const [debugFlag, setDebugFlag] = useState(false);
   const { selectedThemeId, toggleTheme, isThemeUnlocked } = useLauncherTheme();
   const themes = Object.values(LAUNCHER_THEMES);
@@ -83,7 +85,7 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
               {(!debugFlag && !isThemeUnlocked(theme.id)) && theme.unlockRequirement && (
                 <span className="text-xs text-white/40 font-minecraft">
                   {theme.unlockRequirement.type === "advent-door" && (
-                    <>Unlock: Open door {theme.unlockRequirement.day}</>
+                    <>{t("theme_selector.unlock_advent_door", { day: theme.unlockRequirement.day })}</>
                   )}
                 </span>
               )}

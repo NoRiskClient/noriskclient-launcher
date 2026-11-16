@@ -1,4 +1,5 @@
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 interface MessageReaction {
@@ -34,6 +35,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, isOwn, friendUuid, friendName, currentUserUuid, currentUserName, accentColor, showHeader }: ChatMessageProps) {
+  const { t } = useTranslation();
   const avatarUuid = isOwn ? currentUserUuid : friendUuid;
   const avatarUrl = usePlayerAvatar({ uuid: avatarUuid, size: 32 });
 
@@ -44,7 +46,7 @@ export function ChatMessage({ message, isOwn, friendUuid, friendName, currentUse
   };
 
   const timestamp = message.createdAt || message.sentAt || message.timestamp;
-  const displayName = isOwn ? (currentUserName || "You") : friendName;
+  const displayName = isOwn ? (currentUserName || t("chat.you")) : friendName;
 
   return (
     <div className="flex gap-3 px-3 py-1 hover:bg-white/5 transition-colors group">

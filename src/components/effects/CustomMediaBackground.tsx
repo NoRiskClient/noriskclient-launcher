@@ -107,7 +107,7 @@ export default function CustomMediaBackground({ activeTab }: Props) {
       ) : (
         <img
           src={convertFileSrc(customMediaUrl)}
-          alt="Custom Background"
+          alt=""
           onError={handleMediaError}
           className="object-cover"
           style={mediaStyles}

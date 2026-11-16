@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import type { UnifiedGalleryImage } from "../../types/unified";
 import { ModDetailLightbox } from "./ModDetailLightbox";
 
@@ -10,6 +11,7 @@ interface ModDetailGalleryProps {
 }
 
 export function ModDetailGallery({ images }: ModDetailGalleryProps) {
+  const { t } = useTranslation();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,7 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-minecraft text-white flex items-center gap-2 normal-case">
             <Icon icon="solar:gallery-bold" className="w-5 h-5" />
-            Gallery
+            {t("mod_detail.gallery")}
           </h2>
           <span className="text-xs text-white/50 font-minecraft">
             {images.length} image{images.length !== 1 ? "s" : ""}
@@ -93,7 +95,7 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
             >
               <img
                 src={image.thumbnail_url || image.url}
-                alt={image.title || `Gallery image ${index + 1}`}
+                alt={image.title || t("mod_detail.gallery_image", { index: index + 1 })}
                 className="h-40 w-auto min-w-[200px] max-w-[320px] object-cover"
                 loading="lazy"
               />
@@ -109,7 +111,7 @@ export function ModDetailGallery({ images }: ModDetailGalleryProps) {
               {/* Featured Badge */}
               {image.featured && (
                 <div className="absolute top-2 left-2 bg-yellow-500/90 text-black text-xs font-minecraft px-2 py-0.5 rounded">
-                  Featured
+                  {t("applixir.shop.featured")}
                 </div>
               )}
 

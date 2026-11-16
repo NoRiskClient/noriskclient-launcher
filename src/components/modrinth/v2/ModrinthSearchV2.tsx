@@ -2547,7 +2547,7 @@ export function ModrinthSearchV2({
         console.log('🎯 Found source profile:', sourceProfile);
 
         if (!sourceProfile) {
-          throw new Error(`Source profile with ID ${sourceProfileIdToCopy} not found`);
+          throw new Error(t("mod_install.source_profile_not_found", { id: sourceProfileIdToCopy }));
         }
 
         const sourceProfileName = sourceProfile.name;
@@ -2584,7 +2584,7 @@ export function ModrinthSearchV2({
           });
 
         if (!versionToInstall) {
-          throw new Error(`No versions available for ${project.title}`);
+          throw new Error(t("mod_install.no_versions_available", { title: project.title }));
         }
 
         ({ gameVersion, loader } = profileTargetFor(versionToInstall));
@@ -2598,10 +2598,10 @@ export function ModrinthSearchV2({
 
       const contentType = mapUnifiedProjectTypeToNrContentType(project.project_type);
       if (!contentType) {
-        throw new Error(`Unsupported project type for installation: ${project.project_type}`);
+        throw new Error(t("mod_install.unsupported_project_type", { type: project.project_type }));
       }
       if (project.project_type === 'modpack') {
-        throw new Error("Modpacks should be installed as new profiles, not as content to an existing one.");
+        throw new Error(t("mod_install.modpack_as_profile_only"));
       }
 
       if (!versionToInstall) {
@@ -2610,13 +2610,13 @@ export function ModrinthSearchV2({
           loaders: [loader],
         });
         if (!versionToInstall) {
-          throw new Error(`No versions available for ${project.title}`);
+          throw new Error(t("mod_install.no_versions_available", { title: project.title }));
         }
       }
 
       const resolved = await resolveVersionFiles(project, versionToInstall, { gameVersion, loader });
       if (!resolved) {
-        throw new Error(`No downloadable file found for ${project.title} ${versionToInstall.version_number}`);
+        throw new Error(t("mod_install.no_downloadable_file", { title: project.title, version: versionToInstall.version_number }));
       }
 
       const payload = buildInstallPayload(newProfileId, project, resolved, contentType);
@@ -2819,7 +2819,6 @@ export function ModrinthSearchV2({
       const noriskIdentifier = currentVersionStatus.norisk_pack_item_details.norisk_mod_identifier;
       
       const toastMessage = newEnabledState ? "Enabling" : "Disabling";
-      const successMessage = newEnabledState ? "enabled" : "disabled";
       
       await toast.promise(
         async () => {
@@ -2882,9 +2881,9 @@ export function ModrinthSearchV2({
           return { versionName: version.version_number };
         },
         {
-          loading: `${toastMessage} NoRisk Pack item: ${project.title} (${version.version_number})...`,
-          success: ({ versionName }) => `Successfully ${successMessage} NoRisk Pack item: ${project.title} (${versionName})`,
-          error: (err) => `Failed to ${toastMessage.toLowerCase()} NoRisk Pack item: ${err.message || parseErrorMessage(err)}`
+          loading: t(newEnabledState ? "modrinth.toggle.pack_enabling" : "modrinth.toggle.pack_disabling", { title: project.title, version: version.version_number }),
+          success: ({ versionName }) => t(newEnabledState ? "modrinth.toggle.pack_enabled" : "modrinth.toggle.pack_disabled", { title: project.title, version: versionName }),
+          error: (err) => t(newEnabledState ? "modrinth.toggle.pack_enable_failed" : "modrinth.toggle.pack_disable_failed", { error: err.message || parseErrorMessage(err) })
         }
       ).catch(err => {
         console.error(`Error ${toastMessage.toLowerCase()} NoRisk Pack item:`, err);
@@ -2900,7 +2899,6 @@ export function ModrinthSearchV2({
     }
 
     const toastMessage = newEnabledState ? "Enabling" : "Disabling";
-    const successMessage = newEnabledState ? "enabled" : "disabled";
     
     await toast.promise(
       async () => {
@@ -2949,9 +2947,9 @@ export function ModrinthSearchV2({
         return { versionName: version.version_number };
       },
       {
-        loading: `${toastMessage} ${project.title} (${version.version_number})...`,
-        success: ({ versionName }) => `Successfully ${successMessage} ${project.title} (${versionName})`,
-        error: (err) => `Failed to ${toastMessage.toLowerCase()}: ${err.message || parseErrorMessage(err)}`
+        loading: t(newEnabledState ? "modrinth.toggle.enabling" : "modrinth.toggle.disabling", { title: project.title, version: version.version_number }),
+        success: ({ versionName }) => t(newEnabledState ? "modrinth.toggle.enabled" : "modrinth.toggle.disabled", { title: project.title, version: versionName }),
+        error: (err) => t(newEnabledState ? "modrinth.toggle.enable_failed" : "modrinth.toggle.disable_failed", { error: err.message || parseErrorMessage(err) })
       }
     ).catch(err => {
       console.error(`Error ${toastMessage.toLowerCase()} content:`, err);
