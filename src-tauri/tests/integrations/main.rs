@@ -5,6 +5,7 @@ mod lenient;
 mod mod_dependencies;
 mod mod_lookup;
 mod modrinth;
+mod mrpack;
 mod norisk_packs;
 mod pack_preview;
 mod provenance;
