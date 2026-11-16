@@ -21,6 +21,7 @@ use tokio::fs as tokio_fs;
 const VERSION_MANIFEST_URL: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 const MOJANG_API_URL: &str = "https://api.mojang.com";
 const MOJANG_SESSION_URL: &str = "https://sessionserver.mojang.com";
+const SESSION_JOIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -587,6 +588,7 @@ impl MinecraftApiService {
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&join_request)
+            .timeout(SESSION_JOIN_TIMEOUT)
             .send()
             .await;
 
