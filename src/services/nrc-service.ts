@@ -96,8 +96,6 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
       .then(() => logInfo("User permissions refreshed on mount"))
       .catch((error) => logError(`Failed to refresh permissions: ${error}`));
 
-    // What is already on disk is enough to show the profile list and the Play button. The
-    // two refreshes only bring it up to date, and offline they never arrive.
     const profilesFromDisk = useProfileStore.getState().fetchProfiles();
 
     const packsRefresh = refreshNoriskPacks()
@@ -127,8 +125,6 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
     if (nrcPacksSuccess || standardVersionsSuccess) { // Or simply always call it if appropriate
       try {
         console.log("Refreshing profiles state after NRC data update...");
-        // fetchProfiles selects the last played profile; a choice made while the refresh
-        // was running has to survive it.
         const selectedId = useProfileStore.getState().selectedProfile?.id;
         await useProfileStore.getState().fetchProfiles();
         const selected = useProfileStore.getState().profiles.find((profile) => profile.id === selectedId);

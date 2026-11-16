@@ -3,8 +3,6 @@ import { initReactI18next } from "react-i18next";
 
 import en from "./translations/en.json";
 
-// English ships in every window's bundle as the fallback. Each other language is a chunk
-// of its own that is only loaded when it is the one in use.
 const translationChunks = import.meta.glob<{ default: Record<string, string> }>([
   "./translations/*.json",
   "!./translations/en.json",
@@ -88,10 +86,6 @@ function getStoredLanguage(): SupportedLanguage {
   return getSystemLanguage();
 }
 
-/**
- * Settles once the language in use is loaded. A window that renders before that shows
- * English first and then switches.
- */
 export const i18nReady: Promise<void> = i18n.use(lazyTranslations).use(initReactI18next).init({
   resources: {
     en: { translation: en },

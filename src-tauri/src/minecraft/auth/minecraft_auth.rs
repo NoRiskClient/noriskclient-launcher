@@ -1216,9 +1216,6 @@ impl MinecraftAuthStore {
             None => true,
         };
         if is_stale(creds) {
-            // Every command that needs the account asks for this at the same moment when the
-            // launcher starts, and each one used to run the whole refresh chain. Now one does.
-            // The others wait here, then take what it stored...
             static REFRESHING: Mutex<()> = Mutex::const_new(());
             let _refreshing = REFRESHING.lock().await;
             if let Some(stored) = self.get_account_by_id(creds.id).await? {
@@ -1226,8 +1223,6 @@ impl MinecraftAuthStore {
                     return Ok(Some(stored));
                 }
             }
-            // ...or learn that it could not reach the servers a moment ago, and keep the
-            // cached credentials as it did instead of timing out once more each.
             const RETRY_PAUSE: std::time::Duration = std::time::Duration::from_secs(5);
             static UNREACHABLE: std::sync::Mutex<Option<(Uuid, std::time::Instant)>> =
                 std::sync::Mutex::new(None);

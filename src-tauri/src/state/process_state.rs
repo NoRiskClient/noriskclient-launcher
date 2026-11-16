@@ -1483,9 +1483,6 @@ impl ProcessManager {
         let mut interval = interval(Duration::from_secs(2)); // Collect metrics every 2 seconds
         log::trace!("Starting periodic metrics collector task.");
 
-        // Only the CPU count is needed up front; the loop refreshes the processes it reports
-        // on. System::new_all() also listed every process on the machine, which kept a worker
-        // thread busy for 0.5 to 1.1 s right while the launcher was starting.
         let mut sys = System::new();
         sys.refresh_cpu_list(CpuRefreshKind::nothing());
 

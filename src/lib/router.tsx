@@ -5,9 +5,6 @@ import { PlayTab } from "../components/tabs/PlayTab";
 // DISABLED: Advent Calendar (seasonal feature)
 // import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
 
-// Only the Play tab is part of the first load. Every other page is fetched when it is first
-// opened; the router keeps the current page on screen until the new one is ready, so there
-// is no loading state in between.
 const profileDetail = async () => ({
   Component: (await import("../components/profiles/ProfileDetailViewV2Wrapper")).ProfileDetailViewV2Wrapper,
 });
