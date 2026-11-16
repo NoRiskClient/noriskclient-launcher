@@ -1,3 +1,4 @@
+mod background_updater;
 mod content_copy;
 mod deep_link_utils;
 mod disk_space_utils;

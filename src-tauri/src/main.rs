@@ -308,31 +308,8 @@ async fn main() {
                 #[cfg(any(windows, target_os = "macos"))]
                 commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
-                trace!("Attempting to retrieve launcher configuration for update check...");
-                match state::state_manager::State::get().await {
-                    Ok(state_manager_instance) => {
-                        let config = state_manager_instance.config_manager.get_config().await;
-                        let check_beta_channel = config.check_beta_channel;
-                        let mut auto_check_updates_enabled = config.auto_check_updates;
-
-                        // Disable auto-updates when running in Flatpak
-                        if updater_utils::is_flatpak() {
-                            info!("Running in Flatpak environment - disabling automatic updates (Flatpak handles updates through its own mechanism).");
-                            auto_check_updates_enabled = false;
-                        }
-
-                        if auto_check_updates_enabled {
-                            trace!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
-                            updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
-                            trace!("Update check process has finished.");
-                        } else {
-                            info!("Auto-check for updates is disabled in settings. Skipping update check.");
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to get global state for update check: {}.", e);
-                    }
-                }
+                utils::background_updater::install_from_last_session(&state_init_app_handle, updater_window.clone()).await;
+                utils::background_updater::spawn(state_init_app_handle.clone());
 
                 if let Some(win) = updater_window.await {
                     let _ = win.close();
@@ -857,6 +834,7 @@ async fn main() {
             |app_handle, event| {
                 if matches!(event, tauri::RunEvent::Exit) {
                     utils::screen_time::report_before_exit();
+                    utils::background_updater::install_on_exit();
                 }
 
                 #[cfg(target_os = "macos")]
