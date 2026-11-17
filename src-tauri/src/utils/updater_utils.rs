@@ -76,13 +76,15 @@ pub fn build_updater(
             info!("Linux AppImage detected. Updater will use default target for manifest URL.");
             // platform_specific_target remains "{{target}}" for AppImage
         } else {
-            // Not an AppImage, assume .deb or similar package manager context.
-            let deb_target_identifier = "debian";
+            let package_target = match tauri::utils::platform::bundle_type() {
+                Some(tauri::utils::config::BundleType::Rpm) => "rpm",
+                _ => "debian",
+            };
             info!(
-                "Linux non-AppImage (e.g., .deb) detected. Modifying manifest URL to use target: {}",
-                deb_target_identifier
+                "Linux package install detected. Modifying manifest URL to use target: {}",
+                package_target
             );
-            platform_specific_target = deb_target_identifier.to_string();
+            platform_specific_target = package_target.to_string();
         }
     }
 
