@@ -11,6 +11,7 @@ interface ComboboxProps {
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
+  selectOnly?: boolean;
   maxVisible?: number;
   optionStyle?: (option: string) => React.CSSProperties;
   inputStyle?: React.CSSProperties;
@@ -24,14 +25,21 @@ export function Combobox({
   placeholder,
   disabled,
   allowClear,
+  selectOnly,
   maxVisible = 60,
   optionStyle,
   inputStyle,
   className,
 }: ComboboxProps) {
   const accentColor = useThemeStore((s) => s.accentColor);
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const [search, setSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const setOpen = (next: boolean | ((open: boolean) => boolean)) => {
+    setOpenState(next);
+    setSearch("");
+  };
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -41,7 +49,8 @@ export function Combobox({
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const query = value.trim().toLowerCase();
+  const shown = selectOnly ? (open ? search : value) : value;
+  const query = (selectOnly ? search : value).trim().toLowerCase();
   const filtered = (query ? options.filter((o) => o.toLowerCase().includes(query)) : options).slice(
     0,
     maxVisible,
@@ -51,14 +60,19 @@ export function Combobox({
     <div className={cn("relative", className)} ref={rootRef}>
       <input
         type="text"
-        value={value}
+        value={shown}
         onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
+          if (selectOnly) {
+            setOpenState(true);
+            setSearch(e.target.value);
+          } else {
+            onChange(e.target.value);
+            setOpen(true);
+          }
         }}
         onFocus={() => setOpen(true)}
         disabled={disabled}
-        placeholder={placeholder}
+        placeholder={selectOnly && open && value ? value : placeholder}
         spellCheck={false}
         className="w-full rounded-lg border-2 border-[#ffffff20] bg-black/40 px-3 py-2 pr-16 text-base text-white placeholder:text-white/30 outline-none focus:border-white/40 disabled:opacity-40"
         style={inputStyle}

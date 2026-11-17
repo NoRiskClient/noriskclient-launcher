@@ -19,6 +19,8 @@ use quilt_installer::QuiltInstaller;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+pub const LATEST_LOADER_VERSION: &str = "latest";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolvedLoaderVersion {
     pub version: Option<String>,
@@ -37,6 +39,26 @@ pub enum LoaderVersionReason {
 pub struct ModloaderFactory;
 
 impl ModloaderFactory {
+    /// New per-loader map takes precedence over the legacy single-slot
+    /// `overwrite_loader_version`. The legacy fallback is only consulted
+    /// when the map is entirely empty — a "virgin" old profile that no
+    /// new-code write has touched. Once any entry lands in the map, the
+    /// legacy field is treated as stale (it may have been written for a
+    /// different loader and we can't know which).
+    pub fn user_overwrite(profile: &Profile) -> Option<&str> {
+        if !profile.settings.use_overwrite_loader_version {
+            return None;
+        }
+        let version = match profile.settings.overwrite_loader_versions.get(profile.loader.as_str()) {
+            Some(v) => Some(v),
+            None if profile.settings.overwrite_loader_versions.is_empty() => {
+                profile.settings.overwrite_loader_version.as_ref()
+            }
+            None => None,
+        };
+        version.map(String::as_str).filter(|v| !v.is_empty())
+    }
+
     /// Resolves the loader version to use for a profile, considering Norisk pack policies and user overrides
     pub async fn resolve_loader_version(
         profile: &Profile,
@@ -51,31 +73,17 @@ impl ModloaderFactory {
         }
 
         // 1. Check for user overwrite first (highest priority).
-        //
-        // New per-loader map takes precedence over the legacy single-slot
-        // `overwrite_loader_version`. The legacy fallback is only consulted
-        // when the map is entirely empty — a "virgin" old profile that no
-        // new-code write has touched. Once any entry lands in the map, the
-        // legacy field is treated as stale (it may have been written for a
-        // different loader and we can't know which).
-        if profile.settings.use_overwrite_loader_version {
-            let loader_key = profile.loader.as_str();
-            if let Some(v) = profile.settings.overwrite_loader_versions.get(loader_key) {
-                if !v.is_empty() {
-                    return ResolvedLoaderVersion {
-                        version: Some(v.clone()),
-                        reason: LoaderVersionReason::UserOverwrite,
-                    };
-                }
-            } else if profile.settings.overwrite_loader_versions.is_empty() {
-                if let Some(v) = &profile.settings.overwrite_loader_version {
-                    if !v.is_empty() {
-                        return ResolvedLoaderVersion {
-                            version: Some(v.clone()),
-                            reason: LoaderVersionReason::UserOverwrite,
-                        };
-                    }
-                }
+        if let Some(overwrite) = Self::user_overwrite(profile) {
+            let version = if overwrite == LATEST_LOADER_VERSION {
+                Self::fetch_latest_from_api(&profile.loader, minecraft_version, true).await
+            } else {
+                Some(overwrite.to_string())
+            };
+            if let Some(version) = version {
+                return ResolvedLoaderVersion {
+                    version: Some(version),
+                    reason: LoaderVersionReason::UserOverwrite,
+                };
             }
         }
 
@@ -155,7 +163,7 @@ impl ModloaderFactory {
         // ProfileDefault because this is "what the system picked for you"
         // with no explicit override involved. Network failures fall through
         // to NotResolved.
-        if let Some(auto) = Self::fetch_latest_from_api(&profile.loader, minecraft_version).await {
+        if let Some(auto) = Self::fetch_latest_from_api(&profile.loader, minecraft_version, false).await {
             return ResolvedLoaderVersion {
                 version: Some(auto),
                 reason: LoaderVersionReason::ProfileDefault,
@@ -176,9 +184,14 @@ impl ModloaderFactory {
     async fn fetch_latest_from_api(
         loader: &ModLoader,
         mc_version: &str,
+        prefer_stable: bool,
     ) -> Option<String> {
         match Self::list_loader_versions(loader, mc_version).await {
-            Ok(list) => list.into_iter().next(),
+            Ok(list) => list
+                .iter()
+                .find(|v| prefer_stable && v.ends_with(" (stable)"))
+                .or(list.first())
+                .cloned(),
             Err(e) => {
                 warn!("Auto-resolve {}: {}", loader.as_str(), e);
                 None
