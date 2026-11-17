@@ -42,7 +42,6 @@ pub struct ClipDetails {
     pub audio_tracks: Vec<ClipAudioTrack>,
     #[serde(default)]
     pub game: Option<String>,
-    /// The Minecraft server the clip was recorded on, as the game's client reported it.
     #[serde(default)]
     pub server: Option<String>,
     #[serde(default)]
@@ -294,6 +293,23 @@ fn ensure_meta_dir() -> Result<()> {
     let dir = meta_dir();
     std::fs::create_dir_all(&dir)
         .map_err(|e| AppError::Other(format!("could not create {}: {e}", dir.display())))
+}
+
+pub fn copy_origin_details(source: &Path, exported: &Path) {
+    let Some(origin) = read_details(source) else {
+        return;
+    };
+    if origin.game.is_none() && origin.server.is_none() {
+        return;
+    }
+    let details = ClipDetails {
+        game: origin.game,
+        server: origin.server,
+        ..Default::default()
+    };
+    if let Err(e) = write_details(exported, &details) {
+        log::warn!("Could not describe the exported clip: {e}");
+    }
 }
 
 pub fn read_details(clip: &Path) -> Option<ClipDetails> {

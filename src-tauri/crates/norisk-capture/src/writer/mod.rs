@@ -116,7 +116,6 @@ pub fn write_mp4(
     write_mp4_with(clip, path, track, audio, false)
 }
 
-/// `faststart`: the index goes in front of the frames, so a browser can start playing at once.
 pub fn write_mp4_with(
     clip: &Clip,
     path: &Path,
@@ -171,7 +170,6 @@ fn mux(
         let mut guard = FormatGuard::new(format_ctx);
 
         if faststart {
-            // The second pass reopens the url, which has to be the file being written.
             ff::av_freep(std::ptr::addr_of_mut!((*format_ctx).url).cast());
             (*format_ctx).url = ff::av_strdup(path_c.as_ptr());
             if (*format_ctx).url.is_null() {

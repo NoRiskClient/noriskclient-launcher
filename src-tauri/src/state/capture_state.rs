@@ -106,7 +106,6 @@ fn merged(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::
 
 pub type ExportOutcome = std::result::Result<norisk_ipc::ExportedClip, String>;
 
-/// An export the UI did not ask for: its progress and result go to whoever watches it.
 pub struct ExportWatch {
     pub progress: mpsc::UnboundedReceiver<(u32, u32)>,
     pub done: tokio::sync::oneshot::Receiver<ExportOutcome>,
@@ -172,7 +171,6 @@ impl CaptureSupervisor {
         self.watched.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Hands a watched export's events to its watcher; everything else comes back.
     fn claim_export(&self, event: CaptureToLauncher) -> Option<CaptureToLauncher> {
         let mut watched = self.watched_exports();
         match &event {
@@ -922,20 +920,7 @@ impl CaptureSupervisor {
                 {
                     let (source, path) = (exported.source.clone(), exported.path.clone());
                     let _ = tokio::task::spawn_blocking(move || {
-                        let Some(origin) = crate::utils::clip_library::read_details(&source) else {
-                            return;
-                        };
-                        if origin.game.is_none() && origin.server.is_none() {
-                            return;
-                        }
-                        let details = crate::utils::clip_library::ClipDetails {
-                            game: origin.game,
-                            server: origin.server,
-                            ..Default::default()
-                        };
-                        if let Err(e) = crate::utils::clip_library::write_details(&path, &details) {
-                            log::warn!("Could not describe the exported clip: {e}");
-                        }
+                        crate::utils::clip_library::copy_origin_details(&source, &path)
                     })
                     .await;
                 }

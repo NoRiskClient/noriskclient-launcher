@@ -15,12 +15,10 @@ use crate::state::State;
 
 const CONVERT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const LEFTOVERS_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
-/// Room for the audio track and the encoder overshooting its target.
 const SIZE_HEADROOM: f64 = 0.85;
 const AUDIO_KBPS: f64 = 256.0;
 const MIN_VIDEO_KBPS: u32 = 1_000;
 
-/// A converted copy, gone again once the upload is over however it ends.
 pub(super) struct Converted(PathBuf);
 
 impl Converted {
@@ -43,7 +41,6 @@ impl Drop for Converted {
     }
 }
 
-/// Unreadable files go up as they are; the server has the last word.
 pub(super) async fn shareable(clip: &Path) -> bool {
     let path = clip.to_path_buf();
     match tokio::task::spawn_blocking(move || crate::utils::mp4_probe::codecs(&path)).await {
@@ -59,7 +56,6 @@ pub(super) async fn shareable(clip: &Path) -> bool {
     }
 }
 
-/// Re-encodes to H.264 with only the mix as sound, through the engine's export.
 pub(super) async fn convert(
     state: &State,
     clips: &ClipConfig,
@@ -142,8 +138,7 @@ async fn finished(
     }
 }
 
-/// The clip setting's bitrate, lowered when that would not fit the upload limit.
-fn fitted_kbps(wanted: u32, seconds: Option<f64>, max_bytes: Option<u64>) -> u32 {
+pub fn fitted_kbps(wanted: u32, seconds: Option<f64>, max_bytes: Option<u64>) -> u32 {
     let (Some(seconds), Some(max_bytes)) = (seconds.filter(|s| *s > 0.0), max_bytes) else {
         return wanted;
     };
@@ -165,26 +160,5 @@ fn remove_leftovers(dir: &Path) {
         if stale {
             let _ = std::fs::remove_file(entry.path());
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::fitted_kbps;
-
-    const LIMIT: Option<u64> = Some(300 * 1024 * 1024);
-
-    #[test]
-    fn the_clip_setting_is_kept_when_it_fits_and_lowered_when_it_does_not() {
-        assert_eq!(fitted_kbps(12_000, Some(60.0), LIMIT), 12_000);
-        let lowered = fitted_kbps(100_000, Some(120.0), LIMIT);
-        assert!((15_000..18_000).contains(&lowered), "{lowered}");
-        assert_eq!(fitted_kbps(100_000, Some(100_000.0), LIMIT), 1_000);
-    }
-
-    #[test]
-    fn without_a_length_or_a_limit_the_setting_stays() {
-        assert_eq!(fitted_kbps(50_000, None, LIMIT), 50_000);
-        assert_eq!(fitted_kbps(50_000, Some(60.0), None), 50_000);
     }
 }

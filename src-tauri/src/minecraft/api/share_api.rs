@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::utils::http_client::{nrc_get, nrc_post, nrc_put};
 
-/// The presigned PUT has no total limit worth having for a 300 MB clip; stalls are caught by the caller.
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
-/// Completing runs ffprobe (and maybe a remux) on the server.
 const COMPLETE_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const LIMITS_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -57,7 +55,6 @@ struct ShareCreate<'a> {
     permanent: bool,
 }
 
-/// What payback lets the signed-in player pick for how long a share stays up.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ShareChoices {
@@ -71,7 +68,6 @@ pub struct ShareChoices {
     pub max_pinned: u32,
 }
 
-/// How long a share stays up, as the player picked; nothing picked is payback's default.
 #[derive(Deserialize, Debug, Clone, Copy, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ShareExpiry {
@@ -140,7 +136,6 @@ impl ShareApi {
             .await
     }
 
-    /// The presigned url carries its own signature: no Bearer token, exactly the headers it came with.
     pub async fn put_file(ticket: &UploadTicket, size: u64, body: reqwest::Body) -> Result<()> {
         let mut request = nrc_put(&ticket.upload_url)
             .timeout(UPLOAD_TIMEOUT)
@@ -170,7 +165,6 @@ impl ShareApi {
             .await
     }
 
-    /// The signed-in player's own choices; without the flag there are none.
     pub async fn choices(token: &str, is_experimental: bool) -> Result<ShareChoices> {
         nrc_get(format!("{}/limits", Self::shares_url(is_experimental)))
             .bearer(token)

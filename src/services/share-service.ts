@@ -14,13 +14,11 @@ export type ShareTarget =
 
 export type SharePhase = "converting" | "uploading" | "checking";
 
-/** How long a share stays up; nothing picked is payback's default. */
 export interface ShareExpiry {
   days?: number;
   permanent?: boolean;
 }
 
-/** What payback lets the signed-in player pick: up to 30 days for everyone, for good only with its flag. */
 export interface ShareChoices {
   expiryDays: number;
   expiryChoices: number[];
@@ -28,7 +26,6 @@ export interface ShareChoices {
   maxPinned: number;
 }
 
-/** Frames while converting (total 0 until the engine knows), bytes while uploading. */
 export interface ShareProgress {
   id: string;
   phase: SharePhase;
@@ -36,7 +33,6 @@ export interface ShareProgress {
   total: number;
 }
 
-/** Redacts and, when too big, shortens the log in the launcher before it goes up. */
 export async function shareLog(content: string, name: string): Promise<Share> {
   return invoke<Share>("share_log", { content, name });
 }
@@ -102,7 +98,6 @@ const KNOWN_ERRORS = new Set([
   "share.errors.empty_log",
 ]);
 
-/** The translation key for a failed share. */
 export function shareErrorKey(error: unknown): string {
   const err = (typeof error === "object" && error !== null ? error : {}) as NrcCommandError;
   if (err.translatable_key && KNOWN_ERRORS.has(err.translatable_key)) return err.translatable_key;

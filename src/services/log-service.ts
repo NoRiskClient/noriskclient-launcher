@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import i18n from "../i18n/i18n";
 import { shareErrorKey, shareLog } from "./share-service";
+import { logError } from "../utils/logging-utils";
 
 export const LOG_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'] as const;
 export type LogLevel = typeof LOG_LEVELS[number];
@@ -255,15 +256,11 @@ export async function getLogFileContent(logFilePath: string): Promise<string> {
     return await invoke<string>('get_log_file_content', { logFilePath });
 }
 
-/**
- * Shares a log on norisk.gg and returns the link to its page.
- * Rejects with an Error whose message is already translated.
- */
 export async function uploadLog(logContent: string, name: string): Promise<string> {
     try {
         return (await shareLog(logContent, name)).pageUrl;
     } catch (e) {
-        console.error("Could not share the log", e);
+        logError(`Could not share the log: ${e}`);
         throw new Error(i18n.t(shareErrorKey(e)));
     }
 }

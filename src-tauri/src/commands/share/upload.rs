@@ -38,7 +38,6 @@ impl<'a> Progress<'a> {
     }
 }
 
-/// Streams the file from disk and counts what has been handed to the connection.
 pub(super) fn file_body(file: tokio::fs::File, size: u64, sent: Arc<AtomicU64>) -> reqwest::Body {
     let stream = futures::stream::try_unfold(file.take(size), move |mut file| {
         let sent = sent.clone();
@@ -56,7 +55,6 @@ pub(super) fn file_body(file: tokio::fs::File, size: u64, sent: Arc<AtomicU64>) 
     reqwest::Body::wrap_stream(stream)
 }
 
-/// Reports progress and gives up once nothing has moved for a while.
 pub(super) async fn watch_upload(
     put: impl Future<Output = crate::error::Result<()>>,
     sent: &AtomicU64,

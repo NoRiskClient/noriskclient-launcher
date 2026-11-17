@@ -1,5 +1,5 @@
-mod convert;
-mod logfile;
+pub mod convert;
+pub mod logfile;
 mod upload;
 
 use std::path::{Path, PathBuf};
@@ -17,7 +17,6 @@ use crate::minecraft::api::share_api::{
 use crate::state::State;
 use upload::Progress;
 
-/// What goes up beside the medium.
 #[derive(Default)]
 struct About<'a> {
     title: Option<&'a str>,
@@ -115,7 +114,6 @@ pub async fn share_screenshot(
     let progress = Progress::new(&app, &progress_id);
     let ctx = account_ctx(None).await?;
     let name = file_name(&screenshot);
-    // As the client saved it: who is on it rides along in the PNG and the server reads it there.
     let about = About {
         title: options.title(),
         server: None,
@@ -124,14 +122,12 @@ pub async fn share_screenshot(
     share(&ctx, &progress, Payload::File(&screenshot), &name, about, "image", content_type).await
 }
 
-/// How long the signed-in player may make a share last; none when payback offers no choice.
 #[tauri::command]
 pub async fn share_choices() -> Result<ShareChoices, CommandError> {
     let ctx = account_ctx(None).await?;
     Ok(ShareApi::choices(&ctx.token, ctx.is_experimental).await?)
 }
 
-/// Logs go up redacted, and with their middle cut out when they are too big.
 #[tauri::command]
 pub async fn share_log(app: AppHandle, content: String, name: String) -> Result<Share, CommandError> {
     let ctx = account_ctx(None).await?;
