@@ -265,7 +265,6 @@
   "crash_modal.toast.submitting_norisk": "Отправка отчёта о сбое в NoRisk...",
   "crash_modal.toast.submitted_and_copied": "Отчёт отправлен, URL лога скопирован!",
   "crash_modal.toast.submitted_copy_failed": "Отчёт отправлен. URL лога: {{url}} (копирование не удалось)",
-  "crash_modal.toast.url_copied": "Ссылка norisk.gg скопирована в буфер обмена!",
   "crash_modal.toast.unexpected_error": "Произошла непредвиденная ошибка.",
   "crash_modal.toast.discord_opened": "Discord NoRisk открыт в браузере!",
   "crash_modal.toast.discord_failed": "Не удалось открыть Discord. Перейдите вручную на discord.norisk.gg.",

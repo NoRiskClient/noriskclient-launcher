@@ -98,6 +98,15 @@ pub struct Share {
     pub page_url: String,
 }
 
+impl Share {
+    pub fn elsewhere(page_url: String) -> Self {
+        Self {
+            slug: String::new(),
+            page_url,
+        }
+    }
+}
+
 pub struct ShareApi;
 
 impl ShareApi {

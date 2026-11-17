@@ -265,7 +265,6 @@
   "crash_modal.toast.submitting_norisk": "NoRisk'e çökme raporu gönderiliyor...",
   "crash_modal.toast.submitted_and_copied": "Rapor gönderildi ve günlük URL'si kopyalandı!",
   "crash_modal.toast.submitted_copy_failed": "Rapor gönderildi. Günlük URL'si: {{url}} (Kopyalama başarısız)",
-  "crash_modal.toast.url_copied": "norisk.gg bağlantısı panoya kopyalandı!",
   "crash_modal.toast.unexpected_error": "Beklenmeyen bir hata oluştu.",
   "crash_modal.toast.discord_opened": "NoRisk Discord tarayıcıda açıldı!",
   "crash_modal.toast.discord_failed": "Discord açılamadı. Manuel olarak discord.norisk.gg adresine gidin.",

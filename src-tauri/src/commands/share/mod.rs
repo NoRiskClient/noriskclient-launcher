@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::commands::request_context::{account_ctx, AccountCtx};
 use crate::error::{AppError, CommandError};
+use crate::minecraft::api::mclogs_api;
 use crate::minecraft::api::share_api::{
     Share, ShareApi, ShareChoices, ShareDetails, ShareExpiry, UploadRequest,
 };
@@ -130,13 +131,16 @@ pub async fn share_choices() -> Result<ShareChoices, CommandError> {
 
 #[tauri::command]
 pub async fn share_log(app: AppHandle, content: String, name: String) -> Result<Share, CommandError> {
-    let ctx = account_ctx(None).await?;
-    let max_bytes = ShareApi::limits(ctx.is_experimental)
-        .await
-        .inspect_err(|e| log::warn!("Could not read the upload limits: {e}"))
-        .ok()
-        .and_then(|limits| limits.max_text_bytes)
-        .unwrap_or(logfile::DEFAULT_MAX_BYTES);
+    let ctx = account_ctx(None).await;
+    let max_bytes = match &ctx {
+        Ok(ctx) => ShareApi::limits(ctx.is_experimental)
+            .await
+            .inspect_err(|e| log::warn!("Could not read the upload limits: {e}"))
+            .ok()
+            .and_then(|limits| limits.max_text_bytes)
+            .unwrap_or(logfile::DEFAULT_MAX_BYTES),
+        Err(_) => logfile::DEFAULT_MAX_BYTES,
+    };
     let text = tokio::task::spawn_blocking(move || logfile::prepare(&content, max_bytes as usize))
         .await
         .map_err(AppError::Task)?;
@@ -148,7 +152,26 @@ pub async fn share_log(app: AppHandle, content: String, name: String) -> Result<
         name => name,
     };
     let progress = Progress::new(&app, "log");
-    share(&ctx, &progress, Payload::Text(text), name, About::default(), "text", "text/plain").await
+    let shared = match ctx {
+        Ok(ctx) => {
+            let payload = Payload::Text(text.clone());
+            share(&ctx, &progress, payload, name, About::default(), "text", "text/plain").await
+        }
+        Err(e) => Err(e),
+    };
+    match shared {
+        Ok(share) => Ok(share),
+        Err(e) => {
+            log::warn!("Sharing {name} on norisk.gg failed, trying mclo.gs: {}", e.message);
+            match mclogs_api::upload_log(&text).await {
+                Ok(url) => Ok(Share::elsewhere(url)),
+                Err(fallback) => {
+                    log::error!("Uploading {name} to mclo.gs failed too: {fallback}");
+                    Err(e)
+                }
+            }
+        }
+    }
 }
 
 fn file_name(path: &Path) -> String {

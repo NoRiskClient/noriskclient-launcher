@@ -75,6 +75,11 @@ impl NrcRequest {
         self
     }
 
+    pub fn form<T: Serialize + ?Sized>(mut self, form: &T) -> Self {
+        self.builder = self.builder.form(form);
+        self
+    }
+
     pub fn multipart(mut self, form: reqwest::multipart::Form) -> Self {
         self.builder = self.builder.multipart(form);
         self

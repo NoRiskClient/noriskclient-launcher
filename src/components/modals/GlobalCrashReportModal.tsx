@@ -1,3 +1,4 @@
+import { showShareSuccess } from "../share/share-toast";
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/i18n';
@@ -10,7 +11,6 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { getProfile } from '../../services/profile-service';
 import { uploadLog } from '../../services/log-service';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { checkCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
 import type { CrashlogDto, ProcessMetadata } from '../../types/processState';
 import type { CrashCheckResult } from '../../types/crash-analysis';
@@ -186,11 +186,6 @@ export function GlobalCrashReportModal() {
     return null;
   }
 
-  const shareLogLink = async (url: string) => {
-    try { await writeText(url); } catch {}
-    try { await openExternalUrl(url); } catch {}
-  };
-
   const buildLogContent = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
     let crashReport = displayedCrashReportContent;
     if (crashData?.process_id && !crashReport) {
@@ -241,7 +236,7 @@ ${gameLog}`
     } catch (e) {
       logError(`Crash analysis failed, falling back to log link: ${e}`);
       toast.error(t('crash_modal.toast.analyze_failed'));
-      await shareLogLink(url);
+      await showShareSuccess(url);
       return;
     }
     closeCrashModal();
@@ -272,8 +267,7 @@ ${gameLog}`
       if (analyzeWithNoRisk) {
         await analyze(url, profileId, metadata);
       } else {
-        toast.success(t('crash_modal.toast.url_copied'));
-        await shareLogLink(url);
+        await showShareSuccess(url);
         closeCrashModal();
       }
     } catch (error: any) {

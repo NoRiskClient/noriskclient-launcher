@@ -265,7 +265,6 @@
   "crash_modal.toast.submitting_norisk": "Enviando relatório de travamento para NoRisk...",
   "crash_modal.toast.submitted_and_copied": "Relatório enviado e URL do log copiada!",
   "crash_modal.toast.submitted_copy_failed": "Relatório enviado. URL do log: {{url}} (Falha ao copiar)",
-  "crash_modal.toast.url_copied": "Link do norisk.gg copiado para a área de transferência!",
   "crash_modal.toast.unexpected_error": "Ocorreu um erro inesperado.",
   "crash_modal.toast.discord_opened": "Discord NoRisk aberto no navegador!",
   "crash_modal.toast.discord_failed": "Falha ao abrir Discord. Vá manualmente para discord.norisk.gg.",

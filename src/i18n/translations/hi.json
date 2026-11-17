@@ -267,7 +267,6 @@
   "crash_modal.toast.submitting_norisk": "NoRisk को क्रैश रिपोर्ट सबमिट हो रही है...",
   "crash_modal.toast.submitted_and_copied": "रिपोर्ट सबमिट हुई और लॉग URL कॉपी हुआ!",
   "crash_modal.toast.submitted_copy_failed": "रिपोर्ट सबमिट हुई। लॉग URL: {{url}} (कॉपी करना विफल)",
-  "crash_modal.toast.url_copied": "norisk.gg लिंक क्लिपबोर्ड में कॉपी किया गया!",
   "crash_modal.toast.unexpected_error": "एक अप्रत्याशित त्रुटि हुई।",
   "crash_modal.toast.discord_opened": "आपके ब्राउज़र में NoRisk Discord खोला गया!",
   "crash_modal.toast.discord_failed": "Discord नहीं खोल सका। कृपया manually discord.norisk.gg पर जाएं।",
