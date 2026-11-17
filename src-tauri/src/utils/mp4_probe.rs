@@ -1,6 +1,8 @@
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+const MAX_DEPTH: u8 = 8;
+
 #[derive(Debug, Default, PartialEq)]
 pub struct Mp4Codecs {
     pub video: Vec<String>,
@@ -23,7 +25,7 @@ pub fn codecs(path: &Path) -> std::io::Result<Mp4Codecs> {
 
 pub fn codecs_in<R: Read + Seek>(reader: &mut R, len: u64) -> std::io::Result<Mp4Codecs> {
     let mut found = Mp4Codecs::default();
-    walk(reader, 0, len, &mut None, &mut found)?;
+    walk(reader, 0, len, 0, &mut None, &mut found)?;
     Ok(found)
 }
 
@@ -31,9 +33,13 @@ fn walk<R: Read + Seek>(
     file: &mut R,
     start: u64,
     end: u64,
+    depth: u8,
     handler: &mut Option<[u8; 4]>,
     found: &mut Mp4Codecs,
 ) -> std::io::Result<()> {
+    if depth > MAX_DEPTH {
+        return Ok(());
+    }
     let mut at = start;
     while at + 8 <= end {
         file.seek(SeekFrom::Start(at))?;
@@ -57,8 +63,8 @@ fn walk<R: Read + Seek>(
         let next = at + size;
 
         match &kind {
-            b"moov" | b"mdia" | b"minf" | b"stbl" => walk(file, body, next, handler, found)?,
-            b"trak" => walk(file, body, next, &mut None, found)?,
+            b"moov" | b"mdia" | b"minf" | b"stbl" => walk(file, body, next, depth + 1, handler, found)?,
+            b"trak" => walk(file, body, next, depth + 1, &mut None, found)?,
             b"hdlr" if handler.is_none() => *handler = read_at(file, body + 8, next)?,
             b"stsd" => {
                 if let Some(entry) = read_at(file, body + 12, next)? {

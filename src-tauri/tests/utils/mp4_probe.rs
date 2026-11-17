@@ -59,3 +59,12 @@ fn a_cut_off_file_stops_quietly() {
     file.truncate(30);
     assert_eq!(probe(file), Mp4Codecs::default());
 }
+
+#[test]
+fn a_file_of_endlessly_nested_boxes_is_read_without_overflowing() {
+    let mut file = boxed(b"mdat", &[]);
+    for _ in 0..100_000 {
+        file = boxed(b"moov", &file);
+    }
+    assert_eq!(probe(file), Mp4Codecs::default());
+}
