@@ -1,1 +1,0 @@
-export function InstallationSettingsTab() { return <div>Fixed</div>; }

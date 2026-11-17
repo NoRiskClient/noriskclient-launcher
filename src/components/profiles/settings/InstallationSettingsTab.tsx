@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { gsap } from "gsap";
@@ -9,6 +9,7 @@ import type { MinecraftVersion } from "../../../types/minecraft";
 import { useResolvedLoaderVersion } from "../../../hooks/useResolvedLoaderVersion";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { StatusMessage } from "../../ui/StatusMessage";
+import { Chip, Section } from "./SettingsSection";
 import { Combobox } from "../../ui/Combobox";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { cn } from "../../../lib/utils";
@@ -82,59 +83,6 @@ async function fetchLoaderVersions(loader: string, minecraftVersion: string): Pr
     default:
       return [];
   }
-}
-
-function Chip({
-  active,
-  marked,
-  disabled,
-  accent,
-  onClick,
-  className,
-  children,
-}: {
-  active: boolean;
-  marked?: boolean;
-  disabled?: boolean;
-  accent: string;
-  onClick: () => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  const style: CSSProperties | undefined = active
-    ? { backgroundColor: `${accent}33`, borderColor: accent }
-    : marked
-      ? { borderColor: `${accent}99` }
-      : undefined;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "rounded-md border font-minecraft transition-colors",
-        active ? "text-white" : "border-white/10 bg-black/20 text-white/70 enabled:hover:border-white/25 enabled:hover:text-white",
-        disabled && "cursor-not-allowed opacity-40",
-        className,
-      )}
-      style={style}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Section({ title, aside, children }: { title: ReactNode; aside?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-white/10 bg-black/20 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="font-smallcaps text-lg text-white">{title}</h3>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
 }
 
 export function InstallationSettingsTab({
