@@ -3,6 +3,18 @@ use crate::minecraft::rules::RuleProcessor;
 use log::{info, trace};
 use std::path::PathBuf;
 
+pub const BASE64_INTRINSICS_MIN_JAVA: u32 = 11;
+
+pub fn base64_intrinsics_mitigation(java_major: u32) -> Vec<String> {
+    if java_major < BASE64_INTRINSICS_MIN_JAVA {
+        return Vec::new();
+    }
+    vec![
+        "-XX:+UnlockDiagnosticVMOptions".to_string(),
+        "-XX:-UseBASE64Intrinsics".to_string(),
+    ]
+}
+
 pub struct JvmArguments {
     natives_directory: PathBuf,
     launcher_name: String,
