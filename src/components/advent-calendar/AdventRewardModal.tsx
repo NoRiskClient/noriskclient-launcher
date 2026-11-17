@@ -1,11 +1,8 @@
-"use client";
-
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
-import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
 import type { Reward } from "../../types/advent";
 import { CosmeticPreview } from "./CosmeticPreview";

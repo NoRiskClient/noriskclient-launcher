@@ -1,5 +1,3 @@
-"use client";
-
 import type { HTMLAttributes } from "react";
 
 import { useThemeStore } from "../../store/useThemeStore";

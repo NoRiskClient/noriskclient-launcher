@@ -142,9 +142,6 @@ pub enum AppError {
     #[error("Unsupported architecture: {0}")]
     UnsupportedArchitecture(String),
 
-    #[error("Failed to upload log to mclo.gs: {0}")]
-    MclogsUploadFailed(String),
-
     #[error("Request error: {0}")]
     RequestError(String),
 

@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ScreenshotsTabV3 — Gallery-Grid mit Hover-Overlay + Fullscreen-Modal.
  * Ersetzt V2 ScreenshotsTab. Reused V2 ProfileScreenshotModal unveraendert.
@@ -10,7 +8,8 @@ import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { createPortal } from "react-dom";
 import { useInView } from "react-intersection-observer";
 
 import type { Profile } from "../../../../types/profile";
@@ -26,6 +25,9 @@ import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { parseErrorMessage } from "../../../../utils/error-utils";
+import { useShareDialog } from "../../../../hooks/useShareDialog";
+import { copyScreenshotImage, revealScreenshot } from "../../../../utils/screenshot-actions";
+import { clampMenuPosition, SettingsContextMenu, type ContextMenuItem } from "../../../ui/SettingsContextMenu";
 
 interface ScreenshotsTabV3Props {
   profile: Profile;
@@ -50,6 +52,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
   const { showModal, hideModal } = useGlobalModal();
+  const { openShare, shareDialog, isSharing } = useShareDialog();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [screenshots, setScreenshots] = useState<ScreenshotInfo[]>([]);
@@ -129,10 +132,10 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
     setModalScreenshot(null);
   }, []);
 
-  const handleBatchDelete = useCallback(() => {
-    if (selectedPaths.size === 0) return;
-    const paths = Array.from(selectedPaths);
-    const modalId = "batch-delete-screenshots";
+  const confirmDelete = useCallback((paths: string[]) => {
+    if (paths.length === 0) return;
+    const single = paths.length === 1 ? screenshots.find(s => s.path === paths[0]) : undefined;
+    const modalId = "delete-screenshots";
     const doDelete = async () => {
       setIsBatchDeleting(true);
       let successCount = 0;
@@ -145,15 +148,24 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
             console.error("[V3 Screenshots] Delete failed for", p, err);
           }
         }
-        toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: successCount }));
-        setSelectedPaths(new Set());
+        if (single && successCount === 1) toast.success(t("screenshots.deleted", { name: single.filename }));
+        else toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: successCount }));
+        if (!single) setSelectedPaths(new Set());
         await loadData();
       } finally {
         setIsBatchDeleting(false);
         hideModal(modalId);
       }
     };
-    showModal(modalId, (
+    showModal(modalId, single ? (
+      <ConfirmDeleteDialog
+        isOpen={true}
+        itemName={single.filename}
+        onClose={() => hideModal(modalId)}
+        onConfirm={doDelete}
+        isDeleting={isBatchDeleting}
+      />
+    ) : (
       <ConfirmDeleteDialog
         isOpen={true}
         itemName={t("profiles.v3.screenshots.batchDeleteItemName", { count: paths.length })}
@@ -164,7 +176,16 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         message={<p className="text-white/80 font-minecraft">{t("profiles.v3.screenshots.batchDeleteConfirm", { count: paths.length })}</p>}
       />
     ));
-  }, [selectedPaths, loadData, showModal, hideModal, isBatchDeleting, t]);
+  }, [screenshots, loadData, showModal, hideModal, isBatchDeleting, t]);
+
+  const handleBatchDelete = useCallback(() => confirmDelete(Array.from(selectedPaths)), [confirmDelete, selectedPaths]);
+
+  const shareScreenshot = useCallback((s: ScreenshotInfo) => {
+    void openShare(
+      { kind: "screenshot", path: s.path, profileId: profile.id },
+      { kind: "screenshot", name: s.filename, preview: convertFileSrc(s.path) },
+    );
+  }, [openShare, profile.id]);
 
   // Esc clears selection
   useEffect(() => {
@@ -278,6 +299,8 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
                 selectMode={selectedPaths.size > 0}
                 onToggleSelection={() => toggleSelection(s.path)}
                 onOpen={() => setModalScreenshot(s)}
+                onShare={() => shareScreenshot(s)}
+                onDelete={() => confirmDelete([s.path])}
               />
             ))}
           </div>
@@ -301,8 +324,12 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         isOpen={modalScreenshot !== null}
         onClose={() => setModalScreenshot(null)}
         screenshot={modalScreenshot}
+        sharing={modalScreenshot ? isSharing(modalScreenshot.path) : false}
+        onShare={() => modalScreenshot && shareScreenshot(modalScreenshot)}
         onScreenshotDeleted={handleScreenshotDeleted}
       />
+
+      {shareDialog}
     </div>
   );
 }
@@ -315,12 +342,24 @@ interface ScreenshotTileProps {
   selectMode: boolean;
   onToggleSelection: () => void;
   onOpen: () => void;
+  onShare: () => void;
+  onDelete: () => void;
 }
 
+const MENU_HEIGHT = 210;
+
 const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
-  screenshot, accentColor, isSelected, selectMode, onToggleSelection, onOpen,
+  screenshot, accentColor, isSelected, selectMode, onToggleSelection, onOpen, onShare, onDelete,
 }) => {
   const { t } = useTranslation();
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const menuItems: ContextMenuItem<ScreenshotInfo>[] = [
+    { id: "open", label: t("screenshots.view"), icon: "solar:eye-bold", onClick: onOpen },
+    { id: "share", label: t("screenshots.share"), icon: "solar:cloud-upload-bold", onClick: onShare },
+    { id: "copy", label: t("screenshots.copy_image"), icon: "solar:copy-bold", onClick: (s) => void copyScreenshotImage(s.path, t) },
+    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: (s) => void revealScreenshot(s.path, t) },
+    { id: "delete", label: t("clips.gallery.delete"), icon: "solar:trash-bin-trash-bold", destructive: true, separator: true, onClick: onDelete },
+  ];
   // Intersection-Observer: Preview wird erst angefordert wenn das Tile in
   // den Viewport kommt. Vermeidet initial 200+ parallele Backend-Calls.
   const { ref, inView } = useInView({ triggerOnce: true, rootMargin: "300px" });
@@ -357,6 +396,10 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   return (
     <div
       ref={ref}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuAt(clampMenuPosition(e.clientX, e.clientY, MENU_HEIGHT));
+      }}
       onClick={(e) => {
         // Klick in Select-Mode toggled Selection statt Modal zu oeffnen.
         if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
@@ -420,6 +463,19 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
           {formatRelativeTime(screenshot.modified)}
         </span>
       </div>
+      {menuAt && createPortal(
+        <div onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
+          <SettingsContextMenu
+            target={screenshot}
+            isOpen
+            position={menuAt}
+            items={menuItems}
+            onClose={() => setMenuAt(null)}
+            compact
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 };

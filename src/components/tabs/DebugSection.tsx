@@ -1,3 +1,4 @@
+import { shareLogWithToast } from "../share/share-toast";
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -10,7 +11,6 @@ import {
   listAllMcLogs,
   listProcessLogs,
   getLogFileContent,
-  uploadLogToMclogs,
   type FileInfo,
 } from "../../services/log-service";
 import {
@@ -105,12 +105,9 @@ function LogFileSection({ id, title, icon, crash, loader }: LogFileSectionProps)
   async function handleUpload(file: FileInfo) {
     setUploadingFile(file.path);
     try {
-      const content = await getLogFileContent(file.path);
-      const url = await uploadLogToMclogs(content);
-      await writeText(url);
-      toast.success(t("debug.uploaded_copied"));
+      await shareLogWithToast(await getLogFileContent(file.path), file.name);
     } catch (e) {
-      logError(`Failed to upload: ${e}`);
+      logError(`Failed to read the log: ${e}`);
       toast.error(t("debug.upload_failed", { error: getErrorMessage(e) }));
     }
     setUploadingFile(null);

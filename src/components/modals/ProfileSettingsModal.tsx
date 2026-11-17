@@ -1,5 +1,3 @@
-"use client";
-
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
 import { ProfileSettings } from "../profiles/ProfileSettings";
 

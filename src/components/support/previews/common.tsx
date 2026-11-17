@@ -1,5 +1,3 @@
-"use client";
-
 import { Fragment, type ReactNode, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";

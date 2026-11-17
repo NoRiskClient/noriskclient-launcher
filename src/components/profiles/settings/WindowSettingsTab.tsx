@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import type { Profile } from "../../../types/profile";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -20,7 +18,6 @@ export function WindowSettingsTab({
   updateProfile,
 }: WindowSettingsTabProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );

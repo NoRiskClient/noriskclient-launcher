@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * WorldsTabV3 — funktionale Version (worlds only).
  *

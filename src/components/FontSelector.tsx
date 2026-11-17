@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Icon } from "@iconify/react";

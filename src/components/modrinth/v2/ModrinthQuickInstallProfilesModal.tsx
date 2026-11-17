@@ -1,9 +1,7 @@
-"use client";
-
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal } from '../../ui/Modal';
 import { Icon } from '@iconify/react';
-import type { ModrinthSearchHit, ModrinthVersion } from '../../../types/modrinth';
+import type { ModrinthSearchHit } from '../../../types/modrinth';
 import type { UnifiedVersion } from '../../../types/unified';
 import type { Profile } from '../../../types/profile';
 import { ProfileIconV2 } from '../../profiles/ProfileIconV2';

@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 
 import { openExternalUrl } from "../../services/tauri-service";

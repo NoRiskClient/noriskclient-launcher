@@ -8,9 +8,6 @@ import { PlayTab } from "../components/tabs/PlayTab";
 const profileDetail = async () => ({
   Component: (await import("../components/profiles/ProfileDetailViewV2Wrapper")).ProfileDetailViewV2Wrapper,
 });
-const profileBrowse = async () => ({
-  Component: (await import("../components/profiles/BrowseTabWrapper")).BrowseTabWrapper,
-});
 
 export const router = createHashRouter([
   {
@@ -39,14 +36,6 @@ export const router = createHashRouter([
       {
         path: "profiles/:profileId",
         lazy: profileDetail,
-      },
-      {
-        path: "profilesv2/:profileId/browse/:contentType",
-        lazy: profileBrowse,
-      },
-      {
-        path: "profiles/:profileId/browse/:contentType",
-        lazy: profileBrowse,
       },
       {
         path: "sync-packs",

@@ -369,6 +369,7 @@ pub async fn clip_export_vertical(
             removed: removed.unwrap_or_default(),
             blanked: blanked.unwrap_or_default(),
             muted: muted.unwrap_or_default(),
+            ..Default::default()
         },
     )).await?;
 

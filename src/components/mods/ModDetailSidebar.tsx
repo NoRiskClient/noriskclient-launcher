@@ -1,6 +1,3 @@
-"use client";
-
-import React from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";

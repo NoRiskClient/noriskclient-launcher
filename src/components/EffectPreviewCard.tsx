@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../lib/utils";

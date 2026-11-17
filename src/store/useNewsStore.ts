@@ -13,7 +13,6 @@ interface NewsActions {
   setPosts: (posts: BlogPost[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setLastFetched: (timestamp: number) => void;
   clearCache: () => void;
   isCacheValid: () => boolean;
 }
@@ -29,7 +28,6 @@ export const useNewsStore = create<NewsState & NewsActions>()(
       setPosts: (posts) => set({ posts, lastFetched: Date.now() }),
       setLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
-      setLastFetched: (timestamp) => set({ lastFetched: timestamp }),
 
       clearCache: () => set({ posts: [], lastFetched: null, error: null }),
 

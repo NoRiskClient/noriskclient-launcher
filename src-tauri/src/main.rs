@@ -47,7 +47,6 @@ use commands::minecraft_command::{
     remove_skin,
     reset_skin,
     update_skin_properties,
-    upload_log_to_mclogs_command,
     upload_skin,
 };
 use commands::profile_command::{
@@ -286,6 +285,8 @@ async fn main() {
                 tauri::async_runtime::spawn(async {
                     utils::trash_utils::reap_temp_profiles().await;
                 });
+
+                tauri::async_runtime::spawn_blocking(utils::game_sessions::remove_stale);
 
                 tauri::async_runtime::spawn(async {
                     if let Err(e) =
@@ -555,7 +556,6 @@ async fn main() {
             open_profile_folder,
             import_profile,
             preview_import_pack,
-            upload_log_to_mclogs_command,
             get_fabric_loader_versions,
             get_forge_versions,
             get_neoforge_versions,
@@ -821,6 +821,10 @@ async fn main() {
             commands::clip_commands::clip_open_editor,
             commands::clip_commands::clip_editor_current,
             commands::clip_commands::clip_editor_close,
+            commands::share::share_clip,
+            commands::share::share_screenshot,
+            commands::share::share_log,
+            commands::share::share_choices,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

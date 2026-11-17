@@ -51,28 +51,21 @@ interface ProcessStore {
   // Actions
   fetchProcesses: () => Promise<void>;
   setProcesses: (processes: ProcessMetadata[]) => void;
-  updateProcess: (process: ProcessMetadata) => void;
-  removeProcess: (processId: string) => void;
   selectProcess: (processId: string | null) => void;
   markProcessStopped: (processId: string, metadata: ProcessMetadata) => void;
 
   // Log actions
   addLogEntry: (processId: string, rawMessage: string) => void;
   addLogEntriesBatch: (entries: Array<{ processId: string; rawMessage: string }>) => void;
-  loadLogsFromContent: (processId: string, content: string) => void;
   clearLogs: (processId: string) => void;
   setCursor: (processId: string, cursor: number) => void;
-  getLogsForProcess: (processId: string) => LogEntry[];
-  hasLogsForProcess: (processId: string) => boolean;
 
   // Launcher log actions (for launch status messages)
   addLauncherLog: (profileId: string, message: string) => void;
   clearLauncherLogs: (profileId: string) => void;
-  getLauncherLogsForProfile: (profileId: string) => LogEntry[];
 
   // Metrics actions
   updateMetrics: (processId: string, metrics: ProcessMetrics) => void;
-  getMetricsForProcess: (processId: string) => ProcessMetrics | undefined;
 
   // Process actions
   stopProcess: (processId: string) => Promise<void>;
@@ -101,11 +94,6 @@ function createDefaultParserState(): ParserState {
     lastThread: null,
     nextId: 0,
   };
-}
-
-function trimLogTail<T>(logs: T[], maxEntries: number): T[] {
-  if (logs.length <= maxEntries) return logs;
-  return logs.slice(logs.length - maxEntries);
 }
 
 function appendBounded<T>(existing: T[], entries: T[], maxEntries: number): T[] {
@@ -308,38 +296,6 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     set({ processes });
   },
 
-  updateProcess: (process) => {
-    set((state) => {
-      const existingIndex = state.processes.findIndex(p => p.id === process.id);
-      let newProcesses: ProcessMetadata[];
-      if (existingIndex >= 0) {
-        newProcesses = [...state.processes];
-        newProcesses[existingIndex] = process;
-      } else {
-        newProcesses = [...state.processes, process];
-      }
-
-      // When a new process starts, remove stopped process with same profile_id
-      const newStoppedProcesses = new Map(state.stoppedProcesses);
-      const newProcessEndTimes = new Map(state.processEndTimes);
-      for (const [id, stoppedProcess] of newStoppedProcesses) {
-        if (stoppedProcess.profile_id === process.profile_id) {
-          newStoppedProcesses.delete(id);
-          newProcessEndTimes.delete(id);
-        }
-      }
-
-      return { processes: newProcesses, stoppedProcesses: newStoppedProcesses, processEndTimes: newProcessEndTimes };
-    });
-  },
-
-  removeProcess: (processId) => {
-    set((state) => ({
-      processes: state.processes.filter(p => p.id !== processId),
-      selectedProcessId: state.selectedProcessId === processId ? null : state.selectedProcessId,
-    }));
-  },
-
   selectProcess: (processId) => {
     set({ selectedProcessId: processId });
   },
@@ -408,31 +364,6 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     });
   },
 
-  // Load logs from raw content (e.g., from latest.log file)
-  loadLogsFromContent: (processId, content) => {
-    set((state) => {
-      const newLogs = new Map(state.logs);
-      const newParserStates = new Map(state.parserStates);
-
-      // Split content into lines (handle both Windows \r\n and Unix \n)
-      const lines = content
-        .split(/\r?\n/)
-        .map((line) => line.replace(/\r$/, ""))
-        .filter((line) => line.trim().length > 0);
-
-      const parsed = parseLogEntriesForProcess(
-        processId,
-        trimLogTail(lines, MAX_PROCESS_LOG_ENTRIES),
-        createDefaultParserState(),
-      );
-
-      newLogs.set(processId, parsed.entries);
-      newParserStates.set(processId, parsed.parserState);
-
-      return { logs: newLogs, parserStates: newParserStates };
-    });
-  },
-
   clearLogs: (processId) => {
     set((state) => {
       const newLogs = new Map(state.logs);
@@ -452,15 +383,6 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       newCursors.set(processId, cursor);
       return { cursors: newCursors };
     });
-  },
-
-  getLogsForProcess: (processId) => {
-    return get().logs.get(processId) || [];
-  },
-
-  hasLogsForProcess: (processId) => {
-    const logs = get().logs.get(processId);
-    return logs !== undefined && logs.length > 0;
   },
 
   // Launcher log actions (for launch status messages by profileId)
@@ -495,10 +417,6 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
     });
   },
 
-  getLauncherLogsForProfile: (profileId) => {
-    return get().launcherLogs.get(profileId) || [];
-  },
-
   // Metrics actions
   updateMetrics: (processId, metrics) => {
     set((state) => {
@@ -514,10 +432,6 @@ export const useProcessStore = create<ProcessStore>((set, get) => ({
       newMetrics.set(processId, metrics);
       return { metrics: newMetrics };
     });
-  },
-
-  getMetricsForProcess: (processId) => {
-    return get().metrics.get(processId);
   },
 
   // Process actions

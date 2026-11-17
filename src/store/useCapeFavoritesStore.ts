@@ -9,8 +9,6 @@ interface CapeFavoritesState {
   isFavorite: (capeId: string) => boolean;
   addFavorite: (capeId: string) => void;
   removeFavorite: (capeId: string) => void;
-  toggleFavorite: (capeId: string) => void;
-  clearFavorites: () => void;
   setFavoriteOptimistic: (capeId: string, favorite: boolean, noriskToken?: string) => Promise<void>;
   toggleFavoriteOptimistic: (capeId: string, noriskToken?: string) => Promise<void>;
 }
@@ -38,17 +36,6 @@ export const useCapeFavoritesStore = create<CapeFavoritesState>()(
           favoriteCapeIds: state.favoriteCapeIds.filter((id) => id !== capeId),
         }));
       },
-
-      toggleFavorite: (capeId: string) => {
-        const { isFavorite, addFavorite, removeFavorite } = get();
-        if (isFavorite(capeId)) {
-          removeFavorite(capeId);
-        } else {
-          addFavorite(capeId);
-        }
-      },
-
-      clearFavorites: () => set({ favoriteCapeIds: [] }),
 
       setFavoriteOptimistic: async (capeId: string, favorite: boolean, noriskToken?: string) => {
         // Apply local change first and keep it regardless of server outcome

@@ -4,7 +4,6 @@ use crate::minecraft::api::cosmetic_api::CosmeticApi;
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;
 use crate::minecraft::api::mc_api::MinecraftApiService;
-use crate::minecraft::api::mclogs_api::upload_log_to_mclogs;
 use crate::minecraft::api::neo_forge_api::NeoForgeApi;
 use crate::minecraft::api::quilt_api::QuiltApi;
 use crate::minecraft::dto::fabric_meta::FabricVersionInfo;
@@ -65,24 +64,6 @@ pub async fn get_minecraft_versions() -> Result<VersionManifest, CommandError> {
         debug!("Command failed: get_minecraft_versions");
     }
 
-    result
-}
-
-#[tauri::command]
-pub async fn upload_log_to_mclogs_command(log_content: String) -> Result<String, CommandError> {
-    debug!("Command called: upload_log_to_mclogs_command");
-    let result = upload_log_to_mclogs(log_content)
-        .await
-        .map(|result| {
-            debug!("Successfully uploaded log to MCLogs");
-            result.url
-        })
-        .map_err(|e| {
-            debug!("Failed to upload log to MCLogs: {:?}", e);
-            e.into()
-        });
-
-    debug!("Command completed: upload_log_to_mclogs_command");
     result
 }
 

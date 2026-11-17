@@ -1,5 +1,3 @@
-"use client";
-
 import { useTranslation } from "react-i18next";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { SnowEffectToggle } from "../../ui/SnowEffectToggle";

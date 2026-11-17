@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
@@ -13,7 +11,6 @@ import type {
 import type { AccentColor } from '../../../store/useThemeStore';
 import { useThemeStore } from '../../../store/useThemeStore';
 import { Icon } from '@iconify/react';
-import { SearchWithFilters } from '../../ui/SearchWithFilters';
 import { CheckboxV2 } from '../../ui/CheckboxV2';
 import { gsap } from "gsap";
 
@@ -44,7 +41,6 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   activeCount = 0
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen || activeCount > 0);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 

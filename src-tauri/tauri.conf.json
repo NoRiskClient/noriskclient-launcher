@@ -335,6 +335,7 @@
       "app",
       "dmg",
       "deb",
+      "rpm",
       "appimage",
       "nsis"
     ],

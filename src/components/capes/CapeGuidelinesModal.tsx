@@ -1,5 +1,3 @@
-"use client";
-
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";

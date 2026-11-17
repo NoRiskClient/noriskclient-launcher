@@ -1,9 +1,6 @@
-"use client";
-
 import React, { useState, useEffect } from 'react';
 import type {
   ModrinthSearchHit,
-  ModrinthVersion,
 } from '../../../types/modrinth';
 import type { UnifiedVersion } from '../../../types/unified';
 import { Icon } from '@iconify/react';

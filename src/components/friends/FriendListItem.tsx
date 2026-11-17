@@ -6,7 +6,6 @@ import { useChatStore } from "../../store/chat-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { NotificationBadge } from "../ui/NotificationBadge";
-import { cn } from "../../lib/utils";
 
 interface FriendListItemProps {
   friend: FriendsFriendUser;

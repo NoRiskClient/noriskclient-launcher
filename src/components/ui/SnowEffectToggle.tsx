@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { useSnowEffectStore } from "../../store/snow-effect-store";

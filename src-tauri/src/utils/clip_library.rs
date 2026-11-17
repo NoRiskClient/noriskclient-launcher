@@ -16,6 +16,7 @@ pub struct ClipEntry {
     pub created_at: i64,
     pub duration_seconds: Option<f32>,
     pub game: Option<String>,
+    pub server: Option<String>,
     pub thumbnail: Option<PathBuf>,
     pub favourite: bool,
     pub managed: bool,
@@ -42,6 +43,8 @@ pub struct ClipDetails {
     #[serde(default)]
     pub game: Option<String>,
     #[serde(default)]
+    pub server: Option<String>,
+    #[serde(default)]
     pub favourite: bool,
 }
 
@@ -63,6 +66,7 @@ impl From<&norisk_ipc::ClipManifest> for ClipDetails {
             fps: manifest.fps,
             peak_step_ms: norisk_ipc::PEAK_STEP_MS,
             game: None,
+            server: None,
             favourite: false,
             audio_tracks: manifest
                 .audio_tracks
@@ -109,6 +113,7 @@ impl ClipDetails {
             fps: self.fps,
             peak_step_ms: self.peak_step_ms,
             game: self.game.clone(),
+            server: self.server.clone(),
             favourite: self.favourite,
             audio_tracks: if merged.is_empty() {
                 Vec::new()
@@ -290,6 +295,23 @@ fn ensure_meta_dir() -> Result<()> {
         .map_err(|e| AppError::Other(format!("could not create {}: {e}", dir.display())))
 }
 
+pub fn copy_origin_details(source: &Path, exported: &Path) {
+    let Some(origin) = read_details(source) else {
+        return;
+    };
+    if origin.game.is_none() && origin.server.is_none() {
+        return;
+    }
+    let details = ClipDetails {
+        game: origin.game,
+        server: origin.server,
+        ..Default::default()
+    };
+    if let Err(e) = write_details(exported, &details) {
+        log::warn!("Could not describe the exported clip: {e}");
+    }
+}
+
 pub fn read_details(clip: &Path) -> Option<ClipDetails> {
     read_details_at(&details_path(clip))
 }
@@ -355,6 +377,7 @@ pub fn list(dir: &Path) -> Result<Vec<ClipEntry>> {
                     .filter(|seconds| *seconds > 0.0),
                 favourite: details.as_ref().is_some_and(|d| d.favourite),
                 game: details.as_ref().and_then(|d| d.game.clone()),
+                server: details.as_ref().and_then(|d| d.server.clone()),
                 thumbnail,
                 path,
             })
@@ -801,6 +824,7 @@ mod tests {
             peak_step_ms: 20,
             audio_tracks: tracks,
             game: None,
+            server: None,
             favourite: false,
         }
     }
@@ -935,6 +959,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn a_trimmed_clip_keeps_its_server_and_old_sidecars_still_load() {
+        let recorded = ClipDetails {
+            server: Some("hypixel.net".into()),
+            game: Some("Minecraft".into()),
+            ..details_with(Vec::new())
+        };
+        assert_eq!(recorded.sliced(1.0, 4.0).server.as_deref(), Some("hypixel.net"));
+
+        let old: ClipDetails = serde_json::from_str(
+            r#"{"durationSeconds":5.0,"width":1920,"height":1080,"fps":60,"peakStepMs":20,"audioTracks":[],"game":"Minecraft"}"#,
+        )
+        .unwrap();
+        assert_eq!(old.server, None);
+    }
+
     fn entry(name: &str, size_bytes: u64, created_at: i64, favourite: bool) -> ClipEntry {
         ClipEntry {
             path: format!("{name}.mp4").into(),
@@ -943,6 +983,7 @@ mod tests {
             created_at,
             duration_seconds: None,
             game: None,
+            server: None,
             thumbnail: None,
             favourite,
             managed: true,

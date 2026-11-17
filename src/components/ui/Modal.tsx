@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,9 +44,6 @@ export function Modal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
   const [isClosing, setIsClosing] = useState(false);
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

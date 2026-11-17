@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 import type { Span } from "../../../services/clip-service";

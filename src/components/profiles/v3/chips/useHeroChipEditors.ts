@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * useHeroChipEditors — orchestrates fetch + save for the Hero inline-edit
  * chips (Group, Game Version, Loader, Loader Version). Picker components stay

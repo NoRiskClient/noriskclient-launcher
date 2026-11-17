@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { MinecraftVersion, VersionManifest } from "../../../types/minecraft";
@@ -9,7 +7,6 @@ import { Modal } from "../../ui/Modal";
 import { Button } from "../../ui/buttons/Button";
 import { StatusMessage } from "../../ui/StatusMessage";
 import { useThemeStore } from "../../../store/useThemeStore";
-import { Card } from "../../ui/Card";
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import { ProfileWizardV2Step2 } from "./ProfileWizardV2Step2";
 import { ProfileWizardV2Step3 } from "./ProfileWizardV2Step3";

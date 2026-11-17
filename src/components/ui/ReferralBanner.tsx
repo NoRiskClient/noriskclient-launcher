@@ -12,7 +12,6 @@ export function ReferralBanner() {
     referrerInfo,
     isLoading,
     error,
-    pendingCode,
     setPendingCode,
     dismissBanner
   } = useReferralStore();

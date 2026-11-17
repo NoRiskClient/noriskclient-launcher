@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LoaderPickerV3 — presentational picker for the mod loader type.
  *

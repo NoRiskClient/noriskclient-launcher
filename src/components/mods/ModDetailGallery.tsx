@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import type { UnifiedGalleryImage } from "../../types/unified";
