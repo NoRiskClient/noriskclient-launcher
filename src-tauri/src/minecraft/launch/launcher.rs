@@ -346,6 +346,8 @@ impl MinecraftLauncher {
             command.arg("-XX:G1HeapRegionSize=32M");
         }
 
+        command.arg("-Dnorisk.discordOverlayEmuFix=' net.minecraft.client.main.Main '");
+
         // Add NoRisk client specific parameters
         // Only add token if we have credentials AND a NoRisk pack is selected in the profile
         let has_norisk_pack = profile.as_ref().and_then(|p| p.selected_norisk_pack_id.as_ref()).is_some();
