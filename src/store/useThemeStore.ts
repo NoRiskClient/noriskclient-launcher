@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setProfileGroupingPreference } from "../services/launcher-config-service";
 import { ModPlatform } from "../types/unified";
 import type { SupportedLanguage } from "../i18n";
 
@@ -213,14 +212,9 @@ interface ThemeState {
   applyAccentColorToDOM: () => void;
   customColorHistory: string[];
   addToCustomColorHistory: (hexColor: string) => void;
-  clearCustomColorHistory: () => void;
   isBackgroundAnimationEnabled: boolean;
   showNavLabels: boolean;
   toggleNavLabels: () => void;
-  isDetailViewSidebarOnLeft: boolean;
-  toggleDetailViewSidebarPosition: () => void;
-  profileGroupingCriterion: string;
-  setProfileGroupingCriterion: (criterion: string) => Promise<void>;
   staticBackground: boolean;
   toggleStaticBackground: () => void;
   toggleBackgroundAnimation: () => void;
@@ -230,9 +224,6 @@ interface ThemeState {
   borderRadius: number;
   setBorderRadius: (radius: number) => void;
   applyBorderRadiusToDOM: () => void;
-  collapsedProfileGroups: string[];
-  setCollapsedProfileGroups: (groups: string[]) => void;
-  toggleCollapsedProfileGroup: (groupKey: string) => void;
   // ProfilesTabV2 persistent filters
   profilesTabActiveGroup: string;
   profilesTabSortBy: string;
@@ -278,14 +269,11 @@ export const useThemeStore = create<ThemeState>()(
       accentColor: ACCENT_COLORS.blue,
       isBackgroundAnimationEnabled: false,
       showNavLabels: true,
-      isDetailViewSidebarOnLeft: true,
-      profileGroupingCriterion: "group",
       staticBackground: true,
       hasAcceptedTermsOfService: false,
       hasAcceptedCapeGuidelines: false,
       customColorHistory: [],
       borderRadius: DEFAULT_BORDER_RADIUS,
-      collapsedProfileGroups: [],
       // ProfilesTabV2 persistent filters - defaults
       profilesTabActiveGroup: "all",
       profilesTabSortBy: "last_played",
@@ -367,10 +355,6 @@ export const useThemeStore = create<ThemeState>()(
         });
       },
 
-      clearCustomColorHistory: () => {
-        set({ customColorHistory: [] });
-      },
-
       toggleBackgroundAnimation: () => {
         set((state) => ({
           isBackgroundAnimationEnabled: !state.isBackgroundAnimationEnabled,
@@ -379,23 +363,6 @@ export const useThemeStore = create<ThemeState>()(
 
       toggleNavLabels: () => {
         set((state) => ({ showNavLabels: !state.showNavLabels }));
-      },
-
-      toggleDetailViewSidebarPosition: () => {
-        set((state) => ({
-          isDetailViewSidebarOnLeft: !state.isDetailViewSidebarOnLeft,
-        }));
-      },
-
-      setProfileGroupingCriterion: async (criterion: string) => {
-        try {
-          await setProfileGroupingPreference(criterion);
-          set({ profileGroupingCriterion: criterion });
-        } catch (error) {
-          console.error("Failed to save grouping preference:", error);
-          set({ profileGroupingCriterion: criterion });
-          throw error;
-        }
       },
 
       toggleStaticBackground: () => {
@@ -449,20 +416,6 @@ export const useThemeStore = create<ThemeState>()(
         } else {
           document.documentElement.classList.remove("radius-flat");
         }
-      },
-
-      setCollapsedProfileGroups: (groups: string[]) => {
-        set({ collapsedProfileGroups: [...groups] });
-      },
-
-      toggleCollapsedProfileGroup: (groupKey: string) => {
-        set((state) => {
-          const isCollapsed = state.collapsedProfileGroups.includes(groupKey);
-          const next = isCollapsed
-            ? state.collapsedProfileGroups.filter((g) => g !== groupKey)
-            : [...state.collapsedProfileGroups, groupKey];
-          return { collapsedProfileGroups: next };
-        });
       },
 
       // ProfilesTabV2 persistent filters setters
@@ -557,20 +510,11 @@ export const useThemeStore = create<ThemeState>()(
       name: "norisk-theme-storage",
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Migration: Replace old "none" grouping criterion with "group"
-          if (state.profileGroupingCriterion === "none") {
-            state.profileGroupingCriterion = "group";
-          }
-          
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
           // Apply language on rehydrate
           if (state.language) {
             import("../i18n/i18n").then((mod) => mod.default.changeLanguage(state.language));
-          }
-          // Ensure collapsedProfileGroups exists after rehydrate
-          if (!Array.isArray(state.collapsedProfileGroups)) {
-            state.collapsedProfileGroups = [];
           }
 
           // Migration: version filter went from single string to multi-select array

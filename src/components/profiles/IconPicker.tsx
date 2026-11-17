@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";

@@ -12,13 +12,7 @@ pub enum OnlineState {
 }
 
 impl OnlineState {
-    pub fn is_online(&self) -> bool {
-        matches!(self, Self::Online | Self::Afk | Self::Busy)
-    }
 
-    pub fn is_active(&self) -> bool {
-        !matches!(self, Self::Offline | Self::Afk)
-    }
 }
 
 impl Default for OnlineState {

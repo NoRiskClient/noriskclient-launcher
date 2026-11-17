@@ -1,20 +1,12 @@
-"use client";
-
-import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { MainLaunchButton } from './MainLaunchButton';
 import { PlayerRig } from './PlayerRig';
 import { useThemeStore } from '../../store/useThemeStore';
-import { Icon } from '@iconify/react';
 import { ServerLaunchCard } from './ServerLaunchCard';
-import { useProfileStore } from '../../store/profile-store';
 import type { PromoOutlineConfig } from '@noriskclient/nrc-skin-renderer/postfx';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { StaticTooltip } from '../ui/Tooltip';
 import { toast } from 'react-hot-toast';
-import { isWorldCupEventActive } from '../../data/worldcup-event';
-import type { LaunchOverrides } from '../../services/process-service';
 
 // Featured server configuration
 // Option A: profileId = null → uses currently selected profile from MainLaunchButton
@@ -23,14 +15,6 @@ const FEATURED_SERVER = {
   address: "hugosmp.net",
   name: "HugoSMP.net",
   profileId: null as string | null,
-};
-
-const WM_PUBLIC_VIEWING = {
-  address: FEATURED_SERVER.address,
-  iconSrc: "/worldcup/football.png",
-  gameVersion: "1.21.11",
-  pack: "norisk-prod",
-  loader: "fabric",
 };
 
 interface PlayerActionsDisplayProps {
@@ -47,26 +31,6 @@ interface PlayerActionsDisplayProps {
   className?: string;
   displayMode?: 'playerName' | 'logo';
   outline?: Partial<PromoOutlineConfig>;
-}
-
-function FeaturedPromoIcon({ src, alt, size = "md" }: { src: string; alt: string; size?: "sm" | "md" | "lg" }) {
-  const [failed, setFailed] = useState(false);
-  const sizeClass =
-    size === "lg" ? "w-7 h-7" : size === "sm" ? "w-4 h-4" : "w-5 h-5";
-
-  if (failed) {
-    return <Icon icon="noto:soccer-ball" className={cn(sizeClass, "shrink-0")} />;
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={cn(sizeClass, "shrink-0 object-contain")}
-      style={{ imageRendering: "pixelated" }}
-      onError={() => setFailed(true)}
-    />
-  );
 }
 
 export function PlayerActionsDisplay({
@@ -117,15 +81,6 @@ export function PlayerActionsDisplay({
   
   const selectedVersionLabel = launchButtonVersions.find(v => v.id === launchButtonDefaultVersion)?.label;
 
-  const worldCupActive = isWorldCupEventActive();
-  const featuredLaunchOverrides: LaunchOverrides | undefined = worldCupActive
-    ? {
-        game_version: WM_PUBLIC_VIEWING.gameVersion,
-        loader: WM_PUBLIC_VIEWING.loader,
-        pack: WM_PUBLIC_VIEWING.pack,
-      }
-    : undefined;
-
   return (
     <div className={cn("flex flex-col items-center", className)}>
 
@@ -153,39 +108,19 @@ export function PlayerActionsDisplay({
             <div
               className={`absolute left-0 right-0 flex justify-center px-4 z-30 transition-all duration-300 ${featureMode ? 'bottom-32' : 'bottom-24'}`}
             >
-              {!featureMode && worldCupActive ? (
-                <StaticTooltip
-                  content={t('wm.tooltip', {
-                    version: WM_PUBLIC_VIEWING.gameVersion,
-                    server: FEATURED_SERVER.address,
-                  })}
-                  delay={200}
-                >
-                  <button
-                    onClick={handleTopToggle}
-                    className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
-                  >
-                    <span className="flex items-center gap-2">
-                      <FeaturedPromoIcon src={WM_PUBLIC_VIEWING.iconSrc} alt="" size="md" />
-                      {t('wm.public_viewing')}
-                    </span>
-                  </button>
-                </StaticTooltip>
-              ) : (
-                <button
-                  onClick={handleTopToggle}
-                  className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
-                  title={
-                    featureMode
-                      ? t('wm.switch_to_main')
-                      : t('wm.switch_to_hugo', { server: FEATURED_SERVER.name })
-                  }
-                >
-                  {featureMode
+              <button
+                onClick={handleTopToggle}
+                className="font-smallcaps text-base text-white/70 hover:text-white transition-all duration-200 cursor-pointer bg-transparent border-none p-0 whitespace-nowrap text-shadow"
+                title={
+                  featureMode
                     ? t('wm.switch_to_main')
-                    : FEATURED_SERVER.name}
-                </button>
-              )}
+                    : t('wm.switch_to_hugo', { server: FEATURED_SERVER.name })
+                }
+              >
+                {featureMode
+                  ? t('wm.switch_to_main')
+                  : FEATURED_SERVER.name}
+              </button>
             </div>
             <div className={`absolute left-0 right-0 flex justify-center px-4 bottom-2`}>
               {featureMode ? (
@@ -194,7 +129,6 @@ export function PlayerActionsDisplay({
                   serverName={FEATURED_SERVER.name}
                   profileId={featuredServerProfileId}
                   onMods={handleFeaturedServerMods}
-                  launchOverrides={featuredLaunchOverrides}
                 />
               ) : (
                 <div className="max-w-xs sm:max-w-sm">

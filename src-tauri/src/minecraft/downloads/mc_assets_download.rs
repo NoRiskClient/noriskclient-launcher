@@ -331,12 +331,6 @@ impl MinecraftAssetsDownloadService {
         }
     }
 
-    /// Wrapper method to maintain compatibility with existing calls
-    pub async fn download_assets(&self, asset_index: &AssetIndex) -> Result<()> {
-        self.download_assets_with_progress(asset_index, Uuid::nil())
-            .await
-    }
-
     async fn download_asset_index(&self, asset_index: &AssetIndex) -> Result<AssetIndexContent> {
         let index_path = self
             .assets_path

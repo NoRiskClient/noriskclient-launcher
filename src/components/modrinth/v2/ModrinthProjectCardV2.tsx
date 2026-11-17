@@ -1,13 +1,9 @@
-"use client";
-
 import React, { useEffect } from "react";
 import type {
   ModrinthGameVersion,
 } from "../../../types/modrinth";
 import type { UnifiedModSearchResult, UnifiedVersion } from "../../../types/unified";
 
-// Unified project card supporting both Modrinth and CurseForge
-type CompatibleProject = UnifiedModSearchResult;
 import type { AccentColor } from "../../../store/useThemeStore";
 import type { ContentInstallStatus } from "../../../types/profile";
 import { ActionButton } from "../../ui/ActionButton";
@@ -19,7 +15,6 @@ import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
 import { preloadIcons } from "../../../lib/icon-utils";
 import { useTranslation } from "react-i18next";
-import { ThemedSurface } from "../../ui/ThemedSurface";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
 

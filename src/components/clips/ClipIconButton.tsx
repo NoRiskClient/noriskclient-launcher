@@ -1,5 +1,3 @@
-"use client";
-
 import type { ButtonHTMLAttributes } from "react";
 import { Icon } from "@iconify/react";
 

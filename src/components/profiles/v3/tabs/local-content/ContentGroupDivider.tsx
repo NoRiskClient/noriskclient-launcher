@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { SyncPackIcon } from "../../../../sync-packs/SyncPackIcon";
 

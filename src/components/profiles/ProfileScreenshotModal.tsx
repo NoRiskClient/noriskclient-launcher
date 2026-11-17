@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
@@ -8,7 +6,6 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { ScreenshotInfo as ActualScreenshotInfo } from "../../types/profile";
 import { IconButton } from "../ui/buttons/IconButton";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
-import { Image as TauriImage } from "@tauri-apps/api/image";
 import { revealItemInDir } from "../../utils/opener-utils";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";

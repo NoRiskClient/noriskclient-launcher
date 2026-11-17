@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
@@ -36,8 +34,6 @@ export interface SearchStyleInputProps
 
 export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputProps>(
   ({ className, placeholder = "Enter name for new profile", icon, error, ...props }, ref) => {
-    const accentColor = useThemeStore((state) => state.accentColor);
-
     return (
       <div className="w-full">
         <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">

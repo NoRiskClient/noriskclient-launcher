@@ -969,10 +969,6 @@ pub fn closes_to_tray() -> bool {
     CLOSE_TO_TRAY.load(Ordering::Relaxed)
 }
 
-pub fn default_config_path() -> PathBuf {
-    LAUNCHER_DIRECTORY.root_dir().join(CONFIG_FILENAME)
-}
-
 fn differs_ignoring_version(current: &LauncherConfig, next: &LauncherConfig) -> bool {
     let mut candidate = next.clone();
     candidate.version = current.version;

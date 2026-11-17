@@ -95,26 +95,6 @@ pub async fn repair_profile_libraries(profile_id: Uuid) -> Result<()> {
     Ok(())
 }
 
-/// Verifies the integrity of profile files
-/// 
-/// # Arguments
-///
-/// * `profile_id` - The UUID of the profile to verify
-///
-/// # Returns
-///
-/// Returns `Ok(())` if all files are valid, or `Err(AppError)` if issues are found
-pub async fn verify_profile_integrity(profile_id: Uuid) -> Result<()> {
-    info!("Verifying profile integrity for profile {}", profile_id);
-
-    // TODO: Implement file integrity verification
-    // - Check mod file hashes
-    // - Verify configuration files
-    // - Check for missing dependencies
-    
-    Ok(())
-}
-
 /// Repairs mod-related issues in a profile
 /// 
 /// # Arguments
@@ -234,23 +214,3 @@ pub async fn repair_profile_mods(profile_id: Uuid) -> Result<()> {
     info!("Mod repair completed for profile {}", profile_id);
     Ok(())
 }
-
-/// Repairs configuration files for a profile
-/// 
-/// # Arguments
-///
-/// * `profile_id` - The UUID of the profile to repair
-///
-/// # Returns
-///
-/// Returns `Ok(())` on successful config repair, or `Err(AppError)` if repair fails
-pub async fn repair_profile_config(profile_id: Uuid) -> Result<()> {
-    info!("Repairing configuration for profile {}", profile_id);
-
-    // TODO: Implement config repair logic
-    // - Check for corrupted config files
-    // - Reset to defaults if necessary
-    // - Verify settings validity
-    
-    Ok(())
-} 

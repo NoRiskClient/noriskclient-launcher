@@ -77,9 +77,6 @@ function classifyDrop(paths: string[]): DragHoverKind {
 }
 
 export function useGlobalDragAndDrop() {
-  // Destructure from store for useEffect dependencies, but use getState() inside event handler for freshest values.
-  const { activeDropProfileId, activeDropContentType, triggerRefresh } = useAppDragDropStore();
-
   useEffect(() => {
     let unlistenDragDrop: UnlistenFn | undefined;
     const instanceId = Date.now(); // To distinguish listener instances if any HMR issues

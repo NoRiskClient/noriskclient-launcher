@@ -1,11 +1,8 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { fetchNewsAndChangelogs } from "../../services/nrc-service";
 import { openExternalUrl } from "../../services/tauri-service";
-import type { BlogPost } from "../../types/wordPress";
 import { cn } from "../../lib/utils";
 import { NewsCard } from "../ui/NewsCard";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -28,10 +25,8 @@ export function NewsSection({ className }: NewsSectionProps) {
   // News Store
   const {
     posts,
-    isLoading,
     error,
     setPosts,
-    setLoading,
     setError,
     isCacheValid,
   } = useNewsStore();

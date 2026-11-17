@@ -1,4 +1,3 @@
-"use client";
 import { useThemeStore } from "../../store/useThemeStore";
 import { LiquidChrome } from "./LiquidChrome";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";

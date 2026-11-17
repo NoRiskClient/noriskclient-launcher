@@ -610,66 +610,6 @@ pub async fn copy_profile_files(
     Ok(total_files_copied)
 }
 
-/// Example function showing how to copy a profile with exclusions.
-/// This demonstrates how to use the directory structure and filtering functions.
-///
-/// # Arguments
-/// * `source_profile_path` - The source profile directory path
-/// * `dest_profile_path` - The destination profile directory path
-/// * `excluded_paths` - Paths to exclude from copying
-///
-/// # Returns
-/// Result with the number of files copied
-pub async fn copy_profile_with_exclusions(
-    source_profile_path: &Path,
-    dest_profile_path: &Path,
-    excluded_paths: &[PathBuf],
-) -> Result<u64> {
-    info!(
-        "Copying profile from {} to {} with {} exclusions",
-        source_profile_path.display(),
-        dest_profile_path.display(),
-        excluded_paths.len()
-    );
-
-    // Get the io_semaphore from global state
-    let state = crate::state::State::get().await?;
-    let io_semaphore = state.io_semaphore.clone();
-
-    // Convert excluded paths to strings and put them in a HashSet for efficient lookup
-    let excluded_set: std::collections::HashSet<String> = excluded_paths
-        .iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
-
-    // First, get the complete directory structure
-    let dir_structure = get_directory_structure(source_profile_path, false).await?;
-
-    // Filter the structure based on exclusions
-    let filtered_structure = filter_directory_structure(&dir_structure, &excluded_set)
-        .ok_or_else(|| AppError::Other("All files were excluded, nothing to copy".to_string()))?;
-
-    // Create the destination directory if it doesn't exist
-    if !dest_profile_path.exists() {
-        fs::create_dir_all(dest_profile_path)
-            .await
-            .map_err(|e| AppError::Io(e))?;
-    }
-
-    // Copy the files according to the filtered structure
-    let files_copied = copy_profile_files(
-        &filtered_structure,
-        source_profile_path,
-        dest_profile_path,
-        io_semaphore,
-    )
-    .await?;
-
-    info!("Profile copy completed. Copied {} files.", files_copied);
-
-    Ok(files_copied)
-}
-
 // Konstante aus dem mod_downloader/norisk_pack_downloader übernehmen
 const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 

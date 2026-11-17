@@ -12,7 +12,6 @@ macro_rules! measure_time {
 
 pub mod content_copy;
 pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von DataPacks
-pub mod debug_utils;
 pub mod disk_space_utils; // Disk space utility for checking available space before downloads
 pub mod download_utils; // Central download utility for robust file downloads
 pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan cleanup (trash)
@@ -42,6 +41,7 @@ pub mod import_safety; // Strips execution/path primitives out of untrusted impo
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally
 pub mod bounded_log_writer;
+pub mod metered_network;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
 pub mod perf_utils;
@@ -53,6 +53,7 @@ pub mod security_utils; // Security utilities for masking sensitive data
 pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-Servern
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks
 pub mod system_info; // <-- Hinzufügen
+pub mod background_updater;
 pub mod updater_utils;
 pub mod verified_files;
 pub mod world_utils; // <-- Hinzugefügt

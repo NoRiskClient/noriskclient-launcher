@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { BlogPost } from '../types/wordPress';
-import type { UpdateInfo } from '../types/updater';
+import type { LauncherUpdate, UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
-import type { AdventCalendarDay, Reward } from '../types/advent';
+import type { AdventCalendarDay } from '../types/advent';
 import type { UserNotification } from '../types/notification';
 import type {
   AfkPointsBalance,
@@ -47,6 +47,15 @@ export const refreshStandardVersions = (): Promise<Profile[]> => {
   return invoke('refresh_standard_versions');
 };
 
+const refetchProfilesKeepingSelection = async (): Promise<void> => {
+  const selectedId = useProfileStore.getState().selectedProfile?.id;
+  await useProfileStore.getState().fetchProfiles();
+  const selected = useProfileStore.getState().profiles.find((profile) => profile.id === selectedId);
+  if (selected) {
+    useProfileStore.getState().setSelectedProfile(selected);
+  }
+};
+
 /**
  * Refreshes both Norisk packs and standard versions configurations.
  * Logs success or errors to the console.
@@ -61,16 +70,13 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
   //console.log("[TEST] 5-second delay finished.");
 
   try {
-    let nrcPacksSuccess = false;
-    let standardVersionsSuccess = false;
-
     // Fire and forget: Load blocked mods config from Flagsmith
     getBlockedModsConfig()
       .then((config) => {
-        console.log("Blocked mods config loaded successfully:", config);
+        logInfo(`Blocked mods config loaded: ${JSON.stringify(config)}`);
       })
       .catch((error) => {
-        console.error("Failed to load blocked mods config:", error);
+        logError(`Failed to load blocked mods config: ${error}`);
       });
 
     // Fire and forget: Load pack rollout aliases from Flagsmith
@@ -96,42 +102,32 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
       .then(() => logInfo("User permissions refreshed on mount"))
       .catch((error) => logError(`Failed to refresh permissions: ${error}`));
 
-    try {
-      await refreshNoriskPacks();
-      console.log("Norisk Packs updated successfully on mount!");
-      nrcPacksSuccess = true;
-    } catch (error) {
-      console.error("Failed to refresh Norisk Packs on mount:", error);
+    const [, packs, standardVersions] = await Promise.allSettled([
+      useProfileStore.getState().fetchProfiles(),
+      refreshNoriskPacks(),
+      refreshStandardVersions().then((standardProfiles) => {
+        useProfileStore.setState({ standardProfiles });
+      }),
+    ]);
+
+    if (packs.status === "fulfilled") {
+      logInfo("Norisk Packs updated successfully on mount");
+    } else {
+      logError(`Failed to refresh Norisk Packs on mount: ${packs.reason}`);
+    }
+    if (standardVersions.status === "fulfilled") {
+      logInfo("Standard Versions updated successfully on mount");
+    } else {
+      logError(`Failed to refresh Standard Versions on mount: ${standardVersions.reason}`);
     }
 
-    try {
-      const standardProfiles = await refreshStandardVersions();
-      console.log("Standard Versions updated successfully on mount!");
-      // Store the standard profiles in the profile store
-      useProfileStore.setState({ standardProfiles });
-      standardVersionsSuccess = true;
-    } catch (error) {
-      console.error("Failed to refresh Standard Versions on mount:", error);
-    }
-
-    // Fetch profiles from the store after NRC data is refreshed
-    // This ensures the profile list (including standard versions) and last played are up-to-date.
-    if (nrcPacksSuccess || standardVersionsSuccess) { // Or simply always call it if appropriate
-      try {
-        console.log("Refreshing profiles state after NRC data update...");
-        await useProfileStore.getState().fetchProfiles();
-        console.log("Profiles state refreshed successfully.");
-        // fetchProfiles setzt loading: false bei Erfolg oder Fehler
-      } catch (error) {
-        console.error("Failed to refresh profiles state after NRC data update:", error);
-        // fetchProfiles sollte seinen eigenen Ladezustand und Fehler behandeln.
-        // Wenn fetchProfiles hier einen Fehler wirft, wird er vom äußeren Catch behandelt.
-      }
+    if (packs.status === "fulfilled" || standardVersions.status === "fulfilled") {
+      await refetchProfilesKeepingSelection();
     }
   } catch (error) {
     // Dieser Catch fängt Fehler von refreshNoriskPacks, refreshStandardVersions
     // oder wenn fetchProfiles selbst einen Fehler wirft, der nicht intern zu loading:false führt.
-    console.error("Error during NRC data refresh or profile fetching process:", error);
+    logError(`Error during NRC data refresh or profile fetching process: ${error}`);
     useProfileStore.setState({
       error: "Failed to initialize or refresh app data.",
       loading: false, // Sicherstellen, dass der Ladezustand beendet wird
@@ -261,6 +257,10 @@ export const resetMobileAppToken = (): Promise<string> => {
  */
 export const checkUpdateAvailable = (): Promise<UpdateInfo | null> => {
   return invoke('check_update_available_command');
+};
+
+export const getLauncherUpdate = (): Promise<LauncherUpdate | null> => {
+  return invoke('get_launcher_update_command');
 };
 
 /**

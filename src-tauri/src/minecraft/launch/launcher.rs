@@ -84,11 +84,6 @@ impl MinecraftLaunchParameters {
         self
     }
 
-    pub fn with_memory_max_mb(mut self, memory: u32) -> Self {
-        self.memory_max_mb = memory;
-        self
-    }
-
     pub fn with_experimental_mode(mut self, is_experimental: bool) -> Self {
         self.is_experimental_mode = is_experimental;
         self

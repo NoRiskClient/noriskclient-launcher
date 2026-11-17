@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LoaderVersionPickerV3 — presentational picker for loader versions.
  *

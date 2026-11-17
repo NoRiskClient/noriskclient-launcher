@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
@@ -22,7 +20,6 @@ import { NebulaGrid } from ".././effects/NebulaGrid";
 import { NebulaVoxels } from ".././effects/NebulaVoxels";
 import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
-import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
 import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
@@ -37,13 +34,15 @@ import { useFriendsStore } from "../../store/friends-store";
 import { useClipsStore } from "../../store/clips-store";
 import { closeClipEditorThen } from "../../services/clip-service";
 import { useChatStore } from "../../store/chat-store";
-import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
-import type { UpdateInfo } from "../../types/updater";
+import { checkUpdateAvailable, downloadAndInstallUpdate, getLauncherUpdate } from "../../services/nrc-service";
+import type { LauncherUpdate } from "../../types/updater";
+import { listen } from "@tauri-apps/api/event";
+import { useUpdateReminder } from "../../hooks/use-update-reminder";
 import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
-import { exit, relaunch } from '@tauri-apps/plugin-process';
+import { exit } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
@@ -96,10 +95,10 @@ export function AppLayout({
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
   const { qualityLevel } = useQualitySettingsStore();
-  const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
+  const { accentColor: themeAccentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
+  const { loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
 
   // TODO: Re-enable when WebSocket is stable
@@ -435,7 +434,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<LauncherUpdate | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdateClick = async () => {
@@ -459,35 +458,6 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     }
   };
 
-  // Calculate complementary/update highlight color based on current accent
-  const getUpdateHighlightColor = () => {
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result
-        ? {
-            r: Number.parseInt(result[1], 16),
-            g: Number.parseInt(result[2], 16),
-            b: Number.parseInt(result[3], 16),
-          }
-        : { r: 245, g: 158, b: 11 }; // fallback to amber
-    };
-
-    const rgb = hexToRgb(accentColor.value);
-
-    // Calculate a complementary warning color
-    // Mix current accent with amber/yellow for good visibility
-    const accentWeight = 0.4; // How much of the accent color to include
-    const warningWeight = 0.9; // How much of the warning color (amber)
-
-    const warningRgb = { r: 245, g: 158, b: 100 }; // Amber base
-
-    const mixedR = Math.round(rgb.r * accentWeight + warningRgb.r * warningWeight);
-    const mixedG = Math.round(rgb.g * accentWeight + warningRgb.g * warningWeight);
-    const mixedB = Math.round(rgb.b * accentWeight + warningRgb.b * warningWeight);
-
-    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
-  };
-
   useEffect(() => {
     const fetchVersion = async () => {
       try {
@@ -501,10 +471,14 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
 
   const checkForUpdates = async () => {
     try {
+      const ready = await getLauncherUpdate();
+      if (ready) {
+        setAvailableUpdate(ready);
+        return;
+      }
       const updateInfo = await checkUpdateAvailable();
       if (updateInfo) {
-        console.log("Update available:", updateInfo);
-        setAvailableUpdate(updateInfo);
+        setAvailableUpdate((current) => current ?? { ...updateInfo, ready: false });
       }
     } catch (error) {
       console.error("Failed to check for updates:", error);
@@ -515,16 +489,16 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     fetchVersion();
     checkForUpdates();
 
-    // Check for updates every 4 hours (4 * 60 * 60 * 1000 = 14,400,000 ms)
-    const updateCheckInterval = setInterval(() => {
-      console.log("Performing scheduled update check...");
-      checkForUpdates();
-    }, 4 * 60 * 60 * 1000);
+    const unlisten = listen<LauncherUpdate>("launcher_update", (event) => {
+      setAvailableUpdate(event.payload);
+    });
 
     return () => {
-      clearInterval(updateCheckInterval);
+      unlisten.then((stop) => stop());
     };
   }, []);
+
+  useUpdateReminder(availableUpdate, handleUpdateClick);
 
   return (
     <div
@@ -550,7 +524,7 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
               NoRiskClient
             </h1>
             {availableUpdate && (
-              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t('header.update.tooltip_available', { version: availableUpdate.version })}>
+              <Tooltip content={isUpdating ? t('header.update.tooltip_updating') : t(availableUpdate.ready ? 'header.update.tooltip_ready' : 'header.update.tooltip_available', { version: availableUpdate.version })}>
                 <div
                   className={isUpdating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                   onClick={handleUpdateClick}

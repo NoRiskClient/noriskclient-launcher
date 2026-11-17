@@ -1,6 +1,5 @@
 import type {
   CurseForgeModsResponse,
-  GetModsByIdsRequestBody,
 } from "../types/curseforge";
 import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";

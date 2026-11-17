@@ -34,7 +34,6 @@ export function GlobalCrashReportModal() {
   const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(true);
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
   const [displayedCrashReportContent, setDisplayedCrashReportContent] = useState<string | undefined>(undefined);
-  const [isListeningForCrashContent, setIsListeningForCrashContent] = useState(false);
   const hasFetchedCrashReportRef = React.useRef(false);
 
   useEffect(() => {
@@ -57,14 +56,12 @@ export function GlobalCrashReportModal() {
       setIsProcessing(false);
       setAnalyzeWithNoRisk(true);
       setDisplayedCrashReportContent(crashData.crash_report_content);
-      setIsListeningForCrashContent(false);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag for new crash
     } else {
       setProfileName('');
       setSharedUrl(null);
       setIsProcessing(false);
       setDisplayedCrashReportContent(undefined);
-      setIsListeningForCrashContent(false);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag
     }
   }, [crashData]);
@@ -135,7 +132,6 @@ export function GlobalCrashReportModal() {
       
       // Mark as fetched to prevent re-runs
       hasFetchedCrashReportRef.current = true;
-      setIsListeningForCrashContent(true);
       
       
       // SCHRITT 1: Event-Listener SOFORT registrieren (um schnelle Events zu fangen)
@@ -148,7 +144,6 @@ export function GlobalCrashReportModal() {
                 contentReceived = true;
                 setDisplayedCrashReportContent(contentPayload.content);
                 toast.success(t('crash_modal.toast.report_loaded'));
-                setIsListeningForCrashContent(false);
                 if (unlistenFn) unlistenFn();
               }
             } catch (e) {
@@ -171,7 +166,6 @@ export function GlobalCrashReportModal() {
             contentReceived = true;
             setDisplayedCrashReportContent(fetchedContent);
             toast.success(t('crash_modal.toast.report_loaded'));
-            setIsListeningForCrashContent(false);
           }
         } catch (e) {
           logError(`Failed to fetch crash report as fallback: ${e}`);

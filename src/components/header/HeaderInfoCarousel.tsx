@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "../ui/Tooltip";
@@ -7,7 +5,6 @@ import {
   getUniquePlayers24h,
   type UniquePlayersResponse,
 } from "../../services/nrc-service";
-import { parseErrorMessage } from "../../utils/error-utils";
 
 interface HeaderInfoCarouselProps {
   version: string | null;

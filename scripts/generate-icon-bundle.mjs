@@ -13,7 +13,7 @@ const attributionFile = join(root, "THIRD_PARTY_ICONS.md");
 /** Icon sets we ship. A name with any other prefix is an error. */
 const COLLECTIONS = [
   "solar", "pixel", "mdi", "simple-icons", "circle-flags", "ph",
-  "material-symbols", "mingcute", "svg-spinners", "noto", "lucide",
+  "material-symbols", "mingcute", "svg-spinners", "lucide",
   "line-md", "ic", "fluent", "eos-icons",
 ];
 

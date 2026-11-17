@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router-dom";

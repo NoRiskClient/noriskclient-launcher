@@ -1,6 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { LoadingManager } from 'three';
 import { logDebug, logInfo, logWarn, logError } from './logging-utils';
 
 /**

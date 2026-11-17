@@ -164,19 +164,6 @@ impl NoriskPackManager {
         self.save_config().await // Save the updated config (already handles locking)
     }
 
-    /// Prints the current configuration to the console for debugging.
-    #[allow(dead_code)] // Allow unused function for debugging purposes
-    pub async fn print_current_config(&self) {
-        let _config_guard = self.config.read().await;
-        println!("--- Current Norisk Packs Config ---");
-       //println!("{:#?}", *config_guard); // Use pretty-print debug format
-       //match config_guard.print_resolved_packs() {
-       //    Ok(_) => (),
-       //    Err(e) => error!("Failed to print resolved packs: {}", e),
-       //}
-        println!("--- End Norisk Packs Config ---");
-    }
-
     // Add more specific accessor methods if needed, e.g.:
     // pub async fn get_pack_definition(&self, pack_id: &str) -> Option<NoriskPackDefinition> { ... }
     // pub async fn get_repository_url(&self, repo_ref: &str) -> Option<String> { ... }

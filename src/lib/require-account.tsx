@@ -1,5 +1,3 @@
-"use client";
-
 import { useGlobalModalStore } from "../hooks/useGlobalModal";
 import { useMinecraftAuthStore } from "../store/minecraft-auth-store";
 import { LoginRequiredModal } from "../components/modals/LoginRequiredModal";

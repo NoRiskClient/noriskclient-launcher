@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LogsTabV3 — functional log-reader.
  *

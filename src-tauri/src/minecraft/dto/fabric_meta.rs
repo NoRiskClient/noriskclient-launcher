@@ -85,12 +85,6 @@ impl FabricMainClass {
         }
     }
 
-    pub fn get_server(&self) -> String {
-        match self {
-            FabricMainClass::String(s) => s.clone(),
-            FabricMainClass::Object(o) => o.server.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

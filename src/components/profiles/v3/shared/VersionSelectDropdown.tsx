@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";

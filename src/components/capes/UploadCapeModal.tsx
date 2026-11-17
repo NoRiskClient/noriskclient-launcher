@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
@@ -9,7 +7,6 @@ import { CapeImage } from "./CapeImage";
 import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
-import { useThemeStore } from "../../store/useThemeStore";
 import { uploadCape } from "../../services/cape-service";
 import { humanizeTimestamps } from "../../utils/time-utils";
 import { toast } from "react-hot-toast";
@@ -65,7 +62,6 @@ export function UploadCapeModal({
       .then(setPaddedPreviewUrl)
       .catch(() => setPaddedPreviewUrl(previewImageUrl));
   }, [previewImageUrl]);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -77,7 +73,7 @@ export function UploadCapeModal({
     setUploadWarning(null);
 
     try {
-      const result = await uploadCape(previewImagePath);
+      await uploadCape(previewImagePath);
 
       toast.success(t('capes.capeUploadedSuccess'));
 

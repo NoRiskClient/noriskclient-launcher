@@ -1,5 +1,3 @@
-"use client";
-
 import type { ComponentProps } from "react";
 import { Button } from "./Button";
 import { useClickGuard } from "../../../hooks/useClickGuard";

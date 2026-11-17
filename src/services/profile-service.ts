@@ -83,26 +83,6 @@ export async function repairProfile(id: string): Promise<void> {
   return invoke<void>("repair_profile", { id });
 }
 
-export async function launchProfile(
-  id: string,
-  quickPlaySingleplayer?: string, 
-  quickPlayMultiplayer?: string
-): Promise<void> {
-  return invoke<void>("launch_profile", { 
-    id, 
-    quickPlaySingleplayer, 
-    quickPlayMultiplayer 
-  });
-}
-
-export async function abortProfileLaunch(profileId: string): Promise<void> {
-  return invoke<void>("abort_profile_launch", { profileId });
-}
-
-export async function isProfileLaunching(profileId: string): Promise<boolean> {
-  return invoke<boolean>("is_profile_launching", { profileId });
-}
-
 export async function copyProfile(params: CopyProfileParams): Promise<string> {
   return invoke<string>("copy_profile", { params });
 }

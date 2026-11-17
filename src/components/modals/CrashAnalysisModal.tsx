@@ -1,6 +1,3 @@
-"use client";
-
-import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
