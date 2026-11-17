@@ -387,7 +387,7 @@ export function ClipGallery({
 
       {picking && (
         <ShareExpiryModal
-          key={picking.clip.path}
+          key={`share-${picking.clip.path}`}
           name={picking.clip.name}
           choices={picking.choices}
           onClose={() => setPicking(null)}
