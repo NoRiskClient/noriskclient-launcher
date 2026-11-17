@@ -48,6 +48,8 @@ pub struct Medium {
 struct ShareCreate<'a> {
     media: [&'a str; 1],
     #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     server: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     expiry_days: Option<u32>,
@@ -77,6 +79,20 @@ pub struct ShareExpiry {
     pub days: Option<u32>,
     #[serde(default)]
     pub permanent: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ShareDetails {
+    pub title: Option<String>,
+    pub expiry: ShareExpiry,
+    pub hide_server: bool,
+}
+
+impl ShareDetails {
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref().map(str::trim).filter(|title| !title.is_empty())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -167,6 +183,7 @@ impl ShareApi {
         token: &str,
         is_experimental: bool,
         medium_id: &str,
+        title: Option<&str>,
         server: Option<&str>,
         expiry: ShareExpiry,
     ) -> Result<Share> {
@@ -174,6 +191,7 @@ impl ShareApi {
             .bearer(token)
             .json_body(&ShareCreate {
                 media: [medium_id],
+                title,
                 server,
                 expiry_days: expiry.days,
                 permanent: expiry.permanent,

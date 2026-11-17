@@ -9,11 +9,16 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/buttons/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
-import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
+import {
+  clampMenuPosition,
+  CONTEXT_MENU_WIDTH,
+  SettingsContextMenu,
+  type ContextMenuItem,
+} from "../ui/SettingsContextMenu";
+import { formatClipLength } from "../../utils/time-utils";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useShareUpload } from "../../hooks/useShareUpload";
-import { getShareChoices, offersChoice, type ShareChoices } from "../../services/share-service";
+import { useShareDialog } from "../../hooks/useShareDialog";
 import {
   deleteClip,
   exportGif,
@@ -31,7 +36,6 @@ import {
 import { ClipIconButton } from "./ClipIconButton";
 import { ClipThumbnail } from "./ClipThumbnail";
 import { RenameClipModal } from "./RenameClipModal";
-import { ShareExpiryModal } from "./ShareExpiryModal";
 import { VerticalExport } from "./VerticalExport";
 import { clipFailure, useClipEngineEvents } from "./useClipEngineEvents";
 import { parseErrorMessage } from "../../utils/error-utils";
@@ -58,16 +62,21 @@ export function ClipGallery({
 }: ClipGalleryProps) {
   const { t } = useTranslation();
   const { confirm, confirmDialog } = useConfirmDialog();
-  const { share, isSharing } = useShareUpload();
+  const { openShare, shareDialog, isSharing } = useShareDialog();
 
-  // With a choice from payback the player picks how long the clip stays up, else it goes up for the default.
   const shareClip = useCallback(
-    async (clip: ClipEntry) => {
-      const choices = await getShareChoices().catch(() => null);
-      if (offersChoice(choices)) setPicking({ clip, choices });
-      else void share({ kind: "clip", path: clip.path });
-    },
-    [share],
+    (clip: ClipEntry) =>
+      openShare(
+        { kind: "clip", path: clip.path },
+        {
+          kind: "clip",
+          name: clip.name,
+          preview: clip.thumbnail ? convertFileSrc(clip.thumbnail) : null,
+          durationSeconds: clip.durationSeconds,
+          server: clip.server,
+        },
+      ),
+    [openShare],
   );
 
   const [clips, setClips] = useState<ClipEntry[] | null>(null);
@@ -75,7 +84,6 @@ export function ClipGallery({
   const [selected, setSelected] = useState<ClipEntry | null>(null);
   const [vertical, setVertical] = useState<ClipEntry | null>(null);
   const [renaming, setRenaming] = useState<ClipEntry | null>(null);
-  const [picking, setPicking] = useState<{ clip: ClipEntry; choices: ShareChoices } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [gifting, setGifting] = useState<string[]>([]);
   const gifs = useRef(new Set<string>());
@@ -383,18 +391,7 @@ export function ClipGallery({
         />
       )}
 
-      {picking && (
-        <ShareExpiryModal
-          key={`share-${picking.clip.path}`}
-          name={picking.clip.name}
-          choices={picking.choices}
-          onClose={() => setPicking(null)}
-          onShare={(expiry) => {
-            setPicking(null);
-            void share({ kind: "clip", path: picking.clip.path }, expiry);
-          }}
-        />
-      )}
+      {shareDialog}
 
       {renaming && (
         <RenameClipModal
@@ -460,11 +457,7 @@ function ClipCard({
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
-  const openMenu = (x: number, y: number) =>
-    setMenuAt({
-      x: Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH - 8)),
-      y: Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT - 8)),
-    });
+  const openMenu = (x: number, y: number) => setMenuAt(clampMenuPosition(x, y, MENU_HEIGHT));
 
   const menuItems: ContextMenuItem<ClipEntry>[] = [
     { id: "edit", label: t("clips.gallery.edit"), icon: "solar:scissors-bold", onClick: onEdit },
@@ -518,7 +511,7 @@ function ClipCard({
         </span>
         {clip.durationSeconds !== null && (
           <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 border border-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white/80">
-            {formatLength(clip.durationSeconds)}
+            {formatClipLength(clip.durationSeconds)}
           </span>
         )}
         {busy && (
@@ -563,7 +556,7 @@ function ClipCard({
               return;
             }
             const box = moreRef.current?.getBoundingClientRect();
-            if (box) openMenu(box.right - MENU_WIDTH, box.bottom + 4);
+            if (box) openMenu(box.right - CONTEXT_MENU_WIDTH, box.bottom + 4);
           }}
         />
       </div>
@@ -604,14 +597,7 @@ function ClipCard({
   );
 }
 
-const MENU_WIDTH = 176;
 const MENU_HEIGHT = 250;
-
-function formatLength(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  const minutes = Math.floor(total / 60);
-  return `${minutes}:${String(total % 60).padStart(2, "0")}`;
-}
 
 function ClipPlayer({
   clip,

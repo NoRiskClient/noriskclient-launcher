@@ -49,18 +49,27 @@ export function offersChoice(choices: ShareChoices | null): choices is ShareChoi
   return !!choices && (choices.expiryChoices.length > 0 || choices.permanentChoice);
 }
 
+export const SHARE_TITLE_MAX = 100;
+
+export interface ShareOptions {
+  title?: string;
+  expiry?: ShareExpiry;
+  hideServer?: boolean;
+}
+
 export async function shareMedia(
   target: ShareTarget,
   progressId: string,
-  expiry?: ShareExpiry,
+  options?: ShareOptions,
 ): Promise<Share> {
   if (target.kind === "clip") {
-    return invoke<Share>("share_clip", { path: target.path, progressId, expiry: expiry ?? null });
+    return invoke<Share>("share_clip", { path: target.path, progressId, options: options ?? null });
   }
   return invoke<Share>("share_screenshot", {
     profileId: target.profileId,
     path: target.path,
     progressId,
+    options: options ?? null,
   });
 }
 
