@@ -405,12 +405,7 @@ jobs:
           # RPM
           RPM_DIR=${{ matrix.output_path }}/rpm
           mv "$RPM_DIR"/*.rpm "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm
-          mv "$RPM_DIR"/*.rpm.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm.sig || true
-
-          # Pacman
-          PACMAN_DIR=${{ matrix.output_path }}/pacman
-          mv "$PACMAN_DIR"/*.pkg.tar.gz "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.pkg.tar.gz
-          mv "$PACMAN_DIR"/*.pkg.tar.gz.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.pkg.tar.gz.sig || true
+          mv "$RPM_DIR"/*.rpm.sig "$APPIMAGE_DIR"/${{ matrix.asset_name_base }}.rpm.sig
 
           echo "Final content of $APPIMAGE_DIR after moves"
           ls -R "$APPIMAGE_DIR" || true
