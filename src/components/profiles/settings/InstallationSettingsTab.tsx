@@ -13,6 +13,7 @@ import { Combobox } from "../../ui/Combobox";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { cn } from "../../../lib/utils";
 import { parseErrorMessage } from "../../../utils/error-utils";
+import { withoutStableTag } from "../../../utils/loader-version";
 
 interface InstallationSettingsTabProps {
   profile: Profile;
@@ -455,13 +456,13 @@ export function InstallationSettingsTab({
             ) : (
               <Combobox
                 selectOnly
-                value={
+                value={withoutStableTag(
                   !customLoaderVersion
                     ? resolvedLoaderVersion?.version ?? ""
                     : overwrittenVersion === LATEST_LOADER_VERSION
                       ? latestLabel
-                      : overwrittenVersion
-                }
+                      : overwrittenVersion,
+                )}
                 onChange={(version) =>
                   setCustomLoaderVersion(true, version === latestLabel || !version ? LATEST_LOADER_VERSION : version)
                 }
