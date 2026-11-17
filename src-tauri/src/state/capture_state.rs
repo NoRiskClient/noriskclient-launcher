@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -103,6 +104,18 @@ fn merged(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::
     base
 }
 
+pub type ExportOutcome = std::result::Result<norisk_ipc::ExportedClip, String>;
+
+pub struct ExportWatch {
+    pub progress: mpsc::UnboundedReceiver<(u32, u32)>,
+    pub done: tokio::sync::oneshot::Receiver<ExportOutcome>,
+}
+
+struct WatchedExport {
+    progress: mpsc::UnboundedSender<(u32, u32)>,
+    done: tokio::sync::oneshot::Sender<ExportOutcome>,
+}
+
 pub struct CaptureSupervisor {
     session_id: String,
     commands: mpsc::UnboundedSender<LauncherToCapture>,
@@ -116,6 +129,7 @@ pub struct CaptureSupervisor {
     app: Arc<RwLock<Option<tauri::AppHandle>>>,
     running: Arc<RwLock<bool>>,
     incompatible: std::sync::atomic::AtomicBool,
+    watched: std::sync::Mutex<HashMap<PathBuf, WatchedExport>>,
 }
 
 impl CaptureSupervisor {
@@ -134,7 +148,55 @@ impl CaptureSupervisor {
             app: Arc::new(RwLock::new(None)),
             running: Arc::new(RwLock::new(false)),
             incompatible: std::sync::atomic::AtomicBool::new(false),
+            watched: std::sync::Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn watch_export(&self, destination: PathBuf) -> ExportWatch {
+        let (progress, progress_rx) = mpsc::unbounded_channel();
+        let (done, done_rx) = tokio::sync::oneshot::channel();
+        self.watched_exports()
+            .insert(destination, WatchedExport { progress, done });
+        ExportWatch {
+            progress: progress_rx,
+            done: done_rx,
+        }
+    }
+
+    pub fn unwatch_export(&self, destination: &Path) {
+        self.watched_exports().remove(destination);
+    }
+
+    fn watched_exports(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, WatchedExport>> {
+        self.watched.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn claim_export(&self, event: CaptureToLauncher) -> Option<CaptureToLauncher> {
+        let mut watched = self.watched_exports();
+        match &event {
+            CaptureToLauncher::ExportProgress(progress) => {
+                if let Some(watcher) = progress.destination.as_ref().and_then(|d| watched.get(d)) {
+                    let _ = watcher.progress.send((progress.done, progress.total));
+                    return None;
+                }
+            }
+            CaptureToLauncher::ClipExported(exported) => {
+                if let Some(watcher) = watched.remove(&exported.path) {
+                    let _ = watcher.done.send(Ok(exported.clone()));
+                    return None;
+                }
+            }
+            CaptureToLauncher::Error(error) => {
+                if let Some(watcher) = error.destination.as_ref().and_then(|d| watched.remove(d)) {
+                    log::warn!("A watched export failed: {}", error.message);
+                    let _ = watcher.done.send(Err(error.message.clone()));
+                    return None;
+                }
+            }
+            _ => {}
+        }
+        drop(watched);
+        Some(event)
     }
 
     pub async fn state(&self) -> CaptureState {
@@ -422,6 +484,9 @@ impl CaptureSupervisor {
         loop {
             let outcome = self.run_once(&exe, &mut commands).await;
             crate::utils::clip_library::release_all_destinations();
+            for (_, watcher) in self.watched_exports().drain() {
+                let _ = watcher.done.send(Err("the capture engine stopped".into()));
+            }
             if let Some(app) = self.app.read().await.as_ref() {
                 use tauri::Emitter;
                 let _ = app.emit("clip_engine_stopped", ());
@@ -642,6 +707,9 @@ impl CaptureSupervisor {
     }
 
     async fn absorb(&self, event: CaptureToLauncher) {
+        let Some(event) = self.claim_export(event) else {
+            return;
+        };
         match event {
             CaptureToLauncher::Ready(info) => {
                 if ENGINE_REPORTS_PROTOCOL && info.protocol_version != norisk_ipc::PROTOCOL_VERSION {
@@ -761,8 +829,10 @@ impl CaptureSupervisor {
                 {
                     let mut details = crate::utils::clip_library::ClipDetails::from(&manifest);
                     details.game = self.attached_game();
+                    let pid = self.attached();
                     let path = manifest.path.clone();
                     if let Err(e) = tokio::task::spawn_blocking(move || {
+                        details.server = pid.and_then(crate::utils::game_sessions::server_of);
                         crate::utils::clip_library::write_details(&path, &details)
                     })
                     .await
@@ -847,6 +917,13 @@ impl CaptureSupervisor {
                     }),
                 );
                 crate::utils::clip_library::release_destination(&exported.path);
+                {
+                    let (source, path) = (exported.source.clone(), exported.path.clone());
+                    let _ = tokio::task::spawn_blocking(move || {
+                        crate::utils::clip_library::copy_origin_details(&source, &path)
+                    })
+                    .await;
+                }
                 if let Some(app) = self.app.read().await.as_ref() {
                     use tauri::Emitter;
                     if let Err(e) = app.emit("clip_exported", &exported) {

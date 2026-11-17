@@ -529,6 +529,7 @@ mod export_progress {
     fn at(done: u32, total: u32) -> ExportProgress {
         ExportProgress {
             source: PathBuf::from("clip.mp4"),
+            destination: None,
             done,
             total,
         }
@@ -942,6 +943,10 @@ pub struct ExportVerticalRequest {
     pub blanked: Vec<Span>,
     #[serde(default)]
     pub muted: Vec<TrackCut>,
+    #[serde(default)]
+    pub bitrate_kbps: Option<u32>,
+    #[serde(default)]
+    pub faststart: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -963,6 +968,8 @@ pub struct TrackCut {
 #[serde(rename_all = "camelCase")]
 pub struct ExportProgress {
     pub source: PathBuf,
+    #[serde(default)]
+    pub destination: Option<PathBuf>,
     pub done: u32,
     pub total: u32,
 }

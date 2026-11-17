@@ -259,7 +259,7 @@ const RULES: &[Rule] = &[
         replace: Replace::Template("$1: \"*****\""),
     },
     Rule {
-        pattern: r#"(?i)(?-u:\b)(access_token|refresh_token|id_token|code|client_secret|password|token|sig|signature)=[^&\s"]+"#,
+        pattern: r#"(?i)(?-u:\b)(access_token|accessToken|refresh_token|refreshToken|id_token|code|client_secret|password|token|session|sig|signature)=[^&\s"]+"#,
         replace: Replace::Template("$1=*****"),
     },
     Rule {

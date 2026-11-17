@@ -111,6 +111,7 @@ impl Engine {
     {
         let events = self.events.clone();
         let about = (source.clone(), destination.clone());
+        let target = destination.clone();
 
         let spawned = std::thread::Builder::new()
             .name(thread.into())
@@ -126,6 +127,7 @@ impl Engine {
                     let _ = events.send(CaptureToLauncher::ExportProgress(
                         norisk_ipc::ExportProgress {
                             source: source.clone(),
+                            destination: Some(target.clone()),
                             done,
                             total,
                         },

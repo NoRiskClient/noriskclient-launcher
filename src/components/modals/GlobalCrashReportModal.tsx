@@ -1,3 +1,4 @@
+import { showShareSuccess } from "../share/share-toast";
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n/i18n';
@@ -9,8 +10,7 @@ import { Checkbox } from '../ui/Checkbox';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { getProfile } from '../../services/profile-service';
-import { uploadLogToMclogs } from '../../services/log-service';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { uploadLog } from '../../services/log-service';
 import { checkCrashLog, fetchCrashReport, getProcessLogCursor } from '../../services/process-service';
 import type { CrashlogDto, ProcessMetadata } from '../../types/processState';
 import type { CrashCheckResult } from '../../types/crash-analysis';
@@ -29,7 +29,7 @@ export function GlobalCrashReportModal() {
   const { isCrashModalOpen, crashData, closeCrashModal } = useCrashModalStore();
   const { showModal, hideModal } = useGlobalModal();
   const [profileName, setProfileName] = useState<string>('');
-  const [mclogsUrl, setMclogsUrl] = useState<string | null>(null);
+  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [analyzeWithNoRisk, setAnalyzeWithNoRisk] = useState(true);
   const [statusText, setStatusText] = useState<string | null>(null); // inline progress while analyzing
@@ -52,14 +52,14 @@ export function GlobalCrashReportModal() {
             logError(`Failed to fetch profile details for ${crashData.profile_id}: ${err}`);
           });
       }
-      setMclogsUrl(null);
+      setSharedUrl(null);
       setIsProcessing(false);
       setAnalyzeWithNoRisk(true);
       setDisplayedCrashReportContent(crashData.crash_report_content);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag for new crash
     } else {
       setProfileName('');
-      setMclogsUrl(null);
+      setSharedUrl(null);
       setIsProcessing(false);
       setDisplayedCrashReportContent(undefined);
       hasFetchedCrashReportRef.current = false; // Reset fetch flag
@@ -186,11 +186,6 @@ export function GlobalCrashReportModal() {
     return null;
   }
 
-  const shareLogLink = async (url: string) => {
-    try { await writeText(url); } catch {}
-    try { await openExternalUrl(url); } catch {}
-  };
-
   const buildLogContent = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
     let crashReport = displayedCrashReportContent;
     if (crashData?.process_id && !crashReport) {
@@ -222,12 +217,13 @@ ${gameLog}`
     return content;
   };
 
-  const ensureUploaded = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
-    if (mclogsUrl) return mclogsUrl;
+  const ensureShared = async (profileId: string, metadata: ProcessMetadata): Promise<string> => {
+    if (sharedUrl) return sharedUrl;
     const content = await buildLogContent(profileId, metadata);
-    setStatusText(t('crash_modal.toast.uploading_mclogs'));
-    const url = await uploadLogToMclogs(content);
-    setMclogsUrl(url);
+    setStatusText(t('profiles.v3.logs.uploading'));
+    const name = content.startsWith('--- CRASH REPORT ---') ? 'crash-report.txt' : 'latest.log';
+    const url = await uploadLog(content, name);
+    setSharedUrl(url);
     return url;
   };
 
@@ -240,7 +236,7 @@ ${gameLog}`
     } catch (e) {
       logError(`Crash analysis failed, falling back to log link: ${e}`);
       toast.error(t('crash_modal.toast.analyze_failed'));
-      await shareLogLink(url);
+      await showShareSuccess(url);
       return;
     }
     closeCrashModal();
@@ -248,6 +244,7 @@ ${gameLog}`
       'crash-analysis',
       <CrashAnalysisModal
         result={result}
+        logUrl={url}
         profileId={profileId}
         onClose={() => hideModal('crash-analysis')}
       />,
@@ -266,12 +263,11 @@ ${gameLog}`
     setIsProcessing(true);
     setStatusText(t('crash_modal.toast.processing'));
     try {
-      const url = await ensureUploaded(profileId, metadata);
+      const url = await ensureShared(profileId, metadata);
       if (analyzeWithNoRisk) {
         await analyze(url, profileId, metadata);
       } else {
-        toast.success(t('crash_modal.toast.url_copied'));
-        await shareLogLink(url);
+        await showShareSuccess(url);
         closeCrashModal();
       }
     } catch (error: any) {
