@@ -1,4 +1,5 @@
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { useRef } from "react";
 import { StableIcon } from "./IconWrapper";
 import { CustomDropdown } from "./CustomDropdown";
@@ -40,7 +41,7 @@ export interface SearchWithFiltersProps {
 }
 
 export function SearchWithFilters({
-  placeholder = "Search...",
+  placeholder,
   searchValue = "",
   onSearchChange,
   onSearchEnter,
@@ -58,6 +59,7 @@ export function SearchWithFilters({
   dropdownSize = 'md',
   compact = false,
 }: SearchWithFiltersProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +96,7 @@ export function SearchWithFilters({
           <input
             ref={inputRef}
             type="text"
-            placeholder={placeholder}
+            placeholder={placeholder ?? t("common.search")}
             value={searchValue}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
@@ -104,7 +106,7 @@ export function SearchWithFilters({
             <button
               type="button"
               onClick={handleClearSearch}
-              aria-label="Clear search"
+              aria-label={t("common.clear_search")}
               className="text-white/60 hover:text-white transition-colors duration-200 shrink-0"
             >
               <Icon icon="lucide:x" className="w-4 h-4" />

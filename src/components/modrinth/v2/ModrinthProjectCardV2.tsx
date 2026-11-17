@@ -251,7 +251,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Blocked Mod Warning Icon - Top Left */}
         {projectNoRiskStatus === 'blocked' && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+            <Tooltip content={t("modrinth.blocked_tooltip")}>
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -263,7 +263,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         )}
         {projectNoRiskStatus === 'warning' && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This version is known to cause crashes or compatibility issues with NoRisk Client. Installation is possible but not recommended.">
+            <Tooltip content={t("modrinth.problematic_version_tooltip")}>
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -276,7 +276,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Fallback for deprecated isBlocked prop */}
         {!projectNoRiskStatus && isBlocked && (
           <div className="absolute top-2 left-2 z-10 pointer-events-auto">
-            <Tooltip content="This mod is blocked by NoRisk Client as it is known to cause crashes or severe compatibility issues. Installation is not recommended.">
+            <Tooltip content={t("modrinth.blocked_tooltip")}>
               <div>
                 <Icon 
                   icon="solar:danger-triangle-bold" 
@@ -356,9 +356,9 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-gray-400 truncate font-minecraft flex-shrink min-w-0 hover:text-gray-200 hover:underline cursor-pointer"
-                title={`Open ${hit.author}'s profile on ${hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge'}`}
+                title={t("modrinth.open_author_profile", { author: hit.author, source: hit.source === 'Modrinth' ? 'Modrinth' : 'CurseForge' })}
               >
-                by {hit.author}
+                {t("modrinth.by_author", { author: hit.author })}
               </a>
             )}
           </div>
@@ -374,7 +374,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               <>
                 {installStatus.is_installed && (
                   <TagBadge variant="success" size="sm">
-                    Installed
+                    {t("modrinth.installed")}
                   </TagBadge>
                 )}
                 {installStatus.is_included_in_norisk_pack && (
@@ -386,7 +386,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
                     }
                     size="sm"
                   >
-                    NoRisk Pack
+                    {t("modrinth.norisk_pack_badge")}
                   </TagBadge>
                 )}
               </>
@@ -411,7 +411,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         <div className="flex items-center space-x-1">
           {hit.project_type === "modpack" ? (
             <ActionButton
-              label={isInstallingModpackAsProfile ? "Installing..." : "Install"}
+              label={isInstallingModpackAsProfile ? t("modrinth.installing") : t("modrinth.install")}
               icon={isInstallingModpackAsProfile ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
               iconClassName={isInstallingModpackAsProfile ? "animate-spin-slow" : ""}
               variant={isInstallingModpackAsProfile ? "secondary" : "primary"}
@@ -431,7 +431,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             />
           ) : (
             <ActionButton
-              label={isQuickInstalling ? "Installing..." : "Install"}
+              label={isQuickInstalling ? t("modrinth.installing") : t("modrinth.install")}
               icon={
                 isQuickInstalling 
                   ? "solar:refresh-bold" 
@@ -460,7 +460,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
             iconClassName={isLoadingVersions ? "animate-spin-fast" : ""}
             variant="icon-only"
             disabled={isLoadingVersions}
-            tooltip={isExpanded ? "Hide Versions" : "Show Versions"}
+            tooltip={isExpanded ? t("modrinth.hide_versions") : t("modrinth.show_versions")}
             onClick={(e) => {
               e.stopPropagation();
               onToggleVersionsClick(hit.project_id);

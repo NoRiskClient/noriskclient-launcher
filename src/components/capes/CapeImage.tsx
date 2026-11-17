@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { cn } from '../../lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface CapeImageProps {
   imageUrl: string | undefined;
@@ -32,6 +33,7 @@ export const CapeImage = React.memo(function CapeImage({
   width = 60, // Default width
   className,
 }: CapeImageProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -129,7 +131,7 @@ export const CapeImage = React.memo(function CapeImage({
           className="error-message w-full h-full flex justify-center items-center text-center text-xs text-red-600 bg-red-100 border border-red-600 p-1 box-border"
           title={errorMessage}
         >
-          ⚠️ Error
+          ⚠️ {t("common.error")}
         </div>
       ) : (
         <canvas

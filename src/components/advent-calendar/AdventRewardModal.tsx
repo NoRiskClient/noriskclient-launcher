@@ -71,7 +71,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             >
               <img
                 src="/coins.png"
-                alt="Coins"
+                alt=""
                 className="w-full h-full object-contain"
               />
             </div>
@@ -102,12 +102,12 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             </div>
             <div className="text-center">
               <p className="font-minecraft text-xl text-white mb-1">
-                {shopItemName || "Shop Item"}
+                {shopItemName || t("advent.door.shop_item")}
               </p>
               <p className="font-minecraft text-white/60 text-sm">
                 {reward.duration
-                  ? `Duration: ${Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days`
-                  : "Permanent"}
+                  ? t("advent.reward.duration_days", { count: Math.floor(reward.duration / (1000 * 60 * 60 * 24)) })
+                  : t("advent.reward.permanent")}
               </p>
             </div>
           </div>
@@ -131,12 +131,12 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             </div>
             <div className="text-center">
               <p className="font-minecraft text-xl text-white mb-1">
-                Random {reward.itemType}
+                {t("advent.door.random_item", { itemType: reward.itemType })}
               </p>
               <p className="font-minecraft text-white/60 text-sm">
                 {reward.duration
-                  ? `Duration: ${Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days`
-                  : "Permanent"}
+                  ? t("advent.reward.duration_days", { count: Math.floor(reward.duration / (1000 * 60 * 60 * 24)) })
+                  : t("advent.reward.permanent")}
               </p>
             </div>
           </div>
@@ -160,13 +160,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             </div>
             <div className="text-center">
               <p className="font-minecraft text-2xl text-white mb-1">
-                {reward.percentage}% Discount
+                {t("advent.reward.discount", { percentage: reward.percentage })}
               </p>
               <p className="font-minecraft text-white/60 text-sm">
-                Valid until {new Date(reward.endTimestamp).toLocaleDateString()}
+                {t("advent.reward.valid_until", { date: new Date(reward.endTimestamp).toLocaleDateString() })}
               </p>
               <p className="font-minecraft text-white/60 text-sm mt-1">
-                Redeemable once for your next in-game purchase
+                {t("advent.reward.redeemable_once")}
               </p>
             </div>
           </div>
@@ -193,7 +193,7 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
                 NoRisk Plus
               </p>
               <p className="font-minecraft text-white/60 text-sm">
-                {Math.floor(reward.duration / (1000 * 60 * 60 * 24))} days
+                {t("advent.reward.days", { count: Math.floor(reward.duration / (1000 * 60 * 60 * 24)) })}
               </p>
             </div>
           </div>
@@ -238,13 +238,13 @@ function RewardDisplay({ reward, shopItemName, shopItemModelUrl }: { reward: Rew
             </div>
             <div className="text-center">
               <p className="font-minecraft text-xl text-white mb-1">
-                {theme?.name || "Theme Unlocked"}
+                {theme?.name || t("advent.reward.theme_unlocked")}
               </p>
               {!theme && (
-                <p className="font-minecraft text-white/60 text-sm mb-1">Theme ID: {reward.themeId}</p>
+                <p className="font-minecraft text-white/60 text-sm mb-1">{t("advent.reward.theme_id", { id: reward.themeId })}</p>
               )}
               <p className="font-minecraft text-white/60 text-sm">
-                You can apply this theme in Settings/Background
+                {t("advent.reward.theme_apply_hint")}
               </p>
             </div>
           </div>
@@ -313,7 +313,7 @@ function DoorAnimation({
           >
             <img
               src="/mc_door.png"
-              alt="Door"
+              alt=""
               className="max-w-[60%] max-h-[60%] object-contain"
               style={{
                 imageRendering: "pixelated", // Keep pixel art crisp
@@ -374,7 +374,7 @@ function CoinRain({ isActive }: { isActive: boolean }) {
         >
           <img
             src="/coin.png"
-            alt="Coin"
+            alt=""
             className="w-full h-full object-contain"
           />
         </motion.div>

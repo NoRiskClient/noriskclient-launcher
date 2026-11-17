@@ -488,7 +488,7 @@ export function SkinsTab() {
       const removed = await MinecraftSkinService.removeSkin(skinId);
       if (!removed) {
         throw new Error(
-          `Skin "${skinName}" could not be found or was already deleted.`,
+          t("skins.not_found_or_deleted", { name: skinName }),
         );
       }
       return removed;

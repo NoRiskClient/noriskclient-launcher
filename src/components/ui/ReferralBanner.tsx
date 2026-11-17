@@ -137,7 +137,7 @@ export function ReferralBanner() {
         {/* Content */}
         <div className="flex flex-col font-minecraft text-sm tracking-wide">
           <span className="text-white/80">
-            {displayInfo?.fallbackMessage || "You were invited by"}{" "}
+            {displayInfo?.fallbackMessage || t("referral.invited_by")}{" "}
             <span style={{ color: accentColor.value }} className="font-semibold">
               {displayInfo?.referrerName}
             </span>

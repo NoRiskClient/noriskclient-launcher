@@ -308,7 +308,7 @@ ${gameLog}`
         <div className="absolute -top-2 -left-2 z-10 pointer-events-auto">
           <StaticTooltip content={t('crash_modal.tooltip.beta')} delay={0}>
             <span className="rounded border border-amber-400/50 bg-amber-400/30 px-1.5 py-0.5 text-[10px] font-minecraft uppercase leading-none text-amber-200 cursor-help shadow-md">
-              beta
+              {t("common.beta")}
             </span>
           </StaticTooltip>
         </div>

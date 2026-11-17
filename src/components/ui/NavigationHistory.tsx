@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 
 interface NavigationHistoryProps {
@@ -43,6 +44,7 @@ function NavIconButton({
 }
 
 export function NavigationHistory({ className }: NavigationHistoryProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [history, setHistory] = useState<string[]>([]);
@@ -149,13 +151,13 @@ export function NavigationHistory({ className }: NavigationHistoryProps) {
         <Icon icon="solar:arrow-left-bold" className="w-4 h-4 text-current" />,
         handleGoBack,
         !canGoBack,
-        "Go back"
+        t("common.go_back")
       )}
       {createNavButton(
         <Icon icon="solar:arrow-right-bold" className="w-4 h-4 text-current" />,
         handleGoForward,
         !canGoForward,
-        "Go forward"
+        t("common.go_forward")
       )}
     </div>
   );

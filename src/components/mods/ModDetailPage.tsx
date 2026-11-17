@@ -16,6 +16,7 @@ import { ModDetailDescription } from "./ModDetailDescription";
 import { ModDetailVersions } from "./ModDetailVersions";
 import { ModDetailSidebar } from "./ModDetailSidebar";
 import { useThemeStore } from "../../store/useThemeStore";
+import i18n from "../../i18n/i18n";
 
 // Convert Modrinth project to unified format
 function modrinthToUnified(
@@ -121,7 +122,7 @@ function curseforgeToUnified(
     slug: mod.slug,
     description: mod.summary,
     body: fullDescription || mod.summary, // Use full description if available, fallback to summary
-    author: mod.authors?.[0]?.name || "Unknown",
+    author: mod.authors?.[0]?.name || i18n.t("common.unknown"),
     author_avatar_url: null, // CurseForge doesn't provide author avatars
     icon_url: mod.logo?.url || null,
     downloads: mod.downloadCount,

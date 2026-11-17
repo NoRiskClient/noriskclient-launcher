@@ -178,7 +178,7 @@ export function useGlobalDragAndDrop() {
                 const importPromises = potentialWorldFolders.map(async (worldPath) => {
                   // Extract folder name from path for target name
                   const pathParts = worldPath.split(/[/\\]/);
-                  const folderName = pathParts[pathParts.length - 1] || 'Imported World';
+                  const folderName = pathParts[pathParts.length - 1] || i18n.t('worlds.imported_world');
                   
                   try {
                     const generatedFolderName = await WorldService.importWorld(

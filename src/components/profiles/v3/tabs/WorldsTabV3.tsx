@@ -299,7 +299,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       const worldPath = typeof selectedPath === "string" ? selectedPath : selectedPath[0];
       if (!worldPath) return;
 
-      const folderName = worldPath.split(/[/\\]/).pop() || "Imported World";
+      const folderName = worldPath.split(/[/\\]/).pop() || t("worlds.imported_world");
       await toast.promise(
         WorldService.importWorld(profile.id, worldPath, folderName),
         {

@@ -335,7 +335,7 @@ export function SocialsModal() {
                     </p>
                     <img
                       src={generateQrCodeUrl()}
-                      alt="Mobile App QR Code"
+                      alt={t("socials.qr_code_alt")}
                       className="w-40 h-40 mx-auto border-2 border-white/20 rounded-lg"
                     />
                   </div>

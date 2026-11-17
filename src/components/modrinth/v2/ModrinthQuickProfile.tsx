@@ -155,7 +155,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
         <div className="pt-2 animated-fade-in space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium font-minecraft text-gray-400">
-              Source Profile to Copy
+              {t("modrinth.quick_profile.source_profile")}
             </label>
             <span className="text-xs text-white/50 font-minecraft">
               {filteredProfiles.length} profile{filteredProfiles.length !== 1 ? 's' : ''}
@@ -240,7 +240,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
                   >
                     <Icon icon="solar:add-circle-bold" className="w-4 h-4 text-white/50" />
                     <span className="text-xs font-minecraft text-white/50">
-                      +{Math.min(9, filteredProfiles.length - maxProfilesToShow)} more
+                      {t("mod_detail.more_count", { count: Math.min(9, filteredProfiles.length - maxProfilesToShow) })}
                     </span>
                   </button>
                 )}
@@ -257,7 +257,7 @@ export const ModrinthQuickProfile: React.FC<ModrinthQuickProfileProps> = ({
 
           {storeProfiles.length === 0 && !profilesLoading && (
             <p className="text-xs text-amber-500 mt-2 text-center">
-              You don't have any profiles to copy from. A new empty profile will be created if you proceed without selecting a source.
+              {t("modrinth.quick_profile.no_profiles_to_copy")}
             </p>
           )}
         </div>

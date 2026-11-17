@@ -137,7 +137,7 @@ function VersionItem({
             <button
               onClick={toggleExpanded}
               className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20"
-              title={isExpanded ? "Hide changelog" : "Show changelog"}
+              title={isExpanded ? t("modpack_versions.hide_changelog") : t("modpack_versions.show_changelog")}
               disabled={isLoadingChangelog}
             >
               {isLoadingChangelog ? (
@@ -399,7 +399,7 @@ export function ModpackVersionsModal({
             t('modpack_versions.loading')
           ) : (
             <>
-              {versions.all_versions.length} version{versions.all_versions.length !== 1 ? 's' : ''} available
+              {t("modpack_versions.versions_available", { count: versions.all_versions.length })}
               {versions.updates_available && (
                 <span className="ml-2 text-green-400">
                   {t('modpack_versions.updates_available')}
@@ -415,7 +415,7 @@ export function ModpackVersionsModal({
               className="text-xs font-minecraft text-center font-medium mb-1"
               style={{ color: `var(--accent)` }}
             >
-              Selected: {selectedVersion.name} ({selectedVersion.version_number})
+              {t("modpack_versions.selected", { name: selectedVersion.name, version: selectedVersion.version_number })}
             </div>
           </div>
         ) : (

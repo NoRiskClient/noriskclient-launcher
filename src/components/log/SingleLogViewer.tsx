@@ -72,7 +72,7 @@ export function SingleLogViewer({ instanceId, instanceName, profileId, accountNa
         background: `linear-gradient(135deg, ${accentColor.value}20 0%, ${accentColor.value}10 50%, ${accentColor.value}18 100%)`,
       }}
     >
-      <LogWindowTitlebar title={accountName ? `${instanceName} - ${accountName}` : (instanceName || "Logs")} />
+      <LogWindowTitlebar title={accountName ? `${instanceName} - ${accountName}` : (instanceName || t("logs.window_title"))} />
 
       <div className="flex-1 flex flex-col min-h-0 p-3">
         <LogViewerCore

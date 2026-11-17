@@ -28,7 +28,7 @@ export function useConfirmDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions>({
-    title: "Confirm",
+    title: t("common.confirm"),
     fullscreen: true,
   });
   const [inputValue, setInputValue] = useState("");

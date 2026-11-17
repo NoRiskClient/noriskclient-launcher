@@ -68,7 +68,7 @@ export function IconPicker({ selected, onSelect, onClose }: IconPickerProps) {
         multiple: false,
         directory: false,
         filters: [
-          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
+          { name: t("common.file_filter.images"), extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
         ],
       });
       if (typeof selectedPath === "string" && selectedPath) {

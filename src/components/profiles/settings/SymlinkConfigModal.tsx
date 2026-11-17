@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Button } from "../../ui/buttons/Button";
 import { Modal } from "../../ui/Modal";
@@ -39,7 +39,7 @@ export function SymlinkConfigModal({
         directory: true,
         multiple: false,
         defaultPath: defaultPath,
-        title: "Select target location in profile",
+        title: t("symlink.select_target_title"),
       });
 
       if (selected && typeof selected === "string") {
@@ -153,9 +153,13 @@ export function SymlinkConfigModal({
           {isAdvancedOpen && (
             <div className="p-4 pt-0 space-y-3">
               <p className="text-xs text-white/60 font-minecraft tracking-wide select-none">
-                By default, <code className="text-white/80">{folderName}</code> will be placed in the profile root.
+                <Trans
+                  i18nKey="symlink.default_location_info"
+                  values={{ folder: folderName }}
+                  components={{ code: <code className="text-white/80" /> }}
+                />
                 <br />
-                Change the location if you want to organize it in a subfolder.
+                {t("symlink.change_location_hint")}
               </p>
               
               <Button 
@@ -166,7 +170,7 @@ export function SymlinkConfigModal({
               >
                 <span className="flex items-center gap-2">
                   <Icon icon="solar:folder-path-connect-bold" className="w-4 h-4" />
-                  <span>{targetDirectory ? `Current: ${targetDirectory}/` : "Select Custom Location"}</span>
+                  <span>{targetDirectory ? t("symlink.current_location", { path: `${targetDirectory}/` }) : t("symlink.select_custom_location")}</span>
                 </span>
               </Button>
 
@@ -175,7 +179,7 @@ export function SymlinkConfigModal({
                 <div className="flex items-center gap-2 mb-1">
                   <Icon icon="solar:map-point-bold" className="w-4 h-4 text-accent" />
                   <span className="text-xs font-minecraft text-accent tracking-wide">
-                    Symlink will be created at:
+                    {t("symlink.will_be_created_at")}
                   </span>
                 </div>
                 <p className="text-white/70 text-xs break-all font-mono pl-6">
@@ -192,7 +196,7 @@ export function SymlinkConfigModal({
                   className="text-xs text-white/50 hover:text-white transition-colors font-minecraft flex items-center gap-1"
                 >
                   <Icon icon="solar:restart-bold" className="w-3 h-3" />
-                  Reset to Profile Root
+                  {t("symlink.reset_to_root")}
                 </button>
               )}
             </div>

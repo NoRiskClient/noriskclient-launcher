@@ -265,7 +265,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="bg-black/20 rounded-lg p-4 border border-white/10">
           <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
             <Icon icon="solar:widget-add-bold" className="w-4 h-4" />
-            Dependencies ({project.dependencies.length})
+            {t("mod_detail.dependencies_count", { count: project.dependencies.length })}
           </h3>
 
           <div className="space-y-2">
@@ -295,7 +295,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                       ? 'text-red-400/80'
                       : 'text-yellow-400/80'
                   }`}>
-                    {dep.dependency_type === UnifiedDependencyType.Required ? 'Required' : 'Optional'}
+                    {dep.dependency_type === UnifiedDependencyType.Required ? t("mod_detail.support.required") : t("mod_detail.support.optional")}
                   </span>
                 </div>
                 <Icon
@@ -313,7 +313,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
         <div className="bg-black/20 rounded-lg p-4 border border-white/10">
           <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
             <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
-            Team ({project.team_members.length})
+            {t("mod_detail.team_count", { count: project.team_members.length })}
           </h3>
 
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">

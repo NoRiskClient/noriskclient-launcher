@@ -77,7 +77,7 @@ export function ColorPicker({
               ${accentColor.value === color.value ? "ring-2 ring-white ring-offset-2 ring-offset-black/50" : ""}
             `}
             style={{ backgroundColor: color.value }}
-            aria-label={`Set accent color to ${color.name}`}
+            aria-label={t("color_picker.set_accent", { color: color.name })}
           >
             {accentColor.value === color.value && (
               <span className="absolute inset-0 flex items-center justify-center">
@@ -128,7 +128,7 @@ export function ColorPicker({
       {showCustomPicker && (
         <div className="mt-4 p-4 bg-black/30 rounded-lg border border-white/10">
           <h5 className="font-smallcaps text-sm text-white/80 mb-3">
-            Custom Color
+            {t("color_picker.custom_color")}
           </h5>          <div className="flex items-center gap-3">
             <div className="flex-1">              <Input
                 type="text"
@@ -154,21 +154,21 @@ export function ColorPicker({
                   handleCustomColorSubmit();
                 }
               }}
-              title={/^#[0-9A-F]{6}$/i.test(customColor) ? `Click to apply ${customColor}` : 'Invalid color format - use 6-digit hex (e.g., #FF5733)'}
+              title={/^#[0-9A-F]{6}$/i.test(customColor) ? t("color_picker.click_to_apply", { color: customColor }) : t("color_picker.invalid_format")}
             />
             <Button
               onClick={handleCustomColorSubmit}
               size="sm"
               icon={<Icon icon="solar:check-circle-bold" />}
             >
-              Apply
+              {t("color_picker.button.apply")}
             </Button>
           </div>
 
           {customColorHistory.length > 0 && (
             <div className="mt-4 pt-4 border-t border-white/10">
               <h6 className="font-smallcaps text-xs text-white/70 mb-2">
-                Recent Colors
+                {t("color_picker.recent_colors")}
               </h6>
               <div className="flex flex-wrap gap-2">
                 {customColorHistory.map((historyColor, index) => (

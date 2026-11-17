@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../i18n/i18n";
 import { Icon } from "@iconify/react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, emitTo, type UnlistenFn } from "@tauri-apps/api/event";
@@ -79,8 +80,8 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
   return {
     id: process.id,
     profileId: process.profile_id,
-    name: process.profile_name || "Unknown Profile",
-    version: process.minecraft_version || "Unknown",
+    name: process.profile_name || i18n.t("instances.unknown_profile"),
+    version: process.minecraft_version || i18n.t("common.unknown"),
     loader: process.modloader?.toLowerCase() || "vanilla",
     loaderVersion: process.modloader_version || undefined,
     status: getProcessStatus(process.state),
@@ -433,7 +434,7 @@ export function InstanceSidebar({
       // Launch initiated successfully - status updates will come from events
     } catch (error) {
       console.error("Failed to launch profile:", error);
-      const errorMsg = typeof error === "string" ? error : (error as Error).message || "Launch failed";
+      const errorMsg = typeof error === "string" ? error : (error as Error).message || t("instances.launch_failed");
       finalizeButtonLaunch(profileId, errorMsg);
     }
   };

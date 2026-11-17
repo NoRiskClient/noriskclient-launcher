@@ -162,7 +162,7 @@ export function AppearanceTab() {
                 const selected = await open({
                   multiple: false,
                   filters: [{
-                    name: 'Media',
+                    name: t('common.file_filter.media'),
                     extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm']
                   }]
                 });
