@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -22,6 +20,8 @@ interface DropdownProps {
   position?: "bottom" | "top" | "left" | "right";
   role?: string;
   ariaLabel?: string;
+  align?: "center" | "start";
+  offset?: number;
 }
 
 export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
@@ -36,6 +36,8 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       position = "bottom",
       role = "menu",
       ariaLabel,
+      align = "center",
+      offset = 12,
     },
     ref,
   ) => {
@@ -120,7 +122,6 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         const scrollX = window.scrollX || window.pageXOffset;
 
         const estimatedHeight = actualHeight || Math.min(400, dropdownHeight);
-        const offset = 12;
 
         const spaceBelow = viewportHeight - rect.bottom;
         const spaceAbove = rect.top;
@@ -143,11 +144,11 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         switch (effectivePosition) {
           case "bottom":
             top = rect.bottom + scrollY + offset;
-            left = rect.left + scrollX + rect.width / 2 - width / 2;
+            left = align === "start" ? rect.left + scrollX : rect.left + scrollX + rect.width / 2 - width / 2;
             break;
           case "top":
             top = rect.top + scrollY - estimatedHeight - offset;
-            left = rect.left + scrollX + rect.width / 2 - width / 2;
+            left = align === "start" ? rect.left + scrollX : rect.left + scrollX + rect.width / 2 - width / 2;
             break;
           case "left":
             top = rect.top + scrollY + rect.height / 2 - estimatedHeight / 2;
@@ -175,7 +176,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         setDropdownTop(top);
         setDropdownLeft(left);
       },
-      [isOpen, triggerRef, width, position, dropdownHeight],
+      [isOpen, triggerRef, width, position, dropdownHeight, align, offset],
     );
 
     useEffect(() => {
@@ -262,7 +263,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }}
         role={role}
         className={cn(
-          "fixed font-minecraft backdrop-blur-md z-[1001] overflow-hidden",
+          "glass-panel fixed font-smallcaps backdrop-blur-md z-[1001] overflow-hidden",
           radiusClass,
           "text-white transition-all duration-200",
           "border-2 border-b-4 shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",

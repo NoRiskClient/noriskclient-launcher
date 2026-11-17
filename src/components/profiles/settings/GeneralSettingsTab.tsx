@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import type { Profile } from "../../../types/profile";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -9,7 +7,7 @@ import { Checkbox } from "../../ui/Checkbox";
 import { gsap } from "gsap";
 import { ProfileIcon } from "../ProfileIcon";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
 import type { MinecraftAccount } from "../../../types/minecraft";
 import { cn } from "../../../lib/utils";
 import { useTranslation } from "react-i18next";
@@ -76,7 +74,7 @@ export function GeneralSettingsTab({
 
   // Component for account avatar with caching
   function AccountAvatar({ account }: { account: MinecraftAccount }) {
-    const avatarUrl = useCrafatarAvatar({
+    const avatarUrl = usePlayerAvatar({
       uuid: account.id,
       overlay: true,
     });
@@ -92,8 +90,7 @@ export function GeneralSettingsTab({
         className="w-full h-full object-cover pixelated"
         style={{ imageRendering: 'pixelated' }}
         onError={(e) => {
-          // Fallback to default Steve head
-          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+          e.currentTarget.style.display = 'none';
         }}
       />
     );
@@ -117,7 +114,7 @@ export function GeneralSettingsTab({
       <div ref={formRef} className="space-y-6">
         <div className="flex gap-6">
           <div className="flex-1 flex flex-col">
-            <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+            <label className="block text-lg font-smallcaps text-white mb-2">
               {t('profiles.settings.profileName')}
             </label>
             <div className="flex items-center gap-4">
@@ -141,14 +138,14 @@ export function GeneralSettingsTab({
                 value={editedProfile.name}
                 onChange={(e) => updateProfile({ name: e.target.value })}
                 placeholder={t('profiles.settings.enterProfileName')}
-                className="text-xl flex-1"
+                className="text-sm flex-1"
                 disabled={profile.is_standard_version ? true : false}
               />
             </div>
           </div>
 
           <div className="flex-1 flex flex-col">
-            <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+            <label className="block text-lg font-smallcaps text-white mb-2">
               {t('profiles.settings.group')}
             </label>
             <div className="flex items-center">
@@ -156,7 +153,7 @@ export function GeneralSettingsTab({
                 value={editedProfile.group || ""}
                 onChange={(e) => updateProfile({ group: e.target.value || null })}
                 placeholder={t('placeholders.group_name')}
-                className="text-xl w-full"
+                className="text-sm w-full"
                 disabled={profile.is_standard_version ? true : false}
               />
             </div>
@@ -175,16 +172,16 @@ export function GeneralSettingsTab({
               });
             }}
             description={t('profiles.settings.sharedFolderDescription')}
-            descriptionClassName="font-minecraft-ten text-sm"
+            descriptionClassName="font-minecraft text-sm"
             size="lg"
           />
-          <p className="text-xs text-white/50 font-minecraft-ten ml-10 -mt-1">
+          <p className="text-xs text-white/50 font-minecraft ml-10 -mt-1">
             {t('profiles.settings.canChangeAnytime')}
           </p>
         </div>
 
         <div>
-          <label className="block text-3xl font-minecraft text-white mb-2 lowercase">
+          <label className="block text-lg font-smallcaps text-white mb-2">
             {t('profiles.settings.quickPlayPath')}
           </label>
           <SearchStyleInput
@@ -198,15 +195,15 @@ export function GeneralSettingsTab({
               })
             }
             placeholder={t('profiles.settings.quickPlayPlaceholder')}
-            className="text-xl"
+            className="text-sm"
           />
-          <p className="text-xs text-white/70 mt-2 font-minecraft-ten tracking-wide select-none">
+          <p className="text-xs text-white/70 mt-2 font-minecraft tracking-wide select-none">
             {t('profiles.settings.quickPlayDescription')}
           </p>
         </div>
 
         <div ref={accountRef} className="space-y-3">
-          <h3 className="text-3xl font-minecraft text-white lowercase">
+          <h3 className="text-lg font-smallcaps text-white">
             {t('profiles.settings.preferredAccount')}
           </h3>
           
@@ -257,7 +254,7 @@ export function GeneralSettingsTab({
                     
                     {/* Username */}
                     <div className={cn(
-                      "mt-2 font-minecraft text-xl lowercase text-center max-w-[100px] truncate",
+                      "mt-2 font-smallcaps text-sm text-center max-w-[100px] truncate",
                       isSelected ? "text-white" : "text-white/70"
                     )}>
                       {account.username}
@@ -267,7 +264,7 @@ export function GeneralSettingsTab({
               })}
             </div>
           ) : (
-            <div className="text-center py-4 text-white/50 font-minecraft text-lg lowercase">
+            <div className="text-center py-4 text-white/50 font-smallcaps text-xs">
               {t('profiles.settings.noAccountsFound')}
             </div>
           )}
@@ -282,7 +279,7 @@ export function GeneralSettingsTab({
             className="group flex items-center gap-1.5 text-white/30 hover:text-white/55 transition-colors"
           >
             <Icon icon="solar:copy-linear" className="w-3.5 h-3.5" />
-            <span className="font-minecraft-ten text-xs tracking-wide">
+            <span className="font-minecraft text-xs tracking-wide">
               {profile.id}
             </span>
           </button>

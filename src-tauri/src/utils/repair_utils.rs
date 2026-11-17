@@ -1,8 +1,11 @@
 use crate::error::{AppError, Result};
+use crate::minecraft::api::mc_api::MinecraftApiService;
+use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
+use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
+use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
 use crate::state::state_manager::State;
-use crate::state::profile_state::{ModSource, get_profile_mod_filename};
+use crate::state::profile_state::get_profile_mod_filename;
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
-use crate::integrations::norisk_packs;
 use crate::utils::path_utils;
 use log::{debug, info, warn};
 use uuid::Uuid;
@@ -35,30 +38,60 @@ pub async fn repair_profile(profile_id: Uuid) -> Result<()> {
     debug!("Repairing profile: {} ({})", profile.name, profile.id);
     debug!("Game version: {}, Loader: {}", profile.game_version, profile.loader.as_str());
 
-    // Call individual repair functions
+    repair_profile_libraries(profile_id).await?;
     repair_profile_mods(profile_id).await?;
-    
+
     info!("Profile repair completed successfully for profile {}", profile_id);
     Ok(())
 }
 
-/// Verifies the integrity of profile files
-/// 
-/// # Arguments
-///
-/// * `profile_id` - The UUID of the profile to verify
-///
-/// # Returns
-///
-/// Returns `Ok(())` if all files are valid, or `Err(AppError)` if issues are found
-pub async fn verify_profile_integrity(profile_id: Uuid) -> Result<()> {
-    info!("Verifying profile integrity for profile {}", profile_id);
+pub async fn repair_profile_libraries(profile_id: Uuid) -> Result<()> {
+    let state = State::get().await?;
+    let profile = state.profile_manager.get_profile(profile_id).await?;
+    let version_id = profile.game_version.clone();
 
-    // TODO: Implement file integrity verification
-    // - Check mod file hashes
-    // - Verify configuration files
-    // - Check for missing dependencies
-    
+    info!(
+        "Repairing Minecraft libraries for profile {} (version {})",
+        profile_id, version_id
+    );
+
+    let launcher_config = state.config_manager.get_config().await;
+
+    let api_service = MinecraftApiService::new();
+    let manifest = api_service.get_version_manifest().await?;
+    let version = manifest
+        .versions
+        .iter()
+        .find(|v| v.id == version_id)
+        .ok_or_else(|| {
+            AppError::VersionNotFound(format!("Version {} not found", version_id))
+        })?;
+    let piston_meta = api_service.get_piston_meta(&version.url).await?;
+
+    let libraries_service = MinecraftLibrariesDownloadService::new()
+        .with_verify_hashes(true)
+        .with_concurrent_downloads(launcher_config.concurrent_downloads);
+    libraries_service
+        .download_libraries(&piston_meta.libraries)
+        .await?;
+    debug!("Libraries verified for version {}", version_id);
+
+    let client_service = MinecraftClientDownloadService::new().with_verify_hashes(true);
+    client_service
+        .download_client(&piston_meta.downloads.client, &piston_meta.id)
+        .await?;
+    debug!("Client jar verified for version {}", version_id);
+
+    let natives_service = MinecraftNativesDownloadService::new();
+    natives_service
+        .extract_natives(&piston_meta.libraries, &version_id, false)
+        .await?;
+    debug!("Natives re-extracted for version {}", version_id);
+
+    info!(
+        "Library repair completed for profile {} (version {})",
+        profile_id, version_id
+    );
     Ok(())
 }
 
@@ -181,23 +214,3 @@ pub async fn repair_profile_mods(profile_id: Uuid) -> Result<()> {
     info!("Mod repair completed for profile {}", profile_id);
     Ok(())
 }
-
-/// Repairs configuration files for a profile
-/// 
-/// # Arguments
-///
-/// * `profile_id` - The UUID of the profile to repair
-///
-/// # Returns
-///
-/// Returns `Ok(())` on successful config repair, or `Err(AppError)` if repair fails
-pub async fn repair_profile_config(profile_id: Uuid) -> Result<()> {
-    info!("Repairing configuration for profile {}", profile_id);
-
-    // TODO: Implement config repair logic
-    // - Check for corrupted config files
-    // - Reset to defaults if necessary
-    // - Verify settings validity
-    
-    Ok(())
-} 

@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useRef } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ModrinthProjectType,
@@ -9,11 +7,8 @@ import { UnifiedSortType, ModPlatform } from "../../../types/unified";
 // Profile type will be defined locally
 import { SearchWithFilters } from "../../ui/SearchWithFilters";
 import { GroupTabs, type GroupTab } from "../../ui/GroupTabs";
-import { IconButton } from "../../ui/buttons/IconButton";
 import { TagBadge } from "../../ui/TagBadge";
 import { Icon } from "@iconify/react";
-import { useDisplayContextStore } from "../../../store/useDisplayContextStore";
-import { useThemeStore } from "../../../store/useThemeStore";
 import { cn } from "../../../lib/utils";
 
 // Define Profile type locally, similar to ModrinthSearchV2.tsx
@@ -88,20 +83,6 @@ export const ModrinthSearchControlsV2: React.FC<
   onModSourceChange,
 }) => {
   const { t } = useTranslation();
-  const globalDisplayContext = useDisplayContextStore((state) => state.context);
-  const effectiveDisplayContext =
-    overrideDisplayContext || globalDisplayContext;
-  const accentColor = useThemeStore((state) => state.accentColor);
-  const filtersContainerRef = useRef<HTMLDivElement>(null);
-
-  const isDetailView = effectiveDisplayContext === "detail";
-  const buttonSize = isDetailView
-    ? isSidebarVisible
-      ? "xs"
-      : "sm"
-    : !isSidebarVisible
-      ? "lg"
-      : "sm";
 
   // Calculate total number of active filters
   const totalFilters =
@@ -143,7 +124,7 @@ export const ModrinthSearchControlsV2: React.FC<
 
             <button
               onClick={onToggleSidebar}
-              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]"
+              className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]"
               title={isSidebarVisible ? t('content.filters.hide') : t('content.filters.show')}
             >
               <div className="w-4 h-8 flex items-center justify-center">
@@ -159,7 +140,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={() => onModSourceChange(ModPlatform.Modrinth)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]",
+                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.Modrinth
                   ? "bg-green-400/40 text-white border border-green-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"
@@ -177,7 +158,7 @@ export const ModrinthSearchControlsV2: React.FC<
             <button
               onClick={() => onModSourceChange(ModPlatform.CurseForge)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1 rounded-md font-minecraft text-2xl lowercase transition-all duration-200 min-h-[2.5rem]",
+                "flex items-center gap-1.5 px-2 py-1 rounded-md font-smallcaps text-base transition-all duration-200 min-h-[2.5rem]",
                 modSource === ModPlatform.CurseForge
                   ? "bg-orange-400/40 text-white border border-orange-300/30"
                   : "bg-black/30 text-white/70 hover:text-white hover:bg-black/40 border border-transparent"

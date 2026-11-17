@@ -2,14 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { setCapeFavorite } from "../services/cape-service";
 import { toast } from "react-hot-toast";
+import { translateApiError } from "../utils/nrc-error-translations";
 
 interface CapeFavoritesState {
   favoriteCapeIds: string[];
   isFavorite: (capeId: string) => boolean;
   addFavorite: (capeId: string) => void;
   removeFavorite: (capeId: string) => void;
-  toggleFavorite: (capeId: string) => void;
-  clearFavorites: () => void;
   setFavoriteOptimistic: (capeId: string, favorite: boolean, noriskToken?: string) => Promise<void>;
   toggleFavoriteOptimistic: (capeId: string, noriskToken?: string) => Promise<void>;
 }
@@ -38,17 +37,6 @@ export const useCapeFavoritesStore = create<CapeFavoritesState>()(
         }));
       },
 
-      toggleFavorite: (capeId: string) => {
-        const { isFavorite, addFavorite, removeFavorite } = get();
-        if (isFavorite(capeId)) {
-          removeFavorite(capeId);
-        } else {
-          addFavorite(capeId);
-        }
-      },
-
-      clearFavorites: () => set({ favoriteCapeIds: [] }),
-
       setFavoriteOptimistic: async (capeId: string, favorite: boolean, noriskToken?: string) => {
         // Apply local change first and keep it regardless of server outcome
         const prev = get().favoriteCapeIds;
@@ -67,8 +55,7 @@ export const useCapeFavoritesStore = create<CapeFavoritesState>()(
           // Fire-and-forget server sync; do not overwrite local state with response
           await setCapeFavorite(capeId, favorite, noriskToken);
         } catch (err) {
-          const message = err instanceof Error ? err.message : String((err as any)?.message ?? err);
-          toast.error(`Failed to sync favorite: ${message}`);
+          toast.error(translateApiError(err, "Failed to sync favorite"));
           // Intentionally do not revert local state
         }
       },

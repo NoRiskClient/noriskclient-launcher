@@ -67,6 +67,15 @@ pub enum AppError {
     #[error("Other error: {0}")]
     Other(String),
 
+    #[error("The clip engine is not running")]
+    ClipEngineOff,
+
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    #[error("{0}")]
+    DatabaseUnavailable(String),
+
     #[error("Event state was not properly initialized")]
     EventStateNotInitialized,
 
@@ -133,11 +142,15 @@ pub enum AppError {
     #[error("Unsupported architecture: {0}")]
     UnsupportedArchitecture(String),
 
-    #[error("Failed to upload log to mclo.gs: {0}")]
-    MclogsUploadFailed(String),
-
     #[error("Request error: {0}")]
     RequestError(String),
+
+    #[error("API error [{status}]: {translatable_key}")]
+    ApiError {
+        status: u16,
+        translatable_key: String,
+        args: Vec<String>,
+    },
 
     #[error("Parse error: {0}")]
     ParseError(String),
@@ -197,17 +210,39 @@ pub enum AppError {
     },
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct CommandError {
     pub message: String,
     pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub translatable_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<u16>,
 }
 
 impl From<AppError> for CommandError {
     fn from(error: AppError) -> Self {
-        CommandError {
-            message: error.to_string(),
-            kind: format!("{:?}", error),
+        match &error {
+            AppError::ApiError {
+                status,
+                translatable_key,
+                args,
+            } => CommandError {
+                message: error.to_string(),
+                kind: "ApiError".to_string(),
+                translatable_key: Some(translatable_key.clone()),
+                args: Some(args.clone()),
+                status: Some(*status),
+            },
+            _ => CommandError {
+                message: error.to_string(),
+                kind: format!("{:?}", error),
+                translatable_key: None,
+                args: None,
+                status: None,
+            },
         }
     }
 }

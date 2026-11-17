@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
@@ -7,10 +5,10 @@ import { Modal } from "../ui/Modal";
 import { SearchStyleInput } from "../ui/Input";
 import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";
-import { invoke } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
 import { useProfileStore } from "../../store/profile-store";
 import { copyProfile } from "../../services/profile-service";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 export function ProfileDuplicateModal() {
   const { t } = useTranslation();
@@ -55,7 +53,7 @@ export function ProfileDuplicateModal() {
     } catch (err) {
       console.error("Failed to duplicate profile:", err);
       toast.error(
-        t('profile_duplicate.toast.failed', { error: err instanceof Error ? err.message : String(err) })
+        t('profile_duplicate.toast.failed', { error: parseErrorMessage(err) })
       );
     } finally {
       setIsLoading(false);
@@ -78,7 +76,7 @@ export function ProfileDuplicateModal() {
             variant="secondary"
             onClick={handleClose}
             size="md"
-            className="text-2xl"
+            className="text-base"
             disabled={isLoading}
           >
             {t('common.cancel')}
@@ -88,13 +86,13 @@ export function ProfileDuplicateModal() {
             onClick={handleDuplicate}
             disabled={isLoading || !newProfileName.trim()}
             size="md"
-            className="text-2xl"
+            className="text-base"
           >
             {isLoading ? (
               <div className="flex items-center gap-3">
                 <Icon
-                  icon="solar:refresh-bold"
-                  className="w-6 h-6 animate-spin text-white"
+                  icon="svg-spinners:ring-resize"
+                  className="w-6 h-6 text-white"
                 />
                 <span>{t('profile_duplicate.button.duplicating')}</span>
               </div>
@@ -110,16 +108,16 @@ export function ProfileDuplicateModal() {
     >
       <div className="space-y-6 p-6">
         <div className="text-center">
-          <p className="text-2xl font-minecraft text-white/80 mb-4 lowercase">
+          <p className="text-base font-smallcaps text-white/80 mb-4">
             {t('profile_duplicate.description', { name: sourceProfile.name })}
           </p>
-          <p className="text-xs text-white/60 font-minecraft-ten tracking-wide">
+          <p className="text-xs text-white/60 font-minecraft tracking-wide">
             {t('profile_duplicate.copy_notice')}
           </p>
         </div>
 
         <div>
-          <label className="block text-2xl font-minecraft text-white mb-2 lowercase">
+          <label className="block text-base font-smallcaps text-white mb-2">
             {t('profile_duplicate.new_name_label')}
           </label>
           <SearchStyleInput

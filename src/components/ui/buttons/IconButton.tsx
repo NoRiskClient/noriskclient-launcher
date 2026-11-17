@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
@@ -8,9 +6,6 @@ import { useThemeStore } from "../../../store/useThemeStore";
 import { ThemedSurface } from "../ThemedSurface";
 import { 
   getVariantColors,
-  getSizeClasses,
-  getBorderRadiusClass,
-  getAccessibilityProps,
   type ComponentSize,
   type ComponentVariant 
 } from "../design-system";
@@ -23,13 +18,6 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   shadowDepth?: "default" | "short" | "none";
   label?: string;
   description?: string;
-}
-
-interface RippleType {
-  x: number;
-  y: number;
-  size: number;
-  id: number;
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -50,8 +38,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     ref,
   ) => {
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const [ripples, setRipples] = useState<RippleType[]>([]);
-    const rippleCounter = useRef(0);
     const accentColor = useThemeStore((state) => state.accentColor);
     const isBackgroundAnimationEnabled = useThemeStore(
       (state) => state.isBackgroundAnimationEnabled,
@@ -131,19 +117,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         shadowDepth !== "none"
       );
     };    const colors = getVariantColors(variant, accentColor);
-    const radiusClass = getBorderRadiusClass();
-    const accessibilityProps = getAccessibilityProps({
-      label,
-      description,
-      disabled
-    });    const getIconButtonSizeClasses = () => {
+    const getIconButtonSizeClasses = () => {
       switch (size) {
-        case "xs": return "h-[36px] w-[36px] p-2 text-base";
-        case "sm": return "h-[42px] w-[42px] p-2.5 text-lg";
-        case "md": return "h-[50px] w-[50px] p-3 text-xl";
-        case "lg": return "h-[58px] w-[58px] p-3.5 text-2xl";
-        case "xl": return "h-[66px] w-[66px] p-4 text-2xl";
-        default: return "h-[50px] w-[50px] p-3 text-xl";
+        case "xs": return "h-[36px] w-[36px] p-2 text-xs";
+        case "sm": return "h-[42px] w-[42px] p-2.5 text-xs";
+        case "md": return "h-[50px] w-[50px] p-3 text-sm";
+        case "lg": return "h-[58px] w-[58px] p-3.5 text-base";
+        case "xl": return "h-[66px] w-[66px] p-4 text-base";
+        default: return "h-[50px] w-[50px] p-3 text-sm";
       }
     };
 
@@ -264,7 +245,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md",
           "rounded-md text-white tracking-wider",
           "flex items-center justify-center",
           "text-shadow-sm",

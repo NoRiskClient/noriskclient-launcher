@@ -4,25 +4,23 @@ use crate::minecraft::auth::minecraft_auth::NoRiskToken;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
 use crate::state::process_state::ProcessMetadata;
 use crate::{
-    config::HTTP_CLIENT,
     error::{AppError, Result},
+    utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put},
 };
 use crate::state::state_manager::State;
 use crate::state::event_state::{EventPayload, EventType};
-use chrono::Utc;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
-use rand;
 use uuid::Uuid;
-use crate::utils::string_utils::safe_truncate;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CrashlogDto {
     pub mc_logs_url: String,
     pub metadata: Option<ProcessMetadata>,
+    pub locale: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -141,10 +139,10 @@ impl NoRiskApi {
 
     pub fn get_api_base(is_experimental: bool) -> String {
         if is_experimental {
-            debug!("[NoRisk API] Using experimental API endpoint");
+            trace!("[NoRisk API] Using experimental API endpoint");
             String::from("https://api-staging.norisk.gg/api/v1")
         } else {
-            debug!("[NoRisk API] Using production API endpoint");
+            trace!("[NoRisk API] Using production API endpoint");
             String::from("https://api.norisk.gg/api/v1")
         }
     }
@@ -154,115 +152,24 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/auth/request-server-id", base_url);
 
-        debug!("[NoRisk API] Requesting new server ID");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Requesting new server ID");
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[NoRisk API] Server ID request failed: {}", e);
-                AppError::RequestError(format!("Failed to request server ID from NoRisk API: {}", e))
-            })?;
+        let server_response = nrc_post(url)
+            .json::<ServerIdResponse>("NoRisk server-id")
+            .await?;
 
-        let status = response.status();
-        debug!("[NoRisk API] Server ID request response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Server ID request error response: Status {}, Body: {}",
-                status, error_body
-            );
+        let server_id = &server_response.server_id;
+        if !server_id.starts_with("nrc-") {
+            error!("[NoRisk API] Invalid server ID received: {}", server_id);
             return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for server ID request: {}, Body: {}",
-                status, error_body
+                "Invalid server ID received from NoRisk API: {}",
+                server_id
             )));
         }
 
-        debug!("[NoRisk API] Parsing server ID response as JSON");
-        match response.json::<ServerIdResponse>().await {
-            Ok(server_response) => {
-                let server_id = &server_response.server_id;
-                if !server_id.starts_with("nrc-") {
-                    error!("[NoRisk API] Invalid server ID received: {}", server_id);
-                    return Err(AppError::RequestError(format!(
-                        "Invalid server ID received from NoRisk API: {}",
-                        server_id
-                    )));
-                }
-
-                info!("[NoRisk API] Server ID request successful: {}", server_id);
-                Ok(server_response)
-            }
-            Err(e) => {
-                error!("[NoRisk API] Failed to parse server ID response: {}", e);
-                Err(AppError::ParseError(format!("Failed to parse NoRisk API server ID response: {}", e)))
-            }
-        }
-    }
-
-    pub async fn post_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
-        endpoint: &str,
-        norisk_token: &str,
-        params: &str,
-        extra_params: Option<HashMap<&str, &str>>,
-        is_experimental: bool,
-    ) -> Result<T> {
-        let base_url = Self::get_api_base(is_experimental);
-        let url = format!("{}/{}", base_url, endpoint);
-
-        debug!("[NoRisk API] Making request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
-
-        let mut query_params: HashMap<&str, &str> = HashMap::new();
-        if !params.is_empty() {
-            query_params.insert("params", params);
-            debug!("[NoRisk API] Added base params: {}", params);
-        }
-
-        if let Some(extra) = extra_params {
-            for (key, value) in extra {
-                query_params.insert(key, value);
-                debug!("[NoRisk API] Added extra param: {} = {}", key, value);
-            }
-        }
-
-        debug!(
-            "[NoRisk API] Sending POST request with {} parameters",
-            query_params.len()
-        );
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .query(&query_params)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[NoRisk API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send request to NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        response.json::<T>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}", e))
-        })
+        info!("[NoRisk API] Server ID request successful: {}", server_id);
+        Ok(server_response)
     }
 
     pub async fn get_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
@@ -274,40 +181,18 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let mut request = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
+        let mut request = nrc_get(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
-            debug!("[NoRisk API] Adding {} query parameters", extra.len());
+            trace!("[NoRisk API] Adding {} query parameters", extra.len());
             request = request.query(&extra);
         }
 
-        debug!("[NoRisk API] Sending GET request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] GET request failed: {}", e);
-            AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
-        })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        response.json::<T>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}", e))
-        })
+        trace!("[NoRisk API] Sending GET request");
+        request.json::<T>(endpoint).await
     }
 
     pub async fn delete_from_norisk_endpoint_text_with_parameters(
@@ -319,46 +204,21 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!(
+        trace!(
             "[NoRisk API] Making DELETE request to endpoint: {}",
             endpoint
         );
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let mut request = HTTP_CLIENT
-            .delete(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
+        let mut request = nrc_delete(url).bearer(norisk_token);
 
         if let Some(extra) = extra_params {
-            debug!("[NoRisk API] Adding {} query parameters", extra.len());
+            trace!("[NoRisk API] Adding {} query parameters", extra.len());
             request = request.query(&extra);
         }
 
-        debug!("[NoRisk API] Sending DELETE request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] DELETE request failed: {}", e);
-            AppError::RequestError(format!(
-                "Failed to send DELETE request to NoRisk API: {}",
-                e
-            ))
-        })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            error!("[NoRisk API] Error response: Status {}", status);
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}",
-                status
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text");
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })
+        trace!("[NoRisk API] Sending DELETE request");
+        request.text(endpoint).await
     }
 
     /// Secure version of token refresh using server-provided server ID
@@ -428,7 +288,7 @@ impl NoRiskApi {
         let url = format!("{}/launcher/auth/validate/v2", base_url);
 
         debug!("[NoRisk API] Step 3: Making POST request to auth/validate/v2 endpoint");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         // All parameters as query parameters
         let force_str = force.to_string();
@@ -438,69 +298,10 @@ impl NoRiskApi {
         query_params.insert("username", username);
         query_params.insert("server_id", server_id);
 
-        debug!("[NoRisk API] Sending POST request with server-provided server ID");
-        let response = HTTP_CLIENT
-            .post(url)
+        trace!("[NoRisk API] Sending POST request with server-provided server ID");
+        nrc_post(url)
             .query(&query_params)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[NoRisk API] v3 token refresh request failed: {}", e);
-                AppError::RequestError(format!("Failed to send v3 token refresh request to NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] v3 token refresh response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] v3 token refresh error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API v3 returned error status: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Parsing v3 token refresh response body as JSON");
-        match response.json::<NoRiskToken>().await {
-            Ok(token) => {
-                info!("[NoRisk API] v3 token refresh successful");
-                debug!("[NoRisk API] Token valid status: {}", token.value.len() > 0);
-                Ok(token)
-            }
-            Err(e) => {
-                error!("[NoRisk API] Failed to parse v3 token refresh response: {}", e);
-                Err(AppError::ParseError(format!("Failed to parse NoRisk API v3 response: {}", e)))
-            }
-        }
-    }
-
-    pub async fn request_from_norisk_endpoint<T: for<'de> Deserialize<'de>>(
-        endpoint: &str,
-        norisk_token: &str,
-        request_uuid: &str,
-        is_experimental: bool,
-    ) -> Result<T> {
-        debug!(
-            "[NoRisk API] Request from endpoint: {} with UUID: {}",
-            endpoint, request_uuid
-        );
-        let mut extra_params = HashMap::new();
-        extra_params.insert("uuid", request_uuid);
-
-        Self::post_from_norisk_endpoint_with_parameters(
-            endpoint,
-            norisk_token,
-            "",
-            Some(extra_params),
-            is_experimental,
-        )
+            .json::<NoRiskToken>("NoRisk token refresh v3")
             .await
     }
 
@@ -510,11 +311,11 @@ impl NoRiskApi {
         request_uuid: Option<&str>,
         is_experimental: bool,
     ) -> Result<T> {
-        debug!("[NoRisk API] GET request from endpoint: {}", endpoint);
+        trace!("[NoRisk API] GET request from endpoint: {}", endpoint);
 
         let mut extra_params = HashMap::new();
         if let Some(uuid) = request_uuid {
-            debug!("[NoRisk API] Adding UUID: {}", uuid);
+            trace!("[NoRisk API] Adding UUID: {}", uuid);
             extra_params.insert("uuid", uuid);
         }
 
@@ -549,8 +350,10 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskModpacksConfig> {
-        debug!("[NoRisk API] Fetching modpack configuration from v3 endpoint (staging)");
-        // TODO: Remove hardcoded staging once v3 is deployed to production
+        trace!(
+            "[NoRisk API] Fetching modpack configuration from v3 endpoint. Experimental: {}",
+            is_experimental
+        );
         Self::get_from_norisk_endpoint("launcher/modpacks-v3", norisk_token, None, is_experimental)
             .await
     }
@@ -560,7 +363,7 @@ impl NoRiskApi {
         norisk_token: &str,
         is_experimental: bool,
     ) -> Result<NoriskVersionsConfig> {
-        debug!(
+        trace!(
             "[NoRisk API] Fetching standard version profiles. Experimental: {}",
             is_experimental
         );
@@ -650,60 +453,30 @@ impl NoRiskApi {
             .await
     }
 
-    /// Submits a crash log to the NoRisk API.
-    pub async fn submit_crash_log(
+    /// Analyze a crash log; returns the launcher verdict (CrashCheckResult JSON). Served by the
+    /// discord-bot API (same route also lives in core-backend; base can be switched later).
+    pub async fn check_crash_log(
         norisk_token: &str,
         crash_log_data: &CrashlogDto,
         request_uuid: &str,
         is_experimental: bool,
-    ) -> Result<()> {
-        let base_url = Self::get_api_base(is_experimental);
-        let endpoint = "core/crashlog";
+    ) -> Result<serde_json::Value> {
+        let base_url = if is_experimental {
+            "https://discord-api-staging.norisk.gg/api/v1/discord"
+        } else {
+            "https://discord-api.norisk.gg/api/v1/discord"
+        };
+        let endpoint = "crashlog/check";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!(
-            "[NoRisk API] Submitting crash log to endpoint: {}",
-            endpoint
-        );
-        debug!("[NoRisk API] Full URL: {}", url);
-        debug!("[NoRisk API] With request UUID: {}", request_uuid);
-        debug!("[NoRisk API] Crash log data: {:?}", crash_log_data);
+        debug!("[NoRisk API] Checking crash log at: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .json(crash_log_data)
-            .send()
+            .json_body(crash_log_data)
+            .json::<serde_json::Value>(endpoint)
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Crash log submission request failed: {}", e);
-                AppError::RequestError(format!("Failed to send crash log to NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!(
-            "[NoRisk API] Crash log submission response status: {}",
-            status
-        );
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Crash log submission error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for crash log: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        info!("[NoRisk API] Crash log submitted successfully.");
-        Ok(())
     }
 
     pub async fn get_mcreal_app_token(
@@ -716,41 +489,13 @@ impl NoRiskApi {
         let url = format!("{}/{}", base_url, endpoint);
 
         info!("[NoRisk API] Requesting mcreal app token");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .text("McReal app token")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] McReal app token request failed: {}", e);
-                AppError::RequestError(format!("Failed to get mobile app token from NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] McReal app token response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] McReal app token error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for mobile app token: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read mobile app token response: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API mobile app token response: {}", e))
-        })
     }
 
     pub async fn get_user_permissions(
@@ -762,42 +507,14 @@ impl NoRiskApi {
         let endpoint = "core/permissions";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Requesting user permissions for {}", player_uuid);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Requesting user permissions for {}", player_uuid);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(url)
+            .bearer(norisk_token)
             .query(&[("uuid", player_uuid)])
-            .send()
+            .json::<Vec<String>>("NoRisk permissions")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Permissions request failed: {}", e);
-                AppError::RequestError(format!("Failed to get permissions from NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Permissions response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Permissions error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for permissions: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.json::<Vec<String>>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse permissions response: {}", e);
-            AppError::ParseError(format!("Failed to parse NoRisk API permissions response: {}", e))
-        })
     }
 
     pub async fn reset_mcreal_app_token(
@@ -810,41 +527,13 @@ impl NoRiskApi {
         let url = format!("{}/{}", base_url, endpoint);
 
         info!("[NoRisk API] Resetting mcreal app token");
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .text("McReal app token reset")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] McReal app token reset request failed: {}", e);
-                AppError::RequestError(format!("Failed to reset mobile app token from NoRisk API: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] McReal app token reset response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] McReal app token reset error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for mobile app token reset: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read mobile app token reset response: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API mobile app token reset response: {}", e))
-        })
     }
 
     /// Fetches the advent calendar data from the NoRisk API.
@@ -861,63 +550,17 @@ impl NoRiskApi {
         let endpoint = "core/advent/calendar";
         let url = format!("{}/{}", base_url, endpoint);
 
-        debug!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Making GET request to endpoint: {}", endpoint);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         let mut extra_params = HashMap::new();
         extra_params.insert("uuid", request_uuid);
 
-        let mut request = HTTP_CLIENT
-            .get(url)
-            .header("Authorization", format!("Bearer {}", norisk_token));
-
-        debug!("[NoRisk API] Adding UUID query parameter: {}", request_uuid);
-        request = request.query(&extra_params);
-
-        debug!("[NoRisk API] Sending GET request");
-        let response = request.send().await.map_err(|e| {
-            error!("[NoRisk API] GET request failed: {}", e);
-            AppError::RequestError(format!("Failed to send GET request to NoRisk API: {}", e))
-        })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text before parsing");
-        let response_text = response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })?;
-
-        debug!("[NoRisk API] Response body (first 500 chars): {}",
-            if response_text.len() > 500 {
-                format!("{}...", safe_truncate(&response_text, 500))
-            } else {
-                response_text.clone()
-            }
-        );
-
-        debug!("[NoRisk API] Parsing response body as JSON");
-        serde_json::from_str::<Vec<AdventCalendarDay>>(&response_text).map_err(|e| {
-            error!("[NoRisk API] Failed to parse response: {}", e);
-            error!("[NoRisk API] Full response body: {}", response_text);
-            AppError::ParseError(format!("Failed to parse NoRisk API response: {}. Response body: {}", e, response_text))
-        })
+        nrc_get(url)
+            .bearer(norisk_token)
+            .query(&extra_params)
+            .json::<Vec<AdventCalendarDay>>("Advent calendar")
+            .await
     }
 
     /// Claims a reward for a specific day in the advent calendar.
@@ -935,61 +578,14 @@ impl NoRiskApi {
             "[NoRisk API] Claiming advent calendar day {}",
             tag
         );
-        debug!("[NoRisk API] Full URL: {}", url);
-        debug!("[NoRisk API] With request UUID: {}", request_uuid);
+        trace!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] With request UUID: {}", request_uuid);
 
-        let response = HTTP_CLIENT
-            .post(url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .json::<AdventCalendarDay>("Advent calendar claim")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Advent calendar claim request failed: {}", e);
-                AppError::RequestError(format!("Failed to claim advent calendar day: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!(
-            "[NoRisk API] Advent calendar claim response status: {}",
-            status
-        );
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Advent calendar claim error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for advent calendar claim: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        debug!("[NoRisk API] Reading response body as text before parsing");
-        let response_text = response.text().await.map_err(|e| {
-            error!("[NoRisk API] Failed to read response text: {}", e);
-            AppError::ParseError(format!("Failed to read NoRisk API response text: {}", e))
-        })?;
-
-        debug!("[NoRisk API] Response body (first 500 chars): {}",
-            if response_text.len() > 500 {
-                format!("{}...", safe_truncate(&response_text, 500))
-            } else {
-                response_text.clone()
-            }
-        );
-
-        debug!("[NoRisk API] Parsing advent calendar claim response body as JSON");
-        serde_json::from_str::<AdventCalendarDay>(&response_text).map_err(|e| {
-            error!("[NoRisk API] Failed to parse advent calendar claim response: {}", e);
-            error!("[NoRisk API] Full response body: {}", response_text);
-            AppError::ParseError(format!("Failed to parse NoRisk API advent calendar claim response: {}. Response body: {}", e, response_text))
-        })
     }
 
     /// Report a referral code to the backend for tracking.
@@ -1007,7 +603,7 @@ impl NoRiskApi {
         let url = format!("{}/launcher/referral/report", base_url);
 
         info!("[NoRisk API] Reporting referral code: {} for account: {}", code, account_id);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
         #[derive(Serialize)]
         struct ReferralReportRequest<'a> {
@@ -1016,38 +612,12 @@ impl NoRiskApi {
 
         let request_body = ReferralReportRequest { code };
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", account_id.to_string())])
-            .json(&request_body)
-            .send()
+            .json_body(&request_body)
+            .expect_success("Referral report")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Referral report request failed: {}", e);
-                AppError::RequestError(format!("Failed to report referral code: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Referral report response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Referral report error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for referral report: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        info!("[NoRisk API] Successfully reported referral code");
-        Ok(())
     }
 
     /// Get information about a referral code (public endpoint, no auth required).
@@ -1057,43 +627,12 @@ impl NoRiskApi {
         let url = format!("{}/launcher/referral/info", base_url);
 
         info!("[NoRisk API] Fetching referral info for code: {}", code);
-        debug!("[NoRisk API] Full URL: {}", url);
+        trace!("[NoRisk API] Full URL: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(&url)
+        nrc_get(&url)
             .query(&[("code", code)])
-            .send()
+            .json::<ReferralInfo>("Referral info")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Referral info request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch referral info: {}", e))
-            })?;
-
-        let status = response.status();
-        debug!("[NoRisk API] Referral info response status: {}", status);
-
-        if !status.is_success() {
-            let error_body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Failed to read error body".to_string());
-            error!(
-                "[NoRisk API] Referral info error response: Status {}, Body: {}",
-                status, error_body
-            );
-            return Err(AppError::RequestError(format!(
-                "NoRisk API returned error status for referral info: {}, Body: {}",
-                status, error_body
-            )));
-        }
-
-        let info = response.json::<ReferralInfo>().await.map_err(|e| {
-            error!("[NoRisk API] Failed to parse referral info response: {}", e);
-            AppError::ParseError(format!("Failed to parse referral info: {}", e))
-        })?;
-
-        info!("[NoRisk API] Successfully fetched referral info for: {}", info.referrer_name);
-        Ok(info)
     }
 
     /// Get all notifications for the current user
@@ -1105,20 +644,13 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/core/notifications", base_url);
 
-        debug!("[NoRisk API] Fetching notifications from: {}", url);
+        trace!("[NoRisk API] Fetching notifications from: {}", url);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_get(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .json::<Vec<UserNotification>>("Notifications")
             .await
-            .map_err(|e| {
-                error!("[NoRisk API] Notifications request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch notifications: {}", e))
-            })?;
-
-        crate::utils::api_utils::parse_response_with_logging(response, "Notifications").await
     }
 
     /// Mark all notifications as read
@@ -1132,18 +664,11 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] Marking all notifications as read");
 
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_put(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid)])
-            .send()
+            .expect_success("Mark all notifications read")
             .await
-            .map_err(|e| AppError::RequestError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            return Err(AppError::RequestError(format!("Status: {}", response.status())));
-        }
-        Ok(())
     }
 
     /// Mark a specific notification as read
@@ -1161,18 +686,11 @@ impl NoRiskApi {
             "[NoRisk API] Marking notification {} as read",
             notification_id
         );
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_put(&url)
+            .bearer(norisk_token)
             .query(&[("uuid", request_uuid), ("notificationId", notification_id)])
-            .send()
+            .expect_success("Mark notification read")
             .await
-            .map_err(|e| AppError::RequestError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            return Err(AppError::RequestError(format!("Status: {}", response.status())));
-        }
-        Ok(())
     }
 
     /// Confirm an auth bridge session for website authentication.
@@ -1185,30 +703,16 @@ impl NoRiskApi {
         let base_url = Self::get_api_base(is_experimental);
         let url = format!("{}/launcher/auth/bridge/confirm", base_url);
 
-        debug!("[NoRisk API] Confirming auth bridge session: {}", session_id);
+        debug!(
+            "[NoRisk API] Confirming auth bridge session: {}",
+            crate::utils::security_utils::mask_identifier(session_id)
+        );
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
+        nrc_post(&url)
+            .bearer(norisk_token)
             .query(&[("sessionId", session_id)])
-            .send()
+            .expect_success("Auth bridge confirm")
             .await
-            .map_err(|e| AppError::RequestError(format!("Auth bridge request failed: {}", e)))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(AppError::RequestError(format!(
-                "Auth bridge failed: {} - {}",
-                status, body
-            )));
-        }
-
-        info!("[NoRisk API] Auth bridge confirmation successful");
-        Ok(())
     }
 
     /// Fetches the unique players (last 24h) stat from the NoRisk API.
@@ -1220,12 +724,9 @@ impl NoRiskApi {
 
         debug!("[NoRisk API] GET {}", url);
 
-        let response = HTTP_CLIENT.get(&url).send().await.map_err(|e| {
-            error!("[NoRisk API] uniquePlayers24h request failed: {}", e);
-            AppError::RequestError(format!("Failed to GET {}: {}", url, e))
-        })?;
-
-        crate::utils::api_utils::parse_response_with_logging(response, "UniquePlayers24h").await
+        nrc_get(&url)
+            .json::<UniquePlayersResponse>("UniquePlayers24h")
+            .await
     }
 }
 
@@ -1313,6 +814,10 @@ pub enum KnownNotificationContent {
         grantor: NotificationUser,
         #[serde(rename = "expirationDate")]
         expiration_date: Option<String>,
+        #[serde(default)]
+        anonymous: bool,
+        #[serde(default)]
+        message: Option<String>,
     },
     #[serde(rename = "gg.norisk.networking.model.notifications.notification.ShopItemBoughtNotification")]
     ShopItemBought {

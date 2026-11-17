@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ThemedDropdown — Accent-getoentes Dropdown-Primitive fuer V3.
  *
@@ -62,16 +60,17 @@ interface ThemedDropdownProps {
    * positioning is used — still the default everywhere else.
    */
   triggerRef?: React.RefObject<HTMLElement | null>;
+  matchTriggerWidth?: boolean;
 }
 
 export function ThemedDropdown({
   open, onClose, children,
   width = "w-48", align = "right", scrollable = false,
   maxWidth = "max-w-xs", className = "",
-  triggerRef,
+  triggerRef, matchTriggerWidth = false,
 }: ThemedDropdownProps) {
   const accent = useThemeStore((s) => s.accentColor.value);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width?: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [flipped, setFlipped] = useState(false);
 
@@ -82,13 +81,14 @@ export function ThemedDropdown({
       return;
     }
     const r = triggerRef.current.getBoundingClientRect();
-    const minW = WIDTH_TO_PX[width] ?? 192;
+    const minW = matchTriggerWidth ? r.width : (WIDTH_TO_PX[width] ?? 192);
     setPos({
       top: r.bottom + 4,
       left: align === "right" ? r.right - minW : r.left,
+      ...(matchTriggerWidth ? { width: r.width } : {}),
     });
     setFlipped(false);
-  }, [open, triggerRef, width, align]);
+  }, [open, triggerRef, width, align, matchTriggerWidth]);
 
   useLayoutEffect(() => {
     if (flipped || !pos || !panelRef.current || !triggerRef?.current) return;
@@ -98,13 +98,13 @@ export function ThemedDropdown({
     const fitsAbove = trigger.top - panel.height - 4 >= 8;
     if (overflowsBelow && fitsAbove) {
       setFlipped(true);
-      setPos({ top: trigger.top - panel.height - 4, left: pos.left });
+      setPos({ top: trigger.top - panel.height - 4, left: pos.left, width: pos.width });
     }
   }, [pos, flipped, triggerRef]);
 
   if (!open) return null;
 
-  const scrollClass = scrollable ? "max-h-80 overflow-y-auto" : "";
+  const scrollClass = scrollable ? "max-h-80 overflow-y-auto custom-scrollbar" : "overflow-hidden";
   // `w-XX` wird zur Untergrenze (statt fixer Breite). Das Panel waechst mit
   // dem Inhalt (`w-max`), bis `max-w-*` cap erreicht. Verhindert dass lange
   // Texte in lokalisierten Labels den Panel-Rand ueberschreiten. Der
@@ -127,8 +127,14 @@ export function ThemedDropdown({
         <div className="fixed inset-0 z-[1000]" onClick={onClose} />
         <div
           ref={panelRef}
-          style={{ ...panelStyle, position: "fixed", top: pos.top, left: pos.left }}
-          className={`w-max ${maxWidth} rounded-md border shadow-2xl z-[1001] py-1 ${scrollClass} ${className}`}
+          style={{
+            ...panelStyle,
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            ...(pos.width ? { minWidth: pos.width, width: pos.width } : {}),
+          }}
+          className={`glass-panel ${pos.width ? "" : `w-max ${maxWidth}`} rounded-md border shadow-2xl z-[1001] py-1 ${scrollClass} ${className}`}
         >
           {children}
         </div>
@@ -144,7 +150,7 @@ export function ThemedDropdown({
       <div className="fixed inset-0 z-10" onClick={onClose} />
       <div
         style={panelStyle}
-        className={`absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}
+        className={`glass-panel absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}
       >
         {children}
       </div>
@@ -212,7 +218,7 @@ export function ThemedDropdownItem({
         if (selected || disabled) return;
         e.currentTarget.style.backgroundColor = "transparent";
       }}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft-ten text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
+      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft text-left transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${toneText}`}
     >
       {icon && <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />}
       <span className="flex-1 min-w-0">{children}</span>
@@ -227,7 +233,7 @@ export const ThemedDropdownDivider: React.FC = () => (
 );
 
 export const ThemedDropdownHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft-ten border-b border-white/10">
+  <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] text-white/40 font-minecraft border-b border-white/10">
     {children}
   </div>
 );

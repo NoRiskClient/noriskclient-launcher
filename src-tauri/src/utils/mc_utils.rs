@@ -1,7 +1,8 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::AssetIndex;
-use crate::state::event_state::{EventPayload, EventType};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
 use async_compression::tokio::bufread::GzipDecoder;
 // Import the Engine trait for encode/decode methods
@@ -13,16 +14,15 @@ use log::{debug, error, info, warn};
 use serde::Deserialize;
 use serde::Serialize; // Added Serialize directly
                       // To represent NBT Compound
-use futures::future::{join_all, try_join_all};
+use futures::future::try_join_all;
 use std::env;
-use std::io::{Cursor, Read}; // Needed for reading NBT from bytes and decompression
+use std::io::Cursor;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::{AsyncReadExt as _, BufReader};
-use tokio::sync::Semaphore;
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::TokioAsyncResolver;
 use uuid::Uuid;
@@ -35,8 +35,8 @@ use crate::minecraft::dto::minecraft_profile::{
 use crate::minecraft::dto::skin_payloads::{
     SkinModelVariant, SkinSource,
 }; // Added imports for SkinSource and related types
+use crate::utils::hash_utils::calculate_sha1_from_bytes;
 use crate::utils::path_utils;
-use base64::{decode as base64_decode_str, encode as base64_encode_bytes};
 
 // --- End New Helper Imports ---
 
@@ -152,12 +152,6 @@ pub fn get_default_minecraft_dir() -> PathBuf {
             None => PathBuf::new(),
         }
     }
-}
-
-/// Checks if standard Minecraft assets can be reused and copies them if possible
-/// Returns Ok(true) if assets were copied, Ok(false) if they weren't
-pub async fn try_reuse_minecraft_assets(asset_index: &AssetIndex) -> Result<bool> {
-    try_reuse_minecraft_assets_with_progress(asset_index, Uuid::nil()).await
 }
 
 /// Version of try_reuse_minecraft_assets that reports progress events
@@ -416,8 +410,7 @@ pub async fn try_reuse_minecraft_assets_with_progress(
         let progress_counter = Arc::new(AtomicUsize::new(0));
         let total_count = objects.len();
 
-        // Batch size for progress updates - update every 5% or 100 files, whichever is smaller
-        let update_batch = (total_count / 20).max(1).min(100);
+        let progress_throttle = ProgressThrottle::new(100);
 
         for (asset_name, object) in objects {
             if let (Some(hash), Some(size)) = (
@@ -459,22 +452,23 @@ pub async fn try_reuse_minecraft_assets_with_progress(
                                 // Update progress counter
                                 let progress = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
-                                // Report progress periodically
-                                if let Some(state_ref) = &state {
-                                    let percent_complete = progress as f64 / total_count as f64;
-                                    let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
+                                                if let Some(state_ref) = &state {
+                                    if progress_throttle.should_emit() {
+                                        let percent_complete = progress as f64 / total_count as f64;
+                                        let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
 
-                                    emit_reuse_progress(
-                                        state_ref,
-                                        profile_id,
-                                        &format!(
-                                            "Reusing Minecraft assets: {}/{} files processed",
-                                            progress, total_count
-                                        ),
-                                        scaled_progress,
-                                        None,
-                                    )
-                                    .await?;
+                                        emit_reuse_progress(
+                                            state_ref,
+                                            profile_id,
+                                            &format!(
+                                                "Reusing Minecraft assets: {}/{} files processed",
+                                                progress, total_count
+                                            ),
+                                            scaled_progress,
+                                            None,
+                                        )
+                                        .await?;
+                                    }
                                 }
 
                                 continue;
@@ -512,22 +506,23 @@ pub async fn try_reuse_minecraft_assets_with_progress(
                 // Update progress counter
                 let progress = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
-                // Report progress periodically
                 if let Some(state_ref) = &state {
-                    let percent_complete = progress as f64 / total_count as f64;
-                    let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
+                    if progress_throttle.should_emit() {
+                        let percent_complete = progress as f64 / total_count as f64;
+                        let scaled_progress = 0.2 + (percent_complete * 0.7); // Scale from 20% to 90%
 
-                    emit_reuse_progress(
-                        state_ref,
-                        profile_id,
-                        &format!(
-                            "Reusing Minecraft assets: {}/{} files processed",
-                            progress, total_count
-                        ),
-                        scaled_progress,
-                        None,
-                    )
-                    .await?;
+                        emit_reuse_progress(
+                            state_ref,
+                            profile_id,
+                            &format!(
+                                "Reusing Minecraft assets: {}/{} files processed",
+                                progress, total_count
+                            ),
+                            scaled_progress,
+                            None,
+                        )
+                        .await?;
+                    }
                 }
             }
         }
@@ -1650,32 +1645,116 @@ pub async fn ping_server_status(address: &str) -> ServerPingInfo {
 // --- Helper functions for add_skin_locally command ---
 
 /// Downloads an image from a URL and encodes it as a Base64 string.
-pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
-    debug!("[MC Utils] Fetching image from URL: {}", url);
-    // Use the global HTTP_CLIENT from config.rs
+async fn download_bytes(url: &str) -> Result<Vec<u8>> {
     let response = crate::config::HTTP_CLIENT
         .get(url)
         .send()
         .await
         .map_err(|e| {
             error!("[MC Utils] Request to {} failed: {}", url, e);
-            AppError::MinecraftApi(e) // Or a more specific error type if suitable
+            AppError::MinecraftApi(e)
         })?;
 
     if !response.status().is_success() {
         error!(
-            "[MC Utils] Failed to download image from {}. Status: {}",
+            "[MC Utils] Failed to download from {}. Status: {}",
             url,
             response.status()
         );
         return Err(AppError::Other(format!(
-            "Failed to download image from URL {}: {}",
+            "Failed to download from URL {}: {}",
             url,
             response.status()
         )));
     }
-    let bytes = response.bytes().await.map_err(AppError::MinecraftApi)?;
-    Ok(base64_encode_bytes(&bytes))
+    Ok(response.bytes().await.map_err(AppError::MinecraftApi)?.to_vec())
+}
+
+pub async fn fetch_image_as_base64(url: &str) -> Result<String> {
+    debug!("[MC Utils] Fetching image from URL: {}", url);
+    Ok(BASE64.encode(&download_bytes(url).await?))
+}
+
+pub fn normalize_uuid(uuid: &str) -> String {
+    uuid.replace('-', "").to_lowercase()
+}
+
+pub fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let suffix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = path.with_extension(format!("{}.tmp", suffix));
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e
+    })
+}
+
+fn vanilla_skin_cache_path(skin_url: &str) -> Option<PathBuf> {
+    let texture_hash = skin_url.rsplit('/').next()?;
+    if texture_hash.is_empty() {
+        return None;
+    }
+    let utf16le: Vec<u8> = texture_hash.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+    let name = calculate_sha1_from_bytes(&utf16le);
+    if name.len() < 2 {
+        return None;
+    }
+    Some(
+        LAUNCHER_DIRECTORY
+            .meta_dir()
+            .join("assets")
+            .join("skins")
+            .join(&name[0..2])
+            .join(&name),
+    )
+}
+
+pub fn local_cached_skin_base64(skin_url: &str) -> Option<String> {
+    let path = vanilla_skin_cache_path(skin_url)?;
+    let bytes = std::fs::read(&path).ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    Some(BASE64.encode(&bytes))
+}
+
+fn write_vanilla_skin_cache(skin_url: &str, bytes: &[u8]) {
+    if bytes.len() < 8 || &bytes[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return;
+    }
+    let path = match vanilla_skin_cache_path(skin_url) {
+        Some(p) => p,
+        None => return,
+    };
+    if path.exists() {
+        return;
+    }
+    let _ = atomic_write(&path, bytes);
+}
+
+pub async fn fetch_skin_base64(skin_url: &str) -> Result<String> {
+    if let Some(local) = local_cached_skin_base64(skin_url) {
+        debug!("[MC Utils] Vanilla skin cache hit for {}", skin_url);
+        return Ok(local);
+    }
+    let bytes = download_bytes(skin_url).await?;
+    write_vanilla_skin_cache(skin_url, &bytes);
+    Ok(BASE64.encode(&bytes))
+}
+
+pub async fn fetch_skin_base64_for_uuid(uuid: &str) -> Result<(String, SkinModelVariant)> {
+    use crate::minecraft::api::mc_api::MinecraftApiService;
+    let lookup = normalize_uuid(uuid);
+    let profile = MinecraftApiService::new().get_user_profile(&lookup).await?;
+    let (skin_url, variant, _name) = extract_skin_info_from_profile(&profile)?;
+    let base64 = fetch_skin_base64(&skin_url).await?;
+    Ok((base64, variant))
 }
 
 /// Extracts skin URL, variant, and profile name from a MinecraftProfile.
@@ -1698,7 +1777,7 @@ pub fn extract_skin_info_from_profile(
             AppError::Other("Textures property not found in profile".to_string())
         })?;
 
-    let decoded_textures_value = base64_decode_str(&textures_prop.value).map_err(|e| {
+    let decoded_textures_value = BASE64.decode(&textures_prop.value).map_err(|e| {
         error!(
             "[MC Utils] Failed to decode textures base64 for profile {}: {}",
             profile.name, e
@@ -1723,10 +1802,10 @@ pub fn extract_skin_info_from_profile(
         AppError::Other(format!("Failed to parse textures JSON: {}", e))
     })?;
 
-    // Access textures.SKIN correctly
+    // Access textures.skin correctly
     let skin_texture_info = textures_data
         .textures // This is TexturesDictionary
-        .SKIN // This is Option<TextureInfo>
+        .skin // This is Option<TextureInfo>
         .ok_or_else(|| {
             error!(
                 "[MC Utils] SKIN texture info not found for profile {}",
@@ -1817,7 +1896,7 @@ pub async fn get_base64_from_skin_source(source: &SkinSource) -> Result<String> 
                 );
                 AppError::Io(e)
             })?;
-            Ok(base64_encode_bytes(&file_content))
+            Ok(BASE64.encode(&file_content))
         }
         SkinSource::Base64(base64_content_data) => {
             debug!("[MC Utils] Processing Base64 source");

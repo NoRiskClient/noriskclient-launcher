@@ -193,7 +193,7 @@ pub async fn find_all_links(directory: &Path) -> Result<Vec<SymlinkInfo>> {
             let is_link = is_symlink(&path).await.unwrap_or(false);
             
             // Skip hardlink detection for now (too complex/unstable to detect reliably)
-            let is_hardlink = false;
+            let _is_hardlink = false;
             
             if is_link {
                 // Read the link target

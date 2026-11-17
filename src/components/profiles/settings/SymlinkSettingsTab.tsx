@@ -18,6 +18,7 @@ import {
   removeProfileSymlink,
   getProfileSymlinks, getDefaultProfilePath
 } from "../../../services/profile-service";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface SymlinkSettingsTabProps {
   editedProfile: Profile;
@@ -52,7 +53,7 @@ export function SymlinkSettingsTab({
       const links = await getProfileSymlinks(editedProfile.id);
       setSymlinks(links);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to load symlinks for profile ${editedProfile.id}: ${errorMessage}`);
       console.error("Failed to load symlinks:", error);
       toast.error(t('symlinks.load_failed'));
@@ -145,7 +146,7 @@ export function SymlinkSettingsTab({
       toast.success(t('symlinks.created_success', { target: targetPath, external: externalPath }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error: any) {
-      const errorMessage = error?.message || String(error);
+      const errorMessage = error?.message || parseErrorMessage(error);
       logError(`Symlink creation failed for profile ${editedProfile.id}: ${errorMessage}. Target: ${targetPath}, External: ${externalPath}`);
       console.error("Symlink creation failed:", error);
       
@@ -179,7 +180,7 @@ export function SymlinkSettingsTab({
       toast.success(t('symlinks.removed_success', { path }));
       await loadSymlinks(); // Reload symlinks from filesystem
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to remove symlink for profile ${editedProfile.id}: ${errorMessage}. Path: ${path}`);
       toast.error(t('symlinks.remove_failed', { error: errorMessage }));
     }
@@ -202,7 +203,7 @@ export function SymlinkSettingsTab({
       
       await openPath(fullPath);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error.message);
+      const errorMessage = parseErrorMessage(error);
       logError(`Failed to open internal path for profile ${editedProfile.id}: ${errorMessage}. Path: ${relativePath}`);
       console.error("Failed to open internal path:", error);
       toast.error(t('symlinks.open_path_failed', { error: errorMessage }));
@@ -214,8 +215,8 @@ export function SymlinkSettingsTab({
       <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
         <Icon icon="solar:lock-bold" className="w-16 h-16 text-white/40" />
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">{t('symlinks.profile_running')}</h3>
-          <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none">
+          <h3 className="text-lg font-smallcaps text-white mb-2">{t('symlinks.profile_running')}</h3>
+          <p className="text-xs text-white/70 font-minecraft tracking-wide select-none">
             {t('symlinks.stop_profile_to_manage')}
           </p>
         </div>
@@ -228,20 +229,20 @@ export function SymlinkSettingsTab({
       {confirmDialog}
       <div className="space-y-6 overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <h3 className="text-3xl font-minecraft text-white mb-2 lowercase">{t('symlinks.title')}</h3>
-        <p className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none">
+        <h3 className="text-lg font-smallcaps text-white mb-2">{t('symlinks.title')}</h3>
+        <p className="text-xs text-white/70 font-minecraft tracking-wide select-none">
           {t('symlinks.description')}
         </p>
       </div>
 
       {/* Existing Symlinks */}
       <div className="overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('symlinks.active_symlinks')}</h4>
+        <h4 className="text-lg font-smallcaps text-white mb-3">{t('symlinks.active_symlinks')}</h4>
         <div className="space-y-2 overflow-x-hidden" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {loading ? (
-            <p className="text-white/50 text-sm font-minecraft-ten">{t('symlinks.loading')}</p>
+            <p className="text-white/50 text-sm font-minecraft">{t('symlinks.loading')}</p>
           ) : symlinks.length === 0 ? (
-            <p className="text-white/50 text-sm font-minecraft-ten">{t('symlinks.no_symlinks')}</p>
+            <p className="text-white/50 text-sm font-minecraft">{t('symlinks.no_symlinks')}</p>
           ) : (
             symlinks.map((symlink) => (
               <div
@@ -261,7 +262,7 @@ export function SymlinkSettingsTab({
                       className="w-5 h-5 text-accent flex-shrink-0" 
                     />
                     <span 
-                      className="text-white text-base font-medium truncate font-minecraft-ten min-w-0 flex-1"
+                      className="text-white text-base font-medium truncate font-minecraft min-w-0 flex-1"
                       style={{ 
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -272,7 +273,7 @@ export function SymlinkSettingsTab({
                     >
                       {symlink.link_path}
                     </span>
-                    <span className="text-xs text-white/40 font-minecraft-ten flex-shrink-0 whitespace-nowrap">
+                    <span className="text-xs text-white/40 font-minecraft flex-shrink-0 whitespace-nowrap">
                       ({symlink.link_type})
                     </span>
                   </div>
@@ -319,7 +320,7 @@ export function SymlinkSettingsTab({
 
       {/* Add New Symlink */}
       <div>
-        <h4 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('symlink.add_new')}</h4>
+        <h4 className="text-lg font-smallcaps text-white mb-3">{t('symlink.add_new')}</h4>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Button
@@ -350,7 +351,7 @@ export function SymlinkSettingsTab({
           <div className="p-4 bg-white/5 rounded border border-white/10">
             <div className="flex items-start gap-3">
               <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-white/70 font-minecraft-ten tracking-wide select-none space-y-2">
+              <div className="text-xs text-white/70 font-minecraft tracking-wide select-none space-y-2">
                 <p className="text-white">{t('symlinks.how_it_works')}</p>
                 <ol className="list-decimal list-inside space-y-1 text-white/60">
                   <li>{t('symlinks.step_1')}</li>

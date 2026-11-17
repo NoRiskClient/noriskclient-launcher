@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "applixir",
+  "description": "Minimal capability for the Applixir ad window",
+  "windows": ["applixir_window"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
+}

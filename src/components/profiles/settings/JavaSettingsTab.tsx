@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { Profile } from "../../../types/profile";
@@ -17,11 +15,13 @@ import { cn } from "../../../lib/utils";
 import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalCustomJvmArgs, setGlobalCustomJvmArgs } from "../../../services/launcher-config-service";
 import type { MemorySettings } from "../../../types/launcherConfig";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface JavaSettingsTabProps {
   editedProfile: Profile;
   updateProfile: (updates: Partial<Profile>) => void;
   systemRam: number;
+  recommendedRam: number;
   tempRamMb: number;
   setTempRamMb: (value: number) => void;
 }
@@ -39,6 +39,7 @@ export function JavaSettingsTab({
   editedProfile,
   updateProfile,
   systemRam,
+  recommendedRam,
   tempRamMb,
   setTempRamMb,
 }: JavaSettingsTabProps) {
@@ -63,19 +64,10 @@ export function JavaSettingsTab({
     JavaInstallation[]
   >([]);
   const [isDetectingJava, setIsDetectingJava] = useState(false);
-  const [javaDetectionError, setJavaDetectionError] = useState<string | null>(
-    null,
-  );
   const [customJavaPathInput, setCustomJavaPathInput] = useState(
     editedProfile.settings?.java_path || "",
   );
   const [isValidatingJavaPath, setIsValidatingJavaPath] = useState(false);
-  const [validationResult, setValidationResult] = useState<
-    "valid" | "invalid" | "error" | null
-  >(null);
-  const [validationMessage, setValidationMessage] = useState<string | null>(
-    null,
-  );
   
   // Global memory settings for standard profiles
   const [globalMemorySettings, setGlobalMemorySettingsState] = useState<MemorySettings | null>(null);
@@ -122,9 +114,6 @@ export function JavaSettingsTab({
 
   const detectJavaInstallations = async () => {
     setIsDetectingJava(true);
-    setJavaDetectionError(null);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const installations: JavaInstallation[] = await invoke(
         "detect_java_installations_command",
@@ -147,8 +136,7 @@ export function JavaSettingsTab({
     } catch (error) {
       console.error("Error detecting Java installations:", error);
       const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      setJavaDetectionError(errorMessage); // Store for internal reference if needed
+        parseErrorMessage(error);
       toast.error(t('java.detect_failed', { error: errorMessage }));
       setDetectedJavaInstallations([]);
     } finally {
@@ -239,14 +227,11 @@ export function JavaSettingsTab({
       return;
     }
     setIsValidatingJavaPath(true);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const isValid: boolean = await invoke("validate_java_path_command", {
         path: currentPath,
       });
       if (isValid) {
-        setValidationResult("valid");
         toast.success(t('java.path_valid'));
         updateProfile({
           settings: {
@@ -256,27 +241,20 @@ export function JavaSettingsTab({
           },
         });
       } else {
-        setValidationResult("invalid");
         toast.error(t('java.path_invalid'));
       }
     } catch (error: any) {
       console.error(`Error validating Java path ${currentPath}:`, error);
-      setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
         ? t('java.path_not_exist')
-        : error?.message || String(error);
+        : error?.message || parseErrorMessage(error);
       toast.error(t('java.validation_error', { error: message }));
     } finally {
       setIsValidatingJavaPath(false);
     }
   };
 
-  let recommendedMaxRam;
-  if (systemRam <= 8192) {
-    recommendedMaxRam = Math.min(2048, systemRam);
-  } else {
-    recommendedMaxRam = Math.min(4096, systemRam);
-  }
+  const recommendedMaxRam = Math.min(recommendedRam, systemRam);
   
   // Use global memory settings for standard profiles, profile settings for custom profiles
   const memory = editedProfile.is_standard_version
@@ -315,7 +293,6 @@ export function JavaSettingsTab({
 
   const handleJavaPathInputChange = (newPath: string) => {
     setCustomJavaPathInput(newPath);
-    setValidationResult(null);
   };
 
   const handleDetectedJavaListItemClick = (installation: JavaInstallation) => {
@@ -357,7 +334,6 @@ export function JavaSettingsTab({
       updateProfile({
         settings: { ...editedProfile.settings, use_custom_java_path: false },
       });
-      setValidationResult(null);
     }
   };
 
@@ -422,7 +398,7 @@ export function JavaSettingsTab({
     <div ref={tabRef} className="space-y-6 select-none">
       <div ref={memoryRef} className="space-y-4">
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+          <h3 className="text-lg font-smallcaps text-white mb-3">
             {editedProfile.is_standard_version ? t('profiles.settings.globalMemoryAllocated') : t('profiles.settings.memoryAllocated')}
           </h3>
           <Card
@@ -431,8 +407,8 @@ export function JavaSettingsTab({
           >
             {(editedProfile.is_standard_version && (isLoadingGlobalMemory || !globalMemorySettings)) || !isSystemRamLoaded ? (
               <div className="flex items-center justify-center py-8">
-                <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
-                <span className="text-white font-minecraft">
+                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
+                <span className="text-white font-smallcaps">
                   {t('profiles.settings.loadingSettings')}
                 </span>
               </div>
@@ -457,11 +433,11 @@ export function JavaSettingsTab({
                   recommendedRange={[4096, 8192]}
                   unit="MB"
                 />
-                <div className="mt-3 text-xs text-white/70 tracking-wide font-minecraft-ten">
+                <div className="mt-3 text-xs text-white/70 tracking-wide font-minecraft">
                   {t('profiles.settings.recommended')}: {recommendedMaxRam} MB (
                   {(recommendedMaxRam / 1024).toFixed(1)} GB)
                   {editedProfile.is_standard_version && (
-                    <div className="mt-1 text-accent font-minecraft-ten">
+                    <div className="mt-1 text-accent font-minecraft">
                       {t('profiles.settings.appliesToAllStandard')}
                     </div>
                   )}
@@ -480,17 +456,17 @@ export function JavaSettingsTab({
               checked={useCustomJava}
               onChange={(e) => handleCustomJavaToggle(e.target.checked)}
               label={t('profiles.settings.customJavaInstallation')}
-              className="text-2xl"
+              className="text-base"
               variant="flat"
             />
           </div>
 
           {!useCustomJava && (
             <div className="mt-3">
-              <div className="text-2xl text-white font-minecraft mb-2 lowercase tracking-wide select-none">
+              <div className="text-base text-white font-smallcaps mb-2 tracking-wide select-none">
                 {t('profiles.settings.usingDefaultJava')}
               </div>
-              <div className="text-xs text-white/70 font-minecraft-ten break-all lowercase tracking-wide select-none">
+              <div className="text-xs text-white/70 font-minecraft break-all lowercase tracking-wide select-none">
                 {t('profiles.settings.defaultJavaDescription')}
               </div>
             </div>
@@ -499,10 +475,10 @@ export function JavaSettingsTab({
           {useCustomJava && (
             <div className="mt-3 space-y-4">
               {isDetectingJava && (
-                <div className="flex items-center text-white/70 font-minecraft">
+                <div className="flex items-center text-white/70 font-smallcaps">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-5 h-5 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-5 h-5 mr-2"
                   />
                   <span>{t('profiles.settings.detectingJava')}</span>
                 </div>
@@ -511,7 +487,7 @@ export function JavaSettingsTab({
               <div>
                 <label
                   htmlFor="custom-java-path-input"
-                  className="block text-xs text-white/70 font-minecraft-ten mt-3 mb-2 tracking-wide"
+                  className="block text-xs text-white/70 font-minecraft mt-3 mb-2 tracking-wide"
                 >
                   {t('profiles.settings.manualJavaPath')}
                 </label>
@@ -521,7 +497,7 @@ export function JavaSettingsTab({
                     value={customJavaPathInput}
                     onChange={(e) => handleJavaPathInputChange(e.target.value)}
                     placeholder={t('placeholders.java_path')}
-                    className="flex-1 text-2xl py-3"
+                    className="flex-1 text-base py-3"
                     variant="flat"
                   />
                   <Button
@@ -535,7 +511,7 @@ export function JavaSettingsTab({
                         className="w-5 h-5 text-white"
                       />
                     }
-                    className="text-2xl"
+                    className="text-base"
                     aria-label={t('profiles.settings.browse_java')}
                   >
                     {t('profiles.settings.browse')}
@@ -545,7 +521,7 @@ export function JavaSettingsTab({
 
               {detectedJavaInstallations.length > 0 && !isDetectingJava && (
                 <div className="space-y-2 pt-2">
-                  <h4 className="text-xs text-white/70 font-minecraft-ten mb-2 tracking-wide">
+                  <h4 className="text-xs text-white/70 font-minecraft mb-2 tracking-wide">
                     {t('profiles.settings.detectedJavaInstallations')}
                   </h4>
                   <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 p-2 bg-black/10 rounded-lg">
@@ -555,7 +531,7 @@ export function JavaSettingsTab({
                         onClick={() => handleDetectedJavaListItemClick(java)}
                         title={java.path}
                         className={cn(
-                          "w-full text-left p-2 border transition-all duration-150 font-minecraft-ten text-xs rounded-md",
+                          "w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
                           customJavaPathInput === java.path
                             ? "bg-accent/30 border-accent text-white"
                             : "bg-black/20 border-white/10 hover:bg-black/30 hover:border-white/20 text-white/80",
@@ -570,7 +546,7 @@ export function JavaSettingsTab({
                         }
                       >
                         <span className="block truncate">{java.path}</span>
-                        <span className="block text-xs opacity-70 font-minecraft-ten truncate">
+                        <span className="block text-xs opacity-70 font-minecraft truncate">
                           (v{java.major_version} - {java.vendor} -{" "}
                           {java.architecture})
                         </span>
@@ -588,14 +564,14 @@ export function JavaSettingsTab({
                 icon={
                   isValidatingJavaPath ? (
                     <Icon
-                      icon="solar:refresh-bold"
-                      className="w-5 h-5 animate-spin"
+                      icon="svg-spinners:ring-resize"
+                      className="w-5 h-5"
                     />
                   ) : (
                     <Icon icon="solar:test-tube-bold" className="w-5 h-5" />
                   )
                 }
-                className="text-2xl mt-2 w-full sm:w-auto"
+                className="text-base mt-2 w-full sm:w-auto"
               >
                 {isValidatingJavaPath ? t('profiles.settings.testing') : t('profiles.settings.testAndUsePath')}
               </Button>
@@ -612,7 +588,7 @@ export function JavaSettingsTab({
             checked={useCustomArgs}
             onChange={(e) => handleCustomArgsToggle(e.target.checked)}
             label={editedProfile.is_standard_version ? t('profiles.settings.globalCustomJavaArgs') : t('profiles.settings.customJavaArgs')}
-            className="text-2xl"
+            className="text-base"
             variant="flat"
             disabled={editedProfile.is_standard_version && isLoadingGlobalJvmArgs}
           />
@@ -622,8 +598,8 @@ export function JavaSettingsTab({
           <div className="custom-args-textarea">
             {editedProfile.is_standard_version && isLoadingGlobalJvmArgs ? (
               <div className="flex items-center justify-center py-8">
-                <Icon icon="solar:refresh-bold" className="w-6 h-6 animate-spin text-white mr-3" />
-                <span className="text-white font-minecraft">{t('profiles.settings.loadingSettings')}</span>
+                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
+                <span className="text-white font-smallcaps">{t('profiles.settings.loadingSettings')}</span>
               </div>
             ) : (
               <>
@@ -635,7 +611,7 @@ export function JavaSettingsTab({
                   placeholder={t('profiles.settings.enterJavaArgs')}
                   minHeight="100px"
                 />
-                <p className="mt-2 text-xs text-white/50 font-minecraft-ten tracking-wide">
+                <p className="mt-2 text-xs text-white/50 font-minecraft tracking-wide">
                   {t('profiles.settings.javaArgsHint')}
                   {editedProfile.is_standard_version && (
                     <span className="block mt-1 text-accent">

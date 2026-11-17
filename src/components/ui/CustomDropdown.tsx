@@ -1,8 +1,7 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
+import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
 
 export interface DropdownOption {
   value: string;
@@ -57,7 +56,7 @@ export function CustomDropdown({
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Label above (only if provided) */}
       {label && (
-        <label className="block text-white font-minecraft text-3xl lowercase mb-2">
+        <label className="block text-white font-smallcaps text-lg mb-2">
           {label}
         </label>
       )}
@@ -67,10 +66,10 @@ export function CustomDropdown({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 transition-all duration-200 focus:outline-none focus:ring-0 focus:border-transparent ${
           variant === 'search'
-            ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
+            ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
             : label
-            ? `w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
-            : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft-ten ${isSm ? 'text-sm' : 'text-xl'}`
+            ? `w-full justify-between bg-transparent rounded-md px-2 py-1 border border-white/10 hover:border-white/20 bg-black/50 hover:bg-black/60 px-4 py-3 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
+            : `bg-transparent rounded-md px-2 py-1 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
         }`}
         style={{
           boxShadow: isOpen ? `0 0 0 1px ${accentColor.value}40` : 'none',
@@ -111,20 +110,18 @@ export function CustomDropdown({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full mt-2 bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden ${
+        <div className={`absolute top-full mt-2 ${MENU_PANEL_CLASSES} ${
           variant === 'search' ? 'left-0 right-0' : label ? 'left-0 right-0' : 'left-0 w-56'
         }`}>
           <div className="py-2">
             {options.map((option, index) => (
               <div key={option.value}>
                 {option.separator && index > 0 && (
-                  <div className={`border-t border-white/10 ${isSm ? 'my-1 mx-2' : 'my-1.5 mx-3'}`} />
+                  <div className={menuSeparatorClasses(isSm)} />
                 )}
                 <button
                   onClick={() => handleOptionClick(option.value)}
-                  className={`w-full flex items-center gap-2.5 text-left font-minecraft-ten transition-colors duration-150 ${
-                    isSm ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-3 text-base'
-                  } ${
+                  className={`${menuItemClasses(isSm)} ${
                     option.value === value
                       ? 'bg-white/10 text-white'
                       : 'text-white/80 hover:bg-white/5 hover:text-white'

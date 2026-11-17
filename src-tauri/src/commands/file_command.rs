@@ -15,14 +15,13 @@ use tokio::fs;
 // Imports for image processing
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{
-    CpuExtensions, FilterType, ImageView as FirImageViewTrait, IntoImageView,
+    FilterType,
     PixelType as FirPixelType, ResizeAlg, Resizer,
 };
 use image::{
     codecs::{jpeg::JpegEncoder, png::PngEncoder},
     ColorType,
     DynamicImage,
-    GenericImageView, // For getting dimensions from DynamicImage
     ImageFormat,
 };
 use std::io::Cursor; // For writing encoded image to a byte vector
@@ -629,7 +628,7 @@ pub async fn get_image_preview(
     // Select resize algorithm - Lanczos3 offers good quality
     // For higher performance with slightly less quality, one could use Bilinear or even Box.
     // E.g., ResizeAlg::Bilinear or ResizeAlg::Convolution(FilterType::Box)
-    let algorithm = ResizeAlg::Convolution(FilterType::Lanczos3);
+    let _algorithm = ResizeAlg::Convolution(FilterType::Lanczos3);
 
     let resize_options = fast_image_resize::ResizeOptions::default(); // Create an owned instance
     match resizer.resize(&src_fir_view, &mut dst_fir_image, Some(&resize_options)) {

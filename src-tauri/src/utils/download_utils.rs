@@ -1,11 +1,14 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::hash_utils;
+use crate::utils::verified_files;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use futures::stream::StreamExt;
-use log::{debug, error, info, warn};
+use log::{debug, error, trace, warn};
 use reqwest::Response;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use crate::utils::string_utils::safe_truncate;
@@ -32,6 +35,8 @@ pub struct DownloadConfig {
     pub check_disk_space: bool,
     /// Buffer percentage for disk space check (default: 0.25 = 25%)
     pub disk_space_buffer: f64,
+    pub hash_existing_files: bool,
+    pub stats: Option<Arc<DownloadStats>>,
 }
 
 impl std::fmt::Debug for DownloadConfig {
@@ -47,6 +52,8 @@ impl std::fmt::Debug for DownloadConfig {
             .field("progress_callback", &"<callback function>")
             .field("check_disk_space", &self.check_disk_space)
             .field("disk_space_buffer", &self.disk_space_buffer)
+            .field("hash_existing_files", &self.hash_existing_files)
+            .field("stats", &self.stats.is_some())
             .finish()
     }
 }
@@ -66,6 +73,8 @@ impl Clone for DownloadConfig {
             progress_callback: None,
             check_disk_space: self.check_disk_space,
             disk_space_buffer: self.disk_space_buffer,
+            hash_existing_files: self.hash_existing_files,
+            stats: self.stats.clone(),
         }
     }
 }
@@ -79,13 +88,12 @@ impl Default for DownloadConfig {
             use_streaming: true,
             force_overwrite: false,
             max_retries: 3,
-            user_agent: Some(format!(
-                "NoRiskClient-Launcher/{} (support@norisk.gg)",
-                env!("CARGO_PKG_VERSION")
-            )),
+            user_agent: None,
             progress_callback: None,
             check_disk_space: true,
             disk_space_buffer: 0.25, // 25% buffer by default
+            hash_existing_files: true,
+            stats: None,
         }
     }
 }
@@ -125,11 +133,6 @@ impl DownloadConfig {
         self
     }
 
-    pub fn with_user_agent<S: Into<String>>(mut self, user_agent: S) -> Self {
-        self.user_agent = Some(user_agent.into());
-        self
-    }
-
     pub fn with_progress_callback<F>(mut self, callback: F) -> Self
     where
         F: Fn(u64, Option<u64>) + Send + Sync + 'static,
@@ -143,8 +146,13 @@ impl DownloadConfig {
         self
     }
 
-    pub fn with_disk_space_buffer(mut self, buffer_percentage: f64) -> Self {
-        self.disk_space_buffer = buffer_percentage;
+    pub fn with_hash_existing_files(mut self, hash_existing: bool) -> Self {
+        self.hash_existing_files = hash_existing;
+        self
+    }
+
+    pub fn with_stats(mut self, stats: Option<Arc<DownloadStats>>) -> Self {
+        self.stats = stats;
         self
     }
 }
@@ -160,11 +168,14 @@ impl DownloadUtils {
         config: DownloadConfig,
     ) -> Result<()> {
         let target_path = target_path.as_ref();
-        debug!("Starting download: {} -> {:?}", url, target_path);
+        trace!("Starting download: {} -> {:?}", url, target_path);
 
         // Check if file already exists and is valid
         if !config.force_overwrite && Self::verify_existing_file(target_path, &config).await? {
-            info!("File already exists and passes verification: {:?}", target_path);
+            trace!("File already exists and passes verification: {:?}", target_path);
+            if let Some(stats) = &config.stats {
+                stats.record_cached();
+            }
             return Ok(());
         }
 
@@ -193,7 +204,11 @@ impl DownloadUtils {
 
             match Self::download_attempt(url, target_path, &config).await {
                 Ok(()) => {
-                    info!("Successfully downloaded: {} -> {:?}", url, target_path);
+                    debug!("Successfully downloaded: {} -> {:?}", url, target_path);
+                    if let Some(stats) = &config.stats {
+                        let bytes = fs::metadata(target_path).await.map(|m| m.len()).unwrap_or(0);
+                        stats.record_downloaded(bytes);
+                    }
                     return Ok(());
                 }
                 Err(e) => {
@@ -211,7 +226,7 @@ impl DownloadUtils {
                         }
                         
                         if attempt < config.max_retries {
-                            info!("Retrying download in next attempt...");
+                            trace!("Retrying download in next attempt...");
                         }
                     }
                 }
@@ -226,7 +241,10 @@ impl DownloadUtils {
             "Download failed after {} attempts for {}: {}", 
             config.max_retries + 1, url, final_error
         );
-        
+        if let Some(stats) = &config.stats {
+            stats.record_failed();
+        }
+
         Err(final_error)
     }
 
@@ -245,14 +263,20 @@ impl DownloadUtils {
         Self::download_file(url, target_path, config).await
     }
 
-    /// Download with size verification
-    pub async fn download_with_size<P: AsRef<Path>>(
-        url: &str,
-        target_path: P,
-        expected_size: u64,
-    ) -> Result<()> {
-        let config = DownloadConfig::default().with_size(expected_size);
-        Self::download_file(url, target_path, config).await
+    /// Best-effort Maven `.sha1` sidecar fetch; None on any failure (caller falls back to ZIP heuristic).
+    pub async fn try_fetch_sha1_sidecar(file_url: &str) -> Option<String> {
+        let sha1_url = format!("{}.sha1", file_url);
+        let resp = HTTP_CLIENT.get(&sha1_url).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let text = resp.text().await.ok()?;
+        let hash = text.split_whitespace().next()?.trim().to_string();
+        if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            Some(hash)
+        } else {
+            None
+        }
     }
 
     /// Single download attempt
@@ -322,7 +346,7 @@ impl DownloadUtils {
         config: &DownloadConfig,
         content_length: Option<u64>,
     ) -> Result<()> {
-        debug!("Creating file for streaming download: {:?}", target_path);
+        trace!("Creating file for streaming download: {:?}", target_path);
         let mut file = fs::File::create(target_path).await.map_err(|e| {
             let error_msg = format!("Failed to create file {:?}: {}", target_path, e);
             error!("{}", error_msg);
@@ -333,7 +357,7 @@ impl DownloadUtils {
         let mut downloaded = 0u64;
         let mut chunk_count = 0u64;
 
-        debug!("Starting streaming download (content_length: {:?})", content_length);
+        trace!("Starting streaming download (content_length: {:?})", content_length);
         
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result.map_err(|e| {
@@ -353,7 +377,7 @@ impl DownloadUtils {
 
             // Log progress every 1000 chunks or every 10MB for large downloads
             if chunk_count % 1000 == 0 || downloaded % (10 * 1024 * 1024) == 0 {
-                debug!("Downloaded {} bytes in {} chunks", downloaded, chunk_count);
+                trace!("Downloaded {} bytes in {} chunks", downloaded, chunk_count);
             }
 
             // Call progress callback if provided
@@ -362,7 +386,7 @@ impl DownloadUtils {
             }
         }
 
-        debug!("Completed streaming download: {} bytes in {} chunks", downloaded, chunk_count);
+        trace!("Completed streaming download: {} bytes in {} chunks", downloaded, chunk_count);
 
         // Ensure file is fully written to disk - CRITICAL for preventing corruption
         file.sync_all().await.map_err(|e| {
@@ -394,7 +418,7 @@ impl DownloadUtils {
 
         // Verify hash before writing (for in-memory downloads)
         if let Some(expected_sha1) = &config.expected_sha1 {
-            debug!("Verifying SHA1 hash for downloaded content ({} bytes)", bytes.len());
+            trace!("Verifying SHA1 hash for downloaded content ({} bytes)", bytes.len());
             let calculated_hash = hash_utils::calculate_sha1_from_bytes(&bytes);
             if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
                 let error_msg = format!(
@@ -404,11 +428,11 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
-            debug!("SHA1 hash verification passed");
+            trace!("SHA1 hash verification passed");
         }
 
         if let Some(expected_sha256) = &config.expected_sha256 {
-            debug!("Verifying SHA256 hash for downloaded content ({} bytes)", bytes.len());
+            trace!("Verifying SHA256 hash for downloaded content ({} bytes)", bytes.len());
             let calculated_hash = hash_utils::calculate_sha256_from_bytes(&bytes);
             if !calculated_hash.eq_ignore_ascii_case(expected_sha256) {
                 let error_msg = format!(
@@ -418,7 +442,7 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
-            debug!("SHA256 hash verification passed");
+            trace!("SHA256 hash verification passed");
         }
 
         let mut file = fs::File::create(target_path).await.map_err(|e| {
@@ -460,7 +484,7 @@ impl DownloadUtils {
             return Ok(false);
         }
 
-        debug!("Verifying existing file: {:?}", target_path);
+        trace!("Verifying existing file: {:?}", target_path);
 
         // ZIP integrity check FIRST for JAR files - fastest way to detect corruption
         if let Some(extension) = target_path.extension() {
@@ -486,19 +510,22 @@ impl DownloadUtils {
         }
 
         // Check SHA1 hash (slower - reads entire file)
-        if let Some(expected_sha1) = &config.expected_sha1 {
-            let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
-            if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
-                debug!(
-                    "SHA1 mismatch for existing file {:?}: expected {}, got {}",
-                    target_path, expected_sha1, calculated_hash
-                );
-                return Ok(false);
+        if let Some(expected_sha1) = config.expected_sha1.as_ref().filter(|_| config.hash_existing_files) {
+            if !verified_files::is_verified(target_path, Some(expected_sha1)).await {
+                let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
+                if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
+                    debug!(
+                        "SHA1 mismatch for existing file {:?}: expected {}, got {}",
+                        target_path, expected_sha1, calculated_hash
+                    );
+                    return Ok(false);
+                }
+                verified_files::mark_verified(target_path, Some(expected_sha1)).await;
             }
         }
 
         // Check SHA256 hash (slowest - reads entire file)
-        if let Some(expected_sha256) = &config.expected_sha256 {
+        if let Some(expected_sha256) = config.expected_sha256.as_ref().filter(|_| config.hash_existing_files) {
             let calculated_hash = hash_utils::calculate_sha256_from_file(target_path).await?;
             if !calculated_hash.eq_ignore_ascii_case(expected_sha256) {
                 debug!(
@@ -509,13 +536,13 @@ impl DownloadUtils {
             }
         }
 
-        debug!("Existing file passed all verifications: {:?}", target_path);
+        trace!("Existing file passed all verifications: {:?}", target_path);
         Ok(true)
     }
 
     /// Verify downloaded file after writing
     async fn verify_downloaded_file(target_path: &Path, config: &DownloadConfig) -> Result<()> {
-        debug!("Verifying downloaded file: {:?}", target_path);
+        trace!("Verifying downloaded file: {:?}", target_path);
 
         // Check size
         if let Some(expected_size) = config.expected_size {
@@ -533,7 +560,7 @@ impl DownloadUtils {
 
         // Check SHA1 hash
         if let Some(expected_sha1) = &config.expected_sha1 {
-            debug!("Verifying SHA1 hash for downloaded file: {:?}", target_path);
+            trace!("Verifying SHA1 hash for downloaded file: {:?}", target_path);
             let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
             if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
                 let error_msg = format!(
@@ -543,12 +570,12 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
-            debug!("SHA1 hash verification passed for downloaded file");
+            trace!("SHA1 hash verification passed for downloaded file");
         }
 
         // Check SHA256 hash
         if let Some(expected_sha256) = &config.expected_sha256 {
-            debug!("Verifying SHA256 hash for downloaded file: {:?}", target_path);
+            trace!("Verifying SHA256 hash for downloaded file: {:?}", target_path);
             let calculated_hash = hash_utils::calculate_sha256_from_file(target_path).await?;
             if !calculated_hash.eq_ignore_ascii_case(expected_sha256) {
                 let error_msg = format!(
@@ -558,7 +585,7 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
-            debug!("SHA256 hash verification passed for downloaded file");
+            trace!("SHA256 hash verification passed for downloaded file");
         }
 
         // Additional ZIP integrity check for JAR files to detect incomplete downloads
@@ -573,7 +600,11 @@ impl DownloadUtils {
             }
         }
 
-        debug!("Downloaded file passed all verifications: {:?}", target_path);
+        if let Some(expected_sha1) = &config.expected_sha1 {
+            verified_files::mark_verified(target_path, Some(expected_sha1)).await;
+        }
+
+        trace!("Downloaded file passed all verifications: {:?}", target_path);
         Ok(())
     }
 
@@ -638,7 +669,7 @@ impl DownloadUtils {
         for i in (0..buffer.len().saturating_sub(3)).rev() {
             if buffer[i] == 0x50 && buffer[i+1] == 0x4B && 
                buffer[i+2] == 0x05 && buffer[i+3] == 0x06 {
-                debug!("ZIP integrity check passed: {:?}", file_path);
+                trace!("ZIP integrity check passed: {:?}", file_path);
                 return true;
             }
         }

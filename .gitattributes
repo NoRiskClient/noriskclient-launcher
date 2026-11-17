@@ -1,0 +1,5 @@
+# sqlx checksums a migration over its raw bytes at compile time and refuses to run if it
+# ever differs from what a database recorded. With core.autocrlf a Windows checkout would
+# produce CRLF and a different checksum than Linux for the same file, which shows up as
+# "migration was previously applied but has been modified" and silently disables the cache.
+*.sql text eol=lf

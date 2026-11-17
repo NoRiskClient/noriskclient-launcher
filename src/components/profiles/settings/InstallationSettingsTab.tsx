@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { ModLoader, Profile } from "../../../types/profile";
@@ -16,6 +14,7 @@ import { gsap } from "gsap";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
 import { useTranslation } from "react-i18next";
+import { parseErrorMessage } from "../../../utils/error-utils";
 
 interface InstallationSettingsTabProps {
   profile: Profile;
@@ -46,7 +45,6 @@ export function InstallationSettingsTab({
   const [searchQuery, setSearchQuery] = useState("");
 
   const resolvedLoaderVersion = useResolvedLoaderVersion(editedProfile, refreshTrigger);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );
@@ -137,7 +135,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error("Failed to fetch Minecraft versions:", err);
         setError(
-          `failed to fetch minecraft versions: ${err instanceof Error ? err.message : String(err)}`,
+          `failed to fetch minecraft versions: ${parseErrorMessage(err)}`,
         );
       } finally {
         setIsLoadingVersions(false);
@@ -211,7 +209,7 @@ export function InstallationSettingsTab({
       } catch (err) {
         console.error(`Failed to fetch ${editedProfile.loader} versions:`, err);
         setError(
-          `failed to fetch ${editedProfile.loader} versions: ${err instanceof Error ? err.message : String(err)}`,
+          `failed to fetch ${editedProfile.loader} versions: ${parseErrorMessage(err)}`,
         );
       } finally {
         setIsLoadingLoaderVersions(false);
@@ -355,10 +353,10 @@ export function InstallationSettingsTab({
         <div>
           <div className="flex items-start justify-between gap-6">
             <div className="flex-1">
-              <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+              <h3 className="text-lg font-smallcaps text-white mb-3">
                 {t('profiles.settings.currentlyInstalled')}
               </h3>
-              <div className="flex items-center gap-3 text-sm font-minecraft-ten">
+              <div className="flex items-center gap-3 text-sm font-minecraft">
                 {/* Minecraft Version */}
                 <div className="text-white flex items-center gap-2">
                   <img
@@ -401,7 +399,7 @@ export function InstallationSettingsTab({
 
       <div ref={versionsRef} className="space-y-4">
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+          <h3 className="text-lg font-smallcaps text-white mb-3">
             {t('profiles.settings.gameVersion')}
           </h3>
           <div className="mb-3">
@@ -434,10 +432,10 @@ export function InstallationSettingsTab({
               >
                 <div className="flex items-center justify-center">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-6 h-6 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-6 h-6 mr-2"
                   />
-                  <span className="font-minecraft text-2xl">
+                  <span className="font-smallcaps text-base">
                     {t('profiles.settings.loadingVersions')}
                   </span>
                 </div>
@@ -448,7 +446,7 @@ export function InstallationSettingsTab({
                 className="max-h-48 overflow-y-auto custom-scrollbar border border-white/10 bg-black/20"
               >
                 {filteredVersions.length === 0 ? (
-                  <div className="p-4 text-2xl text-white/70 text-center select-none">
+                  <div className="p-4 text-base text-white/70 text-center select-none">
                     {t('profiles.settings.noVersionsFound')}
                   </div>
                 ) : (
@@ -463,7 +461,7 @@ export function InstallationSettingsTab({
                         }
                         size="sm"
                         className={cn(
-                          "text-center text-xl w-full",
+                          "text-center text-sm w-full",
                           editedProfile.game_version === version
                             ? "bg-accent/20 border-accent text-white"
                             : "bg-black/20 hover:bg-black/30 border-white/10 text-white/80 hover:text-white",
@@ -485,7 +483,7 @@ export function InstallationSettingsTab({
 
       <div ref={platformsRef} className="space-y-4">
         <div>
-          <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">
+          <h3 className="text-lg font-smallcaps text-white mb-3">
             {t('profiles.settings.platform')}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -522,7 +520,7 @@ export function InstallationSettingsTab({
                     className="w-10 h-10 mb-2 object-contain"
                     style={{ opacity: isCompatible ? 1 : 0.5 }}
                   />
-                  <span className="font-minecraft text-xl lowercase">
+                  <span className="font-smallcaps text-sm">
                     {loader.name}
                   </span>
                   {!isCompatible && (
@@ -538,14 +536,14 @@ export function InstallationSettingsTab({
 
         {editedProfile.loader !== "vanilla" && (
           <div ref={loaderVersionRef}>
-            <h3 className="text-3xl font-minecraft text-white mb-3 lowercase">{t('profiles.settings.loaderVersion', { loader: editedProfile.loader })}</h3>
+            <h3 className="text-lg font-smallcaps text-white mb-3">{t('profiles.settings.loaderVersion', { loader: editedProfile.loader })}</h3>
             
             {resolvedLoaderVersion && (
               <Card
                 variant="flat"
                 className="p-3 mb-4 border border-white/10 bg-black/20"
               >
-                <div className="text-xs text-white/90 font-minecraft-ten">
+                <div className="text-xs text-white/90 font-minecraft">
                   {t('profiles.settings.currentLoaderVersion')}{" "}
                   <span className="text-white font-bold">
                     {resolvedLoaderVersion.version || t('profiles.settings.notSet')}
@@ -566,10 +564,10 @@ export function InstallationSettingsTab({
               >
                 <div className="flex items-center justify-center">
                   <Icon
-                    icon="solar:refresh-bold"
-                    className="w-6 h-6 mr-2 animate-spin"
+                    icon="svg-spinners:ring-resize"
+                    className="w-6 h-6 mr-2"
                   />
-                  <span className="font-minecraft text-2xl">
+                  <span className="font-smallcaps text-base">
                     {t('profiles.settings.loadingLoaderVersions', { loader: editedProfile.loader })}
                   </span>
                 </div>
@@ -604,7 +602,7 @@ export function InstallationSettingsTab({
                         label: version,
                       })),
                     ]}
-                    className="text-2xl py-3"
+                    className="text-base py-3"
                     variant="flat"
                     disabled={!editedProfile.settings.use_overwrite_loader_version}
                   />
@@ -613,7 +611,7 @@ export function InstallationSettingsTab({
             ) : (
               <Card
                 variant="flat"
-                className="p-4 text-2xl text-white/70 text-center select-none border border-white/10 bg-black/20"
+                className="p-4 text-base text-white/70 text-center select-none border border-white/10 bg-black/20"
               >
                 {t('profiles.settings.noLoaderVersions', { loader: editedProfile.loader, version: editedProfile.game_version })}
               </Card>

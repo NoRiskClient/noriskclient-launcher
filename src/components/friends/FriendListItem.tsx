@@ -4,9 +4,8 @@ import { Icon } from "@iconify/react";
 import { FriendsFriendUser, OnlineState, useFriendsStore } from "../../store/friends-store";
 import { useChatStore } from "../../store/chat-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { NotificationBadge } from "../ui/NotificationBadge";
-import { cn } from "../../lib/utils";
 
 interface FriendListItemProps {
   friend: FriendsFriendUser;
@@ -27,7 +26,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
   const { accentColor } = useThemeStore();
   const [isRemoving, setIsRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const avatarUrl = useCrafatarAvatar({ uuid: friend.uuid, size: 48 });
+  const avatarUrl = usePlayerAvatar({ uuid: friend.uuid, size: 48 });
 
   const unreadCount = useMemo(() => {
     const chat = chats.find(c => c.participants.some(p => p.userId === friend.uuid));
@@ -84,7 +83,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
       >
         <div className="flex items-center gap-2">
           <Icon icon="solar:trash-bin-minimalistic-bold" className="w-5 h-5 text-red-400 flex-shrink-0" />
-          <span className="text-sm font-minecraft-ten text-red-400">
+          <span className="text-sm font-minecraft text-red-400">
             {t('friends.remove_confirm')}
           </span>
         </div>
@@ -92,7 +91,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
           <button
             onClick={handleConfirmRemove}
             disabled={isRemoving}
-            className="px-3 py-1.5 rounded-lg text-xs font-minecraft-ten transition-all duration-200 hover:scale-105"
+            className="px-3 py-1.5 rounded-lg text-xs font-minecraft transition-all duration-200 hover:scale-105"
             style={{
               backgroundColor: "rgba(239, 68, 68, 0.3)",
               border: "1px solid rgba(239, 68, 68, 0.5)",
@@ -100,14 +99,14 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
             }}
           >
             {isRemoving ? (
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 animate-spin" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
             ) : (
               t('common.confirm')
             )}
           </button>
           <button
             onClick={() => setConfirmRemove(false)}
-            className="px-3 py-1.5 rounded-lg text-xs font-minecraft-ten text-white/60 transition-all duration-200 hover:scale-105"
+            className="px-3 py-1.5 rounded-lg text-xs font-minecraft text-white/60 transition-all duration-200 hover:scale-105"
             style={{
               backgroundColor: "rgba(255, 255, 255, 0.1)",
               border: "1px solid rgba(255, 255, 255, 0.2)",
@@ -159,11 +158,11 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-base font-medium text-white truncate font-minecraft-ten">
+          <span className="text-base font-medium text-white truncate font-minecraft">
             {friend.username}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-base text-white/50 font-minecraft">
+        <div className="flex items-center gap-1.5 text-xs text-white/50 font-smallcaps">
           {friend.server ? (
             <>
               <Icon icon="solar:server-bold" className="w-4 h-4" />

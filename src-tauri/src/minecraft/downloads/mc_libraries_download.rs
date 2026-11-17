@@ -1,18 +1,20 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::minecraft::dto::piston_meta::{DownloadInfo, Library};
+use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use futures::stream::{iter, StreamExt};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 const LIBRARIES_DIR: &str = "libraries";
 const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
-const DEFAULT_CONCURRENT_LIBRARIES: usize = 12;
 
 pub struct MinecraftLibrariesDownloadService {
     base_path: PathBuf,
     concurrent_downloads: usize,
-    concurrent_libraries: usize,
+    stats: Option<Arc<DownloadStats>>,
+    verify_hashes: bool,
 }
 
 impl MinecraftLibrariesDownloadService {
@@ -21,8 +23,19 @@ impl MinecraftLibrariesDownloadService {
         Self {
             base_path,
             concurrent_downloads: DEFAULT_CONCURRENT_DOWNLOADS,
-            concurrent_libraries: DEFAULT_CONCURRENT_LIBRARIES,
+            stats: None,
+            verify_hashes: false,
         }
+    }
+
+    pub fn with_stats(mut self, stats: Arc<DownloadStats>) -> Self {
+        self.stats = Some(stats);
+        self
+    }
+
+    pub fn with_verify_hashes(mut self, verify_hashes: bool) -> Self {
+        self.verify_hashes = verify_hashes;
+        self
     }
 
     pub fn with_concurrent_downloads(mut self, concurrent_downloads: usize) -> Self {
@@ -72,11 +85,16 @@ impl MinecraftLibrariesDownloadService {
     async fn download_file(&self, download_info: &DownloadInfo) -> Result<()> {
         let target_path = self.get_library_path(download_info);
 
-        // Use the new centralized download utility with size verification
-        let config = DownloadConfig::new()
+        let mut config = DownloadConfig::new()
             .with_size(download_info.size as u64)  // Size verification prevents corruption
+            .with_hash_existing_files(self.verify_hashes)
             .with_streaming(false)  // Libraries are usually small files
-            .with_retries(3);  // Built-in retry logic for network issues
+            .with_retries(3)  // Built-in retry logic for network issues
+            .with_stats(self.stats.clone());
+
+        if !download_info.sha1.is_empty() {
+            config = config.with_sha1(download_info.sha1.clone());
+        }
 
         DownloadUtils::download_file(&download_info.url, &target_path, config).await
     }

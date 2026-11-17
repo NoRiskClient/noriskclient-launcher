@@ -30,6 +30,7 @@ pub async fn find_unique_profile_segment(
         ['/', '\\', '?', '!', '<', '>', '*', ':', '\'', '\"', '|'],
         "_",
     );
+    let sanitized_segment = to_launchable_ascii(&sanitized_segment);
 
     // Bereinigen und sicherstellen, dass der Segmentname nicht leer ist
     let clean_segment = sanitized_segment.trim();
@@ -111,47 +112,44 @@ pub async fn find_unique_profile_segment(
     }
 }
 
-/// Copies a source file to the custom_mods directory if it doesn't exist.
-/// Logs success, skips, or errors.
-pub async fn copy_as_custom_mod(
+/// Copies a source .jar into the given mods directory if it doesn't already exist.
+pub async fn copy_local_mod(
     src_path_buf: &PathBuf,
-    custom_mods_dir: &PathBuf,
-    profile_id: Uuid,             // Keep profile_id for logging context
-    custom_added_count: &mut u64, // Assuming usize or u64 is better here
-    skipped_count: &mut u64,      // Assuming usize or u64 is better here
+    mods_dir: &PathBuf,
+    profile_id: Uuid,
+    added_count: &mut u64,
+    skipped_count: &mut u64,
 ) {
-    // Check extension (optional, but good safeguard)
     if src_path_buf
         .extension()
         .map_or(false, |ext| ext.eq_ignore_ascii_case("jar"))
     {
         if let Some(filename) = src_path_buf.file_name() {
-            let dest_path = custom_mods_dir.join(filename);
+            let dest_path = mods_dir.join(filename);
 
             if dest_path.exists() {
-                warn!("Skipping custom import: File '{}' already exists in custom_mods for profile {}.", filename.to_string_lossy(), profile_id);
+                warn!("Skipping local mod import: File '{}' already exists in mods for profile {}.", filename.to_string_lossy(), profile_id);
                 *skipped_count += 1;
                 return;
             }
 
             match fs::copy(&src_path_buf, &dest_path).await {
-                // Use fs::copy directly
                 Ok(_) => {
                     info!(
-                        "Successfully imported '{}' as custom mod to profile {}.",
+                        "Successfully imported '{}' as local mod to profile {}.",
                         filename.to_string_lossy(),
                         profile_id
                     );
-                    *custom_added_count += 1;
+                    *added_count += 1;
                 }
                 Err(e) => {
                     error!(
-                        "Failed to copy file '{}' as custom mod for profile {}: {}",
+                        "Failed to copy file '{}' as local mod for profile {}: {}",
                         filename.to_string_lossy(),
                         profile_id,
                         e
                     );
-                    *skipped_count += 1; // Count as skipped due to error
+                    *skipped_count += 1;
                 }
             }
         } else {
@@ -160,7 +158,7 @@ pub async fn copy_as_custom_mod(
         }
     } else {
         warn!(
-            "Skipping custom import as it does not have a .jar extension: {:?}",
+            "Skipping local mod import as it does not have a .jar extension: {:?}",
             src_path_buf
         );
         *skipped_count += 1;
@@ -195,6 +193,10 @@ pub struct FileNode {
 /// # Returns
 /// A Result containing the root FileNode with all its children
 pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> Result<FileNode> {
+    walk_directory(root_path, include_hidden, &mut Vec::new()).await
+}
+
+async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<FileNode> {
     // Get metadata for the root path
     let metadata = fs::metadata(root_path).await.map_err(|e| AppError::Io(e))?;
 
@@ -222,6 +224,39 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         });
     }
 
+    let canonical = fs::canonicalize(root_path).await.unwrap_or_else(|_| root_path.to_path_buf());
+    if ancestors.contains(&canonical) {
+        return Ok(FileNode {
+            name,
+            path: root_path.to_path_buf(),
+            is_dir: true,
+            children: Vec::new(),
+            size: 0,
+            last_modified,
+        });
+    }
+    ancestors.push(canonical);
+    let listed = read_children(root_path, include_hidden, ancestors).await;
+    ancestors.pop();
+    let mut children = listed?;
+
+    children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    Ok(FileNode {
+        name,
+        path: root_path.to_path_buf(),
+        is_dir: true,
+        children,
+        size: 0,
+        last_modified,
+    })
+}
+
+async fn read_children(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<Vec<FileNode>> {
     // If it's a directory, read its entries and process each one
     let mut children = Vec::new();
     let mut entries = fs::read_dir(root_path).await.map_err(|e| AppError::Io(e))?;
@@ -239,7 +274,7 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         }
 
         // Recursively process this entry - using Box::pin to handle recursion
-        match Box::pin(get_directory_structure(&path, include_hidden)).await {
+        match Box::pin(walk_directory(&path, include_hidden, ancestors)).await {
             Ok(node) => children.push(node),
             Err(e) => {
                 // Log the error but continue with other entries
@@ -248,21 +283,7 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         }
     }
 
-    // Sort children: directories first, then files, both alphabetically
-    children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
-
-    Ok(FileNode {
-        name,
-        path: root_path.to_path_buf(),
-        is_dir: true,
-        children,
-        size: 0, // Directories themselves have no size
-        last_modified,
-    })
+    Ok(children)
 }
 
 /// Flattens a directory structure into a vector of paths with their relative depths.
@@ -589,66 +610,6 @@ pub async fn copy_profile_files(
     Ok(total_files_copied)
 }
 
-/// Example function showing how to copy a profile with exclusions.
-/// This demonstrates how to use the directory structure and filtering functions.
-///
-/// # Arguments
-/// * `source_profile_path` - The source profile directory path
-/// * `dest_profile_path` - The destination profile directory path
-/// * `excluded_paths` - Paths to exclude from copying
-///
-/// # Returns
-/// Result with the number of files copied
-pub async fn copy_profile_with_exclusions(
-    source_profile_path: &Path,
-    dest_profile_path: &Path,
-    excluded_paths: &[PathBuf],
-) -> Result<u64> {
-    info!(
-        "Copying profile from {} to {} with {} exclusions",
-        source_profile_path.display(),
-        dest_profile_path.display(),
-        excluded_paths.len()
-    );
-
-    // Get the io_semaphore from global state
-    let state = crate::state::State::get().await?;
-    let io_semaphore = state.io_semaphore.clone();
-
-    // Convert excluded paths to strings and put them in a HashSet for efficient lookup
-    let excluded_set: std::collections::HashSet<String> = excluded_paths
-        .iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
-
-    // First, get the complete directory structure
-    let dir_structure = get_directory_structure(source_profile_path, false).await?;
-
-    // Filter the structure based on exclusions
-    let filtered_structure = filter_directory_structure(&dir_structure, &excluded_set)
-        .ok_or_else(|| AppError::Other("All files were excluded, nothing to copy".to_string()))?;
-
-    // Create the destination directory if it doesn't exist
-    if !dest_profile_path.exists() {
-        fs::create_dir_all(dest_profile_path)
-            .await
-            .map_err(|e| AppError::Io(e))?;
-    }
-
-    // Copy the files according to the filtered structure
-    let files_copied = copy_profile_files(
-        &filtered_structure,
-        source_profile_path,
-        dest_profile_path,
-        io_semaphore,
-    )
-    .await?;
-
-    info!("Profile copy completed. Copied {} files.", files_copied);
-
-    Ok(files_copied)
-}
-
 // Konstante aus dem mod_downloader/norisk_pack_downloader übernehmen
 const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 
@@ -699,6 +660,7 @@ async fn collect_copy_operations(
     src: &Path,
     dst: &Path,
     ops: &mut Vec<(PathBuf, PathBuf)>,
+    ancestors: &mut Vec<PathBuf>,
 ) -> Result<()> {
     if !src.exists() {
         return Ok(());
@@ -706,17 +668,34 @@ async fn collect_copy_operations(
 
     if src.is_dir() {
         fs::create_dir_all(dst).await.map_err(AppError::Io)?;
-        let mut entries = fs::read_dir(src).await.map_err(AppError::Io)?;
-        while let Some(entry) = entries.next_entry().await.map_err(AppError::Io)? {
-            let entry_path = entry.path();
-            let dst_path = dst.join(entry.file_name());
-            Box::pin(collect_copy_operations(&entry_path, &dst_path, ops)).await?;
+        let canonical = fs::canonicalize(src).await.unwrap_or_else(|_| src.to_path_buf());
+        if ancestors.contains(&canonical) {
+            return Ok(());
         }
+        ancestors.push(canonical);
+        let collected = collect_dir_copy_operations(src, dst, ops, ancestors).await;
+        ancestors.pop();
+        collected?;
     } else if src.is_file() {
         if let Some(parent) = dst.parent() {
             fs::create_dir_all(parent).await.map_err(AppError::Io)?;
         }
         ops.push((src.to_path_buf(), dst.to_path_buf()));
+    }
+    Ok(())
+}
+
+async fn collect_dir_copy_operations(
+    src: &Path,
+    dst: &Path,
+    ops: &mut Vec<(PathBuf, PathBuf)>,
+    ancestors: &mut Vec<PathBuf>,
+) -> Result<()> {
+    let mut entries = fs::read_dir(src).await.map_err(AppError::Io)?;
+    while let Some(entry) = entries.next_entry().await.map_err(AppError::Io)? {
+        let entry_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        Box::pin(collect_copy_operations(&entry_path, &dst_path, ops, ancestors)).await?;
     }
     Ok(())
 }
@@ -741,7 +720,7 @@ pub async fn copy_dir_recursively(src: &Path, dst: &Path, semaphore: Arc<Semapho
     );
 
     let mut ops = Vec::new();
-    collect_copy_operations(src, dst, &mut ops).await?;
+    collect_copy_operations(src, dst, &mut ops, &mut Vec::new()).await?;
 
     info!(
         "Collected {} file copy operations. Starting parallel copy.",
@@ -805,21 +784,26 @@ pub async fn count_files_recursively(dir_path: &Path) -> Result<usize> {
 /// Sums the size of every file under a directory recursively, in bytes.
 /// Unreadable entries are skipped silently to avoid aborting the whole walk on a permission hiccup.
 pub async fn calculate_dir_size_recursively(dir_path: &Path) -> Result<u64> {
+    let root = dir_path.to_path_buf();
+    tokio::task::spawn_blocking(move || dir_size_sync(&root))
+        .await
+        .map_err(|e| AppError::Other(format!("Dir size task failed: {e}")))
+}
+
+fn dir_size_sync(root: &Path) -> u64 {
     let mut total: u64 = 0;
-    let mut dirs_to_check = vec![dir_path.to_path_buf()];
+    let mut dirs_to_check = vec![root.to_path_buf()];
 
     while let Some(current_dir) = dirs_to_check.pop() {
-        let mut entries = match fs::read_dir(&current_dir).await {
-            Ok(e) => e,
-            Err(_) => continue,
+        let Ok(entries) = std::fs::read_dir(&current_dir) else {
+            continue;
         };
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let file_type = match entry.file_type().await {
-                Ok(ft) => ft,
-                Err(_) => continue,
+        for entry in entries.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
             };
             if file_type.is_file() {
-                if let Ok(meta) = entry.metadata().await {
+                if let Ok(meta) = entry.metadata() {
                     total = total.saturating_add(meta.len());
                 }
             } else if file_type.is_dir() {
@@ -828,7 +812,7 @@ pub async fn calculate_dir_size_recursively(dir_path: &Path) -> Result<u64> {
         }
     }
 
-    Ok(total)
+    total
 }
 
 /// Copies directory with progress events for each file
@@ -943,4 +927,42 @@ pub async fn download_and_replace_file(
     );
 
     Ok(())
+}
+
+/// Java decodes launch arguments with `sun.jnu.encoding` — on Windows the system ANSI code page,
+/// which `-Dsun.jnu.encoding=UTF-8` does not override. Anything outside it reaches the game as
+/// `?` and the launch dies on an unreadable path. Only the directory is restricted; the display
+/// name keeps its spelling.
+pub fn to_launchable_ascii(segment: &str) -> String {
+    let transliterated = deunicode::deunicode(segment);
+
+    let mut out = String::with_capacity(transliterated.len());
+    let mut pending_replacement = false;
+
+    for c in transliterated.chars() {
+        if c.is_ascii_graphic() || c == ' ' {
+            if pending_replacement {
+                out.push('_');
+                pending_replacement = false;
+            }
+            out.push(c);
+        } else {
+            pending_replacement = true;
+        }
+    }
+    if pending_replacement && !out.is_empty() {
+        out.push('_');
+    }
+
+    let trimmed = out.trim().trim_matches('_').trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in segment.as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("profile-{:06x}", hash & 0xffffff)
 }

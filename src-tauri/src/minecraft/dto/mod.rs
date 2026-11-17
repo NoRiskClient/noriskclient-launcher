@@ -1,3 +1,7 @@
+pub mod afkpoints;
+pub mod cosmetic_icon;
+pub mod cosmetic_outfit;
+pub mod norisk_user;
 pub mod fabric_meta;
 pub mod forge_install_profile;
 pub mod forge_maven_meta;

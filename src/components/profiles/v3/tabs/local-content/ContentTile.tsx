@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useRef } from "react";
 import { Icon } from "@iconify/react";
@@ -9,10 +7,10 @@ import type { LocalContentItem } from "../../../../../hooks/useLocalContentManag
 import type { UnifiedVersion } from "../../../../../types/unified";
 import { formatFileSize } from "../../../../../utils/format-file-size";
 import { Tooltip } from "../../../../ui/Tooltip";
-import { ModUpdateText } from "../../../../ui/ModUpdateText";
 import { ToggleSwitch } from "../../../../ui/ToggleSwitch";
 import { CheckboxV2 } from "../../../../ui/CheckboxV2";
-import { ThemedDropdown, ThemedDropdownItem, ThemedDropdownDivider, ThemedDropdownHeader } from "../../shared/ThemedDropdown";
+import { ThemedDropdown, ThemedDropdownItem, ThemedDropdownDivider } from "../../shared/ThemedDropdown";
+import { VersionSelectDropdown } from "../../shared/VersionSelectDropdown";
 
 export interface ContentTileProps {
   item: LocalContentItem;
@@ -26,20 +24,16 @@ export interface ContentTileProps {
   onNameClick?: () => void;
   menuOpen: boolean;
   onMenuToggle: (open: boolean) => void;
-  // Selection
   selectMode: boolean;
   isSelected: boolean;
   onToggleSelection: () => void;
-  // Update-Checks pausieren
   onToggleUpdateChecks?: () => void;
-  // Quick-Update: immer sichtbar wenn Update da, evtl. disabled
   onQuickUpdate?: () => void;
   quickUpdateDisabled?: boolean;
   quickUpdateTooltip?: React.ReactNode;
   isQuickUpdating?: boolean;
-  // NoRisk Compatibility-Status (null wenn Config nicht geladen oder ok)
   noRiskStatus?: "blocked" | "warning" | null;
-  // Version switching
+  overridesPack?: string;
   versionDropdownOpen: boolean;
   availableVersions: UnifiedVersion[] | null;
   isLoadingVersions: boolean;
@@ -78,6 +72,7 @@ export function ContentTile({
   quickUpdateTooltip,
   isQuickUpdating,
   noRiskStatus,
+  overridesPack,
 }: ContentTileProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -97,11 +92,6 @@ export function ContentTile({
     (item.curseforge_info as any)?.file_id ||
     null;
 
-  // Portal-mode triggers: the tile wrapper carries `opacity-55` when the
-  // content is disabled. CSS opacity cascades to children, so without a
-  // portal the dropdown panels would also fade and become unreadable.
-  // Passing these refs into ThemedDropdown renders the panels in
-  // `document.body`, outside the faded subtree.
   const versionButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -114,7 +104,6 @@ export function ContentTile({
           : `bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30 ${!enabled ? "opacity-55" : ""}`
       }`}
     >
-      {/* Selection checkbox (on-hover, or permanent when selectMode aktiv) */}
       <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         <CheckboxV2
           size="sm"
@@ -124,7 +113,6 @@ export function ContentTile({
         />
       </div>
 
-      {/* Icon + optionales NoRisk-Warn-Icon */}
       <div className="relative w-14 h-14 flex-shrink-0">
         <div className="w-full h-full rounded-lg bg-white/5 ring-1 ring-white/10 flex items-center justify-center overflow-hidden">
           {iconUrl ? (
@@ -149,20 +137,21 @@ export function ContentTile({
         )}
       </div>
 
-      {/* Identity */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           {onNameClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onNameClick(); }}
-              className="text-sm text-white font-minecraft-ten truncate normal-case hover:underline decoration-white/40 underline-offset-2 text-left"
+              className={`text-sm text-white font-minecraft truncate normal-case underline-offset-2 text-left ${!enabled ? "line-through" : "hover:underline decoration-white/40"}`}
+              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
             </button>
           ) : (
             <div
-              className="text-sm text-white font-minecraft-ten truncate normal-case"
+              className={`text-sm text-white font-minecraft truncate normal-case ${!enabled ? "line-through" : ""}`}
+              style={!enabled ? { textDecorationColor: accentColor.value, textDecorationThickness: "2px" } : undefined}
               title={displayName}
             >
               {displayName}
@@ -171,6 +160,11 @@ export function ContentTile({
           {item.updates_enabled === false && (
             <Tooltip content={t("profiles.v3.tile.updateChecksPaused")}>
               <Icon icon="solar:volume-cross-bold" className="w-3 h-3 text-white/30 flex-shrink-0" />
+            </Tooltip>
+          )}
+          {overridesPack && (
+            <Tooltip content={<span className="block max-w-[260px]">{t("profiles.v3.syncMods.replacesHint", { pack: overridesPack })}</span>}>
+              <Icon icon="solar:layers-minimalistic-bold" className="w-3 h-3 text-amber-300/70 flex-shrink-0" />
             </Tooltip>
           )}
           {item.modpack_origin && (
@@ -182,15 +176,12 @@ export function ContentTile({
             </Tooltip>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft-ten">
+        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft">
           <div className="relative min-w-0">
             <button
               ref={versionButtonRef}
               onClick={(e) => { e.stopPropagation(); if (isSwitchable && !isSwitchingVersion) onVersionClick(); }}
               disabled={!isSwitchable || isSwitchingVersion}
-              /* Fixed h-5 verhindert dass die Chip 1-2px hoeher wird sobald ein
-                 Update-Dot/Switch-Spinner reinkommt (inline-block Baseline-Quirk
-                 vom Tooltip-Wrapper). Sonst shifted Identity vertikal. */
               className={`inline-flex items-center gap-1 h-5 max-w-full truncate px-1.5 rounded transition-colors ${
                 isSwitchingVersion
                   ? "text-amber-200 bg-amber-400/10 cursor-wait"
@@ -200,17 +191,13 @@ export function ContentTile({
               }`}
             >
               {isSwitchingVersion && (
-                <Icon icon="solar:refresh-bold" className="w-3 h-3 flex-shrink-0 animate-spin" />
+                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3 flex-shrink-0" />
               )}
               {!isSwitchingVersion && updateAvailable && (() => {
                 const isFromModPack = !!item.modpack_origin;
                 const active = isFromModPack
                   ? item.updates_enabled === true
                   : item.updates_enabled !== false;
-                // Kein Tooltip-Wrapper hier: der Quick-Update-Button rechts
-                // zeigt ohnehin die ModUpdateText-Tooltip beim Hovern. Der Dot
-                // bleibt rein visueller Indicator — vermeidet den inline-block
-                // Baseline-Jitter der sonst die Chip 1px verschiebt.
                 return (
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -223,62 +210,16 @@ export function ContentTile({
               {isSwitchable && !isSwitchingVersion && <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 flex-shrink-0 opacity-60" />}
             </button>
 
-            <ThemedDropdown
+            <VersionSelectDropdown
               open={versionDropdownOpen}
               onClose={() => onVersionClick()}
-              width="w-72"
-              align="left"
-              scrollable
               triggerRef={versionButtonRef}
-            >
-              <ThemedDropdownHeader>{t("profiles.v3.versions.selectVersion")}</ThemedDropdownHeader>
-              {isLoadingVersions && (
-                <div className="flex items-center justify-center py-6 text-white/50 text-xs font-minecraft-ten gap-2">
-                  <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5 animate-spin" />
-                  {t("profiles.v3.versions.loading")}
-                </div>
-              )}
-              {!isLoadingVersions && versionError && (
-                <div className="px-3 py-4 text-xs text-rose-300 font-minecraft-ten">{versionError}</div>
-              )}
-              {!isLoadingVersions && !versionError && availableVersions && availableVersions.length === 0 && (
-                <div className="px-3 py-4 text-xs text-white/40 font-minecraft-ten">{t("profiles.v3.versions.none")}</div>
-              )}
-              {!isLoadingVersions && !versionError && availableVersions && availableVersions.map((v) => {
-                const isCurrent = v.id === currentVersionId;
-                return (
-                  <button
-                    key={v.id}
-                    onClick={(e) => { e.stopPropagation(); if (!isCurrent) onSwitchVersion(v); }}
-                    disabled={isCurrent}
-                    onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = `${accentColor.value}40`; }}
-                    onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.backgroundColor = "transparent"; }}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-minecraft-ten text-left transition-colors ${
-                      isCurrent ? "text-white/40 cursor-default" : "text-white/85 hover:text-white cursor-pointer"
-                    }`}
-                  >
-                    {isCurrent ? (
-                      <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: accentColor.value }} />
-                    ) : (
-                      <Icon icon="solar:tag-linear" className="w-3.5 h-3.5 flex-shrink-0 text-white/40" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{v.version_number}</div>
-                      <div className="text-[10px] text-white/35 truncate normal-case">{v.name}</div>
-                    </div>
-                    {v.release_type !== "release" && (
-                      <span className={`text-[9px] uppercase px-1 py-0.5 rounded flex-shrink-0 ${
-                        v.release_type === "beta"  ? "bg-amber-400/15 text-amber-200 border border-amber-400/25" :
-                        v.release_type === "alpha" ? "bg-rose-400/15  text-rose-200  border border-rose-400/25" :
-                        "bg-white/10 text-white/60 border border-white/15"
-                      }`}>
-                        {v.release_type}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </ThemedDropdown>
+              versions={availableVersions}
+              loading={isLoadingVersions}
+              error={versionError}
+              currentVersionId={currentVersionId}
+              onSelect={onSwitchVersion}
+            />
           </div>
 
           {item.file_size > 0 && (
@@ -287,7 +228,6 @@ export function ContentTile({
         </div>
       </div>
 
-      {/* Quick-Update */}
       {onQuickUpdate && (
         <Tooltip content={isQuickUpdating ? t("profiles.v3.tile.updating") : (quickUpdateTooltip ?? t("profiles.v3.tile.updateToLatest"))}>
           <button
@@ -309,7 +249,6 @@ export function ContentTile({
         </Tooltip>
       )}
 
-      {/* Enable/Disable — V2 ToggleSwitch (accent-getönt, Minecraft-Border) */}
       <div
         className="flex-shrink-0"
         title={enabled ? t("profiles.v3.tile.disable") : t("profiles.v3.tile.enable")}
@@ -322,7 +261,6 @@ export function ContentTile({
         />
       </div>
 
-      {/* Menu */}
       <div className="relative flex-shrink-0">
         <button
           ref={menuButtonRef}

@@ -1,0 +1,2 @@
+[env]
+FFMPEG_DIR = { value = "third-party/ffmpeg", relative = true }

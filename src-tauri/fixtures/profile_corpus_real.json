@@ -1,0 +1,829 @@
+[
+  {
+    "id": "b1a7cec2-30b2-a4d8-6891-0e2e7e9af146",
+    "name": "s6348",
+    "path": "s5834",
+    "game_version": "1.21.1",
+    "loader": "neoforge",
+    "loader_version": "s9852",
+    "created": "2020-01-05T07:22:17.278497600Z",
+    "last_played": "2020-01-05T11:33:00.598400500Z",
+    "settings": {
+      "java_path": "s9797",
+      "use_custom_java_path": true,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 7104,
+        "max": 9216
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "ab1c8398-def1-cbe1-964d-1ffd39c9d517",
+        "source": {
+          "type": "curse_forge",
+          "project_id": "990427",
+          "file_id": "73fb3d6",
+          "file_name": "s8376",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s6365",
+          "file_fingerprint": 2093242437
+        },
+        "enabled": true,
+        "display_name": "s2744",
+        "version": "s8376",
+        "game_versions": [
+          "1.21.1"
+        ],
+        "file_name_override": null,
+        "associated_loader": "neoforge",
+        "modpack_origin": "s9228",
+        "updates_enabled": false,
+        "force_include_versions": []
+      },
+      {
+        "id": "d254654f-d612-32ff-1f3f-f54f1b8e242c",
+        "source": {
+          "type": "curse_forge",
+          "project_id": "151dc5",
+          "file_id": "9b97d51",
+          "file_name": "s6004",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s5694",
+          "file_fingerprint": 703773955
+        },
+        "enabled": true,
+        "display_name": "s4393",
+        "version": "s6004",
+        "game_versions": [
+          "1.21.1"
+        ],
+        "file_name_override": null,
+        "associated_loader": "neoforge",
+        "modpack_origin": "s6506",
+        "updates_enabled": false,
+        "force_include_versions": []
+      },
+      {
+        "id": "644896cf-6721-ac59-ba6e-fc77a3a9e890",
+        "source": {
+          "type": "modrinth",
+          "project_id": "37e0f039",
+          "version_id": "b92f808b",
+          "file_name": "s1277",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s8548"
+        },
+        "enabled": true,
+        "display_name": "s8284",
+        "version": "s6661",
+        "game_versions": [
+          "1.21",
+          "1.21.1",
+          "1.21.2",
+          "1.21.3",
+          "1.21.4",
+          "1.21.5"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": null,
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": "s8194",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": {
+      "source": {
+        "type": "relativeProfile",
+        "path": "s4762"
+      }
+    },
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": {
+      "source": {
+        "source": "curse_forge",
+        "project_id": 462042,
+        "file_id": 6998277
+      },
+      "file_hash": null
+    },
+    "preferred_account_id": null,
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "215a34d3-07ea-1ba8-a0dc-caac3266e948",
+    "name": "s5163",
+    "path": "s4121",
+    "game_version": "1.21.11",
+    "loader": "fabric",
+    "loader_version": "s2037",
+    "created": "2020-01-01T11:14:35.507055300Z",
+    "last_played": "2020-01-02T09:04:51.842189500Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": true,
+      "overwrite_loader_version": "s6847",
+      "overwrite_loader_versions": {
+        "fabric": "s6847"
+      },
+      "memory": {
+        "min": 1024,
+        "max": 3584
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "202b01d6-3cb6-2d82-7512-d637fa972871",
+        "source": {
+          "type": "modrinth",
+          "project_id": "d93dbf8f",
+          "version_id": "926bfd04",
+          "file_name": "s7230",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s5276"
+        },
+        "enabled": true,
+        "display_name": "s2002",
+        "version": "s1673",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "81524060-871b-3110-4acd-d8b0e42e0a9e",
+        "source": {
+          "type": "modrinth",
+          "project_id": "bb3074ea",
+          "version_id": "ec2c221f",
+          "file_name": "s5009",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s5340"
+        },
+        "enabled": true,
+        "display_name": "s3199",
+        "version": "s272",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": "pack-13",
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": "215a34d3-07ea-1ba8-a0dc-caac3266e948",
+    "group": "s9411",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": true,
+    "description": "s1338",
+    "banner": {
+      "source": {
+        "type": "url",
+        "url": "https://example.invalid/x"
+      }
+    },
+    "background": null,
+    "norisk_information": {
+      "keep_local_assets": false,
+      "is_experimental": false,
+      "copy_initial_mc_data": true,
+      "is_main_version": false
+    },
+    "modpack_info": null,
+    "preferred_account_id": null,
+    "playtime_seconds": 42048,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "e33bfaa2-a225-6752-29ee-a3b1eb9febfc",
+    "name": "s5981",
+    "path": "s5981",
+    "game_version": "26.2",
+    "loader": "fabric",
+    "loader_version": null,
+    "created": "2020-01-08T21:00:58.886581700Z",
+    "last_played": null,
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 6144
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "0129b862-2c3f-84d3-c080-4780a60b7946",
+        "source": {
+          "type": "curse_forge",
+          "project_id": "5efc9",
+          "file_id": "8950be0",
+          "file_name": "s5276",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": null,
+          "file_fingerprint": null
+        },
+        "enabled": true,
+        "display_name": null,
+        "version": "s1818",
+        "game_versions": [
+          "26.2"
+        ],
+        "file_name_override": null,
+        "associated_loader": "forge",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": null,
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": null,
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": null,
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": null,
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "fd43a4b8-50d4-28a0-9bc6-b8a5c2c5a3d1",
+    "name": "s4662",
+    "path": "s4662",
+    "game_version": "1.21.11",
+    "loader": "fabric",
+    "loader_version": "s1603",
+    "created": "2020-01-02T11:38:13.376017600Z",
+    "last_played": "2020-01-06T01:40:04.597180400Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 3072
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": "s2083"
+    },
+    "state": "not_installed",
+    "mods": [],
+    "selected_norisk_pack_id": "pack-53",
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": "s4673",
+    "use_shared_minecraft_folder": true,
+    "is_standard_version": false,
+    "description": null,
+    "banner": null,
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": "2539d91c-f7a6-5a22-dd5f-0dac70f43268",
+    "playtime_seconds": 34536,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "409fbba1-b852-5265-efbf-802b627b5118",
+    "name": "s6440",
+    "path": "s9303",
+    "game_version": "1.12.2",
+    "loader": "forge",
+    "loader_version": "s2663",
+    "created": "2020-01-05T21:19:03.989827Z",
+    "last_played": "2020-01-06T06:44:47.867866100Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 3072
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "21da2d1c-04a6-ca11-979e-bbe7d8673e40",
+        "source": {
+          "type": "modrinth",
+          "project_id": "c1a60db0",
+          "version_id": "76f79ed3",
+          "file_name": "s1604",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s3376"
+        },
+        "enabled": true,
+        "display_name": "s5329",
+        "version": "s816",
+        "game_versions": [
+          "1.8",
+          "1.8.1",
+          "1.8.2",
+          "1.8.3",
+          "1.8.4",
+          "1.8.5",
+          "1.8.6",
+          "1.8.7",
+          "1.8.8",
+          "1.8.9",
+          "1.9",
+          "1.9.1",
+          "1.9.2",
+          "1.9.3",
+          "1.9.4",
+          "1.10",
+          "1.10.1",
+          "1.10.2",
+          "1.11",
+          "1.11.1",
+          "1.11.2",
+          "1.12",
+          "1.12.1",
+          "1.12.2"
+        ],
+        "file_name_override": null,
+        "associated_loader": "forge",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "d1233be0-a604-dac7-44e6-ed726ec78d60",
+        "source": {
+          "type": "modrinth",
+          "project_id": "b4538ce5",
+          "version_id": "cdd1acaf",
+          "file_name": "s9133",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s8272"
+        },
+        "enabled": false,
+        "display_name": "s5215",
+        "version": "s7862",
+        "game_versions": [
+          "1.12.2"
+        ],
+        "file_name_override": null,
+        "associated_loader": "forge",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": "pack-21",
+    "disabled_norisk_mods_detailed": [
+      {
+        "pack_id": "pack-21",
+        "mod_id": "85d93149b96b3",
+        "game_version": "1.12.2",
+        "loader": "forge"
+      }
+    ],
+    "source_standard_profile_id": null,
+    "group": "s7178",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": {
+      "source": {
+        "type": "relativeProfile",
+        "path": "s4762"
+      }
+    },
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": null,
+    "playtime_seconds": 169,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "527b2f4b-f19c-8137-8dc9-1b0c508c59d9",
+    "name": "s1732",
+    "path": "s9940",
+    "game_version": "1.21.11",
+    "loader": "fabric",
+    "loader_version": "s6847",
+    "created": "2020-01-02T20:02:16.467700900Z",
+    "last_played": null,
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 6144
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "55816071-5b99-030b-115a-6803c9eb4a14",
+        "source": {
+          "type": "modrinth",
+          "project_id": "68f0d043",
+          "version_id": "e043a49f",
+          "file_name": "s3731",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s6859"
+        },
+        "enabled": true,
+        "display_name": "s3721",
+        "version": "s509",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": "s1851",
+        "updates_enabled": true,
+        "force_include_versions": [
+          "1.21.11"
+        ]
+      },
+      {
+        "id": "13f43591-5707-22d7-1ba5-61d19f71ef1f",
+        "source": {
+          "type": "modrinth",
+          "project_id": "0d247f8f",
+          "version_id": "d8fb6034",
+          "file_name": "s4551",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s8688"
+        },
+        "enabled": true,
+        "display_name": "s4226",
+        "version": "s5604",
+        "game_versions": [
+          "1.21.9",
+          "1.21.10"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": "s596",
+        "updates_enabled": true,
+        "force_include_versions": [
+          "1.21.11"
+        ]
+      },
+      {
+        "id": "c1e92583-291a-8303-d220-a2e842863ac3",
+        "source": {
+          "type": "modrinth",
+          "project_id": "4eb0b6a5",
+          "version_id": "e0930698",
+          "file_name": "s6977",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s5189"
+        },
+        "enabled": true,
+        "display_name": "s8878",
+        "version": "s88",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": null,
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": "s8194",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": {
+      "source": {
+        "type": "relativeProfile",
+        "path": "s9084"
+      }
+    },
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": {
+      "source": {
+        "source": "modrinth",
+        "project_id": "614522a4",
+        "version_id": "1c67756f"
+      },
+      "file_hash": null
+    },
+    "preferred_account_id": null,
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "46594746-0499-9677-f3f2-cbd66e76024a",
+    "name": "s293",
+    "path": "s293",
+    "game_version": "1.21.10",
+    "loader": "fabric",
+    "loader_version": "s4346",
+    "created": "2020-01-01T14:15:07.173445Z",
+    "last_played": "2020-01-07T17:15:47.871094600Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 4096
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": "s3004",
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [],
+    "selected_norisk_pack_id": "pack-32",
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": "s7178",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": null,
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": "2539d91c-f7a6-5a22-dd5f-0dac70f43268",
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "f298f1aa-eb1f-1c41-145b-e5f8017a02d4",
+    "name": "s99",
+    "path": "s99",
+    "game_version": "1.21.5",
+    "loader": "vanilla",
+    "loader_version": null,
+    "created": "2020-01-03T12:39:11.671759Z",
+    "last_played": "2020-01-07T11:20:22.190777Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 4096
+      },
+      "resolution": null,
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": null
+    },
+    "state": "not_installed",
+    "mods": [],
+    "selected_norisk_pack_id": "pack-13",
+    "disabled_norisk_mods_detailed": [],
+    "source_standard_profile_id": null,
+    "group": "s4003",
+    "use_shared_minecraft_folder": true,
+    "is_standard_version": false,
+    "description": null,
+    "banner": null,
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": null,
+    "playtime_seconds": 0,
+    "sync_pack_ids": []
+  },
+  {
+    "id": "04f7c7c9-b140-5d9e-b5ed-961f06372088",
+    "name": "s3377",
+    "path": "s3656",
+    "game_version": "1.21.11",
+    "loader": "fabric",
+    "loader_version": "s1790",
+    "created": "2020-01-04T09:20:37.739188400Z",
+    "last_played": "2020-01-04T15:01:46.238358900Z",
+    "settings": {
+      "java_path": null,
+      "use_custom_java_path": false,
+      "use_overwrite_loader_version": false,
+      "overwrite_loader_version": null,
+      "memory": {
+        "min": 1024,
+        "max": 3072
+      },
+      "resolution": {
+        "width": 1280,
+        "height": 720
+      },
+      "fullscreen": false,
+      "extra_game_args": [],
+      "custom_jvm_args": null,
+      "quick_play_path": "s2083"
+    },
+    "state": "not_installed",
+    "mods": [
+      {
+        "id": "1ee581cc-d12d-d2af-bdb7-e88427268e3d",
+        "source": {
+          "type": "modrinth",
+          "project_id": "534460a8",
+          "version_id": "53ac7e97",
+          "file_name": "s8986",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s1277"
+        },
+        "enabled": false,
+        "display_name": "s8612",
+        "version": "s2725",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "e19cb500-8e99-9a16-2243-a2d775bad76a",
+        "source": {
+          "type": "modrinth",
+          "project_id": "f317d727",
+          "version_id": "d8096522",
+          "file_name": "s5136",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s9703"
+        },
+        "enabled": false,
+        "display_name": "s5634",
+        "version": "s4567",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "487cb794-abc2-b57f-7eed-c989ca448d6f",
+        "source": {
+          "type": "modrinth",
+          "project_id": "782d39a3",
+          "version_id": "7f48c00f",
+          "file_name": "s8832",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s8188"
+        },
+        "enabled": true,
+        "display_name": "s346",
+        "version": "s3778",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "253e09f5-34e0-6b76-474f-bc817d93f863",
+        "source": {
+          "type": "modrinth",
+          "project_id": "5d3509b8",
+          "version_id": "b79bf7ac",
+          "file_name": "s9022",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s7382"
+        },
+        "enabled": false,
+        "display_name": "s1781",
+        "version": "s2948",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      },
+      {
+        "id": "6fb62d6d-5edf-c789-de2b-d1146a2b60e7",
+        "source": {
+          "type": "modrinth",
+          "project_id": "bb3074ea",
+          "version_id": "ec2c221f",
+          "file_name": "s5009",
+          "download_url": "https://example.invalid/x",
+          "file_hash_sha1": "s5340"
+        },
+        "enabled": true,
+        "display_name": "s3199",
+        "version": "s272",
+        "game_versions": [
+          "1.21.11"
+        ],
+        "file_name_override": null,
+        "associated_loader": "fabric",
+        "modpack_origin": null,
+        "updates_enabled": true,
+        "force_include_versions": []
+      }
+    ],
+    "selected_norisk_pack_id": "pack-59",
+    "disabled_norisk_mods_detailed": [
+      {
+        "pack_id": "pack-42",
+        "mod_id": "6f07dc",
+        "game_version": "1.21.11",
+        "loader": "fabric"
+      }
+    ],
+    "source_standard_profile_id": null,
+    "group": "s7178",
+    "use_shared_minecraft_folder": false,
+    "is_standard_version": false,
+    "description": null,
+    "banner": {
+      "source": {
+        "type": "relativeProfile",
+        "path": "s4762"
+      }
+    },
+    "background": null,
+    "norisk_information": null,
+    "modpack_info": null,
+    "preferred_account_id": "3b4705d3-82bd-3a3a-83c9-149d2f812e24",
+    "playtime_seconds": 89222,
+    "sync_pack_ids": []
+  }
+]

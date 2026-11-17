@@ -1,14 +1,14 @@
-use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
+use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::{AssetIndex, AssetIndexContent, AssetObject};
-use crate::state::event_state::{EventPayload, EventType};
+use crate::minecraft::launch::launch_summary::DownloadStats;
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
+use crate::utils::file_utils::scan_object_store;
 use crate::utils::mc_utils;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
-use reqwest;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -22,19 +22,26 @@ const DEFAULT_CONCURRENT_DOWNLOADS: usize = 12;
 pub struct MinecraftAssetsDownloadService {
     assets_path: PathBuf,
     concurrent_downloads: usize,
+    stats: Option<Arc<DownloadStats>>,
 }
 
 impl MinecraftAssetsDownloadService {
     pub fn new() -> Self {
         let assets_path = LAUNCHER_DIRECTORY.meta_dir().join(ASSETS_DIR);
-        info!(
+        trace!(
             "[Assets Service] Initialized. Assets Path: {}",
             assets_path.display()
         );
         Self {
             assets_path,
             concurrent_downloads: DEFAULT_CONCURRENT_DOWNLOADS,
+            stats: None,
         }
+    }
+
+    pub fn with_stats(mut self, stats: Arc<DownloadStats>) -> Self {
+        self.stats = Some(stats);
+        self
     }
 
     /// Sets the number of concurrent downloads to use
@@ -120,7 +127,7 @@ impl MinecraftAssetsDownloadService {
         let task_counter = Arc::new(AtomicUsize::new(1)); // Start counter at 1
         let completed_counter = Arc::new(AtomicUsize::new(0));
         let total_to_download = Arc::new(AtomicUsize::new(0));
-        let total_assets = assets.len();
+        let _total_assets = assets.len();
 
         trace!(
             "[Assets Download] Preparing {} potential jobs...",
@@ -131,7 +138,7 @@ impl MinecraftAssetsDownloadService {
         // This replaces 4585 individual fs::try_exists + fs::metadata calls with a single directory scan
         let objects_path = assets_path.join("objects");
         let existing_files = measure_time!("Assets cache scan", {
-            Self::scan_existing_assets(&objects_path).await
+            scan_object_store(&objects_path).await
         });
         info!("[Assets Download] Found {} cached assets on disk", existing_files.len());
 
@@ -145,11 +152,15 @@ impl MinecraftAssetsDownloadService {
             let completed_counter_clone = Arc::clone(&completed_counter);
             let total_to_download_clone = Arc::clone(&total_to_download);
             let target_path = objects_path.join(&hash[..2]).join(&hash);
+            let stats = self.stats.clone();
 
             // Fast in-memory check instead of filesystem calls
             if let Some(&cached_size) = existing_files.get(&hash) {
                 if cached_size as i64 == size {
                     trace!("[Assets Download] Skipping asset {} (already exists with correct size)", name_clone);
+                    if let Some(stats) = &self.stats {
+                        stats.record_cached();
+                    }
                     continue;
                 }
                 warn!("[Assets Download] Asset {} exists but size mismatch (expected {}, got {}), redownloading.", name_clone, size, cached_size);
@@ -172,7 +183,8 @@ impl MinecraftAssetsDownloadService {
                 let config = DownloadConfig::new()
                     .with_size(size as u64)  // Size verification prevents corruption
                     .with_streaming(false)  // Assets are typically small files
-                    .with_retries(2);  // Limited retries for faster concurrent processing
+                    .with_retries(2)  // Limited retries for faster concurrent processing
+                    .with_stats(stats);
 
                 let download_result = DownloadUtils::download_file(&url, &target_path, config).await;
                 
@@ -182,7 +194,7 @@ impl MinecraftAssetsDownloadService {
                         let completed = completed_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
                         let total = total_to_download_clone.load(Ordering::SeqCst);
 
-                        info!(
+                        trace!(
                             "[Assets Download Task {}] Finished download for: {} ({}/{})",
                             task_id, name_clone, completed, total
                         );
@@ -234,6 +246,8 @@ impl MinecraftAssetsDownloadService {
             .await?;
         }
 
+        let progress_throttle = Arc::new(ProgressThrottle::new(100));
+
         let results: Vec<Result<()>> = iter(downloads)
             .buffer_unordered(self.concurrent_downloads)
             .inspect(|_| {
@@ -241,8 +255,7 @@ impl MinecraftAssetsDownloadService {
                 let completed = completed_counter.fetch_add(0, Ordering::SeqCst); // Just read current value
                 let total = total_to_download.load(Ordering::SeqCst);
 
-                // Report progress every time
-                if total > 0 {
+                if total > 0 && progress_throttle.should_emit() {
                     // Calculate progress from 0.2 to 0.9
                     let progress = 0.2 + 0.7 * (completed as f64 / total as f64);
 
@@ -318,12 +331,6 @@ impl MinecraftAssetsDownloadService {
         }
     }
 
-    /// Wrapper method to maintain compatibility with existing calls
-    pub async fn download_assets(&self, asset_index: &AssetIndex) -> Result<()> {
-        self.download_assets_with_progress(asset_index, Uuid::nil())
-            .await
-    }
-
     async fn download_asset_index(&self, asset_index: &AssetIndex) -> Result<AssetIndexContent> {
         let index_path = self
             .assets_path
@@ -347,41 +354,6 @@ impl MinecraftAssetsDownloadService {
         // Read and parse the downloaded index
         let content = fs::read(&index_path).await?;
         Ok(serde_json::from_slice(&content)?)
-    }
-
-    /// Scans the objects directory and returns a HashMap of hash -> file size.
-    /// This replaces thousands of individual filesystem calls with a single batch scan.
-    async fn scan_existing_assets(objects_path: &PathBuf) -> HashMap<String, u64> {
-        let mut existing = HashMap::new();
-
-        // Read all prefix directories (00, 01, ..., ff)
-        let mut prefix_dirs = match fs::read_dir(objects_path).await {
-            Ok(dir) => dir,
-            Err(_) => return existing,
-        };
-
-        while let Ok(Some(prefix_entry)) = prefix_dirs.next_entry().await {
-            if !prefix_entry.path().is_dir() {
-                continue;
-            }
-
-            // Read all hash files in this prefix directory
-            let mut hash_files = match fs::read_dir(prefix_entry.path()).await {
-                Ok(dir) => dir,
-                Err(_) => continue,
-            };
-
-            while let Ok(Some(hash_entry)) = hash_files.next_entry().await {
-                if let Ok(metadata) = hash_entry.metadata().await {
-                    if metadata.is_file() {
-                        let file_name = hash_entry.file_name().to_string_lossy().to_string();
-                        existing.insert(file_name, metadata.len());
-                    }
-                }
-            }
-        }
-
-        existing
     }
 
     /// Helper method for emitting progress events

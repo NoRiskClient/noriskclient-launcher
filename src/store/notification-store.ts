@@ -7,9 +7,6 @@ interface NotificationStoreState {
   isModalOpen: boolean;
   isLoading: boolean;
   error: string | null;
-
-  // Actions
-  setNotifications: (notifications: UserNotification[]) => void;
   fetchNotifications: () => Promise<void>;
   markAllAsRead: () => Promise<void>;
     markAsRead: (notificationId: string) => Promise<void>;
@@ -22,8 +19,6 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
   isModalOpen: false,
   isLoading: false,
   error: null,
-
-  setNotifications: (notifications) => set({ notifications }),
 
   fetchNotifications: async () => {
     set({ isLoading: true, error: null });

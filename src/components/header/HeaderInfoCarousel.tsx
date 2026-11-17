@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "../ui/Tooltip";
@@ -7,7 +5,6 @@ import {
   getUniquePlayers24h,
   type UniquePlayersResponse,
 } from "../../services/nrc-service";
-import { parseErrorMessage } from "../../utils/error-utils";
 
 interface HeaderInfoCarouselProps {
   version: string | null;
@@ -17,7 +14,7 @@ const SLIDE_INTERVAL_MS = 8000;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const TEXT_CLASSES =
-  "text-white/70 font-minecraft-ten text-[8px] font-normal leading-none";
+  "text-white/70 font-minecraft text-[8px] font-normal leading-none";
 
 export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
   const { t, i18n } = useTranslation();
@@ -88,7 +85,7 @@ export function HeaderInfoCarousel({ version }: HeaderInfoCarouselProps) {
 
   return (
     <div
-      className="relative inline-flex items-center -mt-2.5 h-3 min-w-[3.5rem]"
+      className="relative inline-flex items-center h-3 min-w-[3.5rem]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

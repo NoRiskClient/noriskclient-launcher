@@ -1,4 +1,3 @@
-"use client";
 import { useMemo } from "react";
 import { Lightning } from "./Lightning";
 import { useThemeStore } from "../../store/useThemeStore";

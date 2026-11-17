@@ -1,9 +1,44 @@
+use crate::config::HTTP_CONNECT_TIMEOUT;
 use crate::error::{AppError, Result as AppResult};
-use log::{error, info, warn};
+use log::{debug, error, info, trace};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use std::sync::Mutex;
+use std::time::Instant;
+use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::time::{sleep, Duration};
+
+const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+const UPDATE_CHECK_CACHE_TTL: Duration = Duration::from_secs(60);
+
+struct CachedUpdateCheck {
+    checked_at: Instant,
+    is_beta_channel: bool,
+    result: Option<UpdateInfo>,
+}
+
+static LAST_UPDATE_CHECK: Mutex<Option<CachedUpdateCheck>> = Mutex::new(None);
+
+fn cached_update_check(is_beta_channel: bool) -> Option<Option<UpdateInfo>> {
+    let guard = LAST_UPDATE_CHECK.lock().ok()?;
+    let cached = guard.as_ref()?;
+    if cached.is_beta_channel != is_beta_channel
+        || cached.checked_at.elapsed() > UPDATE_CHECK_CACHE_TTL
+    {
+        return None;
+    }
+    Some(cached.result.clone())
+}
+
+fn remember_update_check(is_beta_channel: bool, result: Option<UpdateInfo>) {
+    if let Ok(mut guard) = LAST_UPDATE_CHECK.lock() {
+        *guard = Some(CachedUpdateCheck {
+            checked_at: Instant::now(),
+            is_beta_channel,
+            result,
+        });
+    }
+}
 
 /// Checks if the application is running inside a Flatpak environment.
 ///
@@ -18,36 +53,16 @@ pub fn is_flatpak() -> bool {
     if is_flatpak {
         info!("Flatpak environment detected (FLATPAK_ID environment variable is set).");
     } else {
-        info!("Not running in Flatpak environment (FLATPAK_ID environment variable not found).");
+        trace!("Not running in Flatpak environment (FLATPAK_ID environment variable not found).");
     }
 
     is_flatpak
 }
 
-/// Checks if an update is available and returns detailed information including the updater instance.
-/// This version provides all necessary information to proceed with download/installation without redundancy.
-///
-/// # Arguments
-///
-/// * `app_handle` - The Tauri AppHandle.
-/// * `is_beta_channel` - `true` to check the beta channel, `false` for stable.
-///
-/// # Returns
-///
-/// * `Result<Option<UpdateCheckResult>>` - Detailed update information with updater instance, or None if up to date.
-pub async fn check_update_available_detailed(
+pub fn build_updater(
     app_handle: &AppHandle,
     is_beta_channel: bool,
-) -> AppResult<Option<UpdateCheckResult>> {
-    let current_version = app_handle.package_info().version.to_string();
-    let channel = if is_beta_channel { "Beta" } else { "Stable" };
-
-    info!(
-        "Checking for available updates (detailed) (Current: {}). Channel: {}",
-        current_version, channel
-    );
-
-    // Determine the base part of the URL and the platform-specific segment template
+) -> AppResult<tauri_plugin_updater::Updater> {
     let base_repo_url = if is_beta_channel {
         "https://api-staging.norisk.gg/api/v1/launcher/releases-v2"
     } else {
@@ -72,26 +87,64 @@ pub async fn check_update_available_detailed(
     }
 
     // Construct the final update URL string
-    let update_url_str = format!(
-        "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
-        base_repo_url, platform_specific_target
-    );
+    let update_url_str = std::env::var("NRC_UPDATE_ENDPOINT").unwrap_or_else(|_| {
+        format!(
+            "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
+            base_repo_url, platform_specific_target
+        )
+    });
 
-    info!("Using update endpoint template: {}", update_url_str);
+    trace!("Using update endpoint template: {}", update_url_str);
 
     let update_url = update_url_str.parse()
         .map_err(|e| AppError::Other(format!("Failed to parse update URL '{}': {}", update_url_str, e)))?;
 
-    let updater_builder = app_handle.updater_builder().endpoints(vec![update_url])
-        .map_err(|e| AppError::Other(format!("Failed to set updater endpoints: {}", e)))?;
-
-    let updater = updater_builder
+    app_handle
+        .updater_builder()
+        .configure_client(|c| c.connect_timeout(HTTP_CONNECT_TIMEOUT))
+        .endpoints(vec![update_url])
+        .map_err(|e| AppError::Other(format!("Failed to set updater endpoints: {}", e)))?
         .build()
-        .map_err(|e| AppError::Other(format!("Failed to build updater: {}", e)))?;
+        .map_err(|e| AppError::Other(format!("Failed to build updater: {}", e)))
+}
 
-    info!("Updater built successfully. Checking for updates...");
+/// Checks if an update is available and returns detailed information including the updater instance.
+/// This version provides all necessary information to proceed with download/installation without redundancy.
+///
+/// # Arguments
+///
+/// * `app_handle` - The Tauri AppHandle.
+/// * `is_beta_channel` - `true` to check the beta channel, `false` for stable.
+///
+/// # Returns
+///
+/// * `Result<Option<UpdateCheckResult>>` - Detailed update information with updater instance, or None if up to date.
+pub async fn check_update_available_detailed(
+    app_handle: &AppHandle,
+    is_beta_channel: bool,
+) -> AppResult<Option<UpdateCheckResult>> {
+    let current_version = app_handle.package_info().version.to_string();
+    let channel = if is_beta_channel { "Beta" } else { "Stable" };
 
-    match updater.check().await {
+    trace!(
+        "Checking for available updates (detailed) (Current: {}). Channel: {}",
+        current_version, channel
+    );
+
+    let updater = build_updater(app_handle, is_beta_channel)?;
+
+    trace!("Updater built successfully. Checking for updates...");
+
+    let check_result = tokio::time::timeout(UPDATE_CHECK_TIMEOUT, updater.check())
+        .await
+        .map_err(|_| {
+            AppError::Other(format!(
+                "Update check timed out after {:?}",
+                UPDATE_CHECK_TIMEOUT
+            ))
+        })?;
+
+    match check_result {
         Ok(Some(update)) => {
             let update_info = UpdateInfo {
                 version: update.version.clone(),
@@ -101,10 +154,13 @@ pub async fn check_update_available_detailed(
             };
 
             info!(
-                "Update available: Version {}, Released: {:?}",
+                "Update check: {} available (current {}, {} channel, released {:?})",
                 update.version,
+                current_version,
+                channel,
                 update.date
             );
+            remember_update_check(is_beta_channel, Some(update_info.clone()));
 
             let result = UpdateCheckResult {
                 update_info,
@@ -115,7 +171,11 @@ pub async fn check_update_available_detailed(
             Ok(Some(result))
         }
         Ok(None) => {
-            info!("No update available for the {} channel.", channel);
+            info!(
+                "Update check: up to date ({}, {} channel)",
+                current_version, channel
+            );
+            remember_update_check(is_beta_channel, None);
             Ok(None)
         }
         Err(e) => {
@@ -143,6 +203,10 @@ pub async fn check_update_available(
     app_handle: &AppHandle,
     is_beta_channel: bool,
 ) -> AppResult<Option<UpdateInfo>> {
+    if let Some(cached) = cached_update_check(is_beta_channel) {
+        debug!("Update check: serving cached result");
+        return Ok(cached);
+    }
     // Use the detailed version but only return the UpdateInfo part
     match check_update_available_detailed(app_handle, is_beta_channel).await? {
         Some(result) => Ok(Some(result.update_info)),
@@ -186,7 +250,7 @@ pub fn emit_status(
     let payload = UpdaterStatusPayload {
         message,
         status: status.to_string(),
-        progress: progress_info.map(|(chunk, total)| (chunk * 100 / total.max(1))),
+        progress: progress_info.map(|(chunk, total)| chunk * 100 / total.max(1)),
         total: progress_info.map(|(_, total)| total),
         chunk: progress_info.map(|(chunk, _)| chunk),
     };
@@ -204,8 +268,8 @@ pub fn emit_status(
 /// # Returns
 ///
 /// * `Result<WebviewWindow>` - The created Tauri webview window instance or an error.
-pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
-    info!("Creating updater window...");
+pub fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<WebviewWindow> {
+    trace!("Creating updater window...");
     let window = WebviewWindowBuilder::new(
         app_handle,
         "updater",                              // Unique label
@@ -221,7 +285,7 @@ pub async fn create_updater_window(app_handle: &AppHandle) -> tauri::Result<Webv
     .visible(false) // Start hidden, show when needed
     .build()?;
 
-    info!("Updater window created successfully (label: 'updater').");
+    trace!("Updater window created successfully (label: 'updater').");
     Ok(window)
 }
 
@@ -241,6 +305,11 @@ pub async fn download_and_install_update(
     is_beta_channel: bool,
 ) -> AppResult<()> {
     info!("Starting manual update download and installation process...");
+
+    if let Some(pending) = crate::utils::background_updater::take_pending() {
+        info!("Installing the already downloaded update {}", pending.update.version);
+        return install_and_restart(&pending.update, &pending.bytes, app_handle);
+    }
 
     // Check for available updates with detailed information
     match check_update_available_detailed(app_handle, is_beta_channel).await? {
@@ -345,40 +414,34 @@ async fn handle_update(
     }
     // --- End Debug Delay ---
 
-    // --- Step 2: Install the update ---
-    // This block can be commented out for testing to prevent actual installation
-    /* START INSTALL BLOCK */
-    info!("Starting update installation...");
-    update
-        .install(bytes) // Use the install method with the downloaded bytes
-        .map_err(|e| {
-            error!("Update installation failed: {}", e);
-            // Convert updater::Error to AppError::Other for install step
-            AppError::Other(format!("Updater install error: {}", e))
-        })?;
-    // Simulate install time if commented out
-    #[cfg(debug_assertions)]
-    if true {
-        // Change to check if install block IS commented out if needed
-        info!("DEBUG: Simulating installation time...");
-        sleep(Duration::from_secs(2)).await;
-        info!("DEBUG: Simulated installation finished.");
-    } else {
-        info!("DEBUG: Installation block active (no extra delay added here).");
-    }
-    // Remove the line below if install block is active
-    info!("Skipping actual installation (commented out).");
-    /* END INSTALL BLOCK */
+    install_and_restart(&update, &bytes, &app_handle)
+}
 
-    // Emit final statuses after successful install (or after download if install is commented out)
+pub fn install_and_restart(
+    update: &tauri_plugin_updater::Update,
+    bytes: &[u8],
+    app_handle: &AppHandle,
+) -> AppResult<()> {
+    info!("Starting update installation...");
     emit_status(
-        &app_handle,
+        app_handle,
+        "installing",
+        format!("Installing update {}...", update.version),
+        None,
+    );
+    update.install(bytes).map_err(|e| {
+        error!("Update installation failed: {}", e);
+        AppError::Other(format!("Updater install error: {}", e))
+    })?;
+
+    emit_status(
+        app_handle,
         "installing",
         "Installation complete.".to_string(),
         None,
     );
     emit_status(
-        &app_handle,
+        app_handle,
         "finished",
         "Update installed successfully!".to_string(),
         None,
@@ -391,168 +454,4 @@ async fn handle_update(
     }
 
     Ok(())
-}
-
-/// Prüft auf Anwendungsupdates für den spezifizierten Kanal.
-///
-/// # Arguments
-///
-/// * `app_handle` - The Tauri AppHandle.
-/// * `is_beta_channel` - `true` to check the beta channel, `false` for stable.
-/// * `updater_window` - An optional WebviewWindow handle to show the updater window.
-pub async fn check_for_updates(
-    app_handle: AppHandle,
-    is_beta_channel: bool,
-    updater_window: Option<WebviewWindow>,
-) {
-    let current_version = app_handle.package_info().version.to_string();
-    let channel = if is_beta_channel { "Beta" } else { "Stable" };
-    let mut final_status: String = "unknown".to_string();
-    let mut final_message: String = "Update process ended.".to_string();
-
-    info!(
-        "Checking for updates (Current: {}). Channel: {}",
-        current_version, channel
-    );
-    emit_status(
-        &app_handle,
-        "checking",
-        format!("Checking for {} updates...", channel),
-        None,
-    );
-
-    // Determine the base part of the URL and the platform-specific segment template
-    let base_repo_url = if is_beta_channel {
-        "https://api-staging.norisk.gg/api/v1/launcher/releases-v2"
-    } else {
-        "https://api.norisk.gg/api/v1/launcher/releases-v2"
-    };
-
-    let mut platform_specific_target = "{{target}}".to_string(); // Default: Tauri replaces {{target}}
-
-    if cfg!(target_os = "linux") {
-        if std::env::var("APPIMAGE").is_ok() {
-            info!("Linux AppImage detected. Updater will use default target for manifest URL.");
-            // platform_specific_target remains "{{target}}" for AppImage
-        } else {
-            // Not an AppImage, assume .deb or similar package manager context.
-            // The server must be configured to serve a .deb manifest for this specific target string.
-            // IMPORTANT: "debian" is a placeholder. Confirm with your backend/server team
-            // what target string they expect for .deb packages (e.g., "debian", "linux-deb").
-            let deb_target_identifier = "debian";
-            info!(
-                "Linux non-AppImage (e.g., .deb) detected. Modifying manifest URL to use target: {}",
-                deb_target_identifier
-            );
-            platform_specific_target = deb_target_identifier.to_string();
-        }
-    }
-
-    // Construct the final update URL string
-    // Tauri will replace {{arch}} and {{current_version}}.
-    // {{target}} will also be replaced by Tauri *if* platform_specific_target is "{{target}}".
-    // Otherwise, our specific target (e.g., "debian") is used directly.
-    let update_url_str = format!(
-        "{}/{}/{{{{arch}}}}/{{{{current_version}}}}",
-        base_repo_url, platform_specific_target
-    );
-
-    info!("Using update endpoint template: {}", update_url_str);
-
-    let update_url = match update_url_str.parse() {
-        Ok(url) => url,
-        Err(e) => {
-            error!("Failed to parse update URL '{}': {}", update_url_str, e);
-            final_status = "error".to_string();
-            final_message = format!("Failed to parse update URL: {}", e);
-            emit_status(&app_handle, &final_status, final_message.clone(), None);
-            emit_status(&app_handle, "close", final_message.clone(), None);
-            return;
-        }
-    };
-
-    let updater_result = app_handle.updater_builder().endpoints(vec![update_url]);
-
-    let updater = match updater_result {
-        Ok(builder) => match builder.build() {
-            Ok(updater) => updater,
-            Err(e) => {
-                error!("Failed to build updater: {}", e);
-                final_status = "error".to_string();
-                final_message = format!("Failed to build updater: {}", e);
-                emit_status(&app_handle, &final_status, final_message.clone(), None);
-                emit_status(&app_handle, "close", final_message.clone(), None);
-                return;
-            }
-        },
-        Err(e) => {
-            error!("Failed to set updater endpoints: {}", e);
-            final_status = "error".to_string();
-            final_message = format!("Failed to set updater endpoints: {}", e);
-            emit_status(&app_handle, &final_status, final_message.clone(), None);
-            emit_status(&app_handle, "close", final_message.clone(), None);
-            return;
-        }
-    };
-
-    info!("Updater built successfully. Checking for updates...");
-
-    match updater.check().await {
-        Ok(Some(update)) => {
-            let update_version = update.version.clone();
-            info!(
-                "Update available: Version {}, Released: {:?}, Body:\n{}",
-                update.version,
-                update.date,
-                update.body.as_deref().unwrap_or_default()
-            );
-
-            if let Some(win) = &updater_window {
-                info!("Update found. Showing updater window...");
-                if let Err(e) = win.show() {
-                    error!("Failed to show updater window: {}", e);
-                }
-            } else {
-                warn!("Update found, but no updater window handle available to show.");
-            }
-
-            emit_status(
-                &app_handle,
-                "pending",
-                format!("Update {} found!", update_version),
-                None,
-            );
-
-            match handle_update(update, app_handle.clone()).await {
-                Ok(_) => {
-                    final_status = "finished".to_string();
-                    final_message = "Update successful.".to_string();
-                }
-                Err(e) => {
-                    final_status = "error".to_string();
-                    final_message = format!("Update download/install failed: {}", e);
-                    emit_status(&app_handle, &final_status, final_message.clone(), None);
-                }
-            }
-        }
-        Ok(None) => {
-            info!("No update available for the {} channel.", channel);
-            final_status = "uptodate".to_string();
-            final_message = "Application is up to date.".to_string();
-            emit_status(&app_handle, &final_status, final_message.clone(), None);
-        }
-        Err(e) => {
-            error!("Error during update check for {} channel: {}", channel, e);
-            final_status = "error".to_string();
-            final_message = format!("Update check error: {}", e);
-            emit_status(&app_handle, &final_status, final_message.clone(), None);
-        }
-    }
-
-    //TODO: Remove this line when the updater is fully implemented
-    emit_status(&app_handle, "close", final_message.clone(), None);
-    info!(
-        "Update check process fully completed (Status: {}). Final Message: {}",
-        final_status, final_message
-    );
 }

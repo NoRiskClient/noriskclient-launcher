@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +9,6 @@ import { Button } from "../ui/buttons/Button";
 import { IconButton } from "../ui/buttons/IconButton";
 import { RolloutIndicator } from "./RolloutIndicator";
 
-import { useThemeStore } from "../../store/useThemeStore";
 import { useVersionSelectionStore } from "../../store/version-selection-store";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch";
 
@@ -111,13 +108,6 @@ export function MainLaunchButton({
     await hookHandleLaunch();
   };
 
-  const handleVersionChange = (version: string) => {
-    if (isButtonLaunching) return;
-    if (onVersionChange) {
-      onVersionChange(version);
-    }
-  };
-
   const handleOpenModal = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isButtonLaunching) return;
@@ -126,20 +116,13 @@ export function MainLaunchButton({
     navigate("/profiles");
   };
 
-  const getMainButtonIcon = () => {
-    if (isButtonLaunching) {
-      return <Icon icon="solar:stop-bold" width="24" height="24" />;
-    }
-    return <Icon icon="solar:play-bold" width="24" height="24" />;
-  };
-
   const renderLaunchButtonContent = () => {
-    const actionText = isButtonLaunching ? "STOP" : "LAUNCH";
+    const actionText = isButtonLaunching ? "Stop" : "Launch";
 
     let statusSubText: string | null | undefined = null;
     let statusColorClass = "opacity-85";
 
-    if (transientSuccessActive && buttonStatusMessage === "STARTING!") {
+    if (transientSuccessActive && buttonStatusMessage === t('launch.starting')) {
       statusSubText = buttonStatusMessage;
       statusColorClass = "text-green-400";
     } else if (isButtonLaunching) {
@@ -158,12 +141,12 @@ export function MainLaunchButton({
 
     const displaySubText = statusSubText || selectedVersionLabel;
     return (
-      <div className="w-full flex flex-col items-center justify-center leading-none -mt-4">
-        <span className="text-5xl text-center lowercase">{actionText}</span>{" "}
+      <div className="w-full flex flex-col items-center justify-center leading-none -translate-y-[5px]">
+        <span className="text-3xl text-center">{actionText}</span>
         {displaySubText && (
           <span
             className={cn(
-              "text-xs font-minecraft-ten tracking-normal -mt-1 text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
+              "text-xs font-minecraft tracking-normal text-center normal-case whitespace-nowrap overflow-hidden text-ellipsis",
               isButtonLaunching ? "max-w-64" : "",
               statusColorClass
             )}

@@ -165,6 +165,7 @@ export interface Mod {
   game_versions: string[] | null;
   file_name_override: string | null;
   associated_loader: ModLoader | null;
+  mod_loaders?: ModLoader[];
 
   /// Origin modpack identifier in format: "platform:project_id[:version_id]"
   /// Example: "modrinth:AANobbMI:tFw0iWAk" or "curseforge:12345:67890"
@@ -188,7 +189,6 @@ export interface NoriskModIdentifier {
 }
 
 export interface NoriskInformation {
-  keep_local_assets: boolean;
   is_experimental: boolean;
   is_main_version?: boolean;
 }
@@ -215,7 +215,11 @@ export interface Profile {
   last_played: string | null;
   settings: ProfileSettings;
   state: ProfileState;
+  // Entries from get_all_profiles_and_last_played (the profile store list) ship
+  // mods as [] to keep the IPC payload small; use mod_count there.
+  // get_profile returns the full mods list and no mod_count.
   mods: Mod[];
+  mod_count?: number;
   selected_norisk_pack_id: string | null;
   disabled_norisk_mods_detailed: NoriskModIdentifier[];
   source_standard_profile_id: string | null;
@@ -229,6 +233,7 @@ export interface Profile {
   modpack_info?: ModPackInfo | null;
   preferred_account_id: string | null;
   playtime_seconds?: number;
+  sync_pack_ids: string[];
 }
 
 export interface ProfileGroup {
@@ -284,11 +289,14 @@ export interface CopyProfileParams {
   copy_all_files?: boolean;
 }
 
+export type ExportPackFormat = "noriskpack" | "mrpack" | "curseforge";
+
 export interface ExportProfileParams {
   profile_id: string;
   file_name: string;
   include_files?: string[];
   open_folder: boolean;
+  format?: ExportPackFormat;
 }
 
 // --- Payload for upload_profile_icon command ---
@@ -422,6 +430,7 @@ export interface GenericModrinthInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
 }
 
 export interface GenericCurseForgeInfo {
@@ -430,6 +439,7 @@ export interface GenericCurseForgeInfo {
   name: string;
   version_number: string;
   download_url?: string | null; // Making it optional as in Rust struct
+  icon_url?: string | null;
   fingerprint?: number; // CurseForge file fingerprint for update checking
 }
 
@@ -457,11 +467,17 @@ export interface LocalContentItem {
 }
 
 // --- Params for get_local_content command ---
+export type CacheBehaviour =
+  | "stale_while_revalidate"
+  | "must_revalidate"
+  | "bypass";
+
 export interface LoadItemsParams {
   profile_id: string; // UUID
   content_type: ContentType; // Enum: ResourcePack, ShaderPack, DataPack
   calculate_hashes: boolean;
   fetch_modrinth_data: boolean;
+  cache_behaviour?: CacheBehaviour;
 }
 
 // --- Migration types ---

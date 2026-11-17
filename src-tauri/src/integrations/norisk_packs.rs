@@ -1,7 +1,6 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::state::event_state::{EventPayload, EventType};
-use crate::state::profile_state::{Profile, ProfileState};
+use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
+use crate::state::profile_state::ProfileState;
 use crate::state::state_manager::State;
 use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
@@ -11,7 +10,6 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::env;
 use std::path::PathBuf;
 use tauri::Manager; // Required for app_handle.get_window() and window.emit()
 use tokio::fs;
@@ -41,6 +39,16 @@ impl Default for NoriskModpacksConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct PackListing {
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub weight: i32,
+    #[serde(default)]
+    pub hidden: bool,
+}
+
 /// Defines a single Norisk modpack variant (e.g., production, development).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NoriskPackDefinition {
@@ -62,6 +70,8 @@ pub struct NoriskPackDefinition {
     /// Optional: Whether this pack is experimental.
     #[serde(rename = "isExperimental", default)]
     pub is_experimental: bool,
+    #[serde(default)]
+    pub listing: PackListing,
     /// Optional: Policy controlling loader version per MC version/loader.
     #[serde(rename = "loaderPolicy", default)]
     pub loader_policy: Option<LoaderPolicy>,
@@ -154,8 +164,8 @@ pub struct LoaderPolicy {
 #[serde(rename_all = "snake_case")]
 pub enum LoaderStrategy {
     Exact,
-    Latest_compatible,
-    Min_compatible,
+    LatestCompatible,
+    MinCompatible,
 }
 
 /// Definition of a desired/allowed loader version.
@@ -293,10 +303,17 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     drop(profile_json_buf_reader);
 
     // 4. Parse the profile.json
-    let mut exported_profile: Profile = serde_json::from_str(&profile_content).map_err(|e| {
-        error!("Failed to parse profile.json: {}", e);
-        AppError::Json(e)
-    })?;
+    let (mut exported_profile, security_report) =
+        crate::utils::import_safety::parse_untrusted_profile(&profile_content).map_err(|e| {
+            error!("Failed to parse profile.json: {}", e);
+            e
+        })?;
+    if !security_report.is_clean() {
+        warn!(
+            "Sanitized untrusted noriskpack {:?}: {:?}",
+            pack_path, security_report
+        );
+    }
 
     // 5. Use the filename as the profile name if available
     if let Some(file_name) = pack_path.file_stem().and_then(|s| s.to_str()) {
@@ -337,6 +354,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
     exported_profile.created = Utc::now();
     exported_profile.last_played = None;
     exported_profile.state = ProfileState::NotInstalled;
+    exported_profile.sync_pack_ids = Vec::new();
 
     info!("Prepared new profile with path: {}", exported_profile.path);
 
@@ -370,7 +388,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
         AppError::Io(e)
     })?;
     let mut overrides_buf_reader = BufReader::new(overrides_file_for_listing);
-    let mut zip_lister_for_overrides = ZipFileReader::with_tokio(&mut overrides_buf_reader)
+    let zip_lister_for_overrides = ZipFileReader::with_tokio(&mut overrides_buf_reader)
         .await
         .map_err(|e| {
         error!(
@@ -403,6 +421,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
     // Create a counter for tracking extraction progress
     let extraction_counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let extraction_throttle = std::sync::Arc::new(ProgressThrottle::new(100));
     let total_files = override_file_count;
 
     let mut extraction_tasks = Vec::new();
@@ -521,6 +540,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
                     entry_filename_str, task_final_dest_path, entry_uncompressed_size
                 );
                 let task_counter = extraction_counter.clone();
+                let task_throttle = extraction_throttle.clone();
                 let task_total = total_files;
                 let task_state = state.clone();
                 let task_event_id = event_id;
@@ -619,7 +639,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
                     // Increment counter and emit progress
                     let completed = task_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    if task_total > 0 {
+                    if task_total > 0 && task_throttle.should_emit() {
                         // Progress from 0.25 to 0.90 during extraction (65% of total)
                         let extraction_progress = completed as f64 / task_total as f64;
                         let overall_progress = 0.25 + (extraction_progress * 0.65);
@@ -735,7 +755,16 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
 
             // Spawn an async task to handle the import
             tauri::async_runtime::spawn(async move {
-                match crate::commands::profile_command::import_profile(path_string_for_task, None).await {
+                match crate::commands::profile_command::import_profile(
+                    path_string_for_task,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                {
                     Ok(profile_id) => {
                         info!("Profile {} imported successfully.", profile_id);
                         // Attempt to bring the main window to the front and focus it.
@@ -758,8 +787,8 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
                             e // Use {:?} for CommandError
                         );
                         // Optionally, send an event to the frontend to show an error toast/dialog
-                        if let Some(window) = import_app_handle.get_webview_window("main") {
-                            let error_message = format!(
+                        if let Some(_window) = import_app_handle.get_webview_window("main") {
+                            let _error_message = format!(
                                 "Failed to import noriskpack ({}): {:?}",
                                 file_path_to_import.display(),
                                 e
@@ -829,15 +858,14 @@ impl NoriskModpacksConfig {
 
         // --- 5. Handle Local Mods ---
         // Local mods defined directly in the pack override any inherited mods.
-        if let local_mods = &base_definition.mods {
-            debug!(
-                "Pack '{}': Processing {} local mods",
-                pack_id,
-                local_mods.len()
-            );
-            for mod_entry in local_mods {
-                resolved_mods.insert(mod_entry.id.clone(), mod_entry.clone());
-            }
+        let local_mods = &base_definition.mods;
+        log::trace!(
+            "Pack '{}': Processing {} local mods",
+            pack_id,
+            local_mods.len()
+        );
+        for mod_entry in local_mods {
+            resolved_mods.insert(mod_entry.id.clone(), mod_entry.clone());
         }
 
         // --- 6. Handle Exclusions ---
@@ -864,7 +892,7 @@ impl NoriskModpacksConfig {
         // Convert the HashMap values back to a Vec
         let final_mod_list: Vec<NoriskModEntryDefinition> = resolved_mods.into_values().collect();
 
-        debug!(
+        log::trace!(
             "Pack '{}': Resolved to {} final mods.",
             pack_id,
             final_mod_list.len()
@@ -958,116 +986,10 @@ impl NoriskModpacksConfig {
             mods: resolved_mods_vec, // Use the fully resolved list here
             assets: base_definition.assets.clone(), // Added missing field
             is_experimental: base_definition.is_experimental, // Added missing field
+            listing: base_definition.listing.clone(),
             loader_policy: resolved_loader_policy, // RESOLVED loader policy
             startup_helper: base_definition.startup_helper.clone(), // Added missing field
         })
     }
 
-    /// Prints the resolved mod list for each pack defined in the configuration.
-    /// Useful for debugging the inheritance and exclusion logic.
-    pub fn print_resolved_packs(&self) -> Result<()> {
-        info!("Printing resolved packs...");
-        // Collect pack IDs to avoid borrowing issues while iterating and resolving
-        let pack_ids: Vec<String> = self.packs.keys().cloned().collect();
-
-        for pack_id in pack_ids {
-            match self.get_resolved_pack_definition(&pack_id) {
-                Ok(resolved_pack) => {
-                    // Use debug logging for potentially large output
-                    debug!("--- Resolved Pack: '{}' ---", resolved_pack.display_name);
-                    debug!("  Description: {}", resolved_pack.description);
-                    if let Some(inherits) = &resolved_pack.inherits_from {
-                        debug!("  Inherits From: {:?}", inherits);
-                    }
-                    if let Some(excludes) = &resolved_pack.exclude_mods {
-                        debug!("  Excludes Mods: {:?}", excludes);
-                    }
-
-                    let mod_ids: Vec<&str> =
-                        resolved_pack.mods.iter().map(|m| m.id.as_str()).collect();
-                    debug!("  Final Mods ({}): {:?}", mod_ids.len(), mod_ids);
-
-                    // Example of printing more details (optional)
-                    // for mod_def in resolved_pack.mods {
-                    //     debug!("    - Mod ID: {}, Source Type: {:?}, Compatibility Keys: {:?}",
-                    //            mod_def.id,
-                    //            mod_def.source, // This might be verbose
-                    //            mod_def.compatibility.keys().collect::<Vec<_>>()
-                    //     );
-                    // }
-                    println!(
-                        "Resolved Pack: '{}' - Final Mod IDs: {:?}",
-                        resolved_pack.display_name, mod_ids
-                    );
-                }
-                Err(e) => {
-                    error!("Failed to resolve pack '{}': {}", pack_id, e);
-                    // Decide if you want to continue or return the error
-                    // For a print function, continuing might be acceptable.
-                    // return Err(e);
-                }
-            }
-        }
-        info!("Finished printing resolved packs.");
-        Ok(())
-    }
-}
-
-/// Copies a dummy/test `test_norisk_modpacks.json` from the project's source directory
-/// (assuming a development environment structure) to the launcher's root directory
-/// as `norisk_modpacks.json` if it doesn't already exist.
-///
-/// Note: This path resolution using CARGO_MANIFEST_DIR might not work correctly
-/// in a packaged production build. Consider using Tauri's resource resolver for that.
-pub async fn load_dummy_modpacks() -> Result<()> {
-    let target_dir = LAUNCHER_DIRECTORY.root_dir();
-    let target_file = target_dir.join("norisk_modpacks.json");
-
-    // Only copy if the target file doesn't exist
-    if target_file.exists() {
-        //info!("Target modpacks file {:?} already exists. Skipping dummy loading.", target_file);
-        //return Ok(());
-    }
-
-    // --- Path resolution based on CARGO_MANIFEST_DIR ---
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // Assuming the project root is one level above the crate's manifest (src-tauri)
-    let project_root = manifest_dir.parent().ok_or_else(|| {
-        AppError::Other("Failed to get parent directory of CARGO_MANIFEST_DIR".to_string())
-    })?;
-
-    // Use the test file as the source
-    let source_path = project_root.join("minecraft-data/nrc/norisk_modpacks.json");
-    // --- End path resolution ---
-
-    if source_path.exists() {
-        info!("Found dummy modpacks source at: {:?}", source_path);
-        // Ensure the target directory exists
-        fs::create_dir_all(&target_dir).await.map_err(|e| {
-            error!("Failed to create target directory {:?}: {}", target_dir, e);
-            AppError::Io(e)
-        })?;
-
-        // Copy the file
-        fs::copy(&source_path, &target_file).await.map_err(|e| {
-            error!(
-                "Failed to copy dummy modpacks from {:?} to {:?}: {}",
-                source_path, target_file, e
-            );
-            AppError::Io(e)
-        })?;
-        info!("Successfully copied dummy modpacks to {:?}", target_file);
-    } else {
-        error!(
-            "Dummy modpacks source file not found at expected path: {:?}",
-            source_path
-        );
-        // Use a more general error as it's not a Tauri resource issue anymore
-        return Err(AppError::Other(format!(
-            "Source file not found for dummy modpacks: {}",
-            source_path.display()
-        )));
-    }
-
-    Ok(())
 }

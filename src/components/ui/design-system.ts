@@ -112,22 +112,22 @@ export const getSizeClasses = (size: ComponentSize, element: "button" | "input" 
   
   if (element === "input") {
     switch (size) {
-      case "xs": return "h-[36px] px-5 text-lg";
-      case "sm": return "h-[42px] px-6 text-xl";
-      case "md": return "h-[50px] px-8 text-xl";
-      case "lg": return "h-[58px] px-10 text-2xl";
-      case "xl": return "h-[66px] px-12 text-2xl";
-      default: return "h-[50px] px-8 text-xl";
+      case "xs": return "h-[36px] px-5 text-xs";
+      case "sm": return "h-[42px] px-6 text-sm";
+      case "md": return "h-[50px] px-8 text-sm";
+      case "lg": return "h-[58px] px-10 text-base";
+      case "xl": return "h-[66px] px-12 text-base";
+      default: return "h-[50px] px-8 text-sm";
     }
   }
   
   switch (size) {
-    case "xs": return "h-[36px] px-5 py-2 text-lg";
-    case "sm": return "h-[42px] px-6 py-2 text-xl"; 
-    case "md": return "h-[50px] px-8 py-2.5 text-xl";
-    case "lg": return "h-[58px] px-10 py-3 text-2xl";
-    case "xl": return "h-[66px] px-12 py-4 text-2xl";
-    default: return "h-[50px] px-8 py-2.5 text-xl";
+    case "xs": return "h-[36px] px-5 py-2 text-xs";
+    case "sm": return "h-[42px] px-6 py-2 text-sm";
+    case "md": return "h-[50px] px-8 py-2.5 text-sm";
+    case "lg": return "h-[58px] px-10 py-3 text-base";
+    case "xl": return "h-[66px] px-12 py-4 text-base";
+    default: return "h-[50px] px-8 py-2.5 text-sm";
   }
 };
 
@@ -205,43 +205,43 @@ export const getTextSizeClass = (size: ComponentSize, element: "button" | "input
   
   if (element === "input") {
     switch (size) {
-      case "xs": return "text-lg";
-      case "sm": return "text-xl";
-      case "md": return "text-xl";
-      case "lg": return "text-2xl";
-      case "xl": return "text-2xl";
-      default: return "text-xl";
+      case "xs": return "text-xs";
+      case "sm": return "text-sm";
+      case "md": return "text-sm";
+      case "lg": return "text-base";
+      case "xl": return "text-base";
+      default: return "text-sm";
     }
   }
     if (element === "button") {
     switch (size) {
-      case "xs": return "text-lg";
-      case "sm": return "text-xl";
-      case "md": return "text-xl";
-      case "lg": return "text-2xl";
-      case "xl": return "text-2xl";
-      default: return "text-xl";
+      case "xs": return "text-xs";
+      case "sm": return "text-sm";
+      case "md": return "text-sm";
+      case "lg": return "text-base";
+      case "xl": return "text-base";
+      default: return "text-sm";
     }
   }
   
   if (element === "checkbox") {
     switch (size) {
-      case "xs": return "text-xl";
-      case "sm": return "text-2xl";
-      case "md": return "text-2xl";
-      case "lg": return "text-3xl";
-      case "xl": return "text-3xl";
-      default: return "text-2xl";
+      case "xs": return "text-xs";
+      case "sm": return "text-xs";
+      case "md": return "text-sm";
+      case "lg": return "text-base";
+      case "xl": return "text-base";
+      default: return "text-sm";
     }
   }
   
   switch (size) {
-    case "xs": return "text-lg";
-    case "sm": return "text-xl";
-    case "md": return "text-xl";
-    case "lg": return "text-2xl";
-    case "xl": return "text-2xl";
-    default: return "text-xl";
+    case "xs": return "text-xs";
+    case "sm": return "text-sm";
+    case "md": return "text-sm";
+    case "lg": return "text-base";
+    case "xl": return "text-base";
+    default: return "text-sm";
   }
 };
 
@@ -258,17 +258,19 @@ export const getToastVariantStyles = (variant: ToastVariant, accentColor: string
     case "success":
       return {
         backgroundColor: "rgba(16, 185, 129, 0.3)",
+        "--glass-tint": "rgb(16, 185, 129)",
         borderColor: "rgba(16, 185, 129, 0.8)",
         borderBottomColor: "#059669",
         color: "#d1fae5",
-      };
+      } as React.CSSProperties;
     case "error":
       return {
         backgroundColor: "rgba(239, 68, 68, 0.3)",
+        "--glass-tint": "rgb(239, 68, 68)",
         borderColor: "rgba(239, 68, 68, 0.8)",
         borderBottomColor: "#dc2626",
         color: "#fee2e2",
-      };
+      } as React.CSSProperties;
     default:
       return {
         backgroundColor: `${accentColor}30`,
@@ -299,4 +301,15 @@ export const getToastBaseStyles = (config: ToastStyleConfig): React.CSSPropertie
   };
 };
 
-export const TOAST_BASE_CLASSES = "font-minecraft tracking-wider lowercase text-shadow-sm";
+export const TOAST_BASE_CLASSES = "glass-panel font-smallcaps tracking-wider text-shadow-sm";
+
+export const MENU_PANEL_CLASSES =
+  "bg-black/90 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden";
+
+export const menuItemClasses = (compact: boolean): string =>
+  `w-full flex items-center gap-2.5 text-left font-minecraft transition-colors duration-150 ${
+    compact ? "px-2.5 py-1.5 text-xs" : "px-4 py-3 text-base"
+  }`;
+
+export const menuSeparatorClasses = (compact: boolean): string =>
+  `border-t border-white/10 ${compact ? "my-1 mx-2" : "my-1.5 mx-3"}`;

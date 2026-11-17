@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LogsTabV3 — functional log-reader.
  *
@@ -8,6 +6,7 @@
  * stack-trace-inherit filter logic.
  */
 
+import { shareLogWithToast } from "../../../share/share-toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
@@ -20,7 +19,6 @@ import {
   getLogFileContent,
   getProfileLogFiles,
   openLogFileDirectory,
-  uploadLogToMclogs,
   parseLogLinesFromString,
   LOG_LEVELS,
   type LogLevel,
@@ -31,6 +29,7 @@ import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { Tooltip } from "../../../ui/Tooltip";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface LogsTabV3Props {
   profile: Profile;
@@ -112,7 +111,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
       onRefresh?.();
     } catch (err) {
       console.error("[V3 Logs] Failed to list:", err);
-      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(parseErrorMessage(err));
     } finally {
       if (mountedRef.current) setIsLoadingList(false);
     }
@@ -136,7 +135,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         if (mountedRef.current) setRawContent(content);
       } catch (err) {
         console.error("[V3 Logs] Failed to load content:", err);
-        if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
+        if (mountedRef.current) setError(parseErrorMessage(err));
       } finally {
         if (mountedRef.current) setIsLoadingContent(false);
       }
@@ -178,31 +177,19 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
     try {
       await openLogFileDirectory(selectedPath);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(parseErrorMessage(err));
     }
   }, [selectedPath]);
 
   const handleUpload = useCallback(async () => {
-    if (!rawContent || isUploading) return;
+    if (!rawContent || !selectedPath || isUploading) return;
     setIsUploading(true);
     try {
-      const url = await toast.promise(
-        uploadLogToMclogs(rawContent),
-        {
-          loading: t("profiles.v3.logs.uploading"),
-          success: (u: string) => t("profiles.v3.logs.uploadSuccess", { url: u }),
-          error: (err) => t("profiles.v3.logs.uploadFailed", { error: err instanceof Error ? err.message : String(err) }),
-        },
-      );
-      // Copy URL to clipboard so the user can paste it straight into a chat.
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(t("profiles.v3.logs.urlCopied"));
-      } catch { /* clipboard blocked — fine */ }
+      await shareLogWithToast(rawContent, getFilename(selectedPath));
     } finally {
       if (mountedRef.current) setIsUploading(false);
     }
-  }, [rawContent, isUploading, t]);
+  }, [rawContent, selectedPath, isUploading, t]);
 
   const scrollToBottom = useCallback(() => {
     if (virtuosoRef.current && visibleLines.length > 0) {
@@ -222,7 +209,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("profiles.v3.logs.searchPlaceholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft-ten"
+            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
           />
         </div>
 
@@ -234,7 +221,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
               <button
                 key={lvl}
                 onClick={() => toggleLevel(lvl)}
-                className={`h-8 px-2 rounded-md border text-[10px] font-minecraft-ten uppercase tracking-wider transition-colors ${
+                className={`h-8 px-2 rounded-md border text-[10px] font-minecraft uppercase tracking-wider transition-colors ${
                   active
                     ? `${cfg.pillBg} ${cfg.pillBorder} ${cfg.text}`
                     : `bg-white/[0.02] border-white/10 text-white/30 ${cfg.pillHover}`
@@ -254,7 +241,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
           <button
             onClick={() => setFileMenuOpen(v => !v)}
             disabled={logFiles.length === 0}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft-ten text-white/80 flex items-center gap-1.5 max-w-[220px] disabled:opacity-50"
+            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/80 flex items-center gap-1.5 max-w-[220px] disabled:opacity-50"
           >
             <Icon icon="solar:file-text-bold" className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{selectedFilename}</span>
@@ -283,7 +270,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             disabled={!rawContent || isUploading}
             className="h-8 w-8 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center justify-center transition-colors"
           >
-            <Icon icon={isUploading ? "solar:refresh-bold" : "solar:cloud-upload-bold"} className={`w-4 h-4 ${isUploading ? "animate-spin" : ""}`} />
+            <Icon icon={isUploading ? "svg-spinners:ring-resize" : "solar:cloud-upload-bold"} className="w-4 h-4" />
           </button>
         </Tooltip>
         <Tooltip content={t("profiles.v3.logs.openFolderTitle")}>
@@ -330,10 +317,10 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         {error && (
           <div className="absolute top-3 left-3 right-3 z-20 flex items-start gap-3 p-3 rounded-lg border border-rose-400/30 bg-rose-500/10">
             <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 text-rose-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0 text-xs font-minecraft-ten text-rose-100 break-words">{error}</div>
+            <div className="flex-1 min-w-0 text-xs font-minecraft text-rose-100 break-words">{error}</div>
             <button
               onClick={loadFiles}
-              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft-ten uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
+              className="flex-shrink-0 h-7 px-2 rounded-md text-[10px] font-minecraft uppercase tracking-wider text-rose-100 hover:bg-rose-500/20 transition-colors"
             >
               {t("profiles.v3.content.retry")}
             </button>
@@ -341,8 +328,8 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         )}
 
         {isLoadingList && logFiles.length === 0 && !error ? (
-          <div className="flex items-center justify-center h-full text-white/40 font-minecraft-ten text-sm">
-            <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+          <div className="flex items-center justify-center h-full text-white/40 font-minecraft text-sm">
+            <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
             {t("profiles.v3.content.loading")}
           </div>
         ) : logFiles.length === 0 && !isLoadingList ? (
@@ -353,8 +340,8 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
           />
         ) : isLoadingContent && parsedLines.length === 0 ? (
           shouldShowLoading ? (
-            <div className="flex items-center justify-center h-full text-white/40 font-minecraft-ten text-sm animate-in fade-in duration-300">
-              <Icon icon="solar:refresh-bold" className="w-4 h-4 mr-2 animate-spin" />
+            <div className="flex items-center justify-center h-full text-white/40 font-minecraft text-sm animate-in fade-in duration-300">
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 mr-2" />
               {t("profiles.v3.content.loading")}
             </div>
           ) : null
@@ -390,7 +377,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         {!atBottom && visibleLines.length > 10 && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 h-9 px-3 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft-ten uppercase tracking-wider flex items-center gap-1.5 shadow-lg transition-colors animate-in fade-in duration-200"
+            className="absolute bottom-4 right-4 h-9 px-3 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 shadow-lg transition-colors animate-in fade-in duration-200"
             title={t("profiles.v3.logs.jumpToBottom")}
           >
             <Icon icon="solar:alt-arrow-down-bold" className="w-4 h-4" />
@@ -450,7 +437,7 @@ const SettingsToggle: React.FC<{ label: string; checked: boolean; onChange: () =
 }) => (
   <button
     onClick={onChange}
-    className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs font-minecraft-ten text-white/80 hover:text-white hover:bg-white/5 transition-colors"
+    className="w-full flex items-center justify-between gap-3 px-3 py-2 text-xs font-minecraft text-white/80 hover:text-white hover:bg-white/5 transition-colors"
   >
     <span>{label}</span>
     <div

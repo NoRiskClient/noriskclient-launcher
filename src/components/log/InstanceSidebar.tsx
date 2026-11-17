@@ -5,11 +5,13 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, emitTo, type UnlistenFn } from "@tauri-apps/api/event";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useProcessStore, getProcessStatus, ProcessMetrics } from "../../store/useProcessStore";
-import { useLaunchStateStore, LaunchState } from "../../store/launch-state-store";
-import { ProcessMetadata, ProcessState } from "../../types/processState";
+import { useLaunchStateStore } from "../../store/launch-state-store";
+import { ProcessMetadata } from "../../types/processState";
 import { EventType } from "../../types/events";
 import * as ProcessService from "../../services/process-service";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
+import { requireMinecraftAccount } from "../../lib/require-account";
+import { handleIconImgLoad } from "../profiles/IconPicker";
 
 type InstanceStatus = "running" | "idle" | "crashed" | "starting" | "stopping";
 
@@ -94,16 +96,6 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
   };
 }
 
-// Get loader icon path
-const getLoaderIcon = (loader: string): string => {
-  const loaderLower = loader.toLowerCase();
-  if (loaderLower === "fabric") return "/icons/fabric.png";
-  if (loaderLower === "forge") return "/icons/forge.png";
-  if (loaderLower === "neoforge") return "/icons/neoforge.png";
-  if (loaderLower === "quilt") return "/icons/quilt.png";
-  return "/icons/minecraft.png";
-};
-
 // Get status color
 const getStatusColor = (status: InstanceStatus): string => {
   switch (status) {
@@ -142,7 +134,7 @@ function InstanceItem({
   const statusColor = getStatusColor(instance.status);
 
   // Get avatar for the account
-  const avatarUrl = useCrafatarAvatar({
+  const avatarUrl = usePlayerAvatar({
     uuid: instance.accountUuid,
     size: 16,
     overlay: true,
@@ -185,6 +177,7 @@ function InstanceItem({
               src={toAssetUrl(instance.profileImageUrl)}
               alt={instance.name}
               className="w-full h-full object-cover"
+              onLoad={handleIconImgLoad}
             />
           ) : (
             <Icon
@@ -199,7 +192,7 @@ function InstanceItem({
         <div className="flex-1 min-w-0">
           {/* Row 1: Name */}
           <span
-            className="block font-minecraft-ten text-white text-sm whitespace-nowrap overflow-hidden text-ellipsis mb-1"
+            className="block font-minecraft text-white text-sm whitespace-nowrap overflow-hidden text-ellipsis mb-1"
             style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
             title={instance.name}
           >
@@ -207,7 +200,7 @@ function InstanceItem({
           </span>
 
           {/* Row 2: Account + Time */}
-          <div className="flex items-center gap-2 text-[11px] font-minecraft-ten">
+          <div className="flex items-center gap-2 text-[11px] font-minecraft">
             {instance.accountName && (
               <div className="flex items-center gap-1.5 text-white/60">
                 {avatarUrl ? (
@@ -268,14 +261,23 @@ export function InstanceSidebar({
   // Track processes user has requested to stop - show START immediately
   const [stoppingProcessIds, setStoppingProcessIds] = useState<Set<string>>(new Set());
 
-  // Get processes from store
-  const { processes, stoppedProcesses, processEndTimes, metrics, fetchProcesses, stopProcess, isLoading } = useProcessStore();
+  const processes = useProcessStore((state) => state.processes);
+  const stoppedProcesses = useProcessStore((state) => state.stoppedProcesses);
+  const processEndTimes = useProcessStore((state) => state.processEndTimes);
+  const metrics = useProcessStore((state) => state.metrics);
+  const fetchProcesses = useProcessStore((state) => state.fetchProcesses);
+  const stopProcess = useProcessStore((state) => state.stopProcess);
+  const isLoading = useProcessStore((state) => state.isLoading);
 
-  // Get launch state store for launch feedback
-  const { getProfileState, initiateButtonLaunch, finalizeButtonLaunch, setButtonStatusMessage } = useLaunchStateStore();
+  const launchStates = useLaunchStateStore((s) => s.profiles);
+  const getProfileState = useLaunchStateStore((s) => s.getProfileState);
+  const initiateButtonLaunch = useLaunchStateStore((s) => s.initiateButtonLaunch);
+  const finalizeButtonLaunch = useLaunchStateStore((s) => s.finalizeButtonLaunch);
 
   // Get launcher log functions
-  const { addLauncherLog, clearLauncherLogs, clearLogs } = useProcessStore();
+  const addLauncherLog = useProcessStore((state) => state.addLauncherLog);
+  const clearLauncherLogs = useProcessStore((state) => state.clearLauncherLogs);
+  const clearLogs = useProcessStore((state) => state.clearLogs);
 
   // Fetch processes on mount
   useEffect(() => {
@@ -320,9 +322,6 @@ export function InstanceSidebar({
           finalizeButtonLaunch(profileId);
         } else if (payload.event_type === EventType.Error) {
           finalizeButtonLaunch(profileId, payload.message || "Error");
-        } else if (payload.message && getProfileState(profileId).isButtonLaunching) {
-          // Update button status message during launch
-          setButtonStatusMessage(profileId, payload.message);
         }
       });
     };
@@ -335,7 +334,7 @@ export function InstanceSidebar({
         eventListenerRef.current();
       }
     };
-  }, [finalizeButtonLaunch, setButtonStatusMessage, getProfileState]);
+  }, [finalizeButtonLaunch]);
 
   // Convert processes to instance data (merge running + stopped)
   const instances = useMemo(() => {
@@ -406,6 +405,14 @@ export function InstanceSidebar({
       return;
     }
 
+    // No account means the backend would reject this with NoCredentialsError —
+    // prompt for sign-in instead and resume once it is done.
+    const signedIn = requireMinecraftAccount({
+      profileName: instances.find((i) => i.profileId === profileId)?.name,
+      onAuthenticated: () => handleLaunchProfile(profileId),
+    });
+    if (!signedIn) return;
+
     // Note: We allow multiple instances of the same profile to run simultaneously
     // Each will have its own process ID and can be stopped independently
 
@@ -436,7 +443,7 @@ export function InstanceSidebar({
       {/* Header */}
       <div className="px-4 py-3">
         <span
-          className="font-minecraft-ten text-sm tracking-wider flex items-center gap-2"
+          className="font-minecraft text-sm tracking-wider flex items-center gap-2"
           style={{ color: accentColor.value }}
         >
           <Icon icon="solar:monitor-bold" className="w-4 h-4" />
@@ -447,12 +454,12 @@ export function InstanceSidebar({
       {/* Instance List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         {isLoading && instances.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft-ten">
+          <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft">
             <Icon icon="svg-spinners:pulse-3" className="w-6 h-6 mr-2" />
             {t('instances.loading')}
           </div>
         ) : instances.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-white/50 text-sm font-minecraft-ten text-center">
+          <div className="flex flex-col items-center justify-center py-8 text-white/50 text-sm font-minecraft text-center">
             <Icon icon="solar:gamepad-no-charge-bold" className="w-8 h-8 mb-2 opacity-50" />
             {t('instances.no_active')}
           </div>
@@ -486,11 +493,11 @@ export function InstanceSidebar({
       {selectedInstance && (
         <div className="px-3 py-3 bg-black/30 rounded-lg mx-3 mb-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-minecraft-ten text-white/50 truncate">
+            <span className="text-xs font-minecraft text-white/50 truncate">
               {selectedInstance.name}
             </span>
             <span
-              className="text-xs font-minecraft-ten"
+              className="text-xs font-minecraft"
               style={{ color: getStatusColor(selectedInstance.status) }}
             >
               {formatElapsedTime(selectedInstance.startTime, selectedInstance.endTime || currentTime)}
@@ -502,7 +509,7 @@ export function InstanceSidebar({
             <div className="flex gap-4 mb-3 mt-1">
               {/* RAM */}
               <div className="flex-1">
-                <div className="flex items-center justify-between text-xs font-minecraft-ten text-white/40 mb-1.5">
+                <div className="flex items-center justify-between text-xs font-minecraft text-white/40 mb-1.5">
                   <span className="flex items-center gap-1">
                     <Icon icon="solar:sd-card-bold" className="w-3 h-3" />
                     RAM
@@ -514,9 +521,11 @@ export function InstanceSidebar({
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${Math.min((selectedInstance.memoryUsage / selectedInstance.memoryMax) * 100, 100)}%`,
-                      backgroundColor: selectedInstance.memoryUsage / selectedInstance.memoryMax > 0.8
-                        ? "rgba(248, 113, 113, 0.7)"
-                        : `${accentColor.value}90`,
+                      backgroundColor: selectedInstance.memoryUsage > selectedInstance.memoryMax
+                        ? "rgba(251, 191, 36, 0.7)"
+                        : selectedInstance.memoryUsage / selectedInstance.memoryMax > 0.8
+                          ? "rgba(248, 113, 113, 0.7)"
+                          : `${accentColor.value}90`,
                     }}
                   />
                 </div>
@@ -524,7 +533,7 @@ export function InstanceSidebar({
 
               {/* CPU */}
               <div className="flex-1">
-                <div className="flex items-center justify-between text-xs font-minecraft-ten text-white/40 mb-1.5">
+                <div className="flex items-center justify-between text-xs font-minecraft text-white/40 mb-1.5">
                   <span className="flex items-center gap-1">
                     <Icon icon="solar:cpu-bolt-bold" className="w-3 h-3" />
                     CPU
@@ -552,14 +561,13 @@ export function InstanceSidebar({
              !stoppingProcessIds.has(selectedInstance.id) ? (
               <button
                 onClick={() => handleStopProcess(selectedInstance.id)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
               >
                 <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
                 {t('instances.stop')}
               </button>
             ) : (selectedInstance.status === "crashed" || selectedInstance.status === "idle" || stoppingProcessIds.has(selectedInstance.id)) && (() => {
-              const launchState = getProfileState(selectedInstance.profileId);
-              const isLaunching = launchState.isButtonLaunching;
+              const isLaunching = launchStates[selectedInstance.profileId]?.isButtonLaunching ?? false;
 
               return isLaunching ? (
                 <button
@@ -572,7 +580,7 @@ export function InstanceSidebar({
                       console.error("Failed to abort launch:", error);
                     }
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
                 >
                   <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
                   {t('instances.stop')}
@@ -580,7 +588,7 @@ export function InstanceSidebar({
               ) : (
                 <button
                   onClick={() => handleLaunchProfile(selectedInstance.profileId)}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft-ten bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-minecraft bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
                 >
                   <Icon icon="solar:play-bold" className="w-3.5 h-3.5" />
                   {t('instances.start')}
@@ -591,7 +599,7 @@ export function InstanceSidebar({
             {/* Open Folder Button */}
             <button
               onClick={() => handleOpenFolder(selectedInstance.profileId)}
-              className="px-2 py-1.5 rounded text-xs font-minecraft-ten bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+              className="px-2 py-1.5 rounded text-xs font-minecraft bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
               title={t('logs.open_folder')}
             >
               <Icon icon="solar:folder-bold" className="w-3.5 h-3.5" />
@@ -611,7 +619,7 @@ export function InstanceSidebar({
                   startTime: selectedInstance.startTime
                 });
               }}
-              className="px-2 py-1.5 rounded text-xs font-minecraft-ten bg-white/10 hover:bg-white/20 transition-colors"
+              className="px-2 py-1.5 rounded text-xs font-minecraft bg-white/10 hover:bg-white/20 transition-colors"
               title={t('logs.pop_out')}
               style={{ color: accentColor.value }}
             >
@@ -622,7 +630,7 @@ export function InstanceSidebar({
       )}
 
       {/* Status Footer */}
-      <div className="px-4 py-2 text-xs font-minecraft-ten text-white/50">
+      <div className="px-4 py-2 text-xs font-minecraft text-white/50">
         {instances.filter((i) => i.status === "running").length} {t('instances.running')}
       </div>
     </div>

@@ -25,13 +25,14 @@ pub struct ProfileProperty {
 
 /// Decoded textures data for a Minecraft profile
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TexturesData {
     /// Unix timestamp in milliseconds
     pub timestamp: i64,
     /// Profile's UUID
-    pub profileId: String,
+    pub profile_id: String,
     /// Profile's name
-    pub profileName: String,
+    pub profile_name: String,
     /// Textures dictionary containing skin and cape information
     pub textures: TexturesDictionary,
 }
@@ -40,11 +41,11 @@ pub struct TexturesData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TexturesDictionary {
     /// Skin information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub SKIN: Option<TextureInfo>,
+    #[serde(rename = "SKIN", skip_serializing_if = "Option::is_none")]
+    pub skin: Option<TextureInfo>,
     /// Cape information
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub CAPE: Option<TextureInfo>,
+    #[serde(rename = "CAPE", skip_serializing_if = "Option::is_none")]
+    pub cape: Option<TextureInfo>,
 }
 
 /// Information about a texture (skin or cape)
@@ -63,4 +64,31 @@ pub struct TextureMetadata {
     /// Skin model type ("slim" or "default")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinUpdateResponse {
+    #[serde(default)]
+    pub skins: Vec<SkinUpdateEntry>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinUpdateEntry {
+    pub id: String,
+    pub state: String,
+    pub url: String,
+    pub texture_key: Option<String>,
+    pub variant: Option<String>,
+}
+
+impl SkinUpdateResponse {
+    pub fn active_skin(&self) -> Option<&SkinUpdateEntry> {
+        self.skins
+            .iter()
+            .find(|skin| skin.state.eq_ignore_ascii_case("ACTIVE"))
+            .or_else(|| self.skins.first())
+    }
 }

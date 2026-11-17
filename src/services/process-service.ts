@@ -1,38 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 // Import the actual type with corrected path
 import type { ProcessMetadata, CrashlogDto } from "../types/processState";
+import type { CrashCheckResult } from "../types/crash-analysis";
 import { getLauncherConfig } from "./launcher-config-service";
 import { hasPermission } from "./permission-service";
 import { PERMISSION } from "../constants/permissions";
 import { toast } from "react-hot-toast";
 import { logInfo, logWarn } from "../utils/logging-utils";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
-export async function isMinecraftRunning(profileId: string): Promise<boolean> {
-  try {
-    const runningProcesses = await getRunningProcesses();
-    // Assuming ProcessMetadata has a field like 'profile_id' or 'profileId'
-    // Adjust 'proc.profile_id' if the actual field name is different
-    const processesForProfile = runningProcesses.filter(proc => proc.profile_id === profileId);
-    return processesForProfile.length > 0;
-  } catch (error) {
-    console.error(`[ProcessService] Error in isMinecraftRunning for profile ${profileId}:`, error);
-    return false; // Assume not running on error
-  }
+export interface LaunchOverrides {
+  game_version?: string;
+  loader?: string;
+  loader_version?: string;
+  pack?: string;
 }
 
-export async function killMinecraft(profileId: string): Promise<void> {
-  return invoke<void>("kill_minecraft", { profileId });
-}
-
-export async function launch(
-  id: string,
-  quickPlaySingleplayer?: string,
-  quickPlayMultiplayer?: string,
-  migrationInfo?: any,
-  skipLastPlayedUpdate?: boolean
-): Promise<void> {
-  // Guard: If experimental mode is enabled in settings, require backend permission
+async function assertExperimentalLaunchAllowed(): Promise<boolean> {
   try {
     const config = await getLauncherConfig();
     if (config?.is_experimental) {
@@ -41,13 +26,38 @@ export async function launch(
       logInfo(`[ProcessService] Permission check result: ${isAllowed}`);
       if (!isAllowed) {
         toast.error(i18n.t('settings.disable_experimental'));
-        return; // Block launch
+        return false;
       }
     }
   } catch (e) {
     logWarn(
-      `[ProcessService] Failed to check experimental permission: ${e instanceof Error ? e.message : String(e)}`,
+      `[ProcessService] Failed to check experimental permission: ${parseErrorMessage(e)}`,
     );
+  }
+  return true;
+}
+
+export async function launch(
+  id: string,
+  quickPlaySingleplayer?: string,
+  quickPlayMultiplayer?: string,
+  migrationInfo?: any,
+  skipLastPlayedUpdate?: boolean,
+  overrides?: LaunchOverrides,
+): Promise<void> {
+  if (!(await assertExperimentalLaunchAllowed())) {
+    return;
+  }
+
+  if (overrides) {
+    return invoke<void>("launch_profile_with_overrides", {
+      profileRef: id,
+      overrides,
+      quickPlaySingleplayer,
+      quickPlayMultiplayer,
+      localMods: [],
+      account: null,
+    });
   }
 
   return invoke<void>("launch_profile", {
@@ -92,21 +102,6 @@ export async function stopProcess(processId: string): Promise<void> {
   }
 }
 
-/**
- * Opens a dedicated log viewer window for the specified process ID.
- */
-export async function openLogWindow(processId: string): Promise<void> {
-  console.debug(`[ProcessService] Requesting log window for process ID: ${processId}`);
-  try {
-    // Pass processId (Uuid as string) to the Rust command
-    await invoke<void>("open_log_window", { processId });
-  } catch (error) {
-    console.error(`[ProcessService] Failed to open log window for process ID ${processId}:`, error);
-    // Handle or re-throw as appropriate
-    throw error; 
-  }
-}
-
 export async function getProcess(processId: string): Promise<ProcessMetadata | null> {
   try {
     return await invoke<ProcessMetadata | null>("get_process", { processId });
@@ -125,8 +120,13 @@ export interface ProcessLogCursor {
 export async function getProcessLogCursor(
   sessionId: string,
   cursor: number,
+  follow = false,
 ): Promise<ProcessLogCursor> {
-  return invoke<ProcessLogCursor>("get_process_log_cursor", { sessionId, cursor });
+  return invoke<ProcessLogCursor>("get_process_log_cursor", {
+    sessionId,
+    cursor,
+    follow,
+  });
 }
 
 /**
@@ -151,15 +151,10 @@ export async function fetchCrashReport(profileId: string, processId?: string, pr
 }
 
 /**
- * Submits a crash log to the backend.
+ * Analyzes a crash log via the backend and returns the launcher-facing verdict.
+ * The backend reports the crash to staff and returns a CrashCheckResult (see types/crash-analysis).
  */
-export async function submitCrashLog(payload: CrashlogDto): Promise<void> {
-  console.debug("[ProcessService] Submitting crash log:", payload);
-  try {
-    await invoke<void>("submit_crash_log_command", { payload });
-    console.log("[ProcessService] Crash log submitted successfully.");
-  } catch (error) {
-    console.error("[ProcessService] Failed to submit crash log:", error);
-    throw error; // Re-throw or handle as needed
-  }
+export async function checkCrashLog(payload: CrashlogDto): Promise<CrashCheckResult> {
+  logInfo(`[ProcessService] Checking crash log: ${payload.mcLogsUrl}`);
+  return invoke<CrashCheckResult>("check_crash_log_command", { payload });
 }

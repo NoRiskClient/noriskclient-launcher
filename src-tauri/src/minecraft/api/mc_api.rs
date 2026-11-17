@@ -1,24 +1,26 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::minecraft::dto::minecraft_profile::MinecraftProfile;
+use crate::minecraft::dto::minecraft_profile::{MinecraftProfile, SkinUpdateResponse, TexturesData};
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::dto::version_manifest::VersionManifest;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error};
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{self, Value};
 use sha1::{Digest, Sha1};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use urlencoding;
-use rand;
 use tokio;
 use tokio::fs as tokio_fs;
 
 const VERSION_MANIFEST_URL: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 const MOJANG_API_URL: &str = "https://api.mojang.com";
 const MOJANG_SESSION_URL: &str = "https://sessionserver.mojang.com";
+const SESSION_JOIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -61,7 +63,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize manifest: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Minecraft manifest cache: {}", e);
         } else {
             debug!("Cached Minecraft version manifest: {:?}", cache_path);
@@ -131,7 +133,7 @@ impl MinecraftApiService {
             AppError::Other(format!("Failed to serialize piston meta: {}", e))
         })?;
 
-        if let Err(e) = tokio_fs::write(cache_path, json_data).await {
+        if let Err(e) = write_atomic(cache_path, json_data).await {
             error!("Failed to write Piston Meta cache: {}", e);
         } else {
             debug!("Cached Piston Meta: {:?}", cache_path);
@@ -220,6 +222,37 @@ impl MinecraftApiService {
         Ok(profile)
     }
 
+    pub async fn resolve_uuid(&self, identifier: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(identifier) {
+            return Ok(uuid);
+        }
+        let profile = self.get_profile_by_name_or_uuid(identifier).await?;
+        Uuid::parse_str(&profile.id).map_err(|_| {
+            AppError::InvalidInput(format!(
+                "Could not resolve player '{}' to a valid UUID.",
+                identifier
+            ))
+        })
+    }
+
+    /// Resolve a player's current skin texture URL via their Mojang profile
+    /// (https-normalized). `None` when the player or skin can't be resolved.
+    pub async fn skin_url_by_name(&self, name: &str) -> Option<String> {
+        if name.is_empty() {
+            return None;
+        }
+        let profile = self.get_profile_by_name_or_uuid(name).await.ok()?;
+        let textures_prop = profile.properties.iter().find(|p| p.name == "textures")?;
+        let decoded = BASE64.decode(&textures_prop.value).ok()?;
+        let textures: TexturesData = serde_json::from_slice(&decoded).ok()?;
+        let url = textures.textures.skin?.url;
+        Some(if let Some(stripped) = url.strip_prefix("http:") {
+            format!("https:{}", stripped)
+        } else {
+            url
+        })
+    }
+
     pub async fn get_profile_by_name_or_uuid(
         &self,
         name_or_uuid_query: &str,
@@ -299,7 +332,7 @@ impl MinecraftApiService {
         uuid: &str,
         skin_path: &str,
         skin_variant: &str,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         debug!(
             "API call: change_skin for UUID: {} with variant: {}",
             uuid, skin_variant
@@ -329,7 +362,7 @@ impl MinecraftApiService {
             .unwrap_or("skin.png");
         debug!("Using filename: {}", filename);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -381,7 +414,17 @@ impl MinecraftApiService {
         }
 
         debug!("API call completed: change_skin - Skin uploaded successfully");
-        Ok(())
+        Ok(Self::active_skin_url(response).await)
+    }
+
+    async fn active_skin_url(response: reqwest::Response) -> Option<String> {
+        match response.json::<SkinUpdateResponse>().await {
+            Ok(profile) => profile.active_skin().map(|skin| skin.url.clone()),
+            Err(e) => {
+                debug!("Could not read the skin url from the upload response: {:?}", e);
+                None
+            }
+        }
     }
 
     // Reset skin to default
@@ -391,7 +434,7 @@ impl MinecraftApiService {
         let url = format!("{}/user/profile/{}/skin", MOJANG_API_URL, uuid);
         debug!("Request URL: {}", url);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending skin reset request to Minecraft API");
 
         let response_result = client
@@ -433,7 +476,7 @@ impl MinecraftApiService {
         access_token: &str,
         base64_data: &str,
         skin_variant: &str,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         debug!(
             "API call: change_skin_from_base64 with variant: {}",
             skin_variant
@@ -445,7 +488,7 @@ impl MinecraftApiService {
 
         // Decode base64 data to bytes
         debug!("Decoding base64 data");
-        let file_content = match base64::decode(base64_data) {
+        let file_content = match BASE64.decode(base64_data) {
             Ok(content) => {
                 debug!("Successfully decoded base64 data ({} bytes)", content.len());
                 content
@@ -459,7 +502,7 @@ impl MinecraftApiService {
             }
         };
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Creating multipart form with file and variant");
 
         // Create form with file part and variant part
@@ -511,7 +554,7 @@ impl MinecraftApiService {
         }
 
         debug!("API call completed: change_skin_from_base64 - Skin uploaded successfully");
-        Ok(())
+        Ok(Self::active_skin_url(response).await)
     }
 
     // Join server session - client side authentication for Minecraft servers
@@ -537,13 +580,14 @@ impl MinecraftApiService {
 
         debug!("Join request - selected_profile: {}, server_id: {}", selected_profile, server_id);
 
-        let client = reqwest::Client::new();
+        let client = &*HTTP_CLIENT;
         debug!("Sending join server request to Minecraft Session API");
 
         let response_result = client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&join_request)
+            .timeout(SESSION_JOIN_TIMEOUT)
             .send()
             .await;
 
@@ -653,106 +697,6 @@ impl MinecraftApiService {
     }
 
     // Test method with real server simulation (more realistic test)
-    pub async fn test_authentication_with_random_server_id(
-        &self,
-        access_token: &str,
-        selected_profile: &str,
-        username: &str,
-    ) -> Result<bool> {
-        debug!("=== Starting Realistic Minecraft Server Authentication Test ===");
-        
-        // Generate a random server ID (simulating what a real server would do)
-        let server_id = format!("{:x}", rand::random::<u64>());
-        debug!("Generated random server ID: {}", server_id);
-
-        // Step 1: Join server session
-        debug!("Step 1: Client joining server session with random server ID");
-        match self.join_server_session(access_token, selected_profile, &server_id).await {
-            Ok(_) => {
-                debug!("✅ Client successfully joined server session");
-            }
-            Err(e) => {
-                debug!("❌ Client failed to join server session: {:?}", e);
-                return Err(e);
-            }
-        }
-
-        // Step 2: Small delay for propagation
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        // Step 3: Server verifies the session
-        debug!("Step 2: Server verifying client session");
-        match self.has_joined(username, &server_id, None).await {
-            Ok(Some(profile)) => {
-                debug!("✅ Server verification successful!");
-                debug!("Authenticated player: {} (UUID: {})", profile.name, profile.id);
-                debug!("=== Realistic Authentication Test PASSED ===");
-                Ok(true)
-            }
-            Ok(None) => {
-                debug!("❌ Server verification failed");
-                debug!("=== Realistic Authentication Test FAILED ===");
-                Ok(false)
-            }
-            Err(e) => {
-                debug!("❌ Server verification error: {:?}", e);
-                Err(e)
-            }
-        }
-    }
 
     // Test Minecraft authentication API using credentials from MinecraftAuthStore
-    pub async fn test_minecraft_auth_api() -> Result<bool> {
-        debug!("=== Starting Minecraft Auth API Test with Real Credentials ===");
-
-        // Import State to access MinecraftAuthStore
-        use crate::state::state_manager::State;
-
-        // Get the current state
-        let state = State::get().await?;
-
-        // Get the active account from MinecraftAuthStore
-        let active_account = state
-            .minecraft_account_manager_v2
-            .get_active_account()
-            .await?;
-
-        let account = match active_account {
-            Some(acc) => {
-                debug!("✅ Found active account: {}", acc.username);
-                debug!("Account ID: {}", acc.id);
-                debug!("Token expires at: {}", acc.expires);
-                acc
-            }
-            None => {
-                debug!("❌ No active account found in MinecraftAuthStore");
-                return Err(AppError::Other(
-                    "No active Minecraft account found. Please login first.".to_string(),
-                ));
-            }
-        };
-
-        // Create MinecraftApiService instance
-        let api_service = MinecraftApiService::new();
-
-        // Test the authentication flow
-        debug!("🚀 Starting authentication test with real credentials");
-        let result = api_service
-            .test_authentication_with_random_server_id(
-                &account.access_token,
-                &account.id.to_string().replace("-", ""), // UUID without dashes
-                &account.username,
-            )
-            .await?;
-
-        if result {
-            debug!("🎉 Authentication test PASSED!");
-            debug!("✅ The Minecraft authentication API is working correctly");
-        } else {
-            debug!("❌ Authentication test FAILED!");
-            debug!("⚠️ There might be an issue with the authentication flow");
-        }
-
-        Ok(result)
-    }
 }

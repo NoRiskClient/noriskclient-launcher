@@ -1,9 +1,6 @@
-"use client";
-
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
-import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -14,12 +11,17 @@ import { Checkbox } from "../ui/Checkbox";
 import { toast } from "react-hot-toast";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
+import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
+import { WebGLBoundary } from "../WebGLBoundary";
+import { FlatSkin } from "@noriskclient/nrc-skin-renderer/react";
+import { useIdleEmote } from "../../hooks/useIdleEmote";
 import { SearchStyleInput } from "../ui/Input";
+import { parseErrorMessage } from "../../utils/error-utils";
 
 interface AddSkinModalProps {
   skin?: MinecraftSkin;
   onSave: (skin: MinecraftSkin) => Promise<void>;
+  onSaveAndApply?: (skin: MinecraftSkin) => Promise<void>;
   onAdd: (
     skinInput: string,
     targetName: string,
@@ -30,9 +32,8 @@ interface AddSkinModalProps {
 }
 
 export const AddSkinModal = memo(
-  ({ skin, onSave, onAdd, isLoading }: AddSkinModalProps) => {
+  ({ skin, onSave, onSaveAndApply, onAdd, isLoading }: AddSkinModalProps) => {
     const { t } = useTranslation();
-    const [name, setName] = useState<string>(skin?.name ?? "");
     const [isSlimVariant, setIsSlimVariant] = useState<boolean>(
       skin?.variant === "slim",
     );
@@ -47,8 +48,8 @@ export const AddSkinModal = memo(
     const [previewSkinName, setPreviewSkinName] = useState<string>(skin?.name ?? "");
 
     const variant: SkinVariant = isSlimVariant ? "slim" : "classic";
-    const accentColor = useThemeStore((state) => state.accentColor);
     const { hideModal } = useGlobalModal();
+    const idleEmote = useIdleEmote();
 
     const handleClose = () => {
       hideModal('add-skin-modal');
@@ -181,20 +182,14 @@ export const AddSkinModal = memo(
       } catch (error) {
         console.error("Error loading skin preview:", error);
         console.error("Error details:", {
-          message: error instanceof Error ? error.message : String(error),
+          message: parseErrorMessage(error),
           stack: error instanceof Error ? error.stack : undefined,
           input: trimmedInput
         });
-        toast.error(t('skins.failedToLoadPreview', { error: error instanceof Error ? error.message : String(error) }));
+        toast.error(t('skins.failedToLoadPreview', { error: parseErrorMessage(error) }));
       } finally {
         setIsPreviewLoading(false);
       }
-    };
-
-    const handleBackToEdit = () => {
-      setIsPreviewMode(false);
-      setPreviewBase64Url(null);
-      setIsPreviewLoading(false);
     };
 
     const handleOpenFileUpload = async () => {
@@ -314,6 +309,18 @@ export const AddSkinModal = memo(
       });
     };
 
+    const handleSaveAndApply = async () => {
+      if (!skin || !onSaveAndApply) return;
+      const updated = {
+        ...skin,
+        name: previewSkinName || skin.name,
+        variant,
+      };
+
+      void onSaveAndApply(updated);
+      handleClose();
+    };
+
     return (
       <Modal
         title={skin ? t('skins.editSkinProperties') : (isPreviewMode ? t('skins.addSkinPreview') : t('skins.addSkin'))}
@@ -322,14 +329,26 @@ export const AddSkinModal = memo(
         footer={
           <div className="flex gap-3 justify-center">
             {isPreviewMode ? (
-              <Button
-                variant="flat"
-                onClick={handleSave}
-                disabled={isLoading}
-                size="sm"
-              >
-                {isLoading ? t('skins.saving') : (skin ? t('skins.saveChanges') : t('skins.saveSkin'))}
-              </Button>
+              <>
+                <Button
+                  variant="flat"
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  size="sm"
+                >
+                  {isLoading ? t('skins.saving') : (skin ? t('skins.saveChanges') : t('skins.saveSkin'))}
+                </Button>
+                {skin && onSaveAndApply && (
+                  <Button
+                    variant="flat"
+                    onClick={handleSaveAndApply}
+                    disabled={isLoading}
+                    size="sm"
+                  >
+                    {t('skins.saveAndApply')}
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 {!skin && (
@@ -380,14 +399,25 @@ export const AddSkinModal = memo(
             </div>
 
             <div className="flex justify-center">
-              <div className="w-64 h-80">
-                <SkinView3DWrapper
-                  skinUrl={previewBase64Url || undefined}
-                  skinVariant={variant}
-                  enableAutoRotate={true}
-                  autoRotateSpeed={0.2}
-                  zoom={0.9}
+              <div className="w-72 h-[min(24rem,40vh)]">
+                <WebGLBoundary
+                  label="add-skin preview"
+                  fallback={
+                    <FlatSkin textureUrl={previewBase64Url} variant={variant} />
+                  }
+                >
+                  <SkinRenderer
+                  textureUrl={previewBase64Url}
+                  variant={variant}
+                  emote={idleEmote.urls}
+                  emoteLoop={idleEmote.loop}
+                  zoom={1.75}
+                  draggable
+                  dragAxis="yaw"
+                  fps={30}
+                  style={{ width: "100%", height: "100%" }}
                 />
+                </WebGLBoundary>
               </div>
             </div>
 
@@ -416,20 +446,31 @@ export const AddSkinModal = memo(
               <div className="space-y-4">
                 {/* 3D Skin Preview for editing */}
                 <div className="flex justify-center">
-                  <div className="w-48 h-64">
-                    <SkinView3DWrapper
-                      skinUrl={previewBase64Url || undefined}
-                      skinVariant={variant}
-                      enableAutoRotate={true}
-                      autoRotateSpeed={0.3}
-                      zoom={0.8}
+                  <div className="w-64 h-[min(20rem,34vh)]">
+                    <WebGLBoundary
+                      label="edit-skin preview"
+                      fallback={
+                        <FlatSkin textureUrl={previewBase64Url} variant={variant} />
+                      }
+                    >
+                      <SkinRenderer
+                      textureUrl={previewBase64Url}
+                      variant={variant}
+                      emote={idleEmote.urls}
+                      emoteLoop={idleEmote.loop}
+                      zoom={1.75}
+                      draggable
+                      dragAxis="yaw"
+                      fps={30}
+                      style={{ width: "100%", height: "100%" }}
                     />
+                    </WebGLBoundary>
                   </div>
                 </div>
 
                 {/* Skin Name Input */}
                 <div>
-                  <label className="block font-minecraft text-3xl text-white/80 lowercase mb-2">
+                  <label className="block font-smallcaps text-lg text-white/80 mb-2">
                     {t('skins.skinName')}
                   </label>
                   <SearchStyleInput
@@ -442,7 +483,7 @@ export const AddSkinModal = memo(
 
                 {/* Skin Variant Selection */}
                 <div>
-                  <p className="font-minecraft text-3xl text-white/80 lowercase mb-4">
+                  <p className="font-smallcaps text-lg text-white/80 mb-4">
                     {t('skins.skinVariant')}
                   </p>
                   <div className="flex justify-center gap-6">
@@ -475,7 +516,7 @@ export const AddSkinModal = memo(
 
             {!skin && (
               <div className="space-y-2">
-                <label className="block font-minecraft text-3xl text-white/80 lowercase">
+                <label className="block font-smallcaps text-lg text-white/80">
                   {t('skins.skin')}
                 </label>
                 <div className="flex gap-2">

@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -227,7 +225,7 @@ export function RangeSlider({
           {icon && <span className="text-white">{icon}</span>}
           <span
             className={cn(
-              "text-white tracking-wide font-minecraft-ten",
+              "text-white tracking-wide font-minecraft",
               sizeConfig[size].text,
             )}
           >
@@ -242,7 +240,7 @@ export function RangeSlider({
             {minLabel && (
               <span
                 className={cn(
-                  "text-white/70 font-minecraft-ten",
+                  "text-white/70 font-minecraft",
                   sizeConfig[size].text,
                 )}
               >
@@ -253,7 +251,7 @@ export function RangeSlider({
               <span
                 ref={valueDisplayRef}
                 className={cn(
-                  "text-white font-minecraft-ten",
+                  "text-white font-minecraft",
                   sizeConfig[size].text,
                 )}
               >
@@ -283,7 +281,7 @@ export function RangeSlider({
             {maxLabel && (
               <span
                 className={cn(
-                  "text-white/70 font-minecraft-ten",
+                  "text-white/70 font-minecraft",
                   sizeConfig[size].text,
                 )}
               >
@@ -372,7 +370,7 @@ export function RangeSlider({
       {description && (
         <p 
           id={accessibilityProps["aria-describedby"]}
-          className="text-sm text-gray-400 mt-1 font-minecraft-ten"
+          className="text-sm text-gray-400 mt-1 font-minecraft"
         >
           {description}
         </p>

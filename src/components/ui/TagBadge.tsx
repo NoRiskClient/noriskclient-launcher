@@ -1,16 +1,10 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { ThemedSurface } from "./ThemedSurface";
 import { 
   getVariantColors, 
-  getSizeClasses,
-  getBorderRadiusClass,
   getAccessibilityProps,
-  getTextSizeClass,
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
@@ -45,7 +39,6 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
   ) => {
     const badgeRef = useRef<HTMLElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const isClickable = !!onClick && !disabled;
@@ -160,7 +153,7 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
     const baseProps = {
       ref: mergedRef,
       className: cn(
-        "inline-flex items-center justify-center relative overflow-hidden",        "w-fit font-minecraft transition-all duration-200",
+        "inline-flex items-center justify-center relative overflow-hidden", "w-fit font-smallcaps transition-all duration-200",
         sizeClasses,
         isClickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-1 focus:ring-offset-black/20" : "",
         disabled ? "opacity-50 cursor-not-allowed" : "",
@@ -180,7 +173,7 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
 
     const content = (
       <>        <span          className={cn(
-            "relative z-10 flex items-center font-minecraft-ten",
+            "relative z-10 flex items-center font-minecraft",
             iconElement ? "gap-x-1.5" : "",
             getTextSizeClass(),
           )}

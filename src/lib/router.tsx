@@ -2,18 +2,12 @@ import { createHashRouter, Navigate } from "react-router-dom";
 import { App } from "../App";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { PlayTab } from "../components/tabs/PlayTab";
-import { ProfilesTab } from "../components/tabs/ProfilesTab";
-import ModrinthTabV2 from "../components/tabs/ModrinthTabV2";
-import { SkinsTab } from "../components/tabs/SkinsTab";
-import { StoreTab } from "../components/tabs/StoreTab";
-import { SettingsTab } from "../components/tabs/SettingsTab";
-import { BrowseTab } from "../components/profiles/detail/BrowseTab";
-import { BrowseTabWrapper } from "../components/profiles/BrowseTabWrapper";
-import { ProfilesTabV2 } from "../components/tabs/ProfilesTabV2";
-import { ProfileDetailViewV2Wrapper } from "../components/profiles/ProfileDetailViewV2Wrapper";
 // DISABLED: Advent Calendar (seasonal feature)
 // import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
-import { ModDetailPage } from "../components/mods/ModDetailPage";
+
+const profileDetail = async () => ({
+  Component: (await import("../components/profiles/ProfileDetailViewV2Wrapper")).ProfileDetailViewV2Wrapper,
+});
 
 export const router = createHashRouter([
   {
@@ -30,44 +24,54 @@ export const router = createHashRouter([
         element: <PlayTab />,
       },
       {
-        path: "profiles/:profileId",
-        element: <ProfilesTab />,
+        path: "profiles",
+        lazy: async () => ({
+          Component: (await import("../components/tabs/ProfilesTabV2")).ProfilesTabV2,
+        }),
       },
       {
         path: "profilesv2/:profileId",
-        element: <ProfileDetailViewV2Wrapper />,
+        lazy: profileDetail,
       },
       {
-        path: "profilesv2/:profileId/browse/:contentType",
-        element: <BrowseTabWrapper />,
+        path: "profiles/:profileId",
+        lazy: profileDetail,
       },
       {
-        path: "profiles",
-        element: <ProfilesTabV2 />,
-      },
-      {
-        path: "profiles/:profileId/browse/:contentType",
-        element: <BrowseTab />,
+        path: "sync-packs",
+        lazy: async () => ({
+          Component: (await import("../components/sync-packs/SyncPacksPage")).SyncPacksPage,
+        }),
       },
       {
         path: "mods",
-        element: <ModrinthTabV2 />,
+        lazy: async () => ({
+          Component: (await import("../components/tabs/ModrinthTabV2")).ModrinthTabV2,
+        }),
       },
       {
         path: "mods/:source/:projectId",
-        element: <ModDetailPage />,
+        lazy: async () => ({
+          Component: (await import("../components/mods/ModDetailPage")).ModDetailPage,
+        }),
       },
       {
         path: "skins",
-        element: <SkinsTab />,
+        lazy: async () => ({
+          Component: (await import("../components/tabs/SkinsTab")).SkinsTab,
+        }),
       },
       {
         path: "capes",
-        element: <StoreTab />,
+        lazy: async () => ({
+          Component: (await import("../components/tabs/StoreTab")).StoreTab,
+        }),
       },
       {
-        path: "settings",
-        element: <SettingsTab />,
+        path: "clips",
+        lazy: async () => ({
+          Component: (await import("../components/tabs/ClipsPage")).ClipsPage,
+        }),
       },
       // DISABLED: Advent Calendar (seasonal feature)
       // {

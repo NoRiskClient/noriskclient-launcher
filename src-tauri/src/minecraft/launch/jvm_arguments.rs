@@ -1,6 +1,6 @@
 use crate::minecraft::dto::piston_meta::{ArgumentValue, ComplexArgument, GameArgument};
 use crate::minecraft::rules::RuleProcessor;
-use log::info;
+use log::{info, trace};
 use std::path::PathBuf;
 
 pub struct JvmArguments {
@@ -26,7 +26,7 @@ impl JvmArguments {
     }
 
     fn should_apply_argument(argument: &ComplexArgument) -> bool {
-        info!("\nChecking argument: {:?}", argument.value);
+        trace!("Checking argument: {:?}", argument.value);
         RuleProcessor::should_apply_argument(&argument.rules)
     }
 
@@ -53,9 +53,9 @@ impl JvmArguments {
         for arg in arguments {
             match arg {
                 GameArgument::Simple(s) => {
-                    info!("\nProcessing simple argument: {}", s);
+                    trace!("Processing simple argument: {}", s);
                     let processed_arg = self.replace_variables(s);
-                    info!("  After variable replacement: {}", processed_arg);
+                    trace!("  After variable replacement: {}", processed_arg);
                     processed_args.push(processed_arg);
                 }
                 GameArgument::Complex(complex) => {
@@ -63,7 +63,7 @@ impl JvmArguments {
                         let values = Self::process_argument_value(&complex.value);
                         for value in values {
                             let processed_arg = self.replace_variables(&value);
-                            info!("  Adding processed argument: {}", processed_arg);
+                            trace!("  Adding processed argument: {}", processed_arg);
                             processed_args.push(processed_arg);
                         }
                     }
@@ -71,7 +71,7 @@ impl JvmArguments {
             }
         }
 
-        info!("\nFinal JVM arguments:");
+        info!("Final JVM arguments:");
         for arg in &processed_args {
             info!("  {}", arg);
         }

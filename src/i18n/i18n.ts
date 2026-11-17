@@ -1,16 +1,28 @@
-import i18n from "i18next";
+import i18n, { type BackendModule } from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import en from "./translations/en.json";
-import de from "./translations/de.json";
-import pl from "./translations/pl.json";
-import fr from "./translations/fr.json";
-import it from "./translations/it.json";
-import tr from "./translations/tr.json";
-import pt from "./translations/pt.json";
-import es from "./translations/es.json";
-import ru from "./translations/ru.json";
-import hi from "./translations/hi.json";
+
+const translationChunks = import.meta.glob<{ default: Record<string, string> }>([
+  "./translations/*.json",
+  "!./translations/en.json",
+]);
+
+const lazyTranslations: BackendModule = {
+  type: "backend",
+  init() {},
+  read(language, _namespace, callback) {
+    const load = translationChunks[`./translations/${language}.json`];
+    if (!load) {
+      callback(new Error(`No translations for "${language}"`), null);
+      return;
+    }
+    load().then(
+      (chunk) => callback(null, chunk.default),
+      (error) => callback(error, null),
+    );
+  },
+};
 
 export const SUPPORTED_LANGUAGES = ["en", "de", "pl", "fr", "it", "tr", "pt", "es", "ru", "hi"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -74,19 +86,11 @@ function getStoredLanguage(): SupportedLanguage {
   return getSystemLanguage();
 }
 
-i18n.use(initReactI18next).init({
+export const i18nReady: Promise<void> = i18n.use(lazyTranslations).use(initReactI18next).init({
   resources: {
     en: { translation: en },
-    de: { translation: de },
-    pl: { translation: pl },
-    fr: { translation: fr },
-    it: { translation: it },
-    tr: { translation: tr },
-    pt: { translation: pt },
-    es: { translation: es },
-    ru: { translation: ru },
-    hi: { translation: hi },
   },
+  partialBundledLanguages: true,
   lng: getStoredLanguage(),
   fallbackLng: "en",
   supportedLngs: [...SUPPORTED_LANGUAGES],
@@ -98,7 +102,10 @@ i18n.use(initReactI18next).init({
   react: {
     useSuspense: false, // Multi-window compatibility
   },
-});
+}).then(
+  () => undefined,
+  () => undefined,
+);
 
 // Cross-window language sync via localStorage events
 if (typeof window !== "undefined") {

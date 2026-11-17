@@ -4,7 +4,7 @@ use crate::minecraft::dto::neo_forge_install_profile::NeoForgeInstallProfile;
 use crate::minecraft::dto::neo_forge_meta::NeoForgeVersion;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
 use futures::stream::{iter, StreamExt};
-use log::info;
+use log::{info, trace};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -45,7 +45,7 @@ impl NeoForgeLibrariesDownload {
         }
 
         info!("Found {} files to download", downloads.len());
-        info!(
+        trace!(
             "Downloading with {} concurrent downloads",
             self.concurrent_downloads
         );
@@ -60,7 +60,7 @@ impl NeoForgeLibrariesDownload {
         let errors: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
         if !errors.is_empty() {
-            info!("\n⚠️ Some downloads failed:");
+            info!("⚠️ Some downloads failed:");
             for error in errors {
                 info!("  - {}", error);
             }
@@ -78,12 +78,12 @@ impl NeoForgeLibrariesDownload {
     ) -> Result<()> {
         // Skip if URL is empty
         if download_info.url.is_empty() {
-            info!("⏩ Skipping file with empty URL: {}", download_info.path);
+            trace!("⏩ Skipping file with empty URL: {}", download_info.path);
             return Ok(());
         }
 
         let target_path = self.get_library_path(download_info);
-        info!("⬇️ Downloading: {}", download_info.path);
+        trace!("⬇️ Downloading: {}", download_info.path);
 
         // Use the new centralized download utility with SHA1 verification
         let mut config = DownloadConfig::new()
@@ -97,7 +97,7 @@ impl NeoForgeLibrariesDownload {
 
         DownloadUtils::download_file(&download_info.url, &target_path, config).await?;
 
-        info!("💾 Saved: {}", download_info.path);
+        trace!("💾 Saved: {}", download_info.path);
         Ok(())
     }
 
@@ -146,13 +146,13 @@ impl NeoForgeLibrariesDownload {
                 );
 
                 let target_path = self.base_path.join(&maven_path);
-                info!("Adding Legacy Library Path: {}", target_path.display());
+                trace!("Adding Legacy Library Path: {}", target_path.display());
                 paths.push(target_path);
             } else {
                 // Modernes Format: Verwende downloads.artifact
                 if let Some(downloads) = &library.downloads {
                     if let Some(artifact) = &downloads.artifact {
-                        info!(
+                        trace!(
                             "Adding Modern Library Path: {}",
                             self.get_library_path(artifact).display()
                         );
@@ -199,7 +199,7 @@ impl NeoForgeLibrariesDownload {
         let errors: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
         if !errors.is_empty() {
-            info!("\n⚠️ Some installer library downloads failed:");
+            info!("⚠️ Some installer library downloads failed:");
             for error in errors {
                 info!("  - {}", error);
             }
@@ -216,7 +216,7 @@ impl NeoForgeLibrariesDownload {
         let mut skipped = 0;
         let mut invalid = 0;
 
-        info!("\n🔍 Starting legacy library download:");
+        trace!("🔍 Starting legacy library download:");
         info!(
             "📚 Total libraries to process: {}",
             forge_version.libraries.len()
@@ -252,7 +252,7 @@ impl NeoForgeLibrariesDownload {
 
             // Prüfe ob die Datei bereits existiert
             if fs::try_exists(&target_path).await? {
-                info!("📦 Library already exists: {}", maven_path);
+                trace!("📦 Library already exists: {}", maven_path);
                 skipped += 1;
                 continue;
             }
@@ -264,8 +264,8 @@ impl NeoForgeLibrariesDownload {
 
             // Füge den Download zur Liste hinzu
             downloads.push(async move {
-                info!("\n⬇️ Downloading: {}", maven_path);
-                info!("  📎 URL: {}", url);
+                trace!("⬇️ Downloading: {}", maven_path);
+                trace!("  📎 URL: {}", url);
 
                 // Use the new centralized download utility for legacy libraries
                 let config = DownloadConfig::new()
@@ -274,7 +274,7 @@ impl NeoForgeLibrariesDownload {
 
                 match DownloadUtils::download_file(&url, &target_path, config).await {
                     Ok(()) => {
-                        info!("✅ Successfully downloaded: {}", maven_path);
+                        trace!("✅ Successfully downloaded: {}", maven_path);
                         Ok(())
                     }
                     Err(e) => {
@@ -285,7 +285,7 @@ impl NeoForgeLibrariesDownload {
             });
         }
 
-        info!("\n📊 Download Summary:");
+        info!("📊 Download Summary:");
         info!("  - Total libraries: {}", forge_version.libraries.len());
         info!("  - Already exists: {}", skipped);
         info!("  - Invalid format: {}", invalid);
@@ -302,7 +302,7 @@ impl NeoForgeLibrariesDownload {
         let errors: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
         if !errors.is_empty() {
-            info!("\n⚠️ Some legacy library downloads failed:");
+            info!("⚠️ Some legacy library downloads failed:");
             for error in errors {
                 info!("  - {}", error);
             }
@@ -311,7 +311,7 @@ impl NeoForgeLibrariesDownload {
             ));
         }
 
-        info!("\n✨ All legacy libraries processed successfully!");
+        info!("✨ All legacy libraries processed successfully!");
         Ok(())
     }
 }

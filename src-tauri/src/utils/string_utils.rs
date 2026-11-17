@@ -6,6 +6,7 @@
 ///
 /// # Example
 /// ```
+/// use noriskclient_launcher_v3_lib::utils::string_utils::safe_truncate;
 /// let korean = "안녕하세요"; // Korean greeting
 /// let truncated = safe_truncate(korean, 5);
 /// // Returns "안" (3 bytes) instead of panicking at byte 5

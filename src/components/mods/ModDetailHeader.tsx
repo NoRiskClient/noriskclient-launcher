@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -19,8 +17,8 @@ import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickI
 import UnifiedService from "../../services/unified-service";
 import { ModrinthService } from "../../services/modrinth-service";
 import { CurseForgeService } from "../../services/curseforge-service";
-import { installContentToProfile } from "../../services/content-service";
-import { ContentType, type InstallContentPayload } from "../../types/content";
+import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 
@@ -30,6 +28,7 @@ interface ModDetailHeaderProps {
   showVersions: boolean;
   onToggleVersions: () => void;
   targetProfile?: Profile;
+  installTarget?: ContentInstallTarget;
 }
 
 function formatNumber(num: number): string {
@@ -48,8 +47,8 @@ function getProjectTypeIcon(type: string): string {
     case "modpack": return "pixel:folder-open-solid";
     case "resourcepack": return "pixel:image-solid";
     case "shader": return "pixel:sun-solid";
-    case "datapack": return "pixel:cube-solid";
-    default: return "pixel:cube-solid";
+    case "datapack": return "pixel:archive-solid";
+    default: return "pixel:archive-solid";
   }
 }
 
@@ -96,7 +95,7 @@ function findBestVersionForProfile(profile: Profile, versions: UnifiedVersion[])
   return versions[0];
 }
 
-export function ModDetailHeader({ project, accentColor, showVersions, onToggleVersions, targetProfile }: ModDetailHeaderProps) {
+export function ModDetailHeader({ project, accentColor, showVersions, onToggleVersions, targetProfile, installTarget }: ModDetailHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { profiles, fetchProfiles } = useProfileStore();
@@ -286,8 +285,8 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         source: project.source,
       };
 
-      await installContentToProfile(payload);
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: profile.name }));
+      await installContentToTarget(payload, installTarget);
+      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
@@ -441,12 +440,12 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           <div>
             <button
               onClick={handleOpenProjectPage}
-              className="text-2xl font-minecraft-ten text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
+              className="text-2xl font-minecraft text-white leading-tight hover:text-accent hover:underline transition-colors text-left"
             >
               {project.title}
             </button>
             {project.author && (
-              <p className="text-sm text-gray-400 font-minecraft-ten mt-1">
+              <p className="text-sm text-gray-400 font-minecraft mt-1">
                 by {project.author}
               </p>
             )}
@@ -454,7 +453,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
 
           {/* Stats + Install Button */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft-ten">
+            <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft">
               <div className="flex items-center gap-1">
                 <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                 <span>{formatNumber(project.downloads)}</span>
@@ -488,7 +487,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-300 font-minecraft-ten mt-3 line-clamp-2">
+        <p className="text-sm text-gray-300 font-minecraft mt-3 line-clamp-2">
           {project.description}
         </p>
 
@@ -519,7 +518,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             </TagBadge>
           ))}
           {project.categories.length > 4 && (
-            <span className="text-xs text-white/50 font-minecraft-ten">
+            <span className="text-xs text-white/50 font-minecraft">
               +{project.categories.length - 4} more
             </span>
           )}

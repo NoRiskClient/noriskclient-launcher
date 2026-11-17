@@ -2,8 +2,13 @@ use crate::error::{AppError, CommandError};
 use crate::state::process_state::ProcessMetadata;
 use crate::state::state_manager::State;
 use chrono::{DateTime, Utc};
+use std::path::PathBuf;
 use tauri::Manager;
 use uuid::Uuid;
+
+const PROCESS_LOG_FILE_NAME: &str = "nrc-process.log";
+pub const MAX_LOG_CURSOR_BYTES: u64 = 512 * 1024;
+pub const LOG_TAIL_BYTES: u64 = 1024 * 1024;
 
 #[tauri::command]
 pub async fn get_processes() -> Result<Vec<ProcessMetadata>, CommandError> {
@@ -45,13 +50,7 @@ pub struct ProcessLogCursor {
     pub new_file: bool,
 }
 
-#[tauri::command]
-pub async fn get_process_log_cursor(
-    session_id: String,
-    cursor: u64,
-) -> Result<ProcessLogCursor, CommandError> {
-    use tokio::io::{AsyncReadExt, AsyncSeekExt};
-
+pub fn validate_log_session_id(session_id: &str) -> Result<(), CommandError> {
     if session_id.is_empty()
         || session_id.contains('/')
         || session_id.contains('\\')
@@ -62,9 +61,60 @@ pub async fn get_process_log_cursor(
         ))));
     }
 
-    let path = crate::utils::log_archive::archive_root()
-        .join(&session_id)
-        .join("nrc-process.log");
+    Ok(())
+}
+
+fn process_log_path(session_id: &str) -> PathBuf {
+    crate::utils::log_archive::archive_root()
+        .join(session_id)
+        .join(PROCESS_LOG_FILE_NAME)
+}
+
+pub fn clamp_log_read_len(requested: Option<u64>) -> u64 {
+    requested
+        .unwrap_or(MAX_LOG_CURSOR_BYTES)
+        .clamp(1, MAX_LOG_CURSOR_BYTES)
+}
+
+pub fn log_read_start(cursor: u64, total_bytes: u64, follow: bool) -> u64 {
+    if cursor != 0 && cursor <= total_bytes {
+        cursor
+    } else if follow {
+        total_bytes.saturating_sub(LOG_TAIL_BYTES)
+    } else {
+        0
+    }
+}
+
+pub fn line_aligned(buf: &[u8], starts_mid_line: bool, whole_budget: bool) -> std::ops::Range<usize> {
+    let begin = if starts_mid_line {
+        match buf.iter().position(|&b| b == b'\n') {
+            Some(newline) => newline + 1,
+            None if whole_budget => return buf.len()..buf.len(),
+            None => return 0..0,
+        }
+    } else {
+        0
+    };
+    let end = match buf.iter().rposition(|&b| b == b'\n') {
+        Some(newline) if newline >= begin => newline + 1,
+        _ if whole_budget => buf.len(),
+        _ => return 0..0,
+    };
+    begin..end
+}
+
+#[tauri::command]
+pub async fn get_process_log_cursor(
+    session_id: String,
+    cursor: u64,
+    max_bytes: Option<u64>,
+    follow: Option<bool>,
+) -> Result<ProcessLogCursor, CommandError> {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    validate_log_session_id(&session_id)?;
+    let path = process_log_path(&session_id);
 
     if !path.exists() {
         return Ok(ProcessLogCursor {
@@ -75,26 +125,40 @@ pub async fn get_process_log_cursor(
     }
 
     let mut file = tokio::fs::File::open(&path).await.map_err(AppError::Io)?;
-    let len = file.metadata().await.map_err(AppError::Io)?.len();
+    let total_bytes = file.metadata().await.map_err(AppError::Io)?.len();
 
-    let mut cursor = cursor;
-    let mut new_file = false;
-    if cursor > len {
-        cursor = 0;
-        new_file = true;
-    }
+    let new_file = cursor > total_bytes;
+    let follow = follow.unwrap_or(false);
+    let read_start = log_read_start(cursor, total_bytes, follow);
+    let starts_mid_line = read_start > 0 && read_start != cursor;
 
-    file.seek(std::io::SeekFrom::Start(cursor))
+    let read_len = clamp_log_read_len(max_bytes);
+    let available = total_bytes.saturating_sub(read_start);
+    let bounded_read_len = read_len.min(available);
+
+    file.seek(std::io::SeekFrom::Start(read_start))
         .await
         .map_err(AppError::Io)?;
-    let mut buf = Vec::new();
-    let read = file.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+
+    let mut buf = Vec::with_capacity(bounded_read_len as usize);
+    let mut reader = file.take(bounded_read_len);
+    let read = reader.read_to_end(&mut buf).await.map_err(AppError::Io)?;
+    let lines = if follow {
+        line_aligned(&buf, starts_mid_line, read as u64 == read_len)
+    } else {
+        0..buf.len()
+    };
+    let next_cursor = if lines.end == 0 {
+        if new_file { 0 } else { cursor }
+    } else {
+        read_start + lines.end as u64
+    };
 
     let output =
-        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf));
+        crate::utils::security_utils::mask_sensitive_data(&String::from_utf8_lossy(&buf[lines]));
 
     Ok(ProcessLogCursor {
-        cursor: cursor + read as u64,
+        cursor: next_cursor,
         output,
         new_file,
     })
@@ -121,7 +185,7 @@ pub async fn set_discord_state(
     state_type: String,
     profile_name: Option<String>,
 ) -> Result<(), CommandError> {
-    log::info!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
+    log::trace!("[Discord RPC] set_discord_state called: state_type='{}', profile_name={:?}", state_type, profile_name);
     let state = State::get().await?;
     state.discord_manager.set_custom_state(state_type).await;
     Ok(())
@@ -135,24 +199,9 @@ pub async fn open_minecraft_log_window<R: tauri::Runtime>(
     let window_label = "minecraft_log_window";
 
     if let Some(window) = app.get_webview_window(window_label) {
-        window.show().map_err(|e| {
+        crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to show minecraft log window: {}",
-                e
-            )))
-        })?;
-        window.unminimize().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to unminimize minecraft log window: {}",
-                e
-            )))
-        })?;
-        // Trick to bring window to front on Windows: temporarily set always on top
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        window.set_focus().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to focus minecraft log window: {}",
+                "Failed to bring minecraft log window to front: {}",
                 e
             )))
         })?;
@@ -249,24 +298,9 @@ pub async fn focus_main_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
     if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| {
+        crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to show main window: {}",
-                e
-            )))
-        })?;
-        window.unminimize().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to unminimize main window: {}",
-                e
-            )))
-        })?;
-        // Trick to bring window to front on Windows: temporarily set always on top
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_always_on_top(false);
-        window.set_focus().map_err(|e| {
-            CommandError::from(crate::error::AppError::Other(format!(
-                "Failed to focus main window: {}",
+                "Failed to bring main window to front: {}",
                 e
             )))
         })?;

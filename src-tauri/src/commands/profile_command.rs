@@ -10,17 +10,16 @@ use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileSettings, ProfileState,
+    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
+    ProfileState,
 };
-use crate::state::profile_state::ProfileManager;
 use crate::state::state_manager::State;
 use crate::commands::analytics_command::track_event as track_analytics;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
 use crate::utils::path_utils::{find_unique_profile_segment, copy_dir_recursively, count_files_recursively};
 use crate::utils::profile_utils::{
-    check_for_group_migration, CheckContentParams, ContentInstallStatus, ContentType as ProfileUtilContentType,
-    GenericModrinthInfo, LoadItemsParams as ProfileUtilLoadItemsParams, LocalContentItem,
+    CheckContentParams, ContentInstallStatus, LoadItemsParams as ProfileUtilLoadItemsParams, LocalContentItem,
     LocalContentLoader as ProfileUtilLocalContentLoader, MigrationInfo, ScreenshotInfo,
 };
 use crate::utils::resourcepack_utils::ResourcePackInfo;
@@ -31,12 +30,11 @@ use crate::utils::{
     shaderpack_utils,
 };
 use chrono::Utc;
-use log::{error, info, trace, warn};
+use log::{error, info, warn};
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use sysinfo::System;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs as TokioFs;
@@ -82,14 +80,34 @@ pub struct CopyProfileParams {
     copy_all_files: Option<bool>,
 }
 
+#[derive(Deserialize, Default, Clone, Copy, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    #[default]
+    Noriskpack,
+    Mrpack,
+    Curseforge,
+}
+
+impl ExportFormat {
+    fn extension(&self) -> &'static str {
+        match self {
+            Self::Noriskpack => "noriskpack",
+            Self::Mrpack => "mrpack",
+            Self::Curseforge => "zip",
+        }
+    }
+}
+
 // Export profile command parameters
 #[derive(Deserialize)]
 pub struct ExportProfileParams {
     profile_id: Uuid,
-    output_path: Option<String>, // This will be ignored but kept for backward compatibility
     file_name: String,           // Base name without extension
     include_files: Option<Vec<PathBuf>>,
     open_folder: bool, // Whether to open the exports folder after export
+    #[serde(default)]
+    format: ExportFormat,
 }
 
 // DTO for the new command
@@ -169,6 +187,8 @@ pub async fn create_profile(params: CreateProfileParams) -> Result<Uuid, Command
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        sync_pack_ids: Vec::new(),
+        extra: Default::default(),
     };
 
     let id = state.profile_manager.create_profile(profile.clone()).await?;
@@ -341,6 +361,8 @@ pub async fn launch_profile(
             quick_play_mp_clone,
             migration_info_clone,
             Vec::new(),
+            Vec::new(),
+            false,
         )
             .await;
 
@@ -792,7 +814,7 @@ pub async fn resolve_loader_version(
     profile_id: Uuid,
     minecraft_version: String,
 ) -> Result<ResolvedLoaderVersion, CommandError> {
-    info!(
+    log::trace!(
         "Executing resolve_loader_version command for profile {} with MC version {}",
         profile_id, minecraft_version
     );
@@ -859,6 +881,56 @@ pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError
     let state = State::get().await?;
     let profiles = state.profile_manager.search_profiles(&query).await?;
     Ok(profiles)
+}
+
+#[tauri::command]
+pub async fn list_removed_standard_profiles() -> Result<Vec<Profile>, CommandError> {
+    let state = State::get().await?;
+    let removed = state.profile_manager.removed_standard_profile_ids().await?;
+    Ok(state
+        .norisk_version_manager
+        .get_config()
+        .await
+        .profiles
+        .into_iter()
+        .filter(|profile| removed.contains(&profile.id))
+        .collect())
+}
+
+#[tauri::command]
+pub async fn restore_standard_profile(id: Uuid) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state.profile_manager.restore_standard_profile(id).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_profile_backups() -> Result<Vec<ProfileBackupInfo>, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.list_profile_backups().await?)
+}
+
+#[tauri::command]
+pub async fn restore_profile_backup(backup_path: String) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    state
+        .profile_manager
+        .restore_profile_backup(backup_path.into())
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_profile_store_status(
+) -> Result<crate::state::profile_state::ProfileStoreStatus, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.store_status().await?)
+}
+
+#[tauri::command]
+pub async fn reimport_profiles_from_legacy_json() -> Result<usize, CommandError> {
+    let state = State::get().await?;
+    Ok(state.profile_manager.reimport_from_legacy_json().await?)
 }
 
 /// Loads and returns the list of standard profiles from the local configuration file.
@@ -997,6 +1069,7 @@ pub async fn update_modrinth_mod_version(
 // --- Custom Mod Commands ---
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, CommandError> {
     log::info!(
         "Received get_custom_mods command for profile {}",
@@ -1008,6 +1081,7 @@ pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, Com
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn set_custom_mod_enabled(
     profile_id: Uuid,
     filename: String,
@@ -1028,6 +1102,7 @@ pub async fn set_custom_mod_enabled(
 }
 
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(), CommandError> {
     log::info!(
         "Received delete_custom_mod command for profile {}, file '{}'",
@@ -1059,14 +1134,12 @@ pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(),
 #[tauri::command]
 pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
     log::info!("Received command get_system_ram_mb");
-    // In a real application, you might want to manage the System instance
-    // in the global state to avoid recreating it, but for a one-off command,
-    // this is fine.
-    let mut sys = System::new_all();
-    sys.refresh_memory(); // Refresh memory information
-    let total_memory_bytes = sys.total_memory();
-    let total_memory_mb = total_memory_bytes / (1024 * 1024);
-    Ok(total_memory_mb)
+    Ok(crate::utils::system_info::total_ram_mb())
+}
+
+#[tauri::command]
+pub async fn get_default_memory_max_mb() -> Result<u32, CommandError> {
+    Ok(crate::state::profile_state::default_memory_max_mb())
 }
 
 // --- New Command to open Profile Folder ---
@@ -1189,95 +1262,63 @@ pub async fn import_local_mods(
 }
 
 #[tauri::command]
-pub async fn import_profile_from_file(app_handle: tauri::AppHandle) -> Result<(), CommandError> {
-    log::info!("Executing import_profile_from_file command");
+pub async fn preview_import_pack(
+    file_path_str: String,
+) -> Result<crate::integrations::pack_preview::ImportPackPreview, CommandError> {
+    log::info!("Previewing modpack file: {}", file_path_str);
+    Ok(crate::integrations::pack_preview::preview_pack_at(PathBuf::from(file_path_str)).await?)
+}
 
-    // Spawn the blocking dialog call onto a blocking thread pool
-    let dialog_result = tokio::task::spawn_blocking(move || {
-        app_handle
-            .dialog()
-            .file()
-            .add_filter("Modpack Files", &["mrpack", "noriskpack", "zip"])
-            .set_title("Select Modpack File (.mrpack, .noriskpack, or .zip)")
-            .blocking_pick_file() // Use the blocking version for single file selection
-    })
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Dialog task failed: {}", e))))?;
+async fn apply_import_overrides(
+    state: &std::sync::Arc<State>,
+    profile_id: Uuid,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) {
+    let name = name_override.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    let group = group_override.map(|g| g.trim().to_string());
+    let clear_pack = clear_norisk_pack.unwrap_or(false);
+    if name.is_none() && group.is_none() && norisk_pack_id.is_none() && !clear_pack {
+        return;
+    }
 
-    if let Some(file_path_obj) = dialog_result {
-        // Convert FilePath to PathBuf
-        let file_path_buf = match file_path_obj.into_path() {
-            Ok(path) => path,
-            Err(e) => {
-                log::error!("Failed to convert selected file path: {}", e);
-                return Err(CommandError::from(AppError::Other(
-                    "Failed to convert selected file path".to_string(),
-                )));
-            }
-        };
-
-        log::info!(
-            "User selected modpack file: {:?}. Triggering processing...",
-            file_path_buf
-        );
-
-        // Check the file extension
-        let file_extension = file_path_buf
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| ext.to_lowercase());
-
-        let new_profile_id = match file_extension.as_deref() {
-            Some("mrpack") => {
-                log::info!("File extension is .mrpack, proceeding with mrpack processing.");
-                mrpack::import_mrpack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            Some("noriskpack") => {
-                log::info!("File extension is .noriskpack, proceeding with noriskpack processing.");
-                crate::integrations::norisk_packs::import_noriskpack_as_profile(file_path_buf, None)
-                    .await?
-            }
-            Some("zip") => {
-                log::info!("File extension is .zip, proceeding with CurseForge modpack processing.");
-                curseforge::import_curseforge_pack_as_profile(file_path_buf, None, None, None, 0.0, 1.0).await?
-            }
-            _ => {
-                log::error!(
-                    "Selected file has an invalid extension: {:?}",
-                    file_path_buf
-                );
-                return Err(CommandError::from(AppError::Other(
-                    "Invalid file type selected. Please select a .mrpack, .noriskpack, or .zip file."
-                        .to_string(),
-                )));
-            }
-        };
-
-        // Get state to emit event
-        let state = State::get().await?;
-        // Emit event to trigger UI update for the newly created profile
-        if let Err(e) = state
-            .event_state
-            .trigger_profile_update(new_profile_id)
-            .await
-        {
-            log::error!(
-                "Failed to emit TriggerProfileUpdate event for new profile {}: {}",
-                new_profile_id,
-                e
-            );
+    let mut profile = match state.profile_manager.get_profile(profile_id).await {
+        Ok(profile) => profile,
+        Err(e) => {
+            log::error!("Cannot apply import overrides for {}: {}", profile_id, e);
+            return;
         }
+    };
 
-        Ok(())
-    } else {
-        log::info!("User cancelled the file import dialog.");
-        Ok(())
+    if let Some(name) = name {
+        profile.name = name;
+    }
+    if let Some(group) = group {
+        profile.group = if group.is_empty() { None } else { Some(group) };
+    }
+    if clear_pack {
+        profile.selected_norisk_pack_id = None;
+    } else if let Some(pack_id) = norisk_pack_id {
+        profile.selected_norisk_pack_id = Some(pack_id);
+    }
+
+    if let Err(e) = state.profile_manager.update_profile(profile_id, profile).await {
+        log::error!("Failed to apply import overrides for {}: {}", profile_id, e);
     }
 }
 
 /// Imports a profile from a specified file path.
 #[tauri::command]
-pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> Result<Uuid, CommandError> {
+pub async fn import_profile(
+    file_path_str: String,
+    event_id: Option<String>,
+    name_override: Option<String>,
+    group_override: Option<String>,
+    norisk_pack_id: Option<String>,
+    clear_norisk_pack: Option<bool>,
+) -> Result<Uuid, CommandError> {
     log::info!(
         "Executing import_profile command with file_path: {}",
         file_path_str
@@ -1350,6 +1391,16 @@ pub async fn import_profile(file_path_str: String, event_id: Option<String>) -> 
             )));
         }
     };
+
+    apply_import_overrides(
+        &state,
+        new_profile_id,
+        name_override,
+        group_override,
+        norisk_pack_id,
+        clear_norisk_pack,
+    )
+    .await;
 
     if let Ok(profile) = state.profile_manager.get_profile(new_profile_id).await {
         let mut props = std::collections::HashMap::new();
@@ -1617,6 +1668,8 @@ pub async fn copy_profile(params: CopyProfileParams) -> Result<Uuid, CommandErro
         modpack_info: source_profile.modpack_info.clone(),
         preferred_account_id: source_profile.preferred_account_id,
         playtime_seconds: 0,
+        sync_pack_ids: source_profile.sync_pack_ids.clone(),
+        extra: Default::default(),
     };
 
     // 6. Erstelle das neue Profilverzeichnis
@@ -1735,20 +1788,42 @@ pub async fn export_profile(
     }
 
     // Generate complete filename with extension
-    let noriskpack_filename = format!("{}.noriskpack", sanitized_name);
+    let pack_filename = format!("{}.{}", sanitized_name, params.format.extension());
 
     // Create full export path
-    let export_path = exports_dir.join(&noriskpack_filename);
+    let export_path = exports_dir.join(&pack_filename);
 
     info!("Exporting profile to {}", export_path.display());
 
     // Perform the export
-    let result_path = profile_utils::export_profile_to_noriskpack(
-        params.profile_id,
-        Some(export_path.clone()),
-        params.include_files,
-    )
-        .await?;
+    let result_path = match params.format {
+        ExportFormat::Noriskpack => {
+            profile_utils::export_profile_to_noriskpack(
+                params.profile_id,
+                Some(export_path.clone()),
+                params.include_files,
+            )
+            .await?
+        }
+        ExportFormat::Mrpack => {
+            crate::integrations::mrpack_export::export_profile_to_mrpack(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+        ExportFormat::Curseforge => {
+            crate::integrations::curseforge_export::export_profile_to_curseforge(
+                params.profile_id,
+                export_path.clone(),
+                params.include_files,
+                None,
+            )
+            .await?
+        }
+    };
 
     // Open the export directory if requested
     if params.open_folder {
@@ -2234,9 +2309,25 @@ pub async fn list_profile_screenshots(
 }
 
 // --- New DTO and Command for All Profiles and Last Played ---
+// List entry with `mods` stripped: the mods arrays make up ~95% of the serialized
+// profile list and blocked the WebView main thread on JSON.parse. The frontend
+// only needs the count here; full mods come from get_profile / get_local_content.
+#[derive(Serialize, Debug, Clone)]
+pub struct ProfileListEntry {
+    #[serde(flatten)]
+    profile: Profile,
+    mod_count: usize,
+}
+
+impl From<(Profile, usize)> for ProfileListEntry {
+    fn from((profile, mod_count): (Profile, usize)) -> Self {
+        Self { profile, mod_count }
+    }
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct AllProfilesAndLastPlayed {
-    all_profiles: Vec<Profile>,
+    all_profiles: Vec<ProfileListEntry>,
     last_played_profile_id: Option<Uuid>,
 }
 
@@ -2246,7 +2337,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
     let state = State::get().await?;
 
     // Fetch User Profiles (includes editable copies of standard profiles)
-    let user_profiles = state.profile_manager.list_profiles().await?;
+    let user_profiles = state.profile_manager.list_profiles_without_mods().await?;
 
     // Handle `last_played_profile_id`
     let mut launcher_config = state.config_manager.get_config().await;
@@ -2255,7 +2346,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
 
     // Validate existing last_played_profile_id
     if let Some(id_to_check) = effective_last_played_id {
-        let exists = user_profiles.iter().any(|p| p.id == id_to_check);
+        let exists = user_profiles.iter().any(|(p, _)| p.id == id_to_check);
         if !exists {
             info!(
                 "Last played profile ID {} no longer exists. Marking for reset.",
@@ -2289,7 +2380,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
         } else {
             // No standard profiles available, use first user profile
             info!("No standard profiles available. Using first user profile as default.");
-            user_profiles.first().map(|p| p.id)
+            user_profiles.first().map(|(p, _)| p.id)
         };
 
         // Check if the determined new_default_id is different from what's in the original config.
@@ -2317,7 +2408,7 @@ pub async fn get_all_profiles_and_last_played() -> Result<AllProfilesAndLastPlay
     }
 
     Ok(AllProfilesAndLastPlayed {
-        all_profiles: user_profiles,
+        all_profiles: user_profiles.into_iter().map(ProfileListEntry::from).collect(),
         last_played_profile_id: effective_last_played_id,
     })
 }
@@ -2351,15 +2442,7 @@ pub async fn get_local_content(
 
     match ProfileUtilLocalContentLoader::load_items(params.clone()).await {
         // .clone() if params is used later, or pass directly
-        Ok(items) => {
-            info!(
-                "Successfully loaded {} items of type '{:?}' for profile {}",
-                items.len(),
-                params.content_type, // Log the enum directly
-                params.profile_id
-            );
-            Ok(items)
-        }
+        Ok(items) => Ok(items),
         Err(e) => {
             error!(
                 "Failed to load content type '{:?}' for profile {}: {}",
@@ -2387,12 +2470,6 @@ pub async fn check_for_group_migration_command(profile_id: Uuid) -> Result<Migra
 }
 
 
-#[tauri::command]
-pub async fn purge_trash(max_age_seconds: Option<u64>) -> Result<u64, CommandError> {
-    let secs = max_age_seconds.unwrap_or(120);
-    let removed = crate::utils::trash_utils::purge_expired(secs).await?;
-    Ok(removed)
-}
 // === Symlink Commands ===
 
 #[derive(Debug, Deserialize)]
@@ -2419,13 +2496,10 @@ pub async fn add_profile_symlink(params: AddSymlinkParams) -> Result<(), Command
     
     // Normalize relative_path by converting to PathBuf (handles forward/backslash normalization)
     // Split by '/' and push segments individually to ensure platform-appropriate separators
-    let mut normalized_relative = PathBuf::new();
-    for segment in params.relative_path.split('/') {
-        if !segment.is_empty() {
-            normalized_relative.push(segment);
-        }
-    }
-    
+    let normalized_relative =
+        crate::utils::import_safety::safe_relative_path(&params.relative_path)
+            .map_err(CommandError::from)?;
+
     let link_path = instance_path.join(&normalized_relative);
     let target_path = PathBuf::from(&params.external_path);
     
@@ -2556,38 +2630,6 @@ pub async fn get_profile_disk_size(profile_id: Uuid) -> Result<u64, CommandError
     Ok(size)
 }
 
-#[tauri::command]
-pub async fn get_profile_folders(profile_id: Uuid) -> Result<Vec<String>, CommandError> {
-    let state = State::get().await?;
-
-    let profile = state
-        .profile_manager
-        .get_profile(profile_id)
-        .await?;
-
-    let instance_path = state
-        .profile_manager
-        .calculate_instance_path_for_profile(&profile)?;
-
-    let mut folders = Vec::new();
-    if let Ok(mut entries) = tokio::fs::read_dir(&instance_path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry
-                .file_type()
-                .await
-                .map(|ft| ft.is_dir())
-                .unwrap_or(false)
-            {
-                if let Some(name) = entry.file_name().to_str() {
-                    folders.push(name.to_string());
-                }
-            }
-        }
-    }
-
-    Ok(folders)
-}
-
 // ---------------------------------------------------------------------------
 // CLI / runtime-override launch
 // ---------------------------------------------------------------------------
@@ -2651,9 +2693,11 @@ pub async fn launch_profile_with_overrides(
     quick_play_multiplayer: Option<String>,
     local_mods: Vec<String>,
     account: Option<String>,
+    jvm_args: Option<Vec<String>>,
 ) -> Result<(), CommandError> {
     let state = State::get().await?;
     let mut profile = resolve_profile_ref(&state, &profile_ref).await?;
+    let jvm_args = jvm_args.unwrap_or_default();
     apply_overrides(&mut profile, overrides)?;
 
     // Quick-play: explicit CLI value wins; otherwise fall back to the profile's
@@ -2670,7 +2714,7 @@ pub async fn launch_profile_with_overrides(
     };
 
     log::info!(
-        "[CLI launch] profile='{}' id={} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        "[CLI launch] profile='{}' id={} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?} jvm_args={:?}",
         profile.name,
         profile.id,
         profile.game_version,
@@ -2679,6 +2723,7 @@ pub async fn launch_profile_with_overrides(
         profile.selected_norisk_pack_id,
         qp_sp,
         qp_mp,
+        jvm_args,
     );
 
     let is_experimental = state.config_manager.is_experimental_mode().await;
@@ -2690,15 +2735,16 @@ pub async fn launch_profile_with_overrides(
     // Runtime-only local mods (referenced in place, never persisted to the profile).
     let local_mod_paths = resolve_local_mod_paths(&local_mods).await?;
 
-    // Mirror launch_profile's install spawn — minus the persistence side-effects
-    // (no update_profile, no last_played_profile, no add_launching_process).
+    // Mirror launch_profile's install spawn — minus the profile persistence
+    // side-effects (no update_profile, no last_played_profile). The launching
+    // handle IS registered so the UI stop button can abort the install phase.
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
     let profile_id = profile.id;
     let profile_clone = profile.clone();
 
-    tokio::spawn(async move {
-        match installer::install_minecraft_version(
+    let handle = tokio::spawn(async move {
+        let install_result = installer::install_minecraft_version(
             &version,
             &modloader.as_str(),
             &profile_clone,
@@ -2707,9 +2753,16 @@ pub async fn launch_profile_with_overrides(
             qp_mp,
             None,
             local_mod_paths,
+            jvm_args,
+            true,
         )
-        .await
-        {
+        .await;
+
+        if let Ok(state) = State::get().await {
+            state.process_manager.remove_launching_process(profile_id);
+        }
+
+        match install_result {
             Ok(_) => log::info!(
                 "[CLI launch] Profile {} started ({} {}).",
                 profile_id,
@@ -2723,6 +2776,10 @@ pub async fn launch_profile_with_overrides(
             ),
         }
     });
+
+    state
+        .process_manager
+        .add_launching_process(profile_id, handle);
 
     Ok(())
 }
@@ -2918,6 +2975,8 @@ pub struct TempLaunchArgs {
     pub local_mods: Vec<String>,
     /// CLI `--account`: launch with this account (username or UUID).
     pub account: Option<String>,
+    #[serde(default)]
+    pub jvm_args: Vec<String>,
 }
 
 /// Spin up a throwaway MC instance with the given overrides. Builds an
@@ -2967,6 +3026,8 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         modpack_info: None,
         preferred_account_id: None,
         playtime_seconds: 0,
+        sync_pack_ids: Vec::new(),
+        extra: Default::default(),
     };
 
     let game_dir = state
@@ -2974,7 +3035,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         .calculate_instance_path_for_profile(&profile)?;
 
     log::info!(
-        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?}",
+        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?} jvm_args={:?}",
         profile.id,
         display_name,
         game_dir,
@@ -2984,6 +3045,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
         profile.selected_norisk_pack_id,
         args.quick_play_singleplayer,
         args.quick_play_multiplayer,
+        args.jvm_args,
     );
 
     let is_experimental = state.config_manager.is_experimental_mode().await;
@@ -3008,6 +3070,7 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
     let profile_clone = profile.clone();
     let qp_sp = args.quick_play_singleplayer.clone();
     let qp_mp = args.quick_play_multiplayer.clone();
+    let jvm_args = args.jvm_args.clone();
 
     tokio::spawn(async move {
         match installer::install_minecraft_version(
@@ -3019,6 +3082,8 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
             qp_mp,
             None,
             local_mod_paths,
+            jvm_args,
+            false,
         )
         .await
         {

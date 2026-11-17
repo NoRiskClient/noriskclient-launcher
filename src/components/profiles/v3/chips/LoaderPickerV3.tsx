@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LoaderPickerV3 — presentational picker for the mod loader type.
  *
@@ -9,6 +7,7 @@
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import type { LoaderKey } from "./useHeroChipEditors";
+import { loaderIconSrc, loaderLabel } from "../../../../lib/loader-icons";
 
 interface LoaderOption {
   key: LoaderKey;
@@ -16,13 +15,13 @@ interface LoaderOption {
   name: string;
 }
 
-const LOADERS: LoaderOption[] = [
-  { key: "vanilla",  icon: "/icons/minecraft.png", name: "Vanilla" },
-  { key: "fabric",   icon: "/icons/fabric.png",    name: "Fabric" },
-  { key: "forge",    icon: "/icons/forge.png",     name: "Forge" },
-  { key: "quilt",    icon: "/icons/quilt.png",     name: "Quilt" },
-  { key: "neoforge", icon: "/icons/neoforge.png",  name: "NeoForge" },
-];
+const LOADERS: LoaderOption[] = (
+  ["vanilla", "fabric", "forge", "quilt", "neoforge"] as const
+).map((key) => ({
+  key,
+  icon: loaderIconSrc(key),
+  name: loaderLabel(key),
+}));
 
 interface LoaderPickerV3Props {
   currentLoader: string | null | undefined;
@@ -56,7 +55,7 @@ export function LoaderPickerV3({ currentLoader, onSelect }: LoaderPickerV3Props)
               className="w-4 h-4 flex-shrink-0"
               style={{ imageRendering: l.key === "vanilla" ? "pixelated" : undefined }}
             />
-            <span className={`flex-1 text-xs font-minecraft-ten ${isCurrent ? "text-white" : "text-white/85"}`}>
+            <span className={`flex-1 text-xs font-minecraft ${isCurrent ? "text-white" : "text-white/85"}`}>
               {l.name}
             </span>
             {isCurrent && (

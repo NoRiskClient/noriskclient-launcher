@@ -1,13 +1,39 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from 'path';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(
+  readFileSync(resolve(__dirname, 'package.json'), 'utf-8'),
+) as { dependencies: Record<string, string> };
+const skinRendererVersion = pkg.dependencies['@noriskclient/nrc-skin-renderer'];
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [react()],
+
+  define: {
+    __SKIN_RENDERER_VERSION__: JSON.stringify(skinRendererVersion),
+  },
+
+  esbuild: {
+    // A release build has no dev tools and nothing forwards the console to the log file,
+    // so these calls only cost time there. `yarn dev` keeps them.
+    pure: command === "build" ? ["console.log", "console.debug"] : [],
+  },
+
+  resolve: {
+    dedupe: ["three", "react", "react-dom", "@react-three/fiber", "@react-three/drei"],
+    alias: [
+      {
+        find: /^@iconify\/react$/,
+        replacement: resolve(__dirname, "src/lib/iconify.tsx"),
+      },
+    ],
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -37,7 +63,8 @@ export default defineConfig(async () => ({
         updater: resolve(__dirname, 'updater.html'),
         minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
         singleLogWindow: resolve(__dirname, 'single-log-window.html'),
-        testerWindow: resolve(__dirname, 'tester-window.html')
+        applixirWindow: resolve(__dirname, 'applixir-window.html'),
+        clipEditorWindow: resolve(__dirname, 'clip-editor-window.html')
       }
     }
   }

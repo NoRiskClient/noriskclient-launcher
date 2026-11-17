@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::forge_maven_meta::ForgeMavenMetadata;
+use crate::utils::file_utils::write_atomic;
 use log::{debug, error, info};
 use quick_xml::de::from_str;
 use std::path::PathBuf;
@@ -51,7 +52,7 @@ impl ForgeApi {
         let metadata: ForgeMavenMetadata = from_str(&xml_content)
             .map_err(|e| AppError::ForgeError(format!("Failed to parse Forge metadata: {}", e)))?;
 
-        if let Err(e) = tokio_fs::write(cache_path, &xml_content).await {
+        if let Err(e) = write_atomic(cache_path, &xml_content).await {
             error!("Failed to write Forge cache: {}", e);
         } else {
             debug!("Cached Forge metadata: {:?}", cache_path);

@@ -1,5 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::minecraft::downloads::norisk_natives_download::NoriskNativesDownloadService as Natives;
+use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
 use crate::minecraft::ClasspathBuilder;
@@ -7,13 +9,9 @@ use crate::minecraft::GameArguments;
 use crate::minecraft::JvmArguments;
 use crate::state::profile_state::{ImageSource, Profile, ProfileBanner, WindowSize};
 use crate::state::state_manager::State;
-use log::{debug, error, info, warn};
-use serde_json::Value;
-use std::collections::HashMap;
+use log::{info, warn};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Instant;
-use tauri::Manager;
+use std::process::Command;
 use uuid::Uuid;
 
 pub struct MinecraftLaunchParameters {
@@ -23,13 +21,13 @@ pub struct MinecraftLaunchParameters {
     pub additional_game_args: Vec<String>,
     pub custom_client_jar: Option<PathBuf>,
     pub old_minecraft_arguments: Option<String>,
-    pub force_include_minecraft_jar: bool,
     pub profile_id: Uuid,
     pub memory_max_mb: u32,
     pub is_experimental_mode: bool,
     pub resolution: Option<WindowSize>,
     pub quick_play_singleplayer: Option<String>,
     pub quick_play_multiplayer: Option<String>,
+    pub mod_resolution: Option<ModResolutionReport>,
 }
 
 impl MinecraftLaunchParameters {
@@ -41,14 +39,19 @@ impl MinecraftLaunchParameters {
             additional_game_args: Vec::new(),
             custom_client_jar: None,
             old_minecraft_arguments: None,
-            force_include_minecraft_jar: false,
             profile_id,
             memory_max_mb,
             is_experimental_mode: false,
             resolution: None,
             quick_play_singleplayer: None,
             quick_play_multiplayer: None,
+            mod_resolution: None,
         }
+    }
+
+    pub fn with_mod_resolution(mut self, report: ModResolutionReport) -> Self {
+        self.mod_resolution = Some(report);
+        self
     }
 
     pub fn with_main_class(mut self, main_class: &str) -> Self {
@@ -81,16 +84,6 @@ impl MinecraftLaunchParameters {
         self
     }
 
-    pub fn with_force_include_minecraft_jar(mut self, force: bool) -> Self {
-        self.force_include_minecraft_jar = force;
-        self
-    }
-
-    pub fn with_memory_max_mb(mut self, memory: u32) -> Self {
-        self.memory_max_mb = memory;
-        self
-    }
-
     pub fn with_experimental_mode(mut self, is_experimental: bool) -> Self {
         self.is_experimental_mode = is_experimental;
         self
@@ -116,7 +109,7 @@ impl MinecraftLaunchParameters {
 /// Returns None if the banner is None or cannot be resolved.
 fn resolve_profile_banner_path(
     banner: &Option<ProfileBanner>,
-    profile_id: Uuid,
+    _profile_id: Uuid,
     profile_path: &Path,
 ) -> Option<String> {
     let banner = banner.as_ref()?;
@@ -184,7 +177,7 @@ impl MinecraftLauncher {
         piston_meta: &PistonMeta,
     ) -> Option<Vec<String>> {
         minecraft_arguments.map(|args_string| {
-            info!("\nProcessing old format arguments (with advanced splitting):");
+            info!("Processing old format arguments (with advanced splitting):");
 
             // 1. Create the helper to resolve variables
             let game_args_resolver = GameArguments::new(
@@ -227,7 +220,7 @@ impl MinecraftLauncher {
         // Arguments
         let mut args_iter = command.get_args().peekable();
         while let Some(arg_os_str) = args_iter.next() {
-            let mut arg_str = arg_os_str.to_string_lossy().into_owned();
+            let arg_str = arg_os_str.to_string_lossy().into_owned();
 
             if arg_str.starts_with("-Dnorisk.token=") {
                 parts.push("-Dnorisk.token=*****".to_string());
@@ -269,7 +262,6 @@ impl MinecraftLauncher {
         let mut command = match launcher_config.hooks.wrapper {
             Some(wrapper) => {
                 info!("Using wrapper command: {}", wrapper);
-                // Exactly like Modrinth: use the whole wrapper string as command and add java path as arg
                 {
                     let mut it = Command::new(wrapper);
                     it.arg(&self.java_path);
@@ -291,12 +283,12 @@ impl MinecraftLauncher {
                 .add_additional_libraries(&params.additional_libraries, 1)
                 .add_piston_libraries(&piston_meta.libraries)
                 .set_custom_client_jar(client_jar)
-                .build(params.force_include_minecraft_jar)
+                .build()
         } else {
             ClasspathBuilder::new(&piston_meta.id)
                 .add_additional_libraries(&params.additional_libraries, 1)
                 .add_piston_libraries(&piston_meta.libraries)
-                .build(params.force_include_minecraft_jar)
+                .build()
         };
 
         // Create JVM arguments processor
@@ -308,7 +300,7 @@ impl MinecraftLauncher {
         );
 
         // Process and add JVM arguments
-        info!("\nProcessing JVM arguments:");
+        info!("Processing JVM arguments:");
         let mut has_classpath = false;
         let mut has_natives = false;
 
@@ -441,11 +433,26 @@ impl MinecraftLauncher {
                     "-Dnorisk.experimental={}",
                     params.is_experimental_mode
                 ));
+
+                // Forward the launcher's analytics opt-in (config flag) to the in-game client.
+                let enable_analytics = state.config_manager.get_config().await.enable_analytics;
+                command.arg(format!("-Dnorisk.analytics.enabled={}", enable_analytics));
             } else {
                 info!("[NoRisk Launcher] No NoRisk pack selected, skipping NoRisk token and experimental mode parameters");
             }
         } else {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
+        }
+
+        if let Some(creds) = &self.credentials {
+            if let Err(e) = state.minecraft_account_manager_v2.ensure_fresh_twitch_token(creds.id).await {
+                warn!("[Twitch] Could not refresh the Twitch token: {}", e);
+            }
+        }
+
+        if let Some(dir) = Natives::ffmpeg_dir() {
+            info!("[NRC Natives] Passing ffmpeg natives directory to the game: {}", dir.display());
+            command.arg(format!("-Dnrc.ffmpeg.natives={}", dir.display()));
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the
@@ -571,6 +578,21 @@ impl MinecraftLauncher {
             Some(p) => p.effective_norisk_pack_id().await,
             None => None,
         };
+        // Snapshot mod manifest (incl. disabled) for crash analysis.
+        let crash_mods = match &profile {
+            Some(p) => {
+                crate::state::process_state::build_crash_mod_manifest(
+                    p,
+                    &state,
+                    params.mod_resolution.as_ref(),
+                )
+                .await
+            }
+            None => Vec::new(),
+        };
+        let crash_modpack = profile
+            .as_ref()
+            .and_then(crate::state::process_state::crash_modpack_info);
         let (profile_loader, profile_loader_version, profile_norisk_pack, profile_name, profile_image_url) =
             match profile {
                 Some(p) => {
@@ -620,6 +642,8 @@ impl MinecraftLauncher {
                 profile_image_url,
                 post_exit_hook,
                 params.memory_max_mb,
+                crash_mods,
+                crash_modpack,
             )
             .await?;
 

@@ -1,5 +1,3 @@
-"use client";
-
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -40,7 +38,7 @@ export function GroupMigrationModal({
       width="md"
     >
       <div className="p-6">
-        <p className="text-white/80 mb-6 text-center font-minecraft-ten">
+        <p className="text-white/80 mb-6 text-center font-minecraft">
           {t('group_migration.description')}
         </p>
 

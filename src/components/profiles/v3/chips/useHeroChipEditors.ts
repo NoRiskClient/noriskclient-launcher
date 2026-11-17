@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * useHeroChipEditors — orchestrates fetch + save for the Hero inline-edit
  * chips (Group, Game Version, Loader, Loader Version). Picker components stay
@@ -35,6 +33,7 @@ import type { Profile, UpdateProfileParams } from "../../../../types/profile";
 import type { MinecraftVersion } from "../../../../types/minecraft";
 import * as ProfileService from "../../../../services/profile-service";
 import { useProfileStore } from "../../../../store/profile-store";
+import { parseErrorMessage } from "../../../../utils/error-utils";
 
 export type LoaderKey = "vanilla" | "fabric" | "forge" | "quilt" | "neoforge";
 
@@ -171,7 +170,7 @@ export function useHeroChipEditors(
         if (fresh) onProfileUpdated(fresh);
         toast.success(t("profiles.settings.saveSuccess"));
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = parseErrorMessage(err);
         toast.error(t("profiles.settings.saveError", { error: msg }));
         throw err;
       }

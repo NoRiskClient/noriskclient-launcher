@@ -3,7 +3,6 @@ import { Icon } from "@iconify/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type {
   ProfileBanner,
-  ImageSourceAbsolutePath,
 } from "../../types/profile";
 import { cn } from "../../lib/utils";
 import * as ProfileService from "../../services/profile-service";
@@ -61,12 +60,16 @@ export function ProfileIcon({
 }: ProfileIconProps) {
   const { t } = useTranslation();
   const { showModal, hideModal } = useGlobalModal();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const cachedUrl = banner?.source
+    ? (imageUrlCache.get(getCacheKey(profileId, banner))?.url ?? null)
+    : null;
+
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
-  const [hasLoadedImage, setHasLoadedImage] = useState(false);
-  const [imageOpacity, setImageOpacity] = useState(0);
+  const [hasLoadedImage, setHasLoadedImage] = useState(!!cachedUrl);
+  const [imageOpacity, setImageOpacity] = useState(cachedUrl ? 1 : 0);
   const cacheVersion = useRef(0);
 
   useEffect(() => {
@@ -204,7 +207,6 @@ export function ProfileIcon({
   const displaySpinner = showLoading || isUpdating;
 
   const effectiveIconClassName = cn(iconClassName, displaySpinner && "opacity-50");
-  const displayPlaceholderIcon = displaySpinner ? "eos-icons:loading" : placeholderIcon;
   const hasImage = imageUrl && hasLoadedImage && !isLoading;
   const shouldShowPlaceholder = !banner?.source && !isLoading;
   

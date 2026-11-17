@@ -1,12 +1,11 @@
-"use client";
-
 import { useRef, useEffect, useState, Suspense, Component, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Center, Resize, Html, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { extendGLTFLoaderForTauri } from "../../utils/tauri-gltf-loader";
-import { logInfo, logError } from "../../utils/logging-utils";
+import { WebGLBoundary } from "../WebGLBoundary";
+import { logInfo } from "../../utils/logging-utils";
 
 interface CosmeticPreviewProps {
   modelPath: string;
@@ -91,6 +90,16 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
   return (
     <div className="w-full h-full relative min-h-[250px]">
       {ready ? (
+        <WebGLBoundary
+          label="cosmetic model preview"
+          fallback={
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <p className="text-white/50 text-xs font-minecraft text-center">
+                {t('webgl.unavailable')}
+              </p>
+            </div>
+          }
+        >
         <Canvas 
           shadows 
           dpr={[1, 2]} 
@@ -105,7 +114,7 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
           <ErrorBoundary fallback={ErrorFallback}>
             <Suspense fallback={
               <Html center>
-                <div className="text-white/70 text-sm font-minecraft-ten">{loadingText}</div>
+                <div className="text-white/70 text-sm font-minecraft">{loadingText}</div>
               </Html>
             }>
               <group position={[0, -0.5, 0]}>
@@ -129,9 +138,10 @@ export function CosmeticPreview({ modelPath }: CosmeticPreviewProps) {
             zoomSpeed={0.8}
           />
         </Canvas>
+        </WebGLBoundary>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-white/50 text-sm font-minecraft-ten">{loadingText}</div>
+          <div className="text-white/50 text-sm font-minecraft">{loadingText}</div>
         </div>
       )}
     </div>

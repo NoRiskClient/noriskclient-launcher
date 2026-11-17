@@ -1,7 +1,5 @@
 import { NoriskModIdentifier, type LocalContentItem as ProfileLocalContentItem } from "./profile";
-import type { ModrinthVersion } from "./modrinth";
 import { ModPlatform, type UnifiedVersion } from "./unified";
-import type { CurseForgeFile } from "./curseforge";
 
 /**
  * Payload for uninstalling content from a profile.
@@ -65,6 +63,10 @@ export interface InstallContentPayload {
   source: ModPlatform; // Added source to distinguish Modrinth/CurseForge
 }
 
+export type ContentInstallTarget =
+  | { type: "profile" }
+  | { type: "syncPack"; packId: string; packName: string };
+
 /**
  * Payload for installing local content (e.g., JARs, resource packs) into a profile.
  * Mirrors the Rust struct `InstallLocalContentPayload` in `content_command.rs`.
@@ -112,6 +114,26 @@ export interface BulkToggleModUpdatesPayload {
 export interface BulkModUpdateEntry {
   mod_id: string; // UUID of the mod
   updates_enabled: boolean; // Whether updates should be enabled for this mod
+}
+
+export interface CopyContentItem {
+  id: string | null;
+  path: string;
+  name: string;
+}
+
+export interface CopyContentsRequest {
+  source_profile_id: string;
+  target_profile_id: string;
+  content_type: ContentType;
+  items: CopyContentItem[];
+}
+
+export interface CopyContentsResult {
+  copied: string[];
+  already_there: string[];
+  inactive: string[];
+  failed: string[];
 }
 
 // Represents a NoriskMod item as expected by the backend for add/remove operations

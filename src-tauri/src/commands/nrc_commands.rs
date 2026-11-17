@@ -1,12 +1,10 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, Reward, UniquePlayersResponse, UserNotification};
+use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
 use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
-use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::state::state_manager::State;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::info;
 use log::{debug, error};
-use std::sync::Arc;
 use tauri::{AppHandle, Manager, Url, UserAttentionType, WebviewUrl, WebviewWindowBuilder};
 use crate::utils::updater_utils;
 
@@ -364,9 +362,11 @@ pub async fn github_auth_unlink() -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), CommandError> {
+pub async fn check_crash_log_command(
+    payload: CrashlogDto,
+) -> Result<serde_json::Value, CommandError> {
     debug!(
-        "Executing submit_crash_log_command with payload: {:?}",
+        "Executing check_crash_log_command with payload: {:?}",
         payload
     );
     let state = State::get().await?;
@@ -377,25 +377,20 @@ pub async fn submit_crash_log_command(payload: CrashlogDto) -> Result<(), Comman
         .get_active_account()
         .await?
         .ok_or(AppError::AccountError(
-            "No active account found for submitting crash log.".to_string(),
+            "No active account found for checking crash log.".to_string(),
         ))?;
 
     let norisk_creds = &selected_account_arc.norisk_credentials;
     let token = norisk_creds.get_token_for_mode(is_experimental)?;
 
-    debug!(
-        "Submitting crash log for account {} (experimental: {}).",
-        selected_account_arc.id, is_experimental
-    );
-
-    NoRiskApi::submit_crash_log(
+    let result = NoRiskApi::check_crash_log(
         &token,
         &payload,
         &selected_account_arc.id.to_string(),
         is_experimental,
     )
     .await?;
-    Ok(())
+    Ok(result)
 }
 
 #[tauri::command]
@@ -472,6 +467,11 @@ pub async fn check_update_available_command(app: AppHandle) -> Result<Option<cra
 
     debug!("Using beta channel setting from config: {}", is_beta_channel);
     Ok(updater_utils::check_update_available(&app, is_beta_channel).await?)
+}
+
+#[tauri::command]
+pub fn get_launcher_update_command() -> Option<crate::utils::background_updater::LauncherUpdate> {
+    crate::utils::background_updater::ready_update()
 }
 
 #[tauri::command]

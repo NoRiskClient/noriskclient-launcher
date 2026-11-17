@@ -3,7 +3,6 @@ pub mod forge_installer;
 pub mod neoforge_installer;
 pub mod quilt_installer;
 
-use crate::config::ProjectDirsExt;
 use crate::error::Result;
 use crate::minecraft::api::fabric_api::FabricApi;
 use crate::minecraft::api::forge_api::ForgeApi;
@@ -172,77 +171,55 @@ impl ModloaderFactory {
 
     /// Calls the live loader metadata API for `loader` + `mc_version` and
     /// returns the top (newest) entry formatted like the rest of the launcher
-    /// stores it. For Fabric/Quilt that means appending " (stable)" when the
-    /// loader flags it — matches the wizard's `"{ver} (stable)"` encoding
-    /// (see `ModLoaderStep.tsx:194`) so saved + resolved values compare
-    /// cleanly. Errors are swallowed with a warn-level log so the UI stays
+    /// stores it. Errors are swallowed with a warn-level log so the UI stays
     /// responsive.
     async fn fetch_latest_from_api(
         loader: &ModLoader,
         mc_version: &str,
     ) -> Option<String> {
-        match loader {
-            ModLoader::Fabric => match FabricApi::new().get_loader_versions(mc_version).await {
-                Ok(list) => list.first().map(|v| {
-                    if v.loader.stable {
-                        format!("{} (stable)", v.loader.version)
-                    } else {
-                        v.loader.version.clone()
-                    }
-                }),
-                Err(e) => {
-                    warn!("Auto-resolve fabric: {}", e);
-                    None
-                }
-            },
-            ModLoader::Quilt => match QuiltApi::new().get_loader_versions(mc_version).await {
-                Ok(list) => list.first().map(|v| {
-                    if v.loader.stable {
-                        format!("{} (stable)", v.loader.version)
-                    } else {
-                        v.loader.version.clone()
-                    }
-                }),
-                Err(e) => {
-                    warn!("Auto-resolve quilt: {}", e);
-                    None
-                }
-            },
-            ModLoader::Forge => match ForgeApi::new().get_all_versions().await {
-                Ok(meta) => meta
-                    .get_versions_for_minecraft(mc_version)
-                    .first()
-                    .cloned(),
-                Err(e) => {
-                    warn!("Auto-resolve forge: {}", e);
-                    None
-                }
-            },
-            ModLoader::NeoForge => match NeoForgeApi::new().get_all_versions().await {
-                Ok(meta) => meta
-                    .get_versions_for_minecraft(mc_version)
-                    .first()
-                    .cloned(),
-                Err(e) => {
-                    warn!("Auto-resolve neoforge: {}", e);
-                    None
-                }
-            },
-            ModLoader::Vanilla => None,
+        match Self::list_loader_versions(loader, mc_version).await {
+            Ok(list) => list.into_iter().next(),
+            Err(e) => {
+                warn!("Auto-resolve {}: {}", loader.as_str(), e);
+                None
+            }
         }
     }
 
-    pub fn create_installer(
-        modloader: &ModLoader,
-        java_path: PathBuf,
-    ) -> Box<dyn ModloaderInstaller> {
-        match modloader {
-            ModLoader::Fabric => Box::new(FabricInstaller::new()),
-            ModLoader::Quilt => Box::new(QuiltInstaller::new()),
-            ModLoader::Forge => Box::new(ForgeInstaller::new(java_path)),
-            ModLoader::NeoForge => Box::new(NeoForgeInstaller::new(java_path)),
-            ModLoader::Vanilla => Box::new(VanillaInstaller),
-        }
+    pub async fn list_loader_versions(
+        loader: &ModLoader,
+        mc_version: &str,
+    ) -> Result<Vec<String>> {
+        let tagged = |version: &str, stable: bool| {
+            if stable {
+                format!("{} (stable)", version)
+            } else {
+                version.to_string()
+            }
+        };
+        Ok(match loader {
+            ModLoader::Fabric => FabricApi::new()
+                .get_loader_versions(mc_version)
+                .await?
+                .iter()
+                .map(|v| tagged(&v.loader.version, v.loader.stable))
+                .collect(),
+            ModLoader::Quilt => QuiltApi::new()
+                .get_loader_versions(mc_version)
+                .await?
+                .iter()
+                .map(|v| tagged(&v.loader.version, v.loader.stable))
+                .collect(),
+            ModLoader::Forge => ForgeApi::new()
+                .get_all_versions()
+                .await?
+                .get_versions_for_minecraft(mc_version),
+            ModLoader::NeoForge => NeoForgeApi::new()
+                .get_all_versions()
+                .await?
+                .get_versions_for_minecraft(mc_version),
+            ModLoader::Vanilla => Vec::new(),
+        })
     }
 
     pub fn create_installer_with_config(
@@ -309,7 +286,6 @@ impl ModloaderInstaller for FabricInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -342,7 +318,6 @@ impl ModloaderInstaller for QuiltInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -359,7 +334,6 @@ impl ModloaderInstaller for ForgeInstaller {
             game_args: Some(result.game_args),
             minecraft_arguments: result.minecraft_arguments,
             custom_client_path: result.custom_client_path,
-            force_include_minecraft_jar: result.force_include_minecraft_jar,
         })
     }
 }
@@ -369,50 +343,13 @@ impl ModloaderInstaller for NeoForgeInstaller {
     async fn install(&self, version_id: &str, profile: &Profile) -> Result<ModloaderInstallResult> {
         let result = self.install(version_id, profile).await?;
 
-        let mut alt_jvm_args = None;
-        if result.uses_neoforgeclient {
-            // For NeoForge with the special launcher case
-            let neoforge_api = crate::minecraft::api::neo_forge_api::NeoForgeApi::new();
-            let versions = neoforge_api.get_all_versions().await?;
-            let compatible_versions = versions.get_versions_for_minecraft(version_id);
-
-            let target_version_str = match &profile.loader_version {
-                Some(v) if !v.is_empty() && compatible_versions.contains(v) => v.clone(),
-                _ => compatible_versions
-                    .first()
-                    .cloned()
-                    .unwrap_or_else(|| version_id.to_string()),
-            };
-
-            // Special case for neoforgeclient flag - additional JVM args needed
-            use crate::minecraft::downloads::neo_forge_installer_download::NeoForgeInstallerDownloadService;
-            use crate::minecraft::launch::neo_forge_arguments::NeoForgeArguments;
-
-            // Download the NeoForge version JSON to get the proper version object
-            let downloader = NeoForgeInstallerDownloadService::new();
-            let neoforge_version = downloader.extract_version_json(&target_version_str).await?;
-
-            alt_jvm_args = Some(NeoForgeArguments::get_jvm_arguments(
-                &neoforge_version,
-                &crate::config::LAUNCHER_DIRECTORY
-                    .meta_dir()
-                    .join("libraries"),
-                version_id, // MCVERSION not NEOFORGEVERSION
-            ));
-        }
-
         Ok(ModloaderInstallResult {
             libraries: result.libraries,
             main_class: Some(result.main_class),
-            jvm_args: alt_jvm_args.or(Some(result.jvm_args)),
+            jvm_args: Some(result.jvm_args),
             game_args: Some(result.game_args),
             minecraft_arguments: result.minecraft_arguments,
-            custom_client_path: if result.uses_neoforgeclient {
-                None
-            } else {
-                result.custom_client_path
-            },
-            force_include_minecraft_jar: false,
+            custom_client_path: result.custom_client_path,
         })
     }
 }
@@ -434,7 +371,6 @@ impl ModloaderInstaller for VanillaInstaller {
             game_args: None,
             minecraft_arguments: None,
             custom_client_path: None,
-            force_include_minecraft_jar: false,
         })
     }
 }
@@ -446,5 +382,4 @@ pub struct ModloaderInstallResult {
     pub game_args: Option<Vec<String>>,
     pub minecraft_arguments: Option<String>,
     pub custom_client_path: Option<PathBuf>,
-    pub force_include_minecraft_jar: bool,
 }

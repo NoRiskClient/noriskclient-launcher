@@ -1,12 +1,10 @@
-"use client";
-
 /**
  * BrowseContentSideSheetV3 — "Add content" as a docked right-side panel.
  *
  * Deliberately NOT styled like the shared `Modal`: a sheet is a docked
  * surface that extends the parent view, not a floating card demanding
  * focus. So the header uses the V3 profile-detail top-bar vocabulary
- * (h-11 toolbar, font-minecraft-ten uppercase breadcrumb, thin accent
+ * (h-11 toolbar, font-minecraft uppercase breadcrumb, thin accent
  * indicator on the docked edge) and the backdrop is lighter, signalling
  * "non-blocking side task" instead of "stop everything".
  *
@@ -21,6 +19,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
 import type { Profile } from "../../../types/profile";
+import type { ContentInstallTarget } from "../../../types/content";
 import type { LocalContentType } from "../../../hooks/useLocalContentManager";
 import type { ModrinthProjectType } from "../../../types/modrinth";
 import { ModrinthSearchV2 } from "../../modrinth/v2/ModrinthSearchV2";
@@ -34,6 +33,8 @@ export interface BrowseContentSideSheetV3Props {
   contentType: LocalContentType;
   onClose: () => void;
   onInstallSuccess?: () => void;
+  installTarget?: ContentInstallTarget;
+  installedOverride?: { projectIds: string[]; versionIds: string[] } | null;
 }
 
 const CONTENT_TO_PROJECT: Partial<Record<LocalContentType, ModrinthProjectType>> = {
@@ -49,6 +50,8 @@ export function BrowseContentSideSheetV3({
   contentType,
   onClose,
   onInstallSuccess,
+  installTarget,
+  installedOverride,
 }: BrowseContentSideSheetV3Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -58,7 +61,10 @@ export function BrowseContentSideSheetV3({
   // without that field doesn't turn the whole `background` property into
   // invalid CSS (which silently wipes every layer).
   const accentDark = accentColor.dark ?? accent;
-  const projectType = CONTENT_TO_PROJECT[contentType] ?? "mod";
+  const isPackTarget = installTarget?.type === "syncPack";
+  const projectType = isPackTarget
+    ? "mod"
+    : CONTENT_TO_PROJECT[contentType] ?? "mod";
 
   // In-sheet mod detail stack — clicking a project tile pushes its id onto
   // this piece of state instead of navigating, so the sheet stays mounted
@@ -104,6 +110,7 @@ export function BrowseContentSideSheetV3({
   if (!open) return null;
 
   const title =
+    isPackTarget                   ? t("profiles.content.addMods") :
     contentType === "Mod"          ? t("profiles.content.addMods") :
     contentType === "ResourcePack" ? t("profiles.content.addResourcePacks") :
     contentType === "ShaderPack"   ? t("profiles.content.addShaderPacks") :
@@ -118,7 +125,7 @@ export function BrowseContentSideSheetV3({
       <div
         onClick={onClose}
         aria-hidden="true"
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
+        className="glass-scrim fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
       />
 
       {/* Sheet: docked to the right edge. Frosted-glass treatment — lower
@@ -130,7 +137,7 @@ export function BrowseContentSideSheetV3({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="fixed right-0 top-0 h-full w-[82vw] min-w-[640px] max-w-[1300px] z-[1001] flex flex-col shadow-[0_0_64px_-8px_rgba(0,0,0,0.7)] animate-in slide-in-from-right duration-200 overflow-hidden"
+        className="glass-panel fixed right-0 top-0 h-full w-[82vw] min-w-[640px] max-w-[1300px] z-[1001] flex flex-col shadow-[0_0_64px_-8px_rgba(0,0,0,0.7)] animate-in slide-in-from-right duration-200 overflow-hidden"
         style={{
           // Light see-through base — a soft dark veil (~0.42 alpha) takes
           // the edge off what's behind without hiding it, with accent
@@ -171,7 +178,7 @@ export function BrowseContentSideSheetV3({
         />
 
         {/* Header uses the V3 detail-view top-bar spec (h-11, px-5, border-
-            white/5, font-minecraft-ten uppercase tracking-wider) so the sheet
+            white/5, font-minecraft uppercase tracking-wider) so the sheet
             reads as an extension of the detail view's chrome rather than a
             foreign dialog with its own type scale.
             When a mod detail is stacked on top, the header morphs into a
@@ -186,7 +193,7 @@ export function BrowseContentSideSheetV3({
                 title={t("common.back")}
               >
                 <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-                <span className="text-xs font-minecraft-ten uppercase tracking-wider">
+                <span className="text-xs font-minecraft uppercase tracking-wider">
                   {title}
                 </span>
               </button>
@@ -197,17 +204,17 @@ export function BrowseContentSideSheetV3({
                   className="w-4 h-4 flex-shrink-0"
                   style={{ color: accent }}
                 />
-                <span className="text-xs font-minecraft-ten uppercase tracking-wider text-white/90 truncate">
+                <span className="text-xs font-minecraft uppercase tracking-wider text-white/90 truncate">
                   {title}
                 </span>
               </>
             )}
             <span className="text-white/25">/</span>
-            <span className="text-xs font-minecraft-ten text-white/55 normal-case truncate max-w-[280px]">
-              {profile.name || profile.id}
+            <span className="text-xs font-minecraft text-white/55 normal-case truncate max-w-[280px]">
+              {isPackTarget ? installTarget.packName : profile.name || profile.id}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-minecraft-ten uppercase tracking-wider text-white/30">
+          <div className="flex items-center gap-2 text-[10px] font-minecraft uppercase tracking-wider text-white/30">
             <span className="hidden sm:inline-flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-white/50">esc</kbd>
               <span>{t("common.close")}</span>
@@ -241,7 +248,11 @@ export function BrowseContentSideSheetV3({
               selectedProfileId={profile.id}
               onProjectClick={handleProjectClick}
               initialProjectType={projectType}
-              allowedProjectTypes={["mod", "resourcepack", "shader", "datapack"]}
+              allowedProjectTypes={
+                isPackTarget
+                  ? ["mod"]
+                  : ["mod", "resourcepack", "shader", "datapack"]
+              }
               // Sidebar on by default — at 82vw the filter rail fits
               // without eating into the grid, and it's the first thing
               // users reach for when browsing Modrinth.
@@ -249,6 +260,8 @@ export function BrowseContentSideSheetV3({
               overrideDisplayContext="detail"
               disableVirtualization={true}
               onInstallSuccess={onInstallSuccess}
+              installTarget={installTarget}
+              installedOverride={installedOverride}
               className="h-full"
             />
           </div>
@@ -268,6 +281,7 @@ export function BrowseContentSideSheetV3({
                 onBack={() => setDetail(null)}
                 hideBackButton
                 targetProfile={profile}
+                installTarget={installTarget}
               />
             </div>
           )}

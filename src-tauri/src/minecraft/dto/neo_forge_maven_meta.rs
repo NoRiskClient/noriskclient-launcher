@@ -23,13 +23,6 @@ pub struct Versions {
 }
 
 impl NeoForgeMavenMetadata {
-    pub fn get_latest_version(&self) -> &str {
-        &self.versioning.latest
-    }
-
-    pub fn get_release_version(&self) -> &str {
-        &self.versioning.release
-    }
 
     pub fn get_all_versions(&self) -> &[String] {
         &self.versioning.versions.versions
@@ -53,13 +46,6 @@ impl NeoForgeMavenMetadata {
         // Reverse to get newest first (Maven metadata is chronological, oldest to newest)
         versions.reverse();
         versions
-    }
-
-    pub fn get_latest_version_for_minecraft(&self, minecraft_version: &str) -> Option<String> {
-        // After reverse, first element is the newest
-        self.get_versions_for_minecraft(minecraft_version)
-            .into_iter()
-            .next()
     }
 
     pub fn parse_neoforge_version_to_minecraft(neoforge_version: &str) -> Option<String> {
@@ -107,15 +93,4 @@ impl NeoForgeMavenMetadata {
         }
     }
 
-    pub fn print_parsed_versions(&self) {
-        log::info!("NeoForge Version -> Parsed Minecraft Version:");
-        for neoforge_version in &self.versioning.versions.versions {
-            let parsed_mc_version = Self::parse_neoforge_version_to_minecraft(neoforge_version);
-            log::info!(
-                "  {} -> {}",
-                neoforge_version,
-                parsed_mc_version.as_deref().unwrap_or("Parse Failed")
-            );
-        }
-    }
 }

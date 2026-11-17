@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -9,6 +7,9 @@ interface TooltipProps {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  wrapperClassName?: string;
+  // "cursor" (default): follows the mouse. "top"/"bottom": static, centered above/below the trigger.
+  position?: "cursor" | "top" | "bottom";
 }
 
 export function Tooltip({
@@ -16,7 +17,11 @@ export function Tooltip({
   children,
   delay = 300,
   className = "",
+  wrapperClassName = "",
+  position = "cursor",
 }: TooltipProps) {
+  const isStatic = position === "top" || position === "bottom";
+  const isBottom = position === "bottom";
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -48,11 +53,23 @@ export function Tooltip({
     setTooltipPosition({ x, y });
   };
 
+  // Static mode: anchor centered above/below the trigger. The transform on the tooltip element
+  // handles centering + vertical placement, so we only need the center-edge point.
+  const positionAboveTrigger = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltipPosition({ x: rect.left + rect.width / 2, y: isBottom ? rect.bottom + 8 : rect.top - 8 });
+  };
+
   const showTooltip = (e: React.MouseEvent) => {
     isHoveringRef.current = true;
 
     // Sofort die Position aktualisieren
-    updateTooltipPosition(e.clientX, e.clientY);
+    if (isStatic) {
+      positionAboveTrigger();
+    } else {
+      updateTooltipPosition(e.clientX, e.clientY);
+    }
 
     timeoutRef.current = setTimeout(() => {
       if (isHoveringRef.current) {
@@ -62,6 +79,7 @@ export function Tooltip({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (isStatic) return; // static tooltip doesn't follow the cursor
     if (isHoveringRef.current) {
       updateTooltipPosition(e.clientX, e.clientY);
       // Wenn der Tooltip noch nicht sichtbar ist, zeige ihn sofort
@@ -88,8 +106,25 @@ export function Tooltip({
     };
   }, []);
 
+  // Static mode: once the tooltip is measurable, clamp its centered x so it never
+  // overflows the viewport edges (e.g. buttons near the right border).
+  useLayoutEffect(() => {
+    if (!isStatic || !isVisible) return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    const tip = tooltipRef.current;
+    if (!rect || !tip) return;
+    const margin = 8;
+    const half = tip.offsetWidth / 2;
+    let x = rect.left + rect.width / 2;
+    x = Math.min(x, window.innerWidth - margin - half);
+    x = Math.max(x, margin + half);
+    const y = isBottom ? rect.bottom + 8 : rect.top - 8;
+    setTooltipPosition((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+  }, [isVisible, isStatic]);
+
   const getTooltipClasses = () => {
-    const baseClasses = "fixed z-50 px-3 py-2 text-xs font-minecraft-ten text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md";
+    // z above modals/overlays (Modal + global modal portal use z-[1000]) so tooltips render on top
+    const baseClasses = "fixed z-[1100] px-3 py-2 text-xs font-minecraft text-white border-2 pointer-events-none transition-opacity duration-200 rounded-lg backdrop-blur-md glass-panel";
 
     return `${baseClasses} ${className}`;
   };
@@ -106,7 +141,7 @@ export function Tooltip({
         // buttons around it in flex rows. Plain `inline-block` was offsetting
         // wrapped children by ~1px because its baseline sits on the last line
         // of text while neighboring `inline-flex` items center their content.
-        className="inline-flex items-center"
+        className={`inline-flex items-center ${wrapperClassName}`}
       >
         {children}
       </div>
@@ -119,6 +154,9 @@ export function Tooltip({
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             position: 'fixed',
+            // static mode: center horizontally on the anchor point and sit above/below it
+            transform: isStatic ? (isBottom ? 'translate(-50%, 0)' : 'translate(-50%, -100%)') : undefined,
+            textAlign: isStatic ? 'center' : undefined,
             backgroundColor: `${accentColor.value}20`, // Wie ProfileIconV2
             borderColor: `${accentColor.value}60`, // Wie ProfileIconV2
             maxWidth: '300px', // Kompakt für kürzere Texte
@@ -140,4 +178,9 @@ interface SimpleTooltipProps extends Omit<TooltipProps, 'children'> {
 
 export function SimpleTooltip(props: SimpleTooltipProps) {
   return <Tooltip {...props} />;
+}
+
+// Static tooltip: shown centered above the trigger element instead of following the cursor.
+export function StaticTooltip(props: Omit<TooltipProps, 'position'>) {
+  return <Tooltip {...props} position="top" />;
 }

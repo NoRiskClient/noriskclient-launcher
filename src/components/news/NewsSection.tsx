@@ -1,11 +1,8 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { fetchNewsAndChangelogs } from "../../services/nrc-service";
 import { openExternalUrl } from "../../services/tauri-service";
-import type { BlogPost } from "../../types/wordPress";
 import { cn } from "../../lib/utils";
 import { NewsCard } from "../ui/NewsCard";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -28,10 +25,8 @@ export function NewsSection({ className }: NewsSectionProps) {
   // News Store
   const {
     posts,
-    isLoading,
     error,
     setPosts,
-    setLoading,
     setError,
     isCacheValid,
   } = useNewsStore();
@@ -160,10 +155,10 @@ export function NewsSection({ className }: NewsSectionProps) {
           return (
             <div key={post.id} className="news-item w-full flex flex-col">
               <p
-                className="font-minecraft text-2xl text-white/70 truncate"
+                className="font-smallcaps text-base text-white/70 truncate"
                 title={displayTitle}
               >
-                {displayTitle.toLowerCase()}
+                {displayTitle}
               </p>
               <div className="relative w-full pt-[56.25%]">
                 <NewsCard
@@ -214,7 +209,7 @@ export function NewsSection({ className }: NewsSectionProps) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Icon icon="pixel:newspaper-solid" className="w-7 h-7 text-white" />
-            <h2 className="text-2xl font-minecraft lowercase text-white">{t('news.title')}</h2>
+            <h2 className="text-base font-smallcaps text-white">{t('news.title')}</h2>
           </div>
         </div>
         <hr

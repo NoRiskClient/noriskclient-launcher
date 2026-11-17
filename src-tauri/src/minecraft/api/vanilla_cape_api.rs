@@ -29,19 +29,6 @@ pub struct VanillaCapeInfo {
     pub obtain_method: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct MojangCapeResponse {
-    capes: Vec<MojangCapeEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct MojangCapeEntry {
-    id: String,
-    state: String,
-    url: String,
-    alias: String,
-}
-
 #[derive(Debug, Serialize)]
 struct ChangeCapeRequest {
     #[serde(rename = "capeId")]
@@ -60,7 +47,7 @@ impl VanillaCapeApi {
     }
 
     fn initialize_cape_info() -> HashMap<String, VanillaCapeInfo> {
-        let mut info = HashMap::new();
+        let info = HashMap::new();
         info
     }
 
@@ -256,8 +243,4 @@ impl VanillaCapeApi {
         self.cape_info.values().cloned().collect()
     }
 
-    /// Get information about a specific cape
-    pub fn get_cape_info_by_id(&self, cape_id: &str) -> Option<&VanillaCapeInfo> {
-        self.cape_info.get(cape_id)
-    }
 }

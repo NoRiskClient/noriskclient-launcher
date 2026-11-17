@@ -1,12 +1,9 @@
-"use client";
-
-import React, { useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Profile } from "../../types/profile";
 import { ExportSettingsTab } from "./settings/ExportSettingsTab";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
-import { useThemeStore } from "../../store/useThemeStore";
 import { Icon } from "@iconify/react";
 import { Checkbox } from "../ui/Checkbox";
 
@@ -22,7 +19,6 @@ export function ExportProfileModal({
   onClose,
 }: ExportProfileModalProps) {
   const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const [exportAction, setExportAction] = useState<{
     handleExport: () => Promise<void>;
@@ -55,7 +51,7 @@ export function ExportProfileModal({
           disabled={exportAction.isDisabled()}
           icon={<Icon icon="solar:export-bold" className="w-5 h-5" />}
           size="md"
-          className="text-xl"
+          className="text-sm"
         >
           {exportAction.isExporting ? t('export.exporting') : t('export.export_profile')}
         </Button>

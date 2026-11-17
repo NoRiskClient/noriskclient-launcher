@@ -3,7 +3,6 @@ import type {
   CreateProfileParams,
   Profile,
   UpdateProfileParams,
-  AllProfilesAndLastPlayed,
 } from "../types/profile";
 import * as ProfileService from "../services/profile-service";
 import type { FileNode } from "../types/fileSystem";
@@ -23,10 +22,6 @@ interface ProfileState {
   createProfile: (params: CreateProfileParams) => Promise<string>;
   updateProfile: (id: string, updates: UpdateProfileParams) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
-  launchProfile: (id: string) => Promise<void>;
-  installProfile: (id: string) => Promise<void>;
-  abortProfileLaunch: (id: string) => Promise<void>;
-  isProfileLaunching: (id: string) => Promise<boolean>;
   copyProfile: (
     sourceId: string,
     newName: string,
@@ -138,43 +133,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (error) {
       console.error(`Failed to delete profile ${id}:`, error);
       throw error;
-    }
-  },
-
-  launchProfile: async (id: string) => {
-    try {
-      await ProfileService.launchProfile(id);
-    } catch (error) {
-      console.error(`Failed to launch profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  installProfile: async (id: string) => {
-    try {
-      //@ts-ignore
-      await ProfileService.installProfile(id);
-    } catch (error) {
-      console.error(`Failed to install profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  abortProfileLaunch: async (id: string) => {
-    try {
-      await ProfileService.abortProfileLaunch(id);
-    } catch (error) {
-      console.error(`Failed to abort profile launch ${id}:`, error);
-      throw error;
-    }
-  },
-
-  isProfileLaunching: async (id: string) => {
-    try {
-      return await ProfileService.isProfileLaunching(id);
-    } catch (error) {
-      console.error(`Failed to check if profile ${id} is launching:`, error);
-      return false;
     }
   },
 

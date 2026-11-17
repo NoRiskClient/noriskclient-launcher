@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CapesBrowseResponse, BrowseCapesOptions, GetPlayerCapesPayloadOptions, CosmeticCape, OwnedCapesResponse } from '../types/noriskCapes';
 import type { MinecraftProfile } from '../types/minecraft';
+import { invalidateEquippedCosmetics } from './cosmetic-cache';
 
 export const getCapeImageUrl = (hash: string, isExperimental: boolean): string => {
   const base = isExperimental ? 'https://cdn.norisk.gg/capes-staging/prod' : 'https://cdn.norisk.gg/capes/prod';
@@ -51,16 +52,17 @@ export const getPlayerCapes = (
  * @param playerUuid Optional UUID of the player (defaults to active account)
  * @returns A promise that resolves when the cape is equipped
  */
-export const equipCape = (
+export const equipCape = async (
   capeHash: string,
   noriskToken?: string,
   playerUuid?: string
 ): Promise<void> => {
-  return invoke('equip_cape', {
+  await invoke('equip_cape', {
      capeHash,
      noriskToken,
      playerUuid
   });
+  invalidateEquippedCosmetics();
 };
 
 /**
@@ -123,14 +125,15 @@ export const uploadCape = (
  * @param playerUuid Optional UUID of the player (defaults to active account)
  * @returns A promise that resolves when the cape is unequipped
  */
-export const unequipCape = (
+export const unequipCape = async (
   noriskToken?: string,
   playerUuid?: string
 ): Promise<void> => {
-  return invoke('unequip_cape', {
+  await invoke('unequip_cape', {
     noriskToken,
     playerUuid
   });
+  invalidateEquippedCosmetics();
 };
 
 /**

@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../services/launcher-config-service";
 import { refreshPermissions } from "../services/permission-service";
 import i18n from '../i18n/i18n';
+import { parseErrorMessage } from "../utils/error-utils";
 
 const setMojangTraits = (account: MinecraftAccount | null) => {
   const uuid = account?.id ?? null;
@@ -34,6 +35,7 @@ const setMojangTraits = (account: MinecraftAccount | null) => {
 interface MinecraftAuthState {
   accounts: MinecraftAccount[];
   activeAccount: MinecraftAccount | null;
+  accountsLoaded: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -46,6 +48,7 @@ interface MinecraftAuthState {
 export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
   accounts: [],
   activeAccount: null,
+  accountsLoaded: false,
   isLoading: false,
   error: null,
 
@@ -55,7 +58,25 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
 
       const accounts = await MinecraftAuthService.getAccounts();
 
-      const activeAccount = await MinecraftAuthService.getActiveAccount();
+      // Commit the (cached) account list first so a failing active-account
+      // refresh — e.g. a Mojang auth outage / HTTP 429 — can never wipe the
+      // whole list. The cached `active` flag gives us a fallback selection.
+      const fallbackActive = accounts.find((a) => a.active) ?? null;
+      set({
+        accounts,
+        activeAccount: fallbackActive,
+        accountsLoaded: true,
+      });
+
+      let activeAccount = fallbackActive;
+      try {
+        activeAccount = await MinecraftAuthService.getActiveAccount();
+      } catch (refreshError) {
+        console.warn(
+          "Active account refresh failed, keeping cached account:",
+          refreshError,
+        );
+      }
 
       const updatedAccounts = accounts.map((account) => ({
         ...account,
@@ -71,8 +92,9 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to initialize accounts:", error);
       set({
-        error: i18n.t('auth.errors.load_accounts', { error: error instanceof Error ? error.message : String(error.message) }),
+        error: i18n.t('auth.errors.load_accounts', { error: parseErrorMessage(error) }),
         isLoading: false,
+        accountsLoaded: true,
       });
       setMojangTraits(null);
     }
@@ -155,7 +177,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
       });
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : String(error.message);
+        parseErrorMessage(error);
       
       // Only show error toast if using browser login (toast.promise already handles it)
       if (useBrowserLogin && !errorMessage.includes(i18n.t('auth.errors.login_cancelled'))) {
@@ -169,9 +191,12 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
         console.error("Failed to add account:", error);
         set({ error: i18n.t('auth.errors.add_account', { error: errorMessage }), isLoading: false });
       } else {
-        // Already handled by cancel button - ensure loading state is reset
+        // Closing the login window is a decision, not a fault. Storing it as an
+        // error left it sitting in state forever, and surfaces that render
+        // `error` before they check for "no account" (the Skins tab) got stuck
+        // showing "Account error" instead of the sign-in prompt.
         console.log("Account add cancelled by user.");
-        set({ isLoading: false, error: i18n.t('auth.errors.login_cancelled') });
+        set({ isLoading: false, error: null });
       }
     }
   },
@@ -202,7 +227,7 @@ export const useMinecraftAuthStore = create<MinecraftAuthState>((set, get) => ({
     } catch (error) {
       console.error("Failed to remove account:", error);
       set({
-        error: i18n.t('auth.errors.remove_account', { error: error instanceof Error ? error.message : String(error.message) }),
+        error: i18n.t('auth.errors.remove_account', { error: parseErrorMessage(error) }),
         isLoading: false,
       });
     }

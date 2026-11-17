@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -18,8 +16,8 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickInstallProfilesModal";
 import { ModrinthVersionItemV2 } from "../modrinth/v2/ModrinthVersionItemV2";
 import { ProgressToast } from "../ui/ProgressToast";
-import { installContentToProfile } from "../../services/content-service";
-import { ContentType, type InstallContentPayload } from "../../types/content";
+import { installContentToProfile, installContentToTarget } from "../../services/content-service";
+import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 import { TagBadge } from "../ui/TagBadge";
@@ -28,6 +26,7 @@ import { Select, type SelectOption } from "../ui/Select";
 interface ModDetailVersionsProps {
   project: UnifiedProjectDetails;
   targetProfile?: Profile;
+  installTarget?: ContentInstallTarget;
 }
 
 // Helper to convert UnifiedProjectDetails to ModrinthSearchHit format
@@ -70,7 +69,7 @@ function mapProjectTypeToContentType(projectType: string): ContentType | null {
   }
 }
 
-export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsProps) {
+export function ModDetailVersions({ project, targetProfile, installTarget }: ModDetailVersionsProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { profiles, fetchProfiles } = useProfileStore();
@@ -81,7 +80,6 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
   const [versions, setVersions] = useState<UnifiedVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [installingVersions, setInstallingVersions] = useState<Record<string, boolean>>({});
   const [installingModpackVersions, setInstallingModpackVersions] = useState<Record<string, boolean>>({});
   const [installingProfiles, setInstallingProfiles] = useState<Record<string, boolean>>({});
   const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
@@ -295,9 +293,9 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
         source: project.source,
       };
 
-      await installContentToProfile(payload);
+      await installContentToTarget(payload, installTarget, { pinVersion: true });
       const versionNumber = version.version_number ?? '';
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: profile.name }));
+      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
       setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
@@ -392,8 +390,8 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icon icon="solar:refresh-bold" className="w-6 h-6 text-white/50 animate-spin" />
-        <span className="ml-2 text-white/50 font-minecraft-ten">{t('modrinth.loading_versions')}</span>
+        <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white/50" />
+        <span className="ml-2 text-white/50 font-minecraft">{t('modrinth.loading_versions')}</span>
       </div>
     );
   }
@@ -403,7 +401,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
     return (
       <div className="text-center py-12">
         <Icon icon="solar:danger-triangle-bold" className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-red-400 font-minecraft-ten text-sm">{error}</p>
+        <p className="text-red-400 font-minecraft text-sm">{error}</p>
       </div>
     );
   }
@@ -449,7 +447,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
           )}
 
           {/* Results count */}
-          <div className="ml-auto text-xs text-white/50 font-minecraft-ten">
+          <div className="ml-auto text-xs text-white/50 font-minecraft">
             {filteredVersions.length} version{filteredVersions.length !== 1 ? "s" : ""}
           </div>
         </div>
@@ -524,7 +522,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
               version={version}
               project={projectAsSearchHit}
               versionStatus={null}
-              isInstalling={installingVersions[version.id] || false}
+              isInstalling={false}
               isInstallingModpackVersion={installingModpackVersions[version.id] || false}
               accentColor={accentColor}
               isHovered={hoveredVersionId === version.id}
@@ -540,7 +538,7 @@ export function ModDetailVersions({ project, targetProfile }: ModDetailVersionsP
           {filteredVersions.length > displayedCount && (
             <button
               onClick={() => setDisplayedCount(prev => prev + 10)}
-              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft-ten transition-colors"
+              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft transition-colors"
               style={{
                 backgroundColor: `${accentColor.value}15`,
                 borderColor: `${accentColor.value}30`,

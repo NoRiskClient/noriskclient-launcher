@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import type { Profile } from "../../types/profile";
 import { ActionButton, type ActionButtonVariant } from "./ActionButton";

@@ -1,6 +1,3 @@
-"use client";
-
-import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -17,14 +14,14 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { ExportProfileModal } from "./ExportProfileModal";
 import { useProfileLaunch } from "../../hooks/useProfileLaunch.tsx";
 import { Tooltip } from "../ui/Tooltip";
-import UnifiedService from "../../services/unified-service";
 import { useProfileStore } from "../../store/profile-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { parseMotdToHtml } from "../../utils/motd-utils";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { useResolvedLoaderVersion } from "../../hooks/useResolvedLoaderVersion";
+import { loaderIconSrc } from "../../lib/loader-icons";
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -83,10 +80,6 @@ export function ProfileCardV2({
   const { isPinned, togglePin } = usePinnedProfilesStore();
   const pinned = isPinned(profile.id);
 
-  // Modpack versions state for conditional rendering
-  const [modpackVersions, setModpackVersions] = useState(null);
-  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
-  
   // Profile settings store
   const { openModal } = useProfileSettingsStore();
   
@@ -107,21 +100,13 @@ export function ProfileCardV2({
     : null;
 
   // Load preferred account avatar
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });
 
   // Settings context menu items
   const contextMenuItems: ContextMenuItem[] = [
-    {
-      id: "pin",
-      label: pinned ? "Unpin" : "Pin to Top",
-      icon: pinned ? "solar:pin-bold" : "solar:pin-bold-duotone",
-      onClick: () => {
-        togglePin(profile.id);
-      },
-    },
     {
       id: "edit",
       label: t('profiles.editProfile'),
@@ -167,8 +152,7 @@ export function ProfileCardV2({
         }
       },
     },
-    // Show modpack versions only if modpack info exists and versions are loaded
-    ...(profile.modpack_info?.source && modpackVersions ? [{
+    ...(profile.modpack_info?.source ? [{
       id: "switch_modpack",
       label: t('profiles.modpackVersions'),
       icon: "solar:refresh-circle-bold",
@@ -181,7 +165,7 @@ export function ProfileCardV2({
               <ModpackVersionsModal
                 isOpen={true}
                 onClose={() => hideModal(`modpack-versions-${profile.id}`)}
-                versions={modpackVersions}
+                versions={null}
                 modpackName={profile.name}
                 profileId={profile.id}
                 onSwitchComplete={async () => {
@@ -238,21 +222,6 @@ export function ProfileCardV2({
     }
   }, [openContextMenuId, contextMenuId, isContextMenuOpen]);
 
-  // Load modpack versions when profile has modpack info
-  useEffect(() => {
-    if (profile.modpack_info?.source) {
-      setIsLoadingVersions(true);
-      UnifiedService.getModpackVersions(profile.modpack_info.source)
-        .then(setModpackVersions)
-        .catch(err => {
-          console.error("Failed to load modpack versions:", err);
-          setModpackVersions(null);
-        })
-        .finally(() => setIsLoadingVersions(false));
-    } else {
-      setModpackVersions(null);
-    }
-  }, [profile.modpack_info?.source]);
 
 
 
@@ -260,20 +229,7 @@ export function ProfileCardV2({
 
 
   // Get mod loader icon - reused from ProfileCard.tsx
-  const getModLoaderIcon = () => {
-    switch (profile.loader) {
-      case "fabric":
-        return "/icons/fabric.png";
-      case "forge":
-        return "/icons/forge.png";
-      case "quilt":
-        return "/icons/quilt.png";
-      case "neoforge":
-        return "/icons/neoforge.png";
-      default:
-        return "/icons/minecraft.png";
-    }
-  };
+  const getModLoaderIcon = () => loaderIconSrc(profile.loader);
 
   // Get 3D styling for variant (matching Button.tsx exactly)
   const get3DStyling = () => {
@@ -371,7 +327,7 @@ export function ProfileCardV2({
   const actionButtons: ProfileActionButton[] = [
     {
       id: "play",
-      label: isLaunching ? t('profiles.stop').toUpperCase() : t('profiles.play').toUpperCase(),
+      label: isLaunching ? t('profiles.stop') : t('profiles.play'),
       icon: isLaunching ? "solar:stop-bold" : "solar:play-bold",
       variant: isLaunching ? "destructive" : "primary",
       tooltip: isLaunching ? t('profiles.stopPlaying') : t('profiles.startPlaying'),
@@ -437,7 +393,6 @@ export function ProfileCardV2({
     // Grid layout (more compact, similar to ProfileCard.tsx)
   if (layoutMode === "grid" || layoutMode === "compact") {
     const isCompact = layoutMode === "compact";
-    const iconSize = isCompact ? 16 : 20; // Smaller icons for compact mode
     const padding = isCompact ? "p-3" : "p-4"; // Less padding for compact mode
     const gap = isCompact ? "gap-2" : "gap-3"; // Smaller gaps for compact mode
     
@@ -556,7 +511,7 @@ export function ProfileCardV2({
           >
             <Icon icon="solar:box-bold" className={isCompact ? 'w-3 h-3' : 'w-4 h-4'} />
             {variant === "3d" && (
-              <span className={`font-minecraft-ten ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
+              <span className={`font-minecraft ${isCompact ? 'text-xs' : 'text-sm'} uppercase`}>MODS</span>
             )}
           </button>
         </div>
@@ -591,7 +546,7 @@ export function ProfileCardV2({
           <div className={`flex-grow min-w-0 mr-auto pr-2 ${isCompact ? 'max-w-[calc(100%-64px)]' : 'max-w-[calc(100%-80px)]'}`}>
             <div className="flex items-center gap-2 mb-0.5">
               <h3
-                className={`font-minecraft-ten text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis normal-case`}
+                className={`font-minecraft text-white ${isCompact ? 'text-base' : 'text-lg'} whitespace-nowrap overflow-hidden text-ellipsis normal-case`}
                 style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
                 title={profile.name}
               >
@@ -617,7 +572,7 @@ export function ProfileCardV2({
                         className={`${isCompact ? 'w-4 h-4' : 'w-5 h-5'} rounded-sm pixelated flex-shrink-0`}
                         style={{ imageRendering: 'pixelated' }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                          e.currentTarget.style.display = 'none';
                         }}
                       />
                     )}
@@ -628,7 +583,7 @@ export function ProfileCardV2({
             </div>
             {isLaunching ? (
               <div
-                className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+                className="text-white/60 text-xs font-minecraft opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
               >
                 {statusMessage || t('profiles.card.starting')}
@@ -636,7 +591,7 @@ export function ProfileCardV2({
             ) : (
               isCompact ? (
                  // Compact mode: Only MC version + last played
-                 <div className="flex items-center gap-1.5 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                 <div className="flex items-center gap-1.5 text-xs font-minecraft" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                    {/* Minecraft Version */}
                    <div className="text-white/70 flex items-center gap-0.5">
                      <img
@@ -656,7 +611,7 @@ export function ProfileCardV2({
                  </div>
                ) : (
                  // Grid mode: Full info display
-                 <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                 <div className="flex items-center gap-2 text-xs font-minecraft" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                    {/* Minecraft Version */}
                    <div className="text-white/70 flex items-center gap-1">
                      <img
@@ -698,7 +653,7 @@ export function ProfileCardV2({
 
         {/* Settings Context Menu */}
                  <SettingsContextMenu
-           profile={profile}
+           target={profile}
            isOpen={isContextMenuOpen}
            position={contextMenuPosition}
            items={contextMenuItems}
@@ -776,7 +731,7 @@ export function ProfileCardV2({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h3
-            className="text-white font-minecraft-ten text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case"
+            className="text-white font-minecraft text-sm whitespace-nowrap overflow-hidden text-ellipsis normal-case"
             style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}
             title={profile.name}
           >
@@ -802,7 +757,7 @@ export function ProfileCardV2({
                     className="w-5 h-5 rounded-sm pixelated flex-shrink-0"
                     style={{ imageRendering: 'pixelated' }}
                     onError={(e) => {
-                      e.currentTarget.src = 'https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?overlay=true';
+                      e.currentTarget.style.display = 'none';
                     }}
                   />
                 )}
@@ -814,13 +769,13 @@ export function ProfileCardV2({
         
         {isLaunching ? (
           <div
-            className="text-white/60 text-xs font-minecraft-ten opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+            className="text-white/60 text-xs font-minecraft opacity-70 whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
             style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
           >
             {statusMessage || t('profiles.card.starting')}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-xs font-minecraft-ten" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          <div className="flex items-center gap-2 text-xs font-minecraft" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
           {/* Minecraft Version */}
           <div className="text-white/70 flex items-center gap-1">
             <img
@@ -868,7 +823,7 @@ export function ProfileCardV2({
 
              {/* Settings Context Menu */}
        <SettingsContextMenu
-         profile={profile}
+         target={profile}
          isOpen={isContextMenuOpen}
          position={contextMenuPosition}
          items={contextMenuItems}

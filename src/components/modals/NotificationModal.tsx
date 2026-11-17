@@ -1,11 +1,9 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { useNotificationStore, useUnreadCount } from "../../store/notification-store";
-import { getNotificationMessage, UserNotification } from "../../types/notification";
+import { getNotificationMessage, getNotificationNote, UserNotification } from "../../types/notification";
 import { timeAgo } from "../../utils/time-utils";
 
 export function NotificationModal() {
@@ -46,7 +44,7 @@ export function NotificationModal() {
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-white/50">
             <Icon icon="solar:bell-off-outline" className="w-12 h-12 mb-2" />
-            <p className="font-minecraft-ten text-sm">{t('notification_modal.no_notifications')}</p>
+            <p className="font-minecraft text-sm">{t('notification_modal.no_notifications')}</p>
           </div>
         ) : (
           notifications.map((notification) => (
@@ -60,6 +58,7 @@ export function NotificationModal() {
 
 function NotificationItem({ notification }: Readonly<{ notification: UserNotification }>) {
   const message = getNotificationMessage(notification.notification);
+  const note = getNotificationNote(notification.notification);
   const createdAt = notification.notification.createdAt;
   const relativeTime = createdAt ? timeAgo(new Date(createdAt).getTime()) : "";
 
@@ -84,6 +83,9 @@ function NotificationItem({ notification }: Readonly<{ notification: UserNotific
         <p className={`text-sm font-sans ${notification.seen ? "text-white/60" : "text-white"}`}>
           {message}
         </p>
+        {note && (
+          <p className="text-xs font-sans italic text-white/60 mt-1 break-words">"{note}"</p>
+        )}
         <p className="text-xs font-sans text-white/40 mt-1">{relativeTime}</p>
       </div>
       {/* Buttons/Icons */}

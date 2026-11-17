@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
@@ -11,6 +9,7 @@ import { getAdventCalendar, claimAdventCalendarDay } from "../../services/nrc-se
 import type { Reward, AdventCalendarDay, AdventCalendarDayStatus } from "../../types/advent";
 import { toast } from "react-hot-toast";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { translateApiError } from "../../utils/nrc-error-translations";
 
 interface AdventDoorProps {
   day: number;
@@ -83,7 +82,7 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
       {/* Day Number */}
       <div className="absolute top-2 left-2">
         <span
-          className="font-minecraft-ten text-lg text-white/70"
+          className="font-minecraft text-lg text-white/70"
           style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}
         >
           {day}
@@ -104,7 +103,7 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
               }}
             />
             <span
-              className="font-minecraft-ten text-xs text-white/80 uppercase transition-colors duration-200 text-center px-1"
+              className="font-minecraft text-xs text-white/80 uppercase transition-colors duration-200 text-center px-1"
               style={{ 
                 textShadow: "0 1px 2px rgba(0,0,0,0.5)",
                 color: isHovered ? accentColor.value : undefined,
@@ -134,7 +133,7 @@ function AdventDoor({ day, status, reward, shopItemName, onOpen, debugFlag, canO
               }}
             />
             <span
-              className="font-minecraft-ten text-xs text-white/60 uppercase transition-colors duration-200"
+              className="font-minecraft text-xs text-white/60 uppercase transition-colors duration-200"
               style={{ 
                 textShadow: "0 1px 2px rgba(0,0,0,0.5)",
                 color: isHovered ? accentColor.value : undefined,
@@ -201,7 +200,7 @@ export function AdventCalendarTab() {
         setCalendarData(data);
       } catch (err) {
         console.error("Failed to load advent calendar:", err);
-        setError(err.message);
+        setError(translateApiError(err, t('advent.load_failed')));
         toast.error(t('advent.load_failed'));
       } finally {
         setLoading(false);
@@ -300,7 +299,7 @@ export function AdventCalendarTab() {
       toast.success(t('advent.reward_claimed', { day }));
     } catch (error) {
       console.error("Failed to claim reward:", error);
-      const errorMessage = error instanceof Error ? error.message : t('advent.claim_failed');
+      const errorMessage = translateApiError(error, t('advent.claim_failed'));
       toast.error(errorMessage);
       
       // Show error in modal
@@ -337,10 +336,10 @@ export function AdventCalendarTab() {
           <div className="flex items-center justify-between">
             {/* Left: Title */}
             <div>
-              <h1 className="font-minecraft text-4xl mb-1" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}>
+              <h1 className="font-smallcaps text-xl mb-1" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.7)" }}>
                 Advent Calendar
               </h1>
-              <p className="text-white/70 font-minecraft-ten text-sm">
+              <p className="text-white/70 font-minecraft text-sm">
                 Open a door every day in December
               </p>
             </div>
@@ -352,7 +351,7 @@ export function AdventCalendarTab() {
                   icon="solar:calendar-bold"
                   className="w-4 h-4 text-white/60"
                 />
-                <span className="font-minecraft-ten text-sm text-white/70">
+                <span className="font-minecraft text-sm text-white/70">
                   {formattedDate}
                 </span>
               </div>
@@ -361,7 +360,7 @@ export function AdventCalendarTab() {
                   icon="solar:gift-bold"
                   className="w-4 h-4 text-white/60"
                 />
-                <span className="font-minecraft-ten text-sm text-white/70">
+                <span className="font-minecraft text-sm text-white/70">
                   {openedDoorsCount} / 24 opened
                 </span>
               </div>
@@ -388,7 +387,7 @@ export function AdventCalendarTab() {
             icon="solar:info-circle-bold"
             className="w-12 h-12 text-red-500"
           />
-          <p className="font-minecraft-ten text-white/70">{error}</p>
+          <p className="font-minecraft text-white/70">{error}</p>
         </div>
       )}
 

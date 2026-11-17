@@ -1,12 +1,34 @@
 use crate::config::{LAUNCHER_DIRECTORY, ProjectDirsExt};
 use crate::error::{AppError, Result};
-use chrono::{DateTime, Utc};
-use log::{error, info, warn};
+use chrono::{DateTime, Datelike, Utc};
+use log::{debug, info, warn};
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
+
+/// Generational (Grandfather-Father-Son) retention. Independent day/week/month
+/// buckets mean heavy same-day churn can't evict older daily/weekly/monthly snapshots.
+#[derive(Debug, Clone)]
+pub struct GfsPolicy {
+    pub keep_recent: usize,
+    pub daily_days: i64,
+    pub weekly_weeks: i64,
+    pub monthly_months: i64,
+}
+
+impl Default for GfsPolicy {
+    fn default() -> Self {
+        Self {
+            keep_recent: 10,
+            daily_days: 14,
+            weekly_weeks: 8,
+            monthly_months: 12,
+        }
+    }
+}
 
 /// Backup configuration for automatic backups
 #[derive(Debug, Clone)]
@@ -17,6 +39,8 @@ pub struct BackupConfig {
     pub max_backup_age_seconds: u64,
     /// Minimum time between backups in seconds (to prevent spam)
     pub min_backup_interval_seconds: u64,
+    /// When set, generational GFS retention replaces the flat "keep N newest" prune.
+    pub gfs: Option<GfsPolicy>,
 }
 
 impl Default for BackupConfig {
@@ -25,6 +49,7 @@ impl Default for BackupConfig {
             max_backups_per_file: 10,
             max_backup_age_seconds: 30 * 24 * 60 * 60, // 30 days
             min_backup_interval_seconds: 60, // 1 minute
+            gfs: None,
         }
     }
 }
@@ -44,22 +69,26 @@ async fn ensure_backup_dir(category: Option<&str>) -> Result<PathBuf> {
     Ok(base)
 }
 
-/// Creates an atomic backup of a file before it's modified
-/// Returns the path to the backup file
+/// Backs up a file. Skips if byte-identical to the most recent backup.
 pub async fn create_backup<P: AsRef<Path>>(
     source_path: P,
     category: Option<&str>,
     config: &BackupConfig,
 ) -> Result<PathBuf> {
-    let source_path = source_path.as_ref();
+    create_backup_inner(source_path.as_ref(), category, config).await
+}
 
+async fn create_backup_inner(
+    source_path: &Path,
+    category: Option<&str>,
+    config: &BackupConfig,
+) -> Result<PathBuf> {
     if !source_path.exists() {
         return Err(AppError::Other(format!(
             "Source file does not exist: {}",
             source_path.display()
         )));
     }
-
     let backup_base = ensure_backup_dir(category).await?;
 
     // Generate backup filename with Unix timestamp and UUID
@@ -82,21 +111,30 @@ pub async fn create_backup<P: AsRef<Path>>(
 
     let backup_path = backup_base.join(backup_filename);
 
-    // Check if we should skip backup due to minimum interval
-    if let Some(last_backup) = get_last_backup_time(source_path, category).await {
-        let elapsed = timestamp.signed_duration_since(last_backup).num_seconds();
-        if elapsed < config.min_backup_interval_seconds as i64 {
-            info!(
-                "Skipping backup for {} - last backup was {} seconds ago (min interval: {})",
+    // Skip when the latest backup is younger than the configured interval, or
+    // when its content is identical.
+    let latest = latest_backup_path(&backup_base, original_name).await;
+    if let Some((latest, modified)) = latest {
+        let age = SystemTime::now()
+            .duration_since(modified)
+            .unwrap_or_default()
+            .as_secs();
+        if age < config.min_backup_interval_seconds {
+            debug!(
+                "Skipping backup for {} - last backup is {}s old",
                 source_path.display(),
-                elapsed,
-                config.min_backup_interval_seconds
+                age
             );
-            return Ok(backup_path); // Return the path but don't create backup
+            return Ok(latest);
         }
-    } else {
-        // Debug: Log when we can't determine last backup time
-        info!("No last backup time found for {}, proceeding with backup", source_path.display());
+
+        if files_equal(source_path, &latest).await {
+            debug!(
+                "Skipping backup for {} - content identical to latest backup",
+                source_path.display()
+            );
+            return Ok(latest);
+        }
     }
 
     // Copy the file atomically
@@ -119,46 +157,30 @@ pub async fn create_backup<P: AsRef<Path>>(
 
     fs::write(&metadata_path, metadata.as_bytes()).await.map_err(AppError::Io)?;
 
-    // Cleanup old backups
-    cleanup_old_backups(source_path, category, config).await?;
+    if let Some(policy) = &config.gfs {
+        cleanup_old_backups_generational(source_path, category, policy).await?;
+    } else {
+        cleanup_old_backups(source_path, category, config).await?;
+    }
 
     Ok(backup_path)
 }
 
-/// Gets the timestamp of the last backup for a file
-async fn get_last_backup_time(source_path: &Path, category: Option<&str>) -> Option<DateTime<Utc>> {
-    let backup_base = ensure_backup_dir(category).await.ok()?;
-
-    let original_name = source_path
-        .file_name()
-        .and_then(OsStr::to_str)
-        .unwrap_or("unknown");
-
-    let mut latest_time: Option<DateTime<Utc>> = None;
-
-    if let Ok(mut entries) = fs::read_dir(&backup_base).await {
+async fn latest_backup_path(
+    backup_base: &Path,
+    original_name: &str,
+) -> Option<(PathBuf, SystemTime)> {
+    let mut latest: Option<(PathBuf, std::time::SystemTime)> = None;
+    if let Ok(mut entries) = fs::read_dir(backup_base).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
             if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
                 if filename.starts_with(original_name) && filename.ends_with(".backup") {
-                    // Parse timestamp from filename
-                    // Format: original_name.unix_timestamp.uuid.backup
-                    // e.g.: profiles.json.1726585512.f5e5d94434d94be0b7616a28e0dc0fba.backup
-                    // Timestamp is at index 2 when split by '.'
-                    if let Some(ts_part) = filename.split('.').nth(2) {
-                        // Parse as Unix timestamp (i64) and convert to DateTime
-                        let parsed_time = ts_part.parse::<i64>()
-                            .ok()
-                            .and_then(|unix_ts| DateTime::from_timestamp(unix_ts, 0));
-
-                        if let Some(utc_time) = parsed_time {
-                            match latest_time {
-                                None => latest_time = Some(utc_time),
-                                Some(current_latest) => {
-                                    if utc_time > current_latest {
-                                        latest_time = Some(utc_time);
-                                    }
-                                }
+                    if let Ok(md) = fs::metadata(&path).await {
+                        if let Ok(modified) = md.modified() {
+                            match &latest {
+                                Some((_, t)) if *t >= modified => {}
+                                _ => latest = Some((path.clone(), modified)),
                             }
                         }
                     }
@@ -166,8 +188,20 @@ async fn get_last_backup_time(source_path: &Path, category: Option<&str>) -> Opt
             }
         }
     }
+    latest
+}
 
-    latest_time
+async fn files_equal(a: &Path, b: &Path) -> bool {
+    match (fs::metadata(a).await, fs::metadata(b).await) {
+        (Ok(ma), Ok(mb)) if ma.len() != mb.len() => return false,
+        (Ok(_), Ok(_)) => {}
+        _ => return false,
+    }
+
+    match (fs::read(a).await, fs::read(b).await) {
+        (Ok(da), Ok(db)) => da == db,
+        _ => false,
+    }
 }
 
 /// Cleans up old backups according to the configuration
@@ -240,46 +274,95 @@ pub async fn cleanup_old_backups(
     Ok(())
 }
 
-/// Restores a file from the most recent backup
+/// Generational (GFS) cleanup. See [`GfsPolicy`].
+pub async fn cleanup_old_backups_generational(
+    source_path: &Path,
+    category: Option<&str>,
+    policy: &GfsPolicy,
+) -> Result<()> {
+    let backups = list_backups(source_path, category).await?; // newest-first
+    if backups.len() <= policy.keep_recent {
+        return Ok(());
+    }
+
+    let now = Utc::now();
+    let mut keep: HashSet<PathBuf> = HashSet::new();
+
+    for (path, _) in backups.iter().take(policy.keep_recent) {
+        keep.insert(path.clone());
+    }
+
+    // Newest-first iteration: first entry to claim a bucket key is its survivor.
+    let mut daily_seen: HashSet<i64> = HashSet::new();
+    let mut weekly_seen: HashSet<i64> = HashSet::new();
+    let mut monthly_seen: HashSet<i64> = HashSet::new();
+
+    for (path, ts) in backups.iter() {
+        let age_days = now.signed_duration_since(*ts).num_days();
+        let day_key = ts.num_days_from_ce() as i64;
+
+        if age_days < policy.daily_days && daily_seen.insert(day_key) {
+            keep.insert(path.clone());
+        }
+        if age_days < policy.weekly_weeks * 7 && weekly_seen.insert(day_key / 7) {
+            keep.insert(path.clone());
+        }
+        let month_key = ts.year() as i64 * 12 + ts.month() as i64;
+        if age_days < policy.monthly_months * 31 && monthly_seen.insert(month_key) {
+            keep.insert(path.clone());
+        }
+    }
+
+    for (path, _) in backups.iter() {
+        if !keep.contains(path) {
+            if let Err(e) = fs::remove_file(path).await {
+                warn!("Failed to remove old backup '{}': {}", path.display(), e);
+            } else {
+                let meta_path = path.with_extension("backup.meta");
+                let _ = fs::remove_file(&meta_path).await;
+                info!("GFS prune: removed backup {}", path.display());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Valid = parses as a non-empty JSON array.
+async fn is_valid_profiles_backup(path: &Path) -> bool {
+    match fs::read_to_string(path).await {
+        Ok(data) => matches!(
+            serde_json::from_str::<Vec<serde_json::Value>>(&data),
+            Ok(entries) if !entries.is_empty()
+        ),
+        Err(_) => false,
+    }
+}
+
+/// Restores a file from backup. For "profiles", picks the newest backup that is
+/// a non-empty JSON array (skips empty/corrupt newest), else the plain newest.
 pub async fn restore_from_backup<P: AsRef<Path>>(
     target_path: P,
     category: Option<&str>,
 ) -> Result<PathBuf> {
     let target_path = target_path.as_ref();
-    let backup_base = ensure_backup_dir(category).await?;
 
-    let original_name = target_path
-        .file_name()
-        .and_then(OsStr::to_str)
-        .unwrap_or("unknown");
+    let backups = list_backups(target_path, category).await?; // newest-first
 
-    // Find the most recent backup
-    let mut latest_backup: Option<PathBuf> = None;
-    let mut latest_time = DateTime::from_timestamp(0, 0).unwrap_or_else(|| {
-        // Fallback: use 2000-01-01 00:00:00 UTC as minimum timestamp
-        DateTime::from_timestamp(946684800, 0).unwrap()
-    });
-
-    if let Ok(mut entries) = fs::read_dir(&backup_base).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let path = entry.path();
-            if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
-                if filename.starts_with(original_name) && filename.ends_with(".backup") {
-                    if let Ok(metadata) = fs::metadata(&path).await {
-                        if let Ok(modified) = metadata.modified() {
-                            let modified_dt: DateTime<Utc> = modified.into();
-                            if modified_dt > latest_time {
-                                latest_time = modified_dt;
-                                latest_backup = Some(path);
-                            }
-                        }
-                    }
-                }
+    let chosen: Option<PathBuf> = if category == Some("profiles") {
+        let mut pick = None;
+        for (path, _) in &backups {
+            if is_valid_profiles_backup(path).await {
+                pick = Some(path.clone());
+                break;
             }
         }
-    }
+        pick.or_else(|| backups.first().map(|(p, _)| p.clone()))
+    } else {
+        backups.first().map(|(p, _)| p.clone())
+    };
 
-    if let Some(backup_path) = latest_backup {
+    if let Some(backup_path) = chosen {
         // Create a timestamped copy of the current file (if it exists) before restoring
         if target_path.exists() {
             let corrupted_path = target_path.with_extension(format!(
@@ -345,52 +428,6 @@ pub async fn list_backups<P: AsRef<Path>>(
     Ok(backups)
 }
 
-/// Gets backup statistics
-pub async fn get_backup_stats(category: Option<&str>) -> Result<BackupStats> {
-    let backup_base = ensure_backup_dir(category).await?;
-
-    let mut total_backups = 0;
-    let mut total_size = 0u64;
-    let mut oldest_backup: Option<DateTime<Utc>> = None;
-    let mut newest_backup: Option<DateTime<Utc>> = None;
-
-    if let Ok(mut entries) = fs::read_dir(&backup_base).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let path = entry.path();
-            if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
-                if filename.ends_with(".backup") {
-                    total_backups += 1;
-
-                    if let Ok(metadata) = fs::metadata(&path).await {
-                        total_size += metadata.len();
-
-                        if let Ok(modified) = metadata.modified() {
-                            let modified_dt: DateTime<Utc> = modified.into();
-
-                            oldest_backup = Some(match oldest_backup {
-                                Some(oldest) => oldest.min(modified_dt),
-                                None => modified_dt,
-                            });
-
-                            newest_backup = Some(match newest_backup {
-                                Some(newest) => newest.max(modified_dt),
-                                None => modified_dt,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(BackupStats {
-        total_backups,
-        total_size,
-        oldest_backup,
-        newest_backup,
-    })
-}
-
 /// Statistics about backups
 #[derive(Debug)]
 pub struct BackupStats {
@@ -414,49 +451,9 @@ pub async fn safe_write_with_backup<P: AsRef<Path>, C: AsRef<[u8]>>(
         create_backup(file_path, category, config).await?;
     }
 
-    // Write new content (atomic operation)
-    let temp_path = file_path.with_extension("tmp");
-    fs::write(&temp_path, contents).await.map_err(AppError::Io)?;
-
-    // Atomic move
-    fs::rename(&temp_path, file_path).await.map_err(AppError::Io)?;
+    crate::utils::file_utils::write_atomic(file_path, contents).await?;
 
     info!("Successfully wrote file with backup: {}", file_path.display());
     Ok(())
-}
-
-/// Validates a backup file
-pub async fn validate_backup(backup_path: &Path) -> Result<bool> {
-    if !backup_path.exists() {
-        return Ok(false);
-    }
-
-    // Check if metadata file exists
-    let meta_path = backup_path.with_extension("backup.meta");
-    if !meta_path.exists() {
-        warn!("Backup metadata missing for: {}", backup_path.display());
-        return Ok(false);
-    }
-
-    // Try to read metadata
-    match fs::read_to_string(&meta_path).await {
-        Ok(metadata) => {
-            // Basic validation - check if required fields are present
-            let has_original_path = metadata.contains("original_path=");
-            let has_backup_time = metadata.contains("backup_time=");
-            let has_file_size = metadata.contains("file_size=");
-
-            if !has_original_path || !has_backup_time || !has_file_size {
-                warn!("Backup metadata incomplete for: {}", backup_path.display());
-                return Ok(false);
-            }
-
-            Ok(true)
-        }
-        Err(e) => {
-            error!("Failed to read backup metadata '{}': {}", meta_path.display(), e);
-            Ok(false)
-        }
-    }
 }
 

@@ -1,10 +1,13 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::integrations::norisk_packs::{self, NoriskModSourceDefinition, NoriskModpacksConfig};
+use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
+use crate::utils::verified_files;
 use futures::stream::{iter, StreamExt};
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
 
 const DEFAULT_CONCURRENT_MOD_DOWNLOADS: usize = 4;
@@ -14,19 +17,27 @@ const MODRINTH_MAVEN_URL: &str = "https://api.modrinth.com/maven"; // Modrinth M
 #[derive(Clone)]
 pub struct NoriskPackDownloadService {
     concurrent_downloads: usize,
+    stats: Option<Arc<DownloadStats>>,
 }
 
 impl NoriskPackDownloadService {
     pub fn new() -> Self {
         Self {
             concurrent_downloads: DEFAULT_CONCURRENT_MOD_DOWNLOADS,
+            stats: None,
         }
     }
 
     pub fn with_concurrency(concurrent_downloads: usize) -> Self {
         Self {
             concurrent_downloads,
+            stats: None,
         }
+    }
+
+    pub fn with_stats(mut self, stats: Arc<DownloadStats>) -> Self {
+        self.stats = Some(stats);
+        self
     }
 
     /// Downloads mods specified in a Norisk pack definition to the central mod cache.
@@ -77,6 +88,7 @@ impl NoriskPackDownloadService {
             let mod_id = mod_entry.id.clone();
             let display_name_opt = mod_entry.display_name.clone();
             let target_clone = compatibility_target.clone();
+            let stats = self.stats.clone();
 
             download_futures.push(async move {
                 let display_name = display_name_opt.unwrap_or_else(|| mod_id.clone());
@@ -121,6 +133,7 @@ impl NoriskPackDownloadService {
                             filename,
                             target_path,
                             None,
+                            stats,
                         )
                         .await
                         .map_err(|e| {
@@ -156,6 +169,7 @@ impl NoriskPackDownloadService {
                             filename,
                             target_path,
                             None,
+                            stats,
                         )
                         .await
                         .map_err(|e| {
@@ -167,12 +181,12 @@ impl NoriskPackDownloadService {
                     }
                     NoriskModSourceDefinition::Url => {
                         // For URL mods, use the identifier as direct URL
-                        info!(
+                        trace!(
                             "Downloading URL mod for cache: {} ({}) from {}",
                             display_name, filename, effective_identifier
                         );
 
-                        Self::download_and_verify_file(&effective_identifier, &target_path, None).await
+                        Self::download_and_verify_file(&effective_identifier, &target_path, None, stats).await
                             .map_err(|e| {
                                 error!("Failed to download URL mod '{}': {}", display_name, e);
                                 e
@@ -225,17 +239,18 @@ impl NoriskPackDownloadService {
         filename: String,
         target_path: PathBuf,
         expected_sha1: Option<&str>,
+        stats: Option<Arc<DownloadStats>>,
     ) -> Result<()> {
         let group_path = group_id.replace('.', "/");
         let artifact_path = format!("{}/{}/{}/{}", group_path, artifact_id, version, filename);
         let download_url = format!("{}/{}", repo_url, artifact_path);
 
-        info!(
+        trace!(
             "Preparing Maven mod for cache: {} (Group: {}, Artifact: {}, Version: {}) from {}",
             filename, group_id, artifact_id, version, repo_url
         );
 
-        Self::download_and_verify_file(&download_url, &target_path, expected_sha1).await
+        Self::download_and_verify_file(&download_url, &target_path, expected_sha1, stats).await
     }
 
     /// Downloads a file from a URL to a target path, optionally verifying its SHA1 hash.
@@ -243,18 +258,36 @@ impl NoriskPackDownloadService {
         url: &str,
         target_path: &PathBuf,
         expected_sha1: Option<&str>,
+        stats: Option<Arc<DownloadStats>>,
     ) -> Result<()> {
-        // Use the new centralized download utility with optional SHA1 verification
-        let mut config = DownloadConfig::new()
-            .with_streaming(true)  // Use streaming for potentially large mod files
-            .with_retries(3);
-
-        // Only add SHA1 verification if hash is provided
-        if let Some(hash) = expected_sha1 {
-            config = config.with_sha1(hash.to_string());
+        if expected_sha1.is_none() && verified_files::is_verified(target_path, None).await {
+            if let Some(stats) = &stats {
+                stats.record_cached();
+            }
+            return Ok(());
         }
 
-        DownloadUtils::download_file(url, target_path, config).await
+        // Explicit hash wins; else best-effort Maven `.sha1` sidecar (None = ZIP heuristic fallback).
+        let resolved_sha1 = match expected_sha1 {
+            Some(hash) => Some(hash.to_string()),
+            None => DownloadUtils::try_fetch_sha1_sidecar(url).await,
+        };
+
+        let mut config = DownloadConfig::new()
+            .with_streaming(true)  // Use streaming for potentially large mod files
+            .with_retries(3)
+            .with_stats(stats);
+
+        if let Some(hash) = &resolved_sha1 {
+            config = config.with_sha1(hash.clone());
+        }
+
+        DownloadUtils::download_file(url, target_path, config).await?;
+
+        if resolved_sha1.is_none() {
+            verified_files::mark_verified(target_path, None).await;
+        }
+        Ok(())
     }
 
 

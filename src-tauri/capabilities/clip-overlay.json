@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "clip-overlay",
+  "description": "Minimal capability for the on-screen clip confirmation. A window with no capability at all can neither receive events nor call commands, so without this the overlay stays silent even though everything behind it works. It is kept separate from the main window's set because this window only listens for one event and asks to be shown and hidden again.",
+  "windows": [
+    "clip-overlay"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-show",
+    "core:window:allow-hide"
+  ]
+}

@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ProfileDetailViewV3 — Redesign des Profile-Detail-Views.
  *
@@ -26,8 +24,8 @@ preloadIcons([
   "solar:play-bold", "solar:stop-bold", "solar:settings-bold",
   "solar:refresh-bold",
   "solar:arrow-left-linear", "solar:folder-linear", "solar:copy-linear",
-  "solar:upload-linear", "solar:menu-dots-bold",
-  "solar:clock-circle-bold", "solar:hourglass-bold", "solar:hard-drive-bold",
+  "solar:upload-linear", "solar:menu-dots-bold", "solar:refresh-circle-bold",
+  "solar:clock-circle-bold", "solar:hourglass-bold", "solar:ssd-round-bold",
   "solar:copy-bold", "solar:download-bold", "solar:archive-bold",
   "solar:trash-bin-trash-bold",
 ]);
@@ -46,18 +44,18 @@ import { useProfileDuplicateStore } from "../../../store/profile-duplicate-store
 import { useProfileLaunch } from "../../../hooks/useProfileLaunch.tsx";
 import { useAppDragDropStore } from "../../../store/appStore";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { useCrafatarAvatar } from "../../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
 import { useResolvedLoaderVersion } from "../../../hooks/useResolvedLoaderVersion";
 
 import { Button } from "../../ui/buttons/Button";
 import { ProfileIconV2 } from "../ProfileIconV2";
 import { ExportProfileModal } from "../ExportProfileModal";
 import { ModpackVersionsModal } from "../../modals/ModpackVersionsModal";
-import { ConfirmDeleteDialog } from "../../modals/ConfirmDeleteDialog";
+import { useDeleteProfile } from "../../../hooks/useDeleteProfile";
 import { SettingsContextMenu, type ContextMenuItem } from "../../ui/SettingsContextMenu";
 import { Tooltip } from "../../ui/Tooltip";
 
-import { ProfileLeftRailV3, type NavKey, CONTENT_NAV_KEYS } from "./ProfileLeftRailV3";
+import { ProfileLeftRailV3, type NavKey, contentTabOf } from "./ProfileLeftRailV3";
 import { EditableChipV3 } from "./chips/EditableChipV3";
 import { GameVersionPickerV3 } from "./chips/GameVersionPickerV3";
 import { LoaderBadgeV3 } from "./chips/LoaderBadgeV3";
@@ -68,30 +66,26 @@ import { WorldsTabV3 } from "./tabs/WorldsTabV3";
 import { ScreenshotsTabV3 } from "./tabs/ScreenshotsTabV3";
 import { LogsTabV3 } from "./tabs/LogsTabV3";
 import type { LocalContentItem } from "../../../hooks/useLocalContentManager";
+import { parseErrorMessage } from "../../../utils/error-utils";
+import { useContentCacheStore } from "../../../store/content-cache-store";
 
 const mainTabFor = (k: NavKey): string =>
-  CONTENT_NAV_KEYS.includes(k) ? "content" : k;
+  contentTabOf(k) ? "content" : k;
 
 interface ProfileDetailViewV3Props {
   profile: Profile;
   onClose: () => void;
   onEdit: () => void;
+  initialNav?: NavKey;
 }
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
-const Chip: React.FC<{ icon?: string; children: React.ReactNode }> = ({ icon, children }) => (
-  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft-ten">
-    {icon && <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />}
-    {children}
-  </span>
-);
-
 const Stat: React.FC<{ icon: string; label: string; value: string; muted?: boolean }> = ({ icon, label, value, muted }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-colors min-w-[160px] max-w-[240px]">
     <Icon icon={icon} className={`w-5 h-5 flex-shrink-0 ${muted ? "text-white/25" : "text-white/60"}`} />
     <div className="flex flex-col leading-tight min-w-0">
-      <span className="text-xs uppercase tracking-wider text-white/50 font-minecraft-ten">{label}</span>
-      <span className={`text-sm font-minecraft-ten truncate ${muted ? "text-white/40" : "text-white/95"}`} title={value}>{value}</span>
+      <span className="text-xs uppercase tracking-wider text-white/50 font-minecraft">{label}</span>
+      <span className={`text-sm font-minecraft truncate ${muted ? "text-white/40" : "text-white/95"}`} title={value}>{value}</span>
     </div>
   </div>
 );
@@ -101,11 +95,12 @@ export function ProfileDetailViewV3({
   profile,
   onClose,
   onEdit,
+  initialNav,
 }: ProfileDetailViewV3Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentProfile, setCurrentProfile] = useState<Profile>(profile);
-  const [activeNavItem, setActiveNavItem] = useState<NavKey>("mods");
+  const [activeNavItem, setActiveNavItem] = useState<NavKey>(initialNav ?? "mods");
 
   // Inline-edit chip editors — owns fetchers + save + lock state
   const chipEditors = useHeroChipEditors(currentProfile, setCurrentProfile);
@@ -121,12 +116,13 @@ export function ProfileDetailViewV3({
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Delete modal state
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { requestDelete, deleteDialog } = useDeleteProfile();
 
-  // Modpack versions state
-  const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(null);
+  const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
+    const source = profile.modpack_info?.source;
+    if (!source) return null;
+    return useContentCacheStore.getState().getModpackVersions(JSON.stringify(source)) ?? null;
+  });
 
   const { showModal, hideModal } = useGlobalModal();
   const { openContextMenuId, setOpenContextMenuId } = useThemeStore();
@@ -138,7 +134,7 @@ export function ProfileDetailViewV3({
   const preferredAccount = currentProfile.preferred_account_id
     ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)
     : null;
-  const preferredAccountAvatarUrl = useCrafatarAvatar({
+  const preferredAccountAvatarUrl = usePlayerAvatar({
     uuid: preferredAccount?.id,
     overlay: true,
   });
@@ -150,10 +146,24 @@ export function ProfileDetailViewV3({
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const getGenericDisplayFileName = useCallback((item: LocalContentItem) => item.filename, []);
+  const getGenericDisplayFileName = useCallback(
+    (item: LocalContentItem) => item.modrinth_info?.name || item.curseforge_info?.name || item.filename,
+    [],
+  );
 
   // Stub — tabs handle their own refresh; mirrors V2's handleRefresh noop.
   const handleRefresh = useCallback(() => {}, []);
+
+  const refreshNoRiskMods = useCallback(async () => {
+    try {
+      await fetchProfiles();
+      setCurrentProfile((prev) => ({ ...prev }));
+    } catch (err) {
+      console.error("[V3] Failed to refresh profile data:", err);
+    }
+  }, [fetchProfiles]);
+
+  const contentTab = contentTabOf(activeNavItem);
 
   const handleLaunchRequest = useCallback(async (params: {
     profileId: string;
@@ -171,39 +181,11 @@ export function ProfileDetailViewV3({
     }
   }, [handleQuickPlayLaunch, t]);
 
-  const handleDeleteProfile = useCallback(() => {
-    if (currentProfile.is_standard_version) {
-      toast.error(t('profiles.cannotDeleteStandard'));
-      return;
+  const handleDeleteProfile = useCallback(async () => {
+    if (await requestDelete(currentProfile)) {
+      navigate("/profiles");
     }
-    setIsDeleteModalOpen(true);
-  }, [currentProfile, t]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    setIsDeleting(true);
-    try {
-      const deletePromise = useProfileStore.getState().deleteProfile(currentProfile.id);
-      await toast.promise(deletePromise, {
-        loading: t('profiles.deletingProfile', { name: currentProfile.name }),
-        success: () => {
-          fetchProfiles();
-          navigate("/profiles");
-          setIsDeleteModalOpen(false);
-          return t('profiles.deleteSuccess', { name: currentProfile.name });
-        },
-        error: (err) =>
-          t('profiles.deleteError', { error: err instanceof Error ? err.message : String(err.message) }),
-      });
-    } catch (error) {
-      console.error("[V3] Delete failed:", error);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [currentProfile, fetchProfiles, navigate, t]);
-
-  const handleCancelDelete = useCallback(() => {
-    setIsDeleteModalOpen(false);
-  }, []);
+  }, [currentProfile, navigate, requestDelete]);
 
   const handleOpenExportModal = useCallback(() => {
     showModal(`export-profile-${currentProfile.id}`, (
@@ -221,7 +203,7 @@ export function ProfileDetailViewV3({
       loading: t('profiles.openingFolder', { name: currentProfile.name }),
       success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
       error: (err) => {
-        const message = err instanceof Error ? err.message : String(err.message);
+        const message = parseErrorMessage(err);
         return t('profiles.openFolderError', { error: message });
       },
     });
@@ -344,10 +326,10 @@ export function ProfileDetailViewV3({
     (async () => {
       try {
         const versions = await UnifiedService.getModpackVersions(modpackSource);
+        if (modpackSourceKey) useContentCacheStore.getState().setModpackVersions(modpackSourceKey, versions);
         if (!cancelled) setModpackVersions(versions);
       } catch (err) {
         console.error("[V3] Failed to refresh modpack versions:", err);
-        if (!cancelled) setModpackVersions(null);
       }
     })();
     return () => { cancelled = true; };
@@ -362,15 +344,18 @@ export function ProfileDetailViewV3({
 
   // Disk usage: fetch once per profile, also refetch when a session ends
   // (Playtime-Wert hat sich dann geändert, plausibel dass sich auch Dateien änderten).
-  const [diskSize, setDiskSize] = useState<number | null>(null);
+  const [diskSize, setDiskSize] = useState<number | null>(
+    () => useContentCacheStore.getState().getDiskSize(profile.id) ?? null,
+  );
   useEffect(() => {
     let cancelled = false;
-    setDiskSize(null);
     ProfileService.getProfileDiskSize(currentProfile.id)
-      .then((size) => { if (!cancelled) setDiskSize(size); })
+      .then((size) => {
+        useContentCacheStore.getState().setDiskSize(currentProfile.id, size);
+        if (!cancelled) setDiskSize(size);
+      })
       .catch((err) => {
         console.warn("[V3] Failed to fetch disk size:", err);
-        if (!cancelled) setDiskSize(null);
       });
     return () => { cancelled = true; };
   }, [currentProfile.id, currentProfile.playtime_seconds]);
@@ -394,16 +379,23 @@ export function ProfileDetailViewV3({
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
           <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
-          <span className="text-xs font-minecraft-ten uppercase tracking-wider">{t('profiles.back')}</span>
+          <span className="text-xs font-minecraft uppercase tracking-wider">{t('profiles.back')}</span>
           <span className="text-white/30">/</span>
           <span
-            className="text-xs font-minecraft-ten text-white/80 normal-case max-w-[240px] truncate"
+            className="text-xs font-minecraft text-white/80 normal-case max-w-[240px] truncate"
             dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
           />
         </button>
 
         <div className="flex items-center gap-1 relative">
-          <Tooltip content={t('profiles.openFolder')}>
+          <button
+            onClick={() => navigate("/sync-packs", { state: { fromProfileId: currentProfile.id } })}
+            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+          >
+            <span className="text-xs font-minecraft uppercase tracking-wider">{t('syncPacks.title')}</span>
+          </button>
+          <div className="w-px h-5 bg-white/10 mx-1" />
+          <Tooltip content={t('profiles.openFolder')} position="top" delay={0}>
             <button
               onClick={handleOpenFolder}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -411,7 +403,7 @@ export function ProfileDetailViewV3({
               <Icon icon="solar:folder-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
-          <Tooltip content={t('profiles.duplicate')}>
+          <Tooltip content={t('profiles.duplicate')} position="top" delay={0}>
             <button
               onClick={handleDuplicateProfile}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -419,7 +411,7 @@ export function ProfileDetailViewV3({
               <Icon icon="solar:copy-linear" className="w-4 h-4" />
             </button>
           </Tooltip>
-          <Tooltip content={t('profiles.export')}>
+          <Tooltip content={t('profiles.export')} position="top" delay={0}>
             <button
               onClick={handleOpenExportModal}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
@@ -428,7 +420,7 @@ export function ProfileDetailViewV3({
             </button>
           </Tooltip>
           <div className="w-px h-5 bg-white/10 mx-1" />
-          <Tooltip content={t('profiles.moreOptions')}>
+          <Tooltip content={t('profiles.moreOptions')} position="top" delay={0}>
             <button
               ref={moreButtonRef}
               onClick={toggleContextMenu}
@@ -439,7 +431,7 @@ export function ProfileDetailViewV3({
           </Tooltip>
 
           <SettingsContextMenu
-            profile={currentProfile}
+            target={currentProfile}
             isOpen={isContextMenuOpen}
             position={contextMenuPosition}
             items={contextMenuItems}
@@ -469,7 +461,7 @@ export function ProfileDetailViewV3({
           {/* Identity + chips */}
           <div className="flex-1 min-w-0 pt-1">
             <h1
-              className="font-minecraft-ten text-3xl text-white normal-case truncate"
+              className="font-minecraft text-3xl text-white normal-case truncate"
               dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
             />
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -560,7 +552,7 @@ export function ProfileDetailViewV3({
                       onChange={(e) => setGroupDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
                       placeholder={t("profiles.v3.chips.group.placeholder")}
-                      className="w-full h-7 px-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft-ten"
+                      className="w-full h-7 px-2 rounded bg-white/5 border border-white/10 focus:border-white/25 outline-none text-xs text-white placeholder:text-white/30 font-minecraft"
                     />
                   </div>
                 )}
@@ -578,7 +570,7 @@ export function ProfileDetailViewV3({
                       type="button"
                       disabled={!versionsReady}
                       onClick={() => versionsReady && handleOpenModpackVersionsModal()}
-                      className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft-ten transition-colors max-w-[280px] ${
+                      className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors max-w-[280px] ${
                         !versionsReady
                           ? "bg-black/20 border-white/5 text-white/30 cursor-wait"
                           : "bg-black/30 border-white/10 text-white/75 hover:bg-black/40 hover:border-white/20 hover:text-white cursor-pointer"
@@ -599,7 +591,7 @@ export function ProfileDetailViewV3({
               })()}
               {preferredAccount && (
                 <Tooltip content={t('profiles.launchWith', { account: preferredAccount.username })}>
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft-ten">
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft">
                     {preferredAccountAvatarUrl ? (
                       <img
                         src={preferredAccountAvatarUrl}
@@ -648,12 +640,12 @@ export function ProfileDetailViewV3({
         <div className="flex items-center gap-2 flex-wrap mt-5">
           {isLaunching && statusMessage ? (
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-400/25 min-w-[160px] animate-in fade-in duration-200">
-              <Icon icon="solar:refresh-bold" className="w-5 h-5 text-emerald-300 animate-spin flex-shrink-0" />
+              <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-emerald-300 flex-shrink-0" />
               <div className="flex flex-col leading-tight min-w-0">
-                <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft-ten">
+                <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft">
                   {t("profiles.card.starting")}
                 </span>
-                <span className="text-sm text-emerald-100/95 font-minecraft-ten truncate" title={statusMessage}>
+                <span className="text-sm text-emerald-100/95 font-minecraft truncate" title={statusMessage}>
                   {statusMessage}
                 </span>
               </div>
@@ -672,7 +664,7 @@ export function ProfileDetailViewV3({
                 muted={!currentProfile.playtime_seconds}
               />
               <Stat
-                icon="solar:hard-drive-bold"
+                icon="solar:ssd-round-bold"
                 label={t("profiles.v3.stats.disk")}
                 value={diskSize == null ? "…" : formatBytes(diskSize)}
                 muted={diskSize == null || diskSize === 0}
@@ -685,79 +677,20 @@ export function ProfileDetailViewV3({
       {/* ── Body: Main + Right-Rail ─────────────────────────────────────── */}
       <div className={`flex-1 min-h-0 flex border-t border-white/5 ${activeNavItem === "logs" ? "" : "overflow-hidden"}`}>
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
-          {activeNavItem === "mods" && (
+          {contentTab && (
             <LocalContentTabV3<LocalContentItem>
+              key={contentTab.key}
               profile={currentProfile}
-              contentType="Mod"
+              contentType={contentTab.contentType}
               getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.mod')}
-              itemTypeNamePlural={t('profiles.content.mods')}
-              addContentButtonText={t('profiles.content.addMods')}
-              emptyStateIconOverride="solar:bolt-bold-duotone"
-              onRefreshRequired={handleRefresh}
+              itemTypeName={t(contentTab.nameKey)}
+              itemTypeNamePlural={t(contentTab.pluralKey)}
+              addContentButtonText={t(contentTab.addKey)}
+              emptyStateIconOverride={contentTab.icon}
+              onRefreshRequired={contentTab.contentType === "NoRiskMod" ? refreshNoRiskMods : handleRefresh}
             />
           )}
 
-          {activeNavItem === "resourcepacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="ResourcePack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.resourcePack')}
-              itemTypeNamePlural={t('profiles.content.resourcePacks')}
-              addContentButtonText={t('profiles.content.addResourcePacks')}
-              emptyStateIconOverride="solar:gallery-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "shaderpacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="ShaderPack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.shaderPack')}
-              itemTypeNamePlural={t('profiles.content.shaderPacks')}
-              addContentButtonText={t('profiles.content.addShaderPacks')}
-              emptyStateIconOverride="solar:sun-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "datapacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="DataPack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.dataPack')}
-              itemTypeNamePlural={t('profiles.content.dataPacks')}
-              addContentButtonText={t('profiles.content.addDataPacks')}
-              emptyStateIconOverride="solar:database-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "nrc" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="NoRiskMod"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.noriskMod')}
-              itemTypeNamePlural={t('profiles.content.noriskMods')}
-              addContentButtonText={t('profiles.content.addNoriskMods')}
-              emptyStateIconOverride="solar:shield-check-bold-duotone"
-              onRefreshRequired={async () => {
-                try {
-                  await fetchProfiles();
-                  setCurrentProfile(prev => ({ ...prev }));
-                } catch (err) {
-                  console.error("[V3] Failed to refresh profile data:", err);
-                }
-                handleRefresh();
-              }}
-              /* Kein Add-CTA: NoRisk-Mods kommen ueber den Pack-Selector, nicht via Browse. */
-            />
-          )}
 
           {activeNavItem === "worlds" && (
             <WorldsTabV3
@@ -785,19 +718,7 @@ export function ProfileDetailViewV3({
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
-      <ConfirmDeleteDialog
-        isOpen={isDeleteModalOpen}
-        itemName={currentProfile.name}
-        onClose={handleCancelDelete}
-        onConfirm={handleConfirmDelete}
-        isDeleting={isDeleting}
-        title={t('profiles.deleteProfileTitle')}
-        message={
-          <p className="text-white/80 font-minecraft-ten">
-            {t('profiles.deleteConfirmMessage', { name: currentProfile.name })}
-          </p>
-        }
-      />
+      {deleteDialog}
 
     </div>
   );

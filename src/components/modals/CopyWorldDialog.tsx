@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -132,7 +130,7 @@ export function CopyWorldDialog({
           variant="success"
           onClick={handleConfirm}
           disabled={isCopying || isLoadingProfiles || !targetProfileId || !targetWorldName.trim()}
-          icon={isCopying ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : null}
+          icon={isCopying ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : null}
         >
           {isCopying ? t('copy_world.button.copying') : t('copy_world.button.copy')}
         </Button>

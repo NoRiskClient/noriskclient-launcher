@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LoaderBadgeV3 — the loader icon sitting on the bottom-right corner of the
  * profile picture, a clickable trigger for LoaderPickerV3. Frameless: the
@@ -14,6 +12,7 @@
 import { useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
+import { loaderIconSrc } from "../../../../lib/loader-icons";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { ThemedDropdown } from "../shared/ThemedDropdown";
 import { LoaderPickerV3 } from "./LoaderPickerV3";
@@ -26,20 +25,13 @@ interface LoaderBadgeV3Props {
   disabledReason?: string;
 }
 
-const ICON_MAP: Record<string, string> = {
-  fabric:   "/icons/fabric.png",
-  forge:    "/icons/forge.png",
-  quilt:    "/icons/quilt.png",
-  neoforge: "/icons/neoforge.png",
-};
-
 export function LoaderBadgeV3({ loader, onChange, disabled, disabledReason }: LoaderBadgeV3Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const accent = useThemeStore((s) => s.accentColor);
 
-  const icon = ICON_MAP[loader ?? ""] ?? "/icons/minecraft.png";
+  const icon = loaderIconSrc(loader);
   const label = loader ?? "vanilla";
 
   return (

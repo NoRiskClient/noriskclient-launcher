@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
@@ -23,71 +21,8 @@ import {
 } from "../../services/nrc-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
-
-interface AccountLinkRowProps {
-  icon: string;
-  name: string;
-  isLoading: boolean;
-  isLinked: boolean;
-  isProcessing: boolean;
-  onLink: () => void;
-  onUnlink: () => void;
-  visitUrl?: string;
-}
-
-function AccountLinkRow({
-  icon,
-  name,
-  isLoading,
-  isLinked,
-  isProcessing,
-  onLink,
-  onUnlink,
-  visitUrl,
-}: AccountLinkRowProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
-      <div className="flex items-center">
-        <Icon icon={icon} className="w-6 h-6 mr-3 text-white/80" />
-        <span className="text-white/90 font-minecraft-ten text-xs">{name}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        {isLinked ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onUnlink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-off"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.unlink')}
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onLink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-variant"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.link')}
-          </Button>
-        )}
-        <IconButton
-          variant="ghost"
-          size="sm"
-          onClick={() => visitUrl && openExternalUrl(visitUrl)}
-          icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
-          disabled={!visitUrl}
-          className={!visitUrl ? "invisible" : ""}
-        />
-      </div>
-    </div>
-  );
-}
+import { AccountLinkRow } from "../account/AccountLinkRow";
+import { TwitchLinkCard } from "../account/TwitchLinkCard";
 
 export function SocialsModal() {
   const { t } = useTranslation();
@@ -310,7 +245,7 @@ export function SocialsModal() {
             icon="mdi:gift-outline"
             className="w-16 h-16 text-accent"
           />
-          <p className="text-white/90 font-minecraft-ten text-sm select-none">
+          <p className="text-white/90 font-minecraft text-sm select-none">
             {t('socials.referral_text')}{" "}
             <span
               className="text-accent underline cursor-pointer hover:text-accent/80"
@@ -346,7 +281,7 @@ export function SocialsModal() {
               <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
                 <div className="flex items-center">
                   <Icon icon="material-symbols:phone-android" className="w-6 h-6 mr-3 text-white/80" />
-                  <span className="text-white/90 font-minecraft-ten text-xs">{t('socials.mobile_app')}</span>
+                  <span className="text-white/90 font-minecraft text-xs">{t('socials.mobile_app')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {mobileAppToken || isLoadingMobileApp ? (
@@ -395,7 +330,7 @@ export function SocialsModal() {
               {showQrCode && mobileAppToken && (
                 <div className="flex justify-center p-3 bg-black/10 rounded-md">
                   <div className="text-center space-y-2">
-                    <p className="text-white/70 font-minecraft-ten text-xs select-none">
+                    <p className="text-white/70 font-minecraft text-xs select-none">
                       {t('socials.scan_qr')}
                     </p>
                     <img
@@ -410,14 +345,14 @@ export function SocialsModal() {
 
           <AccountLinkRow
             icon="ic:baseline-discord"
-              name="Discord"
-              isLoading={isLoadingDiscord}
-              isLinked={isDiscordLinked}
-              isProcessing={isProcessingDiscord}
-              onLink={handleDiscordLink}
-              onUnlink={handleDiscordUnlink}
-              visitUrl="https://discord.norisk.gg"
-            />
+            name="Discord"
+            isLoading={isLoadingDiscord}
+            isLinked={isDiscordLinked}
+            isProcessing={isProcessingDiscord}
+            onLink={handleDiscordLink}
+            onUnlink={handleDiscordUnlink}
+            visitUrl="https://discord.norisk.gg"
+          />
 
           <AccountLinkRow
             icon="mdi:github"
@@ -429,6 +364,8 @@ export function SocialsModal() {
             onUnlink={handleGithubUnlink}
             visitUrl="https://github.com/NoRiskClient"
           />
+
+          <TwitchLinkCard />
         </div>
       </div>
     </Modal>

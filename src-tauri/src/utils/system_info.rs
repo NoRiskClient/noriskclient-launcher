@@ -29,13 +29,6 @@ pub enum Architecture {
 }
 
 impl OperatingSystem {
-    pub fn get_path_separator(&self) -> Result<&'static str> {
-        Ok(match self {
-            OperatingSystem::WINDOWS => ";",
-            OperatingSystem::LINUX | OperatingSystem::OSX => ":",
-            _ => return Err(AppError::JavaDownload("Invalid OS".to_string())),
-        })
-    }
 
     pub fn get_simple_name(&self) -> Result<&'static str> {
         Ok(match self {
@@ -118,3 +111,17 @@ pub const ARCHITECTURE: Architecture = if cfg!(target_arch = "x86") {
 } else {
     Architecture::UNKNOWN
 };
+
+/// Total physical memory in MB, read once.
+///
+/// `System::new_all()` enumerates every process, disk and network just to reach this number,
+/// which is why the value is cached rather than recomputed per caller.
+pub fn total_ram_mb() -> u64 {
+    static RAM_MB: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
+    *RAM_MB.get_or_init(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_memory();
+        sys.total_memory() / (1024 * 1024)
+    })
+}

@@ -11,3 +11,7 @@ export interface UpdateInfo {
   /** Download URL for the update (optional) */
   download_url?: string;
 }
+
+export interface LauncherUpdate extends UpdateInfo {
+  ready: boolean;
+}

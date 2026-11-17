@@ -1,11 +1,10 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { useThemeStore } from "../../store/useThemeStore";
 import { Button } from "../ui/buttons/Button";
 import { openExternalUrl } from "../../services/tauri-service";
@@ -27,6 +26,7 @@ const CLOSE_DELAY = 150;
 
 export function RolloutIndicator() {
   const { t } = useTranslation();
+  const isWindowFocused = useWindowFocus();
   const accentColor = useThemeStore((s) => s.accentColor);
   const [inRollout, setInRollout] = useState(false);
   const [optedOut, setOptedOut] = useState(false);
@@ -118,6 +118,9 @@ export function RolloutIndicator() {
   if (!inRollout) return null;
 
   const iconColor = optedOut ? undefined : ACTIVE_COLOR;
+  // Only pulse while the window is focused — a CSS `infinite` animation keeps
+  // driving the GPU even when the launcher is minimized/hidden (issue #40).
+  const animate = !optedOut && isWindowFocused;
 
   return (
     <div
@@ -125,19 +128,30 @@ export function RolloutIndicator() {
       onMouseEnter={handleIconEnter}
       onMouseLeave={handleIconLeave}
     >
+      {/* Static glow layer. Rendered once and never animated, so the GPU does
+          not re-rasterize the drop-shadow blur every frame. The pulsing icon
+          below carries no filter, keeping the animation a cheap composite. */}
+      {!optedOut && (
+        <Icon
+          icon="solar:bolt-bold"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 w-full h-full"
+          style={{
+            color: ACTIVE_COLOR,
+            filter: `drop-shadow(0 0 8px ${ACTIVE_COLOR})`,
+          }}
+        />
+      )}
       <button
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
         className={cn(
-          "w-full h-full flex items-center justify-center cursor-pointer",
-          optedOut ? "opacity-40 grayscale" : "animate-pulse",
+          "relative w-full h-full flex items-center justify-center cursor-pointer",
+          optedOut ? "opacity-40 grayscale" : "",
+          animate ? "animate-pulse" : "",
         )}
-        style={
-          optedOut
-            ? undefined
-            : { color: ACTIVE_COLOR, filter: `drop-shadow(0 0 8px ${ACTIVE_COLOR})` }
-        }
+        style={optedOut ? undefined : { color: ACTIVE_COLOR }}
         aria-label={
           optedOut
             ? t("rollout.popover.click_to_opt_in")
@@ -150,7 +164,7 @@ export function RolloutIndicator() {
       {open &&
         createPortal(
           <div
-            className="fixed z-[1000] w-[20rem] animate-slide-up-fade-in border border-b-2 rounded-md overflow-hidden"
+            className="glass-panel fixed z-[1000] w-[20rem] animate-slide-up-fade-in border border-b-2 rounded-md overflow-hidden"
             style={{
               left: pos.x,
               top: pos.top,
@@ -179,7 +193,7 @@ export function RolloutIndicator() {
                   filter: optedOut ? "grayscale(1)" : undefined,
                 }}
               />
-              <h3 className="font-minecraft text-xl text-white lowercase tracking-wide leading-none pt-1">
+              <h3 className="font-smallcaps text-sm text-white tracking-wide leading-none pt-1">
                 {optedOut
                   ? t("rollout.popover.title_opted_out")
                   : t("rollout.popover.title")}
@@ -188,12 +202,12 @@ export function RolloutIndicator() {
 
             <div className="p-4 flex flex-col gap-3.5">
               {optedOut ? (
-                <p className="font-minecraft-ten text-sm text-white/80 leading-relaxed">
+                <p className="font-minecraft text-sm text-white/80 leading-relaxed">
                   {t("rollout.popover.body_opted_out")}
                 </p>
               ) : (
                 <>
-                  <p className="font-minecraft-ten text-sm text-white/85 leading-relaxed">
+                  <p className="font-minecraft text-sm text-white/85 leading-relaxed">
                     {t("rollout.popover.body_intro_before")}
                     <span
                       className="font-bold mx-1"
@@ -203,7 +217,7 @@ export function RolloutIndicator() {
                     </span>
                     {t("rollout.popover.body_intro_after")}
                   </p>
-                  <p className="font-minecraft-ten text-sm text-white/65 leading-relaxed">
+                  <p className="font-minecraft text-sm text-white/65 leading-relaxed">
                     {t("rollout.popover.body_bug")}
                   </p>
                 </>
@@ -225,7 +239,7 @@ export function RolloutIndicator() {
                 </Button>
               )}
 
-              <p className="font-minecraft-ten text-xs tracking-wide text-white/45 text-center mt-1 lowercase">
+              <p className="font-minecraft text-xs tracking-wide text-white/45 text-center mt-1 lowercase">
                 {optedOut
                   ? t("rollout.popover.click_to_opt_in")
                   : t("rollout.popover.click_to_opt_out")}

@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,9 +7,6 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { gsap } from "gsap";
 import { ThemedSurface } from "./ThemedSurface";
 import { 
-  getSizeClasses,
-  getBorderRadiusClass,
-  getAccessibilityProps,
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
@@ -57,14 +52,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
     const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
-    const sizeClasses = getSizeClasses(size, "input");
-    const radiusClass = getBorderRadiusClass();
-    const accessibilityProps = getAccessibilityProps({
-      label,
-      description,
-      error,
-      disabled
-    });    const mergedRef = (node: HTMLInputElement) => {
+    const mergedRef = (node: HTMLInputElement) => {
       if (ref) {
         if (typeof ref === "function") {
           ref(node);
@@ -152,19 +140,19 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       sm: {
         container: "h-[42px]",
         padding: "px-6",
-        text: "text-xl",
+        text: "text-sm",
         icon: "w-5 h-5",
       },
       md: {
         container: "h-[50px]",
         padding: "px-8",
-        text: "text-2xl",
+        text: "text-base",
         icon: "w-6 h-6",
       },
       lg: {
         container: "h-[58px]",
         padding: "px-10",
-        text: "text-3xl",
+        text: "text-lg",
         icon: "w-7 h-7",
       },
     };    const getVariantColors = () => {
@@ -229,8 +217,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           >
             {loading ? (
               <Icon
-                icon="solar:refresh-bold"
-                className="animate-spin text-white"
+                icon="svg-spinners:ring-resize"
+                className="text-white"
               />
             ) : (
               <Icon icon="solar:magnifer-bold" className="text-white" />
@@ -246,7 +234,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              "flex-1 h-full bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+              "flex-1 h-full bg-transparent border-none outline-none text-white font-smallcaps placeholder:text-white/50 truncate",
               sizeStyles[size].text,
             )}
             style={{
@@ -301,8 +289,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                 >
                   {loading ? (
                     <Icon
-                      icon="solar:refresh-bold"
-                      className="animate-spin text-white"
+                      icon="svg-spinners:ring-resize"
+                      className="text-white"
                     />
                   ) : (
                     <Icon icon="solar:magnifer-bold" className="text-white" />
@@ -318,7 +306,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                   placeholder={placeholder}
                   disabled={disabled}
                   className={cn(
-                    "bg-transparent border-none outline-none text-white font-minecraft placeholder:text-white/50 lowercase truncate",
+                    "bg-transparent border-none outline-none text-white font-smallcaps placeholder:text-white/50 truncate",
                     sizeStyles[size].text,
                   )}
                   style={{
@@ -353,8 +341,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       <div
         ref={containerRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md",
-          "text-white tracking-wider lowercase",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md",
+          "text-white tracking-wider",
           "flex items-center justify-center w-full",
           "text-shadow-sm",
           getBorderClasses(),

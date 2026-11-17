@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useProcessStore } from "../store/useProcessStore";
 import { getProcessLogCursor } from "../services/process-service";
+import { logError } from "../utils/logging-utils";
 
 const POLL_INTERVAL_MS = 700;
 
@@ -11,13 +12,15 @@ export function useProcessLogCursor(
   useEffect(() => {
     if (!sessionId || !processId) return;
     let cancelled = false;
+    let isPolling = false;
 
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || isPolling) return;
+      isPolling = true;
       const store = useProcessStore.getState();
       const cursor = store.cursors.get(processId) ?? 0;
       try {
-        const res = await getProcessLogCursor(sessionId, cursor);
+        const res = await getProcessLogCursor(sessionId, cursor, true);
         if (cancelled) return;
         if (res.new_file) {
           store.clearLogs(processId);
@@ -33,7 +36,9 @@ export function useProcessLogCursor(
         }
         useProcessStore.getState().setCursor(processId, res.cursor);
       } catch (e) {
-        console.error("[useProcessLogCursor] poll failed:", e);
+        logError(`[useProcessLogCursor] poll for session ${sessionId} failed: ${e}`);
+      } finally {
+        isPolling = false;
       }
     };
 

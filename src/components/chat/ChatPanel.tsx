@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -7,7 +7,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 
 function getDateLabel(timestamp: number, t: (key: string) => string): string {
   const date = new Date(timestamp);
@@ -81,7 +81,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const avatarUrl = useCrafatarAvatar({ uuid: friend.uuid, size: 20 });
+  const avatarUrl = usePlayerAvatar({ uuid: friend.uuid, size: 20 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
@@ -410,7 +410,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
               />
             </div>
           )}
-          <span className="text-sm font-medium text-white font-minecraft-ten truncate">
+          <span className="text-sm font-medium text-white font-minecraft truncate">
             {friend.username}
           </span>
         </div>
@@ -446,8 +446,8 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                 style={{ color: accentColor.value }}
               />
             </div>
-            <p className="text-white/50 text-xs font-minecraft-ten">{t('chat.no_messages_title')}</p>
-            <p className="text-white/30 text-xl mt-1 font-minecraft">{t('chat.no_messages_desc')}</p>
+            <p className="text-white/50 text-xs font-minecraft">{t('chat.no_messages_title')}</p>
+            <p className="text-white/30 text-sm mt-1 font-smallcaps">{t('chat.no_messages_desc')}</p>
           </div>
         ) : (
           <>
@@ -458,15 +458,15 @@ export function ChatPanel({ friend }: ChatPanelProps) {
             {isLoadingMore && (
               <div className="flex justify-center py-3">
                 <Icon
-                  icon="solar:refresh-linear"
-                  className="w-5 h-5 animate-spin"
+                  icon="svg-spinners:ring-resize"
+                  className="w-5 h-5"
                   style={{ color: accentColor.value }}
                 />
               </div>
             )}
             {!hasMore && !isLoadingMore && (
               <div className="flex justify-center py-2">
-                <span className="text-xs font-minecraft-ten text-white/30">
+                <span className="text-xs font-minecraft text-white/30">
                   {t('chat.start_of_conversation')}
                 </span>
               </div>
@@ -490,7 +490,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
                   {showDateSeparator && (
                     <div className="flex items-center justify-center py-3 my-1">
                       <div
-                        className="px-3 py-1 rounded-full text-[10px] font-minecraft-ten uppercase tracking-wider"
+                        className="px-3 py-1 rounded-full text-[10px] font-minecraft uppercase tracking-wider"
                         style={{
                           backgroundColor: `${accentColor.value}15`,
                           color: `${accentColor.value}90`,

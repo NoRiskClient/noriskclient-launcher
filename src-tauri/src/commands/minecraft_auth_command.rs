@@ -329,6 +329,10 @@ pub async fn remove_account(account_id: Uuid) -> Result<(), CommandError> {
         .minecraft_account_manager_v2
         .remove_account(account_id)
         .await?;
+    state
+        .content_cache
+        .forget_player(&account_id)
+        .await;
     Ok(())
 }
 
@@ -372,6 +376,20 @@ pub async fn set_active_account(account_id: Uuid) -> Result<(), CommandError> {
         .minecraft_account_manager_v2
         .set_active_account(account_id)
         .await?;
+
+    tokio::spawn(async move {
+        if let Ok(state) = State::get().await {
+            match state.active_skin_manager.reconcile(&account_id.to_string()).await {
+                Ok(changed) => {
+                    if changed {
+                        let _ = state.event_state.skin_changed(Some(account_id)).await;
+                    }
+                }
+                Err(e) => log::warn!("Skin reconcile after account switch failed: {}", e),
+            }
+        }
+    });
+
     Ok(())
 }
 

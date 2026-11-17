@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
@@ -8,21 +6,12 @@ import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { Button } from "../ui/buttons/Button";
 import type { UnifiedModpackVersionsResponse, UnifiedVersion, ModpackSwitchRequest } from "../../types/unified";
-import { UnifiedVersionType } from "../../types/unified";
 import type { ModPackSource } from "../../types/profile";
 import UnifiedService from "../../services/unified-service";
 import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
-
-// HTML sanitizer for CurseForge HTML content
-const sanitizeHtml = (html: string) => {
-  // Basic HTML sanitization - remove potentially dangerous tags
-  return html
-    .replace(/<script[^>]*>.*?<\/script>/gi, '')
-    .replace(/<style[^>]*>.*?<\/style>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '');
-};
+import { parseErrorMessage } from "../../utils/error-utils";
+import { sanitizeRichHtml } from "../../utils/html-sanitize";
 
 interface ModpackVersionsModalProps {
   isOpen: boolean;
@@ -33,32 +22,6 @@ interface ModpackVersionsModalProps {
   onVersionSwitch?: (version: UnifiedVersion) => void;
   onSwitchComplete?: () => void;
   isSwitching?: boolean;
-}
-
-function getVersionTypeColor(type: UnifiedVersionType): string {
-  switch (type) {
-    case UnifiedVersionType.Release:
-      return "text-green-400";
-    case UnifiedVersionType.Beta:
-      return "text-yellow-400";
-    case UnifiedVersionType.Alpha:
-      return "text-red-400";
-    default:
-      return "text-gray-400";
-  }
-}
-
-function getVersionTypeIcon(type: UnifiedVersionType): string {
-  switch (type) {
-    case UnifiedVersionType.Release:
-      return "solar:tag-bold";
-    case UnifiedVersionType.Beta:
-      return "solar:test-tube-bold";
-    case UnifiedVersionType.Alpha:
-      return "solar:flask-bold";
-    default:
-      return "solar:tag-bold";
-  }
 }
 
 function formatDate(dateString: string): string {
@@ -143,7 +106,7 @@ function VersionItem({
       onClick={handleClick}
     >
       {/* Stats - oben rechts */}
-      <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-white/50 font-minecraft-ten">
+      <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-white/50 font-minecraft">
         <span>{formatDownloads(version.downloads)}</span>
         <span>{formatDate(version.date_published)}</span>
       </div>
@@ -153,18 +116,18 @@ function VersionItem({
         <div className="flex-1 min-w-0">
           {/* Name und Version in einer Zeile */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-white font-minecraft-ten text-sm font-medium truncate">
+            <span className="text-white font-minecraft text-sm font-medium truncate">
               {version.version_number}
             </span>
             {isInstalled && (
-              <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft-ten uppercase">
+              <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft uppercase">
                 {t('modpack_versions.current')}
               </span>
             )}
           </div>
 
           {/* MC Versionen */}
-          <div className="text-xs text-white/60 font-minecraft-ten">
+          <div className="text-xs text-white/60 font-minecraft">
             MC: {version.game_versions.slice(0, 2).join(', ')}
             {version.game_versions.length > 2 && ` +${version.game_versions.length - 2}`}
           </div>
@@ -173,12 +136,12 @@ function VersionItem({
           {(version.changelog || version.source === "CurseForge") && (
             <button
               onClick={toggleExpanded}
-              className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft-ten border border-white/20"
+              className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20"
               title={isExpanded ? "Hide changelog" : "Show changelog"}
               disabled={isLoadingChangelog}
             >
               {isLoadingChangelog ? (
-                <Icon icon="solar:refresh-circle-bold" className="w-3 h-3 animate-spin" />
+                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
               ) : (
                 <Icon
                   icon={isExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
@@ -196,25 +159,25 @@ function VersionItem({
       {/* Changelog Bereich */}
       {isExpanded && displayChangelog && (
         <div className="mt-3 pt-3 border-t border-white/10">
-          <div className="text-xs font-minecraft-ten text-white/70 mb-2 uppercase">
+          <div className="text-xs font-minecraft text-white/70 mb-2 uppercase">
             {t('modpack_versions.changelog')}
           </div>
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {isLoadingChangelog ? (
               <div className="flex items-center justify-center py-4">
-                <Icon icon="solar:refresh-circle-bold" className="w-5 h-5 animate-spin text-white/50" />
-                <span className="ml-2 text-sm text-white/50 font-minecraft-ten">{t('modpack_versions.loading_changelog')}</span>
+                <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" />
+                <span className="ml-2 text-sm text-white/50 font-minecraft">{t('modpack_versions.loading_changelog')}</span>
               </div>
             ) : displayChangelog ? (
               version.source === "CurseForge" ? (
                 // Render HTML for CurseForge (sanitized)
                 <div
-                  className="prose prose-invert prose-sm max-w-none font-minecraft-ten [&_*]:text-white [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:first:mt-0 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_h3]:mt-2 [&_p]:text-sm [&_p]:text-white/90 [&_p]:mb-2 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:list-inside [&_ul]:text-sm [&_ul]:text-white/90 [&_ul]:mb-2 [&_ul]:space-y-1 [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:text-sm [&_ol]:text-white/90 [&_ol]:mb-2 [&_ol]:space-y-1 [&_ol]:ml-4 [&_li]:leading-relaxed [&_strong]:font-bold [&_strong]:text-white [&_em]:italic [&_em]:text-white/80 [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_code]:text-white/90 [&_pre]:bg-black/30 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-xs [&_pre]:font-mono [&_pre]:text-white/90 [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-2 [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline"
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayChangelog) }}
+                  className="prose prose-invert prose-sm max-w-none font-minecraft [&_*]:text-white [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:first:mt-0 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_h3]:mt-2 [&_p]:text-sm [&_p]:text-white/90 [&_p]:mb-2 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:list-inside [&_ul]:text-sm [&_ul]:text-white/90 [&_ul]:mb-2 [&_ul]:space-y-1 [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:text-sm [&_ol]:text-white/90 [&_ol]:mb-2 [&_ol]:space-y-1 [&_ol]:ml-4 [&_li]:leading-relaxed [&_strong]:font-bold [&_strong]:text-white [&_em]:italic [&_em]:text-white/80 [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_code]:text-white/90 [&_pre]:bg-black/30 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-xs [&_pre]:font-mono [&_pre]:text-white/90 [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-2 [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(displayChangelog) }}
                 />
               ) : (
                 // Render Markdown for Modrinth
-                <div className="prose prose-invert prose-sm max-w-none font-minecraft-ten">
+                <div className="prose prose-invert prose-sm max-w-none font-minecraft">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -248,7 +211,7 @@ function VersionItem({
                 </div>
               )
             ) : (
-              <div className="text-sm text-white/50 font-minecraft-ten text-center py-4">
+              <div className="text-sm text-white/50 font-minecraft text-center py-4">
                 {t('modpack_versions.no_changelog')}
               </div>
             )}
@@ -270,57 +233,7 @@ export function ModpackVersionsModal({
   isSwitching = false,
 }: ModpackVersionsModalProps) {
   const { t } = useTranslation();
-  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
-    // DEBUG: Add mock changelogs to initial versions for testing with Markdown (only for Modrinth)
-    if (initialVersions && initialVersions.all_versions.length > 0) {
-      initialVersions.all_versions.forEach((version, index) => {
-        if (!version.changelog && version.source === "Modrinth") {
-          const mockChangelogs = [
-            `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-            `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-            `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-          ];
-          version.changelog = mockChangelogs[index % mockChangelogs.length];
-        }
-      });
-    }
-    return initialVersions;
-  });
+  const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(initialVersions);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
   // Load fresh versions when modal opens by loading the current profile
@@ -343,55 +256,6 @@ This release focuses on stability and performance improvements.
         .then(versions => {
           console.log("Loaded modpack versions:", versions);
           console.log("First version has changelog:", versions.all_versions[0]?.changelog);
-
-          // Only add mock changelogs for Modrinth versions (CurseForge will be lazy loaded)
-          if (versions && versions.all_versions.length > 0) {
-            versions.all_versions.forEach((version, index) => {
-              if (!version.changelog && version.source === "Modrinth") {
-                const mockChangelogs = [
-                  `### Version ${version.version_number}
-
-**An actually working version of ${version.version_number}, sorry about last time.** No changes to anything except for the pack format, same mods and fabric version as last time.
-
-> ### Status Update
-> I've been working on new tooling for Sodium Plus for a long time now. I'm in the middle of migrating some of my infrastructure to a new system, so it may be a while. In the future, these tools will allow us to update and work on Sodium Plus a lot more quickly and with much higher quality. It is important that I finish this. In the meantime, @NoSadBeHappy will be updating the pack with smaller fixes and alpha versions to support Minecraft updates. Thank you for your patience!
-> - RedstoneWizard08
-
-#### Changes:
-- Fixed compatibility with Minecraft ${version.game_versions[0] || 'latest'}
-- Updated mod dependencies
-- Performance improvements`,
-                  `## What's New in ${version.version_number}
-
-### ✨ Features
-- Added new shader support
-- Improved graphics settings
-- Enhanced mod compatibility
-
-### 🐛 Bug Fixes
-- Fixed crash on startup
-- Resolved memory leaks
-- Corrected texture rendering issues
-
-### 🔧 Technical
-- Updated to Fabric ${version.loaders.includes('fabric') ? 'latest' : 'compatible'} version
-- Optimized resource loading
-- Better error handling`,
-                  `# Changelog for ${version.version_number}
-
-This release focuses on stability and performance improvements.
-
-**Key Changes:**
-- **Performance**: Significant FPS improvements in heavy modpacks
-- **Compatibility**: Better support for Minecraft ${version.game_versions[0] || 'various versions'}
-- **Bug Fixes**: Various crash fixes and stability improvements
-
-> **Note**: This version requires Java 17 or higher for optimal performance.`
-                ];
-                version.changelog = mockChangelogs[index % mockChangelogs.length];
-              }
-            });
-          }
 
           setVersions(versions);
         })
@@ -487,7 +351,7 @@ This release focuses on stability and performance improvements.
         onClose();
 
       } catch (error) {
-        toast.error(t('modpack_versions.toast.switch_failed', { error: String(error) }));
+        toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
       }
     } else if (onVersionSwitch) {
       // Fallback to old method if we don't have all required info
@@ -522,7 +386,7 @@ This release focuses on stability and performance improvements.
             variant="default"
             onClick={handleSwitchVersion}
             disabled={!selectedVersion || isSwitching}
-            icon={isSwitching ? <Icon icon="solar:refresh-bold" className="animate-spin h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
+            icon={isSwitching ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
           >
             {isSwitching ? t('modpack_versions.button.switching') : selectedVersion ? t('modpack_versions.button.switch_version') : t('modpack_versions.button.select_version')}
           </Button>
@@ -530,7 +394,7 @@ This release focuses on stability and performance improvements.
       }
     >
       <div className="p-4">
-        <div className="mb-4 text-sm text-white/70 font-minecraft-ten">
+        <div className="mb-4 text-sm text-white/70 font-minecraft">
           {isLoadingVersions ? (
             t('modpack_versions.loading')
           ) : (
@@ -548,14 +412,14 @@ This release focuses on stability and performance improvements.
         {selectedVersion ? (
           <div className="mb-4">
             <div
-              className="text-xs font-minecraft-ten text-center font-medium mb-1"
+              className="text-xs font-minecraft text-center font-medium mb-1"
               style={{ color: `var(--accent)` }}
             >
               Selected: {selectedVersion.name} ({selectedVersion.version_number})
             </div>
           </div>
         ) : (
-          <div className="mb-4 text-xs text-white/50 font-minecraft-ten text-center">
+          <div className="mb-4 text-xs text-white/50 font-minecraft text-center">
             {t('modpack_versions.select_hint')}
           </div>
         )}
@@ -573,7 +437,7 @@ This release focuses on stability and performance improvements.
         </div>
 
         {sortedVersions.length === 0 && (
-          <div className="text-center py-8 text-white/50 font-minecraft-ten">
+          <div className="text-center py-8 text-white/50 font-minecraft">
             {t('modpack_versions.no_versions')}
           </div>
         )}

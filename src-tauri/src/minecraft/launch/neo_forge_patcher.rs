@@ -15,6 +15,7 @@ pub struct NeoForgePatcher {
     library_path: PathBuf,
     java_path: PathBuf,
     minecraft_jar_path: PathBuf,
+    minecraft_version: String,
     root_path: PathBuf,
     event_id: Option<Uuid>,
     profile_id: Option<Uuid>,
@@ -34,6 +35,7 @@ impl NeoForgePatcher {
             library_path,
             java_path,
             minecraft_jar_path,
+            minecraft_version: minecraft_version.to_string(),
             root_path,
             event_id: None,
             profile_id: None,
@@ -50,33 +52,12 @@ impl NeoForgePatcher {
         self
     }
 
-    fn parse_artifact(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('[') && arg.ends_with(']') {
-            let artifact_str = &arg[1..arg.len() - 1];
-            info!("Parsing artifact: {}", artifact_str);
-            if let Ok(path) = self.get_library_path(artifact_str) {
-                let path_str = path.to_string_lossy().to_string();
-                info!("Resolved artifact path: {}", path_str);
-                return Some(path_str);
-            }
-        }
-        None
-    }
-
-    fn parse_data_value(&self, arg: &str) -> Option<String> {
-        if arg.starts_with('\'') && arg.ends_with('\'') {
-            let value = arg[1..arg.len() - 1].to_string();
-            info!("Parsed data value: {}", value);
-            return Some(value);
-        }
-        None
-    }
-
     fn replace_tokens(
         &self,
         arg: &str,
         install_profile: &NeoForgeInstallProfile,
         is_client: bool,
+        installer_path: &PathBuf,
     ) -> Result<String> {
         let mut result = String::new();
         let mut chars = arg.chars().peekable();
@@ -84,7 +65,6 @@ impl NeoForgePatcher {
         while let Some(c) = chars.next() {
             match c {
                 '\\' => {
-                    // Handle escape character
                     if let Some(next) = chars.next() {
                         result.push(next);
                     } else {
@@ -94,14 +74,12 @@ impl NeoForgePatcher {
                     }
                 }
                 '{' | '\'' => {
-                    // Start of a token or quoted string
                     let mut key = String::new();
                     let mut found_end = false;
 
                     while let Some(d) = chars.next() {
                         match d {
                             '\\' => {
-                                // Handle escape in token
                                 if let Some(next) = chars.next() {
                                     key.push(next);
                                 } else {
@@ -111,12 +89,10 @@ impl NeoForgePatcher {
                                 }
                             }
                             '}' if c == '{' => {
-                                // End of token
                                 found_end = true;
                                 break;
                             }
                             '\'' if c == '\'' => {
-                                // End of quoted string
                                 found_end = true;
                                 break;
                             }
@@ -132,10 +108,8 @@ impl NeoForgePatcher {
                     }
 
                     if c == '\'' {
-                        // Quoted string, use as is
                         result.push_str(&key);
                     } else {
-                        // Token replacement
                         if let Some(value) = install_profile.data.get(&key) {
                             let replacement = if is_client {
                                 &value.client
@@ -145,7 +119,6 @@ impl NeoForgePatcher {
                             info!("Replacing {} with: {}", key, replacement);
                             result.push_str(replacement);
                         } else {
-                            // Handle special tokens
                             match key.as_str() {
                                 "SIDE" => {
                                     let side = if is_client { "client" } else { "server" };
@@ -160,6 +133,26 @@ impl NeoForgePatcher {
                                 "ROOT" => {
                                     let path = self.root_path.to_string_lossy();
                                     info!("Replacing {{ROOT}} with: {}", path);
+                                    result.push_str(&path);
+                                }
+                                // Only server-side processors use these today, but an unknown
+                                // token is a hard error below, so a future version shipping one
+                                // client-side would otherwise fail to install.
+                                "MINECRAFT_VERSION" => {
+                                    info!(
+                                        "Replacing {{MINECRAFT_VERSION}} with: {}",
+                                        self.minecraft_version
+                                    );
+                                    result.push_str(&self.minecraft_version);
+                                }
+                                "LIBRARY_DIR" => {
+                                    let path = self.library_path.to_string_lossy();
+                                    info!("Replacing {{LIBRARY_DIR}} with: {}", path);
+                                    result.push_str(&path);
+                                }
+                                "INSTALLER" => {
+                                    let path = installer_path.to_string_lossy();
+                                    info!("Replacing {{INSTALLER}} with: {}", path);
                                     result.push_str(&path);
                                 }
                                 _ => {
@@ -189,12 +182,13 @@ impl NeoForgePatcher {
         let mut parsed_args = Vec::new();
 
         if let Some(args) = &processor.args {
-            info!("\nProcessing arguments for processor:");
+            info!("Processing arguments for processor:");
             for arg in args {
-                info!("\nProcessing argument: {}", arg);
+                info!("Processing argument: {}", arg);
 
                 // First handle token replacement
-                let processed = self.replace_tokens(arg, install_profile, is_client)?;
+                let processed =
+                    self.replace_tokens(arg, install_profile, is_client, installer_path)?;
                 info!("After token replacement: {}", processed);
 
                 // Then check if the result is an artifact or data path
@@ -230,12 +224,12 @@ impl NeoForgePatcher {
             }
         }
 
-        info!("\nFinal parsed arguments: {:?}", parsed_args);
+        info!("Final parsed arguments: {:?}", parsed_args);
         Ok(parsed_args)
     }
 
     fn get_library_path(&self, library: &str) -> Result<PathBuf> {
-        info!("\n=== get_library_path Debug ===");
+        info!("=== get_library_path Debug ===");
         info!("Input library string: {}", library);
 
         // Remove square brackets if present
@@ -302,7 +296,7 @@ impl NeoForgePatcher {
 
         info!("Final path: {}", path.display());
         info!("Path exists: {}", path.exists());
-        info!("=== End Debug ===\n");
+        info!("=== End Debug ===");
 
         Ok(path)
     }
@@ -386,12 +380,12 @@ impl NeoForgePatcher {
     pub async fn apply_processors(
         &self,
         install_profile: &NeoForgeInstallProfile,
-        minecraft_version: &str,
+        _minecraft_version: &str,
         is_client: bool,
         installer_path: &PathBuf,
     ) -> Result<()> {
         info!(
-            "\nApplying NeoForge processors for {}...",
+            "Applying NeoForge processors for {}...",
             if is_client { "client" } else { "server" }
         );
 
@@ -433,7 +427,7 @@ impl NeoForgePatcher {
                 }
             }
 
-            info!("\nProcessor: {:?}", processor);
+            info!("Processor: {:?}", processor);
 
             // Print Sides
             if let Some(sides) = &processor.sides {
@@ -441,7 +435,7 @@ impl NeoForgePatcher {
             }
 
             // Print JAR
-            info!("\nJAR: {}", processor.jar);
+            info!("JAR: {}", processor.jar);
 
             // Print Classpath
             if let Some(classpath) = &processor.classpath {
@@ -453,19 +447,19 @@ impl NeoForgePatcher {
 
             // Get the JAR path from libraries
             let jar_path = self.get_library_path(&processor.jar)?;
-            info!("\nJAR Path: {}", jar_path.display());
+            info!("JAR Path: {}", jar_path.display());
             let main_class = self.get_main_class_from_jar(&jar_path).await?;
-            info!("\nMain Class: {}", main_class);
+            info!("Main Class: {}", main_class);
 
             // Build classpath including the processor JAR
             let mut classpath = self.build_classpath(processor)?;
             let separator = if cfg!(windows) { ";" } else { ":" };
             classpath = format!("{}{}{}", classpath, separator, jar_path.display());
-            info!("\nFull Classpath: {}", classpath);
+            info!("Full Classpath: {}", classpath);
 
             let jvm_arguments =
                 self.parse_arguments(install_profile, processor, is_client, installer_path)?;
-            info!("\nJVM Arguments: {:?}", jvm_arguments);
+            info!("JVM Arguments: {:?}", jvm_arguments);
 
             // Execute the processor
             let mut command = std::process::Command::new(&self.java_path);
@@ -481,7 +475,7 @@ impl NeoForgePatcher {
                 command.arg(arg);
             }
 
-            info!("\nExecuting command: {:?}", command);
+            info!("Executing command: {:?}", command);
 
             let output = command.output()?;
             if !output.status.success() {

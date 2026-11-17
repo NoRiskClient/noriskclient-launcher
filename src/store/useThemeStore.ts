@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setProfileGroupingPreference } from "../services/launcher-config-service";
 import { ModPlatform } from "../types/unified";
 import type { SupportedLanguage } from "../i18n";
 
@@ -213,33 +212,27 @@ interface ThemeState {
   applyAccentColorToDOM: () => void;
   customColorHistory: string[];
   addToCustomColorHistory: (hexColor: string) => void;
-  clearCustomColorHistory: () => void;
   isBackgroundAnimationEnabled: boolean;
-  isDetailViewSidebarOnLeft: boolean;
-  toggleDetailViewSidebarPosition: () => void;
-  profileGroupingCriterion: string;
-  setProfileGroupingCriterion: (criterion: string) => Promise<void>;
+  showNavLabels: boolean;
+  toggleNavLabels: () => void;
   staticBackground: boolean;
   toggleStaticBackground: () => void;
   toggleBackgroundAnimation: () => void;
   hasAcceptedTermsOfService: boolean;
-  acceptTermsOfService: () => void;
   hasAcceptedCapeGuidelines: boolean;
   acceptCapeGuidelines: () => void;
   borderRadius: number;
   setBorderRadius: (radius: number) => void;
   applyBorderRadiusToDOM: () => void;
-  collapsedProfileGroups: string[];
-  setCollapsedProfileGroups: (groups: string[]) => void;
-  toggleCollapsedProfileGroup: (groupKey: string) => void;
   // ProfilesTabV2 persistent filters
   profilesTabActiveGroup: string;
   profilesTabSortBy: string;
-  profilesTabVersionFilter: string;
+  profilesTabVersionFilters: string[];
   profilesTabLayoutMode: "list" | "grid" | "compact";
   setProfilesTabActiveGroup: (group: string) => void;
   setProfilesTabSortBy: (sortBy: string) => void;
-  setProfilesTabVersionFilter: (filter: string) => void;
+  setProfilesTabVersionFilters: (filters: string[]) => void;
+  toggleProfilesTabVersionFilter: (version: string) => void;
   setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => void;
   // Global context menu management
   openContextMenuId: string | null;
@@ -250,7 +243,7 @@ interface ThemeState {
   // News section width
   newsSectionWidth: number;
   setNewsSectionWidth: (width: number) => void;
-  // Featured profile mode
+  // Featured HugoSMP card on Play tab
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
   // Language
@@ -275,18 +268,16 @@ export const useThemeStore = create<ThemeState>()(
     (set, get) => ({
       accentColor: ACCENT_COLORS.blue,
       isBackgroundAnimationEnabled: false,
-      isDetailViewSidebarOnLeft: true,
-      profileGroupingCriterion: "group",
+      showNavLabels: true,
       staticBackground: true,
       hasAcceptedTermsOfService: false,
       hasAcceptedCapeGuidelines: false,
       customColorHistory: [],
       borderRadius: DEFAULT_BORDER_RADIUS,
-      collapsedProfileGroups: [],
       // ProfilesTabV2 persistent filters - defaults
       profilesTabActiveGroup: "all",
       profilesTabSortBy: "last_played",
-      profilesTabVersionFilter: "all",
+      profilesTabVersionFilters: [],
       profilesTabLayoutMode: "list",
       // Global context menu management - defaults
       openContextMenuId: null,
@@ -294,7 +285,7 @@ export const useThemeStore = create<ThemeState>()(
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
       newsSectionWidth: 375,
-      // Featured profile mode - defaults
+      // Featured HugoSMP card - defaults
       featureMode: false,
       // Language - defaults
       language: "en" as SupportedLanguage,
@@ -364,37 +355,18 @@ export const useThemeStore = create<ThemeState>()(
         });
       },
 
-      clearCustomColorHistory: () => {
-        set({ customColorHistory: [] });
-      },
-
       toggleBackgroundAnimation: () => {
         set((state) => ({
           isBackgroundAnimationEnabled: !state.isBackgroundAnimationEnabled,
         }));
       },
 
-      toggleDetailViewSidebarPosition: () => {
-        set((state) => ({
-          isDetailViewSidebarOnLeft: !state.isDetailViewSidebarOnLeft,
-        }));
-      },
-
-      setProfileGroupingCriterion: async (criterion: string) => {
-        try {
-          await setProfileGroupingPreference(criterion);
-          set({ profileGroupingCriterion: criterion });
-        } catch (error) {
-          console.error("Failed to save grouping preference:", error);
-          set({ profileGroupingCriterion: criterion });
-          throw error;
-        }
+      toggleNavLabels: () => {
+        set((state) => ({ showNavLabels: !state.showNavLabels }));
       },
 
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
-      },      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });
       },
       acceptCapeGuidelines: () => {
         set({ hasAcceptedCapeGuidelines: true });
@@ -446,20 +418,6 @@ export const useThemeStore = create<ThemeState>()(
         }
       },
 
-      setCollapsedProfileGroups: (groups: string[]) => {
-        set({ collapsedProfileGroups: [...groups] });
-      },
-
-      toggleCollapsedProfileGroup: (groupKey: string) => {
-        set((state) => {
-          const isCollapsed = state.collapsedProfileGroups.includes(groupKey);
-          const next = isCollapsed
-            ? state.collapsedProfileGroups.filter((g) => g !== groupKey)
-            : [...state.collapsedProfileGroups, groupKey];
-          return { collapsedProfileGroups: next };
-        });
-      },
-
       // ProfilesTabV2 persistent filters setters
       setProfilesTabActiveGroup: (group: string) => {
         set({ profilesTabActiveGroup: group });
@@ -469,8 +427,20 @@ export const useThemeStore = create<ThemeState>()(
         set({ profilesTabSortBy: sortBy });
       },
 
-      setProfilesTabVersionFilter: (filter: string) => {
-        set({ profilesTabVersionFilter: filter });
+      setProfilesTabVersionFilters: (filters: string[]) => {
+        set({ profilesTabVersionFilters: filters });
+      },
+
+      toggleProfilesTabVersionFilter: (version: string) => {
+        set((state) => {
+          const current = Array.isArray(state.profilesTabVersionFilters)
+            ? state.profilesTabVersionFilters
+            : [];
+          const next = current.includes(version)
+            ? current.filter((v) => v !== version)
+            : [...current, version];
+          return { profilesTabVersionFilters: next };
+        });
       },
 
       setProfilesTabLayoutMode: (mode: "list" | "grid" | "compact") => {
@@ -492,7 +462,7 @@ export const useThemeStore = create<ThemeState>()(
         set({ newsSectionWidth: width });
       },
 
-      // Featured profile mode
+      // Featured HugoSMP card
       setFeatureMode: (enabled: boolean) => {
         set({ featureMode: enabled });
       },
@@ -540,21 +510,25 @@ export const useThemeStore = create<ThemeState>()(
       name: "norisk-theme-storage",
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Migration: Replace old "none" grouping criterion with "group"
-          if (state.profileGroupingCriterion === "none") {
-            state.profileGroupingCriterion = "group";
-          }
-          
           state.applyAccentColorToDOM();
           state.applyBorderRadiusToDOM();
           // Apply language on rehydrate
           if (state.language) {
             import("../i18n/i18n").then((mod) => mod.default.changeLanguage(state.language));
           }
-          // Ensure collapsedProfileGroups exists after rehydrate
-          if (!Array.isArray(state.collapsedProfileGroups)) {
-            state.collapsedProfileGroups = [];
+
+          // Migration: version filter went from single string to multi-select array
+          if (!Array.isArray(state.profilesTabVersionFilters)) {
+            state.profilesTabVersionFilters = [];
           }
+
+          const legacyFeaturedLaunchMode = (state as { featuredLaunchMode?: string }).featuredLaunchMode;
+          if (legacyFeaturedLaunchMode === "hugo") {
+            state.featureMode = true;
+          } else if (legacyFeaturedLaunchMode) {
+            state.featureMode = false;
+          }
+          delete (state as { featuredLaunchMode?: string }).featuredLaunchMode;
 
           // Ensure analytics consent state exists for existing users
           if (!state.analyticsConsent) {

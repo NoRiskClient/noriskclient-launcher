@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { FriendRequestWithUsers, useFriendsStore } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
 import { cn } from "../../lib/utils";
 
 interface FriendRequestItemProps {
@@ -19,7 +19,7 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
   const [isHovered, setIsHovered] = useState(false);
 
   const otherUser = request.users.find((u) => u.uuid !== currentUser?.uuid);
-  const avatarUrl = useCrafatarAvatar({ uuid: otherUser?.uuid, size: 48 });
+  const avatarUrl = usePlayerAvatar({ uuid: otherUser?.uuid, size: 48 });
 
   if (!otherUser) return null;
 
@@ -78,11 +78,11 @@ export const FriendRequestItem = memo(function FriendRequestItem({ request, type
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-base font-medium text-white truncate font-minecraft-ten">
+          <span className="text-base font-medium text-white truncate font-minecraft">
             {otherUser.username}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-base text-white/50 font-minecraft">
+        <div className="flex items-center gap-1.5 text-xs text-white/50 font-smallcaps">
           <Icon
             icon={type === "incoming" ? "solar:inbox-in-bold" : "solar:inbox-out-bold"}
             className="w-4 h-4"

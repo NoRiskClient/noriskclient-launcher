@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { type Event as TauriEvent, listen } from "@tauri-apps/api/event";
@@ -42,13 +40,13 @@ export default function ChildProtectionModal() {
                     variant="flat"
                   >
                     <div className="p-4">
-                      <p className="text-white/90 mb-6 text-center font-minecraft-ten">
+                      <p className="text-white/90 mb-6 text-center font-minecraft">
                         {t('child_protection.description')}
                       </p>
-                      <p className="text-white/90 mb-6 text-center font-minecraft-ten">
+                      <p className="text-white/90 mb-6 text-center font-minecraft">
                         {t('child_protection.review_settings')}
                       </p>
-                      <p className="text-white/90 mb-6 text-center font-minecraft-ten">
+                      <p className="text-white/90 mb-6 text-center font-minecraft">
                         {t('child_protection.setting_location')}
                       </p>
                       <div className="flex justify-center gap-4">

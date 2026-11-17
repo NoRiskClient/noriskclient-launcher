@@ -74,6 +74,8 @@ export interface ShopGiftReceivedNotification extends NotificationBase {
   shopItem: NotificationShopItem;
   grantor: NotificationUser;
   expirationDate: string | null;
+  anonymous?: boolean;
+  message?: string | null;
 }
 
 /**
@@ -262,7 +264,8 @@ export function getNotificationMessage(notification: NotificationContent): strin
     // Shop notifications
     case TYPES.SHOP_GIFT_RECEIVED: {
       const n = notification as ShopGiftReceivedNotification;
-      return `${n.grantor.name} gifted you "${n.shopItem.name}"!`;
+      const sender = n.anonymous ? "Someone" : n.grantor.name;
+      return `${sender} gifted you "${n.shopItem.name}"!`;
     }
     case TYPES.SHOP_ITEM_BOUGHT:
       return `You purchased "${(notification as ShopItemBoughtNotification).shopItem.name}"!`;
@@ -309,4 +312,14 @@ export function getNotificationMessage(notification: NotificationContent): strin
     default:
       return "New notification";
   }
+}
+
+/**
+ * The personal note a notification carries, e.g. the message attached to a gift.
+ */
+export function getNotificationNote(notification: NotificationContent): string | null {
+  if (notification.type === TYPES.SHOP_GIFT_RECEIVED) {
+    return (notification as ShopGiftReceivedNotification).message ?? null;
+  }
+  return null;
 }

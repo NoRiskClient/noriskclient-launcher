@@ -4,6 +4,7 @@ use fastnbt::{from_bytes, to_bytes, Value};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+#[cfg(not(unix))]
 use fs4::tokio::AsyncFileExt;
 use fs_extra::dir::{copy as copy_dir, CopyOptions};
 use log::{error, info, warn};
@@ -603,93 +604,60 @@ async fn modify_level_dat_name(level_dat_path: &Path, new_level_name: &str) -> R
     Ok(())
 }
 
-/// Checks if the world directory's session.lock file can be exclusively locked.
-/// This indicates whether the world is likely currently in use by Minecraft.
-///
-/// # Arguments
-/// * `world_path` - Path to the specific world directory (e.g., .../saves/MyWorld).
-///
-/// # Returns
-/// * `Ok(())` if the lock can be acquired (world likely not in use).
-/// * `Err(AppError::WorldLocked)` if the lock cannot be acquired immediately.
-/// * `Err(AppError::Io)` for other file system errors.
-pub async fn check_world_session_lock(world_path: &Path) -> Result<()> {
-    let lock_file_path = world_path.join("session.lock");
-    info!(
-        "Checking session lock for world at: {}",
-        lock_file_path.display()
-    );
-
-    // Try to open or create the lock file for writing
-    // Use tokio::fs::OpenOptions for async operation
-    let file = match fs::OpenOptions::new()
-        .write(true)
-        .create(true) // Create if it doesn't exist
-        .open(&lock_file_path)
-        .await
-    {
-        Ok(f) => f,
-        Err(e) => {
-            error!(
-                "Failed to open session.lock file at '{}': {}",
-                lock_file_path.display(),
-                e
-            );
-            // Don't necessarily error out if we can't OPEN it,
-            // maybe Minecraft hasn't created it yet, but the folder exists.
-            // However, if we can't lock it later, that's the real issue.
-            // Let's try to proceed, try_lock_exclusive handles non-existence implicitly I think?
-            // Re-evaluate: Opening it is necessary for fs4::try_lock_exclusive
-            return Err(AppError::Io(e));
-        }
-    };
-
-    // Try to acquire an exclusive, non-blocking lock
-    match file.try_lock_exclusive() {
-        Ok(_) => {
-            // Lock acquired successfully! This means the file was not locked by another process.
-            info!(
-                "Session lock acquired for '{}'. World is likely not in use.",
-                lock_file_path.display()
-            );
-            // The lock is automatically released when `file` goes out of scope here.
-            Ok(())
-        }
-        Err(e) => {
-            // Check if the error is specifically because it's already locked
-            if e.kind() == std::io::ErrorKind::WouldBlock
-                || e.kind() == std::io::ErrorKind::TimedOut
-                || e.kind() == std::io::ErrorKind::PermissionDenied
-                || e.kind() == std::io::ErrorKind::ResourceBusy
-            {
-                error!(
-                    "Failed to acquire session lock for '{}' (likely in use): {}",
-                    lock_file_path.display(),
-                    e
-                );
-                // Cannot acquire lock, world is likely in use
-                Err(AppError::WorldLocked {
-                    // We don't have profile_id/world_folder here easily, adjust error or pass them in?
-                    // For now, use path, but ideally the caller (copy_world_directory) constructs the specific error.
-                    // Let's change the return type to signal locked state.
-                    // Returning Ok(false) might be cleaner than a specific error here.
-                    // Let's stick with the specific error for now.
-                    profile_id: Uuid::nil(), // Placeholder - To be filled by caller
-                    world_folder: world_path
-                        .file_name()
-                        .map_or_else(|| "?".to_string(), |n| n.to_string_lossy().to_string()), // Get folder name from path
-                })
-            } else {
-                error!(
-                    "Unexpected error trying to lock session.lock file '{}': {}",
-                    lock_file_path.display(),
-                    e
-                );
-                // Another I/O error occurred
-                Err(AppError::Io(e))
-            }
-        }
+pub async fn session_lock_is_held(world_path: &Path) -> std::io::Result<bool> {
+    match query_session_lock(&world_path.join("session.lock")).await {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        result => result,
     }
+}
+
+#[cfg(unix)]
+async fn query_session_lock(lock_path: &Path) -> std::io::Result<bool> {
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let lock_path = lock_path.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(&lock_path)?;
+
+        let mut lock: libc::flock = unsafe { std::mem::zeroed() };
+        lock.l_type = libc::F_WRLCK as _;
+        lock.l_whence = libc::SEEK_SET as _;
+
+        if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETLK, &mut lock) } == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(lock.l_type != libc::F_UNLCK as libc::c_short)
+    })
+    .await
+    .map_err(std::io::Error::other)?
+}
+
+#[cfg(not(unix))]
+async fn query_session_lock(lock_path: &Path) -> std::io::Result<bool> {
+    let file = fs::OpenOptions::new().write(true).open(lock_path).await?;
+
+    match file.try_lock_exclusive() {
+        Ok(()) => Ok(false),
+        Err(e) if e.raw_os_error() == fs4::lock_contended_error().raw_os_error() => Ok(true),
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn check_world_session_lock(world_path: &Path) -> Result<()> {
+    if !session_lock_is_held(world_path).await? {
+        return Ok(());
+    }
+
+    Err(AppError::WorldLocked {
+        profile_id: Uuid::nil(),
+        world_folder: world_path
+            .file_name()
+            .map_or_else(|| "?".to_string(), |n| n.to_string_lossy().to_string()),
+    })
 }
 
 /// Deletes a singleplayer world directory from a profile's saves folder.

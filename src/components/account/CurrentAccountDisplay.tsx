@@ -1,13 +1,11 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { gsap } from "gsap";
-import { useCrafatarAvatar } from "../../hooks/useCrafatarAvatar";
+import { PlayerHead } from "../common/PlayerHead";
+import { useEntranceAnimation } from "../../hooks/useEntranceAnimation";
 
 interface CurrentAccountDisplayProps {
   onClick?: () => void;
@@ -27,26 +25,11 @@ export function CurrentAccountDisplay({
   const accentColor = useThemeStore((state) => state.accentColor);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const avatarUrl = useCrafatarAvatar({
-    uuid: activeAccount?.id,
-    size: 28,
-    overlay: true,
-  });
-
-  useEffect(() => {
-    if (buttonRef.current) {
-      gsap.fromTo(
-        buttonRef.current,
-        { scale: 0.95, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-      );
-    }
-  }, []);
+  useEntranceAnimation(
+    buttonRef,
+    { scale: 0.95, opacity: 0 },
+    { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" },
+  );
 
   // Get border classes based on variant
   const getBorderClasses = () => {
@@ -62,22 +45,6 @@ export function CurrentAccountDisplay({
       return "none";
     }
     return `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}40, inset 0 0 0 1px ${accentColor.value}20`;
-  };
-
-  // Get hover box shadow based on variant
-  const getHoverBoxShadow = () => {
-    if (variant === "flat") {
-      return "none";
-    }
-    return "0 10px 0 rgba(0,0,0,0.25), 0 12px 20px rgba(0,0,0,0.4)";
-  };
-
-  // Get active box shadow based on variant
-  const getActiveBoxShadow = () => {
-    if (variant === "flat") {
-      return "none";
-    }
-    return "0 2px 0 rgba(0,0,0,0.2), 0 3px 5px rgba(0,0,0,0.3)";
   };
 
   // Get hover transform based on variant
@@ -109,7 +76,7 @@ export function CurrentAccountDisplay({
       <div
         ref={buttonRef}
         className={cn(
-          "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+          "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
           "rounded-md text-white tracking-wider",
           "flex items-center gap-3 px-4 py-1",
           "text-shadow-sm",
@@ -118,10 +85,8 @@ export function CurrentAccountDisplay({
             "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
           "cursor-pointer",
           getHoverTransform(),
-          variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
           "hover:brightness-110",
           getActiveTransform(),
-          variant !== "flat" && `active:shadow-[${getActiveBoxShadow()}]`,
           "active:brightness-90",
           className,
         )}
@@ -156,11 +121,11 @@ export function CurrentAccountDisplay({
             backgroundColor: `${accentColor.value}20`,
           }}
         >
-          <span className="text-white font-minecraft text-xs">+</span>
+          <span className="text-white font-smallcaps text-xs">+</span>
         </div>
 
         <div className="flex items-center gap-1 min-w-0">
-          <span className="text-xl text-white font-minecraft lowercase">
+          <span className="text-sm text-white font-smallcaps">
             {t('auth.addAccount')}
           </span>
         </div>
@@ -180,7 +145,7 @@ export function CurrentAccountDisplay({
     <div
       ref={buttonRef}
       className={cn(
-        "font-minecraft relative overflow-hidden backdrop-blur-md transition-all duration-200",
+        "font-smallcaps relative overflow-hidden backdrop-blur-md transition-all duration-200",
         "rounded-md text-white tracking-wider",
         "flex items-center gap-3 px-4 py-1",
         "text-shadow-sm",
@@ -189,10 +154,8 @@ export function CurrentAccountDisplay({
           "shadow-[0_8px_0_rgba(0,0,0,0.3),0_10px_15px_rgba(0,0,0,0.35)]",
         "cursor-pointer",
         getHoverTransform(),
-        variant !== "flat" && `hover:shadow-[${getHoverBoxShadow()}]`,
         "hover:brightness-110",
         getActiveTransform(),
-        variant !== "flat" && `active:shadow-[${getActiveBoxShadow()}]`,
         "active:brightness-90",
         className,
       )}
@@ -227,33 +190,19 @@ export function CurrentAccountDisplay({
           backgroundColor: `${accentColor.value}20`,
         }}
       >
-        {avatarUrl ? (
-          <img
-            src={avatarUrl || "/placeholder.svg"}
-            alt={`${username}'s avatar`}
-            className="w-full h-full object-cover pixelated"
-            style={{ imageRendering: 'pixelated' }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-              const fallback = target.nextElementSibling as HTMLElement;
-              if (fallback) fallback.style.display = "flex";
-            }}
-          />
-        ) : null}
-        <span
-          className={`absolute inset-0 flex items-center justify-center text-white font-minecraft text-xs ${
-            avatarUrl ? "hidden" : ""
-          }`}
-        >
-          {username.charAt(0).toUpperCase()}
-        </span>
+        <PlayerHead
+          uuid={activeAccount.id}
+          username={username}
+          size={64}
+          fill
+          className="text-xs"
+        />
       </div>
 
       {!compact && (
         <div className="flex flex-col min-w-0">
           <span
-            className="text-2xl text-white font-minecraft uppercase truncate"
+            className="text-base text-white font-smallcaps truncate"
             title={username}
           >
             {username}

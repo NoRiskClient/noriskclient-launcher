@@ -8,8 +8,11 @@ use base64::Engine;
 
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use log::debug;
 use log::error;
 use log::info;
+use log::trace;
+use log::warn;
 use machineid_rs::{Encryption, HWIDComponent, IdBuilder};
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
@@ -24,7 +27,7 @@ use serde_json::json;
 use sha2::Digest;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 use axum::{
     extract::Query,
@@ -36,6 +39,10 @@ use tokio::net::TcpListener;
 
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::minecraft::api::NoRiskApi;
+use crate::minecraft::auth::twitch_auth::{self, RefreshOutcome, TwitchToken};
+use crate::state::event_state::{EventPayload, EventType};
+use crate::state::state_manager::State;
+use crate::utils::file_utils::write_atomic;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NoRiskTokenClaims {
@@ -68,6 +75,12 @@ pub struct Credentials {
     /// The authentication flow used to create this account (optional for backwards compatibility)
     #[serde(default)]
     pub auth_flow: Option<AuthFlow>,
+    /// Absolute expiry of the *Minecraft* access_token (distinct from `expires`, the Microsoft OAuth
+    /// token). `None` for accounts from older launcher versions → treated as stale to refresh once.
+    #[serde(default)]
+    pub mc_access_token_expires: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub twitch_token: Option<TwitchToken>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -83,14 +96,6 @@ pub struct NoRiskToken {
 }
 
 impl NoRiskCredentials {
-    pub async fn get_token(&self) -> Result<String> {
-        Ok(self
-            .production
-            .as_ref()
-            .ok_or(AppError::NoCredentialsError)?
-            .value
-            .clone())
-    }
 
     /// Gets the appropriate NoRisk token based on the experimental mode setting.
     ///
@@ -206,10 +211,20 @@ pub struct DirectOAuthFlow {
     pub authorize_url: String,
 }
 
+fn publish_log_redactions(accounts: &[Credentials]) {
+    let pairs: Vec<(String, String)> = accounts
+        .iter()
+        .map(|account| (account.username.clone(), account.id.to_string()))
+        .collect();
+    crate::utils::security_utils::set_known_accounts(&pairs);
+}
+
+#[derive(Clone)]
 pub struct MinecraftAuthStore {
     accounts: Arc<RwLock<Vec<Credentials>>>,
     store_path: PathBuf,
     token: Arc<RwLock<Option<SaveDeviceToken>>>,
+    save_lock: Arc<Mutex<()>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -231,6 +246,7 @@ impl MinecraftAuthStore {
             accounts: Arc::new(RwLock::new(Vec::new())),
             store_path: store_path,
             token: Arc::new(RwLock::new(None)),
+            save_lock: Arc::new(Mutex::new(())),
         };
 
         manager.load().await?;
@@ -238,26 +254,21 @@ impl MinecraftAuthStore {
     }
 
     pub async fn load(&self) -> Result<()> {
-        info!("[Storage] Starting load operation");
+        trace!("[Storage] Starting load operation");
 
         if self.store_path.try_exists()? {
-            info!(
+            trace!(
                 "[Storage] Account file exists at: {}",
                 self.store_path.display()
             );
-            info!("[Storage] Reading account data");
             let data = fs::read_to_string(&self.store_path).await?;
-            info!(
+            trace!(
                 "[Storage] Successfully read data, length: {} bytes",
                 data.len()
             );
 
-            info!("[Storage] Deserializing account data");
             let store: AccountStore = match serde_json::from_str(&data) {
-                Ok(store) => {
-                    info!("[Storage] Successfully deserialized data");
-                    store
-                }
+                Ok(store) => store,
                 Err(e) => {
                     error!(
                         "[Storage] Failed to deserialize account data: {}. The accounts.json file appears to be corrupted. Resetting to empty state.",
@@ -265,7 +276,6 @@ impl MinecraftAuthStore {
                     );
 
                     // Create new empty store - no backup needed as corrupted data is useless
-                    info!("[Storage] Creating new empty account store");
                     AccountStore {
                         accounts: Vec::new(),
                         token: None,
@@ -273,63 +283,53 @@ impl MinecraftAuthStore {
                 }
             };
 
-            info!("[Storage] Acquiring write lock to update accounts");
+            let account_count = store.accounts.len();
+            let has_device_token = store.token.is_some();
             let mut accounts = self.accounts.write().await;
-            info!("[Storage] Successfully acquired write lock");
-
-            info!(
-                "[Storage] Loading {} accounts into memory",
-                store.accounts.len()
-            );
             *accounts = store.accounts;
-            info!("[Storage] Successfully loaded accounts");
+            publish_log_redactions(&accounts);
 
             // Also restore saved device token
-            info!("[Storage] Restoring saved device token (if any)");
             {
                 let mut token_guard = self.token.write().await;
                 *token_guard = store.token;
             }
-            info!("[Storage] Device token restored");
+            info!(
+                "[Storage] Loaded {} accounts (device token: {})",
+                account_count,
+                if has_device_token { "yes" } else { "no" }
+            );
         } else {
             info!("[Storage] No account file found, starting with empty accounts");
         }
 
-        info!("[Storage] Load operation completed successfully");
         Ok(())
     }
 
     async fn save(&self) -> Result<()> {
-        info!("[Storage] Starting save operation");
-        info!("[Storage] Acquiring read locks for accounts and device token");
+        // Serialize saves so concurrent callers can't interleave writes to accounts.json
+        let _save_guard = self.save_lock.lock().await;
+        debug!("[Storage] Starting save operation");
 
-        let accounts = self.accounts.read().await;
-        info!("[Storage] Successfully acquired accounts read lock");
-
-        let device_token = self.token.read().await;
-        info!("[Storage] Successfully acquired device token read lock");
-
-        info!(
-            "[Storage] Creating AccountStore with {} accounts",
-            accounts.len()
-        );
-        let store = AccountStore {
-            accounts: accounts.clone(),
-            token: device_token.clone(),
+        let store = {
+            let accounts = self.accounts.read().await;
+            let device_token = self.token.read().await;
+            AccountStore {
+                accounts: accounts.clone(),
+                token: device_token.clone(),
+            }
         };
-
-        info!("[Storage] Serializing data to JSON");
-        let data = serde_json::to_string_pretty(&store)?;
-        info!("[Storage] Successfully serialized data");
-
-        info!(
-            "[Storage] Writing data to file: {}",
+        publish_log_redactions(&store.accounts);
+        debug!(
+            "[Storage] Saving AccountStore with {} accounts to: {}",
+            store.accounts.len(),
             self.store_path.display()
         );
-        fs::write(&self.store_path, data).await?;
-        info!("[Storage] Successfully wrote data to file");
 
-        info!("[Storage] Save operation completed successfully");
+        let data = serde_json::to_string_pretty(&store)?;
+        write_atomic(&self.store_path, data).await?;
+
+        debug!("[Storage] Save operation completed successfully");
         Ok(())
     }
 
@@ -464,7 +464,10 @@ impl MinecraftAuthStore {
         match sisu_authenticate(&token.token, &challenge, &key, current_date, redirect_uri).await {
             Ok((session_id, redirect_uri)) => {
                 info!("[Auth Flow] SISU authentication successful");
-                info!("[Auth Flow] Session ID generated: {}", session_id);
+                info!(
+                    "[Auth Flow] Session ID generated: {}",
+                    crate::utils::security_utils::mask_identifier(&session_id)
+                );
                 Ok(MinecraftLoginFlow {
                     verifier,
                     challenge,
@@ -661,6 +664,8 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: existing_account.as_ref().and_then(|a| a.twitch_token.clone()),
         };
 
         self.update_or_insert(credentials.clone()).await?;
@@ -734,6 +739,8 @@ impl MinecraftAuthStore {
             },
             ignore_child_protection_warning: existing_account.as_ref().map(|a| a.ignore_child_protection_warning).unwrap_or(false),
             auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: existing_account.as_ref().and_then(|a| a.twitch_token.clone()),
         };
 
         info!(
@@ -746,13 +753,15 @@ impl MinecraftAuthStore {
         Ok(credentials)
     }
 
+    /// Returns the (possibly refreshed) credentials plus whether they actually changed,
+    /// so callers can skip redundant persistence when nothing was updated.
     pub(crate) async fn refresh_norisk_token_if_necessary(
         &self,
         creds: &Credentials,
         force_update: bool,
         experimental_mode: bool,
-    ) -> Result<Credentials> {
-        info!(
+    ) -> Result<(Credentials, bool)> {
+        trace!(
             "[Token Refresh] Starting NoRisk token refresh check for user: {}",
             creds.username
         );
@@ -772,7 +781,7 @@ impl MinecraftAuthStore {
                 validation.insecure_disable_signature_validation();
                 match decode::<NoRiskTokenClaims>(&token.value, &key, &validation) {
                     Ok(data) => {
-                        info!(
+                        trace!(
                             "[Token Refresh] Token expiration check - Expires at: {}",
                             data.claims.exp
                         );
@@ -790,7 +799,7 @@ impl MinecraftAuthStore {
                     }
                 };
             } else {
-                info!("[Token Refresh] No token found for the selected mode");
+                debug!("[Token Refresh] No token found for the selected mode");
                 maybe_update = true;
             }
         }
@@ -860,23 +869,25 @@ impl MinecraftAuthStore {
                     self.update_or_insert(copied_credentials.clone()).await?;
 
                     info!("[Token Refresh] Token refresh completed successfully");
-                    Ok(copied_credentials)
+                    Ok((copied_credentials, true))
                 }
                 Err(e) => {
                     info!("[NoRisk Token] Token refresh failed: {:?}", e);
                     info!("[NoRisk Token] Falling back to original credentials");
                     // Return the original credentials if token refresh fails
                     let creds_mut =  &mut creds.clone();
+                    let mut changed = false;
                     if e.to_string().contains("InsufficientPrivilegesException") && e.to_string().contains("/session/minecraft/join") {
                         info!("[NoRisk Token] Detected child protection restriction, setting ignore_child_protection_warning to true");
+                        changed = !creds_mut.ignore_child_protection_warning;
                         creds_mut.ignore_child_protection_warning = true;
                     }
-                    Ok(creds_mut.clone())
+                    Ok((creds_mut.clone(), changed))
                 }
             }
         } else {
-            info!("[Token Refresh] Token is still valid, no refresh needed");
-            Ok(creds.clone())
+            debug!("[Token Refresh] Token is still valid, no refresh needed");
+            Ok((creds.clone(), false))
         }
     }
 
@@ -905,6 +916,10 @@ impl MinecraftAuthStore {
                 match self.refresh_token_sisu(creds, cred_id, profile_name.clone()).await {
                     Ok(result) => Ok(result),
                     Err(sisu_err) => {
+                        if let Some(reason) = keep_cached_credentials_reason(&sisu_err) {
+                            info!("[Token Refresh] SISU flow failed ({}); skipping Direct fallback", reason);
+                            return Err(sisu_err);
+                        }
                         info!("[Token Refresh] SISU flow failed: {:?}, trying Direct...", sisu_err);
                         self.refresh_token_direct(creds, cred_id, profile_name).await
                     }
@@ -938,6 +953,8 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Direct),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: creds.twitch_token.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -990,6 +1007,8 @@ impl MinecraftAuthStore {
             active: creds.active,
             ignore_child_protection_warning: creds.ignore_child_protection_warning,
             auth_flow: Some(AuthFlow::Sisu),
+            mc_access_token_expires: Some(mc_token_expiry(minecraft_token.expires_in)),
+            twitch_token: creds.twitch_token.clone(),
         };
 
         info!("[Token Refresh] Updating account in storage");
@@ -1044,11 +1063,11 @@ impl MinecraftAuthStore {
             if let Some(updated) = updated_account {
                 // Update account in storage after refresh
                 {
-                    info!("[Account Manager] Acquiring write lock to update account");
+                    debug!("[Account Manager] Acquiring write lock to update account");
                     let mut accounts = self.accounts.write().await;
-                    info!("[Account Manager] Successfully acquired write lock");
+                    debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
-                        info!("[Account Manager] Updating account in list");
+                        debug!("[Account Manager] Updating account in list");
                         // Preserve ignore flag from in-memory existing account to avoid
                         // overwriting a recent user 'ignore' action performed concurrently.
                         let existing_flag = existing.ignore_child_protection_warning;
@@ -1056,16 +1075,16 @@ impl MinecraftAuthStore {
                         merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
                         *existing = merged;
                     }
-                    info!("[Account Manager] Releasing write lock");
+                    debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
-                info!("[Account Manager] Saving updated account");
+                debug!("[Account Manager] Saving updated account");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved account");
+                debug!("[Account Manager] Successfully saved account");
 
                 Ok(Some(updated))
             } else {
-                info!("[Account Manager] Token refresh returned None, using original credentials");
+                debug!("[Account Manager] Token refresh returned None, using original credentials");
                 Ok(Some(creds))
             }
         } else {
@@ -1075,16 +1094,16 @@ impl MinecraftAuthStore {
     }
 
     pub async fn update_or_insert(&self, credentials: Credentials) -> Result<()> {
-        info!("[Account Manager] Starting account update/insert operation");
-        info!("[Account Manager] Account ID: {}", credentials.id);
-        info!("[Account Manager] Username: {}", credentials.username);
+        debug!("[Account Manager] Starting account update/insert operation");
+        debug!("[Account Manager] Account ID: {}", credentials.id);
+        debug!("[Account Manager] Username: {}", credentials.username);
 
         {
             let mut accounts = self.accounts.write().await;
 
             // If new credentials are active, deactivate all other accounts first
             if credentials.active {
-                info!("[Account Manager] New account is active, deactivating all other accounts");
+                debug!("[Account Manager] New account is active, deactivating all other accounts");
                 for account in accounts.iter_mut() {
                     account.active = false;
                 }
@@ -1092,7 +1111,7 @@ impl MinecraftAuthStore {
 
             // Wenn der Account existiert, aktualisiere ihn
             if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == credentials.id) {
-                info!("[Account Manager] Found existing account, updating credentials");
+                debug!("[Account Manager] Found existing account, updating credentials");
                 // Preserve the existing ignore_child_protection_warning flag to avoid
                 // races where another concurrent flow set the flag while this flow
                 // was constructing credentials from stale data.
@@ -1103,17 +1122,69 @@ impl MinecraftAuthStore {
                 info!("[Account Manager] Account successfully updated (merged ignore flag)");
             } else {
                 // Wenn der Account nicht existiert, füge ihn hinzu
-                info!("[Account Manager] No existing account found, creating new account");
+                debug!("[Account Manager] No existing account found, creating new account");
                 accounts.push(credentials);
                 info!("[Account Manager] New account successfully created");
             }
         } // Write-Lock wird hier automatisch freigegeben
 
-        info!("[Account Manager] Saving account changes to storage");
+        debug!("[Account Manager] Saving account changes to storage");
         self.save().await?;
-        info!("[Account Manager] Account changes successfully saved");
+        debug!("[Account Manager] Account changes successfully saved");
 
         Ok(())
+    }
+
+    pub async fn set_twitch_token(&self, id: Uuid, token: Option<TwitchToken>) -> Result<()> {
+        {
+            let mut accounts = self.accounts.write().await;
+            let account = accounts
+                .iter_mut()
+                .find(|acc| acc.id == id)
+                .ok_or_else(|| AppError::AccountError(format!("Account with ID {} not found", id)))?;
+            account.twitch_token = token;
+        }
+        self.save().await
+    }
+
+    pub async fn ensure_fresh_twitch_token(&self, id: Uuid) -> Result<()> {
+        static REFRESHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+        let _guard = REFRESHING.lock().await;
+
+        let Some(current) = self.get_account_by_id(id).await?.and_then(|a| a.twitch_token) else {
+            return Ok(());
+        };
+        if !current.needs_refresh() {
+            return Ok(());
+        }
+
+        info!("[Twitch] Stored token for account {} is stale, refreshing", id);
+        match twitch_auth::refresh_token(&current.refresh_token).await {
+            RefreshOutcome::Refreshed(refreshed) => self.set_twitch_token(id, Some(*refreshed)).await,
+            RefreshOutcome::Rejected(reason) => {
+                error!("[Twitch] Refresh token for account {} is no longer valid ({}). Clearing link.", id, reason);
+                self.set_twitch_token(id, None).await
+            }
+            RefreshOutcome::Transient(reason) => {
+                warn!("[Twitch] Could not refresh account {} ({}), keeping the link for the next attempt", id, reason);
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn adopt_rotated_twitch_token(&self, id: Uuid, token: TwitchToken) -> Result<bool> {
+        {
+            let mut accounts = self.accounts.write().await;
+            let Some(account) = accounts.iter_mut().find(|acc| acc.id == id) else {
+                return Ok(false);
+            };
+            match &account.twitch_token {
+                Some(current) if token.expires > current.expires => account.twitch_token = Some(token),
+                _ => return Ok(false),
+            }
+        }
+        self.save().await?;
+        Ok(true)
     }
 
     pub async fn update_norisk_and_microsoft_token(
@@ -1121,17 +1192,29 @@ impl MinecraftAuthStore {
         creds: &Credentials,
         experimental_mode: bool,
     ) -> Result<Option<Credentials>> {
-        info!(
+        trace!(
             "[Token Check] Starting token validation check for user: {}",
             creds.username
         );
-        info!(
+        trace!(
             "[Token Check] Microsoft token expires at: {}",
             creds.expires
         );
 
-        if creds.expires <= Utc::now() + Duration::minutes(5) {
-            info!("[Token Check] Microsoft token nearing expiry, initiating proactive refresh");
+        // Refresh on the Minecraft token's own expiry (12h buffer, Prism-style); None = legacy
+        // account → refresh once to populate the field.
+        if mc_token_stale(creds) {
+            let _refreshing = MC_TOKEN_REFRESH.lock().await;
+            if let Some(stored) = self.get_account_by_id(creds.id).await? {
+                if !mc_token_stale(&stored) {
+                    return Ok(Some(stored));
+                }
+            }
+            if refresh_unreachable_recently(creds.id) {
+                return Ok(None);
+            }
+
+            info!("[Token Check] Minecraft token stale or nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
             let res = self.refresh_token(&old_credentials).await;
@@ -1140,66 +1223,74 @@ impl MinecraftAuthStore {
                 Ok(val) => {
                     return if val.is_some() {
                         info!("[Token Check] Successfully refreshed Microsoft token");
-                        Ok(Some(
-                            self.refresh_norisk_token_if_necessary(
+                        // Microsoft token was refreshed, so credentials changed either way
+                        let (refreshed, _) = self
+                            .refresh_norisk_token_if_necessary(
                                 &val.unwrap().clone(),
                                 false,
                                 experimental_mode,
                             )
-                            .await?,
-                        ))
+                            .await?;
+                        Ok(Some(refreshed))
                     } else {
                         info!("[Token Check] Failed to refresh Microsoft token - No credentials found");
                         Err(AppError::NoCredentialsError)
                     };
                 }
                 Err(err) => {
-                    if let AppError::MinecraftAuthenticationError(
-                        MinecraftAuthenticationError::Request { ref source, .. },
-                    ) = err
-                    {
-                        if source.is_connect() || source.is_timeout() {
-                            info!("[Token Check] Connection error during refresh, using old credentials");
-                            return Ok(Some(old_credentials));
+                    if let Some(reason) = keep_cached_credentials_reason(&err) {
+                        info!(
+                            "[Token Check] {} during refresh, using cached credentials",
+                            reason
+                        );
+                        if is_offline_error(&err) {
+                            emit_offline_mode(&creds.username).await;
                         }
+                        remember_refresh_unreachable(creds.id);
+                        return Ok(None);
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
                     Err(err)
                 }
             }
         } else {
-            info!("[Token Check] Microsoft token is still valid");
+            debug!("[Token Check] Microsoft token valid until {}", creds.expires);
             if creds.ignore_child_protection_warning {
-                info!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
+                debug!("[Token Check] Skipping NoRisk token check due to child protection warning ignore flag");
                 Ok(None)
             } else {
-                info!("[Token Check] Checking NoRisk token status");
-                Ok(Some(
-                    self.refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
-                        .await?,
-                ))
+                trace!("[Token Check] Checking NoRisk token status");
+                let (refreshed, changed) = self
+                    .refresh_norisk_token_if_necessary(&creds.clone(), false, experimental_mode)
+                    .await?;
+                if changed {
+                    Ok(Some(refreshed))
+                } else {
+                    // Nothing changed — signal callers to skip the redundant save
+                    Ok(None)
+                }
             }
         }
     }
 
     pub async fn get_active_account(&self) -> Result<Option<Credentials>> {
-        info!("[Account Manager] Starting get_active_account process");
+        trace!("[Account Manager] Starting get_active_account process");
 
         // Get the global state to check the experimental mode
         let state = crate::state::State::get().await?;
         let is_experimental = state.config_manager.is_experimental_mode().await;
-        info!(
+        trace!(
             "[Account Manager] Global experimental mode is: {}",
             is_experimental
         );
 
         // Zuerst nur lesen um den aktiven Account zu finden
         let active_account = {
-            info!("[Account Manager] Acquiring read lock to find active account");
+            trace!("[Account Manager] Acquiring read lock to find active account");
             let accounts = self.accounts.read().await;
-            info!("[Account Manager] Successfully acquired read lock");
+            trace!("[Account Manager] Successfully acquired read lock");
             let account = accounts.iter().find(|acc| acc.active).cloned();
-            info!(
+            trace!(
                 "[Account Manager] Active account found: {}",
                 account.is_some()
             );
@@ -1207,7 +1298,7 @@ impl MinecraftAuthStore {
         };
 
         if let Some(account) = active_account {
-            info!(
+            trace!(
                 "[Account Manager] Refreshing credentials for active account: {}",
                 account.username
             );
@@ -1219,11 +1310,11 @@ impl MinecraftAuthStore {
             if let Some(updated) = updated_account {
                 // Aktualisiere den Account in der Liste
                 {
-                    info!("[Account Manager] Acquiring write lock to update account");
+                    debug!("[Account Manager] Acquiring write lock to update account");
                     let mut accounts = self.accounts.write().await;
-                    info!("[Account Manager] Successfully acquired write lock");
+                    debug!("[Account Manager] Successfully acquired write lock");
                     if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
-                        info!("[Account Manager] Updating account in list");
+                        debug!("[Account Manager] Updating account in list");
                         // Preserve ignore flag from in-memory existing account to avoid
                         // overwriting a recent user 'ignore' action performed concurrently.
                         let existing_flag = existing.ignore_child_protection_warning;
@@ -1231,19 +1322,19 @@ impl MinecraftAuthStore {
                         merged.ignore_child_protection_warning = existing_flag || merged.ignore_child_protection_warning;
                         *existing = merged;
                     }
-                    info!("[Account Manager] Releasing write lock");
+                    debug!("[Account Manager] Releasing write lock");
                 } // Write-Lock wird hier freigegeben
 
-                info!("[Account Manager] Saving updated account");
+                debug!("[Account Manager] Saving updated account");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved account");
+                debug!("[Account Manager] Successfully saved account");
 
                 Ok(Some(updated))
             } else {
                 Ok(Some(account))
             }
         } else {
-            info!("[Account Manager] No active account found, checking for any accounts");
+            debug!("[Account Manager] No active account found, checking for any accounts");
 
             // Wenn kein Account aktiv ist, aber Accounts existieren, setze den ersten als aktiv
             let first_account = {
@@ -1261,9 +1352,9 @@ impl MinecraftAuthStore {
             }; // Write-Lock wird hier freigegeben
 
             if let Some(account) = first_account {
-                info!("[Account Manager] Saving changes");
+                debug!("[Account Manager] Saving changes");
                 self.save().await?;
-                info!("[Account Manager] Successfully saved changes");
+                debug!("[Account Manager] Successfully saved changes");
                 Ok(Some(account))
             } else {
                 info!("[Account Manager] No accounts found at all");
@@ -1273,12 +1364,12 @@ impl MinecraftAuthStore {
     }
 
     pub async fn remove_account(&self, id: Uuid) -> Result<()> {
-        info!("[Account Manager] Starting account removal for ID: {}", id);
+        debug!("[Account Manager] Starting account removal for ID: {}", id);
 
         {
-            info!("[Account Manager] Acquiring write lock for account removal");
+            debug!("[Account Manager] Acquiring write lock for account removal");
             let mut accounts = self.accounts.write().await;
-            info!("[Account Manager] Successfully acquired write lock");
+            debug!("[Account Manager] Successfully acquired write lock");
 
             let initial_count = accounts.len();
             accounts.retain(|acc| acc.id != id);
@@ -1289,48 +1380,48 @@ impl MinecraftAuthStore {
             } else {
                 info!("[Account Manager] Successfully removed account");
             }
-            info!("[Account Manager] Releasing write lock");
+            debug!("[Account Manager] Releasing write lock");
         } // Write-Lock wird hier freigegeben
 
-        info!("[Account Manager] Saving changes after account removal");
+        debug!("[Account Manager] Saving changes after account removal");
         self.save().await?;
-        info!("[Account Manager] Successfully saved changes");
+        debug!("[Account Manager] Successfully saved changes");
 
         Ok(())
     }
 
     pub async fn get_all_accounts(&self) -> Result<Vec<Credentials>> {
-        info!("[Account Manager] Starting get_all_accounts operation");
+        trace!("[Account Manager] Starting get_all_accounts operation");
 
-        info!("[Account Manager] Acquiring read lock");
+        trace!("[Account Manager] Acquiring read lock");
         let accounts = self.accounts.read().await;
-        info!("[Account Manager] Successfully acquired read lock");
+        trace!("[Account Manager] Successfully acquired read lock");
 
-        info!("[Account Manager] Found {} accounts", accounts.len());
+        trace!("[Account Manager] Found {} accounts", accounts.len());
         let accounts_clone = accounts.clone();
 
-        info!("[Account Manager] Returning all accounts");
+        trace!("[Account Manager] Returning all accounts");
         Ok(accounts_clone)
     }
 
     pub async fn set_active_account(&self, account_id: Uuid) -> Result<()> {
-        info!("[Account Manager] Starting set_active_account operation");
+        debug!("[Account Manager] Starting set_active_account operation");
         info!("[Account Manager] Setting account {} as active", account_id);
 
         {
-            info!("[Account Manager] Acquiring write lock");
+            debug!("[Account Manager] Acquiring write lock");
             let mut accounts = self.accounts.write().await;
-            info!("[Account Manager] Successfully acquired write lock");
+            debug!("[Account Manager] Successfully acquired write lock");
 
             // Set all accounts to inactive first
-            info!("[Account Manager] Deactivating all accounts");
+            debug!("[Account Manager] Deactivating all accounts");
             for account in accounts.iter_mut() {
                 account.active = false;
             }
 
             // Find and set the specified account as active
             if let Some(account) = accounts.iter_mut().find(|acc| acc.id == account_id) {
-                info!("[Account Manager] Found account, setting as active");
+                debug!("[Account Manager] Found account, setting as active");
                 account.active = true;
             } else {
                 info!("[Account Manager] Warning: Account not found");
@@ -1340,12 +1431,12 @@ impl MinecraftAuthStore {
                 )));
             }
 
-            info!("[Account Manager] Releasing write lock");
+            debug!("[Account Manager] Releasing write lock");
         } // Write-Lock wird hier freigegeben
 
-        info!("[Account Manager] Saving changes");
+        debug!("[Account Manager] Saving changes");
         self.save().await?;
-        info!("[Account Manager] Successfully saved changes");
+        debug!("[Account Manager] Successfully saved changes");
 
         Ok(())
     }
@@ -1359,6 +1450,31 @@ const REQUESTED_SCOPE: &str = "service::user.auth.xboxlive.com::MBI_SSL";
 const DIRECT_OAUTH_CLIENT_ID: &str = "e16699bb-2aa8-46da-b5e3-45cbcce29091";
 const DIRECT_OAUTH_AUTHORIZE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
 const DIRECT_OAUTH_TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+
+const AUTH_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+const REFRESH_RETRY_PAUSE: std::time::Duration = std::time::Duration::from_secs(5);
+
+static MC_TOKEN_REFRESH: Mutex<()> = Mutex::const_new(());
+static REFRESH_UNREACHABLE: std::sync::Mutex<Option<(Uuid, std::time::Instant)>> =
+    std::sync::Mutex::new(None);
+
+fn mc_token_stale(creds: &Credentials) -> bool {
+    creds
+        .mc_access_token_expires
+        .map_or(true, |exp| exp <= Utc::now() + Duration::hours(12))
+}
+
+fn refresh_unreachable_recently(id: Uuid) -> bool {
+    REFRESH_UNREACHABLE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .is_some_and(|(at_id, at)| at_id == id && at.elapsed() < REFRESH_RETRY_PAUSE)
+}
+
+fn remember_refresh_unreachable(id: Uuid) {
+    *REFRESH_UNREACHABLE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+        Some((id, std::time::Instant::now()));
+}
 
 pub struct RequestWithDate<T> {
     pub date: DateTime<Utc>,
@@ -1495,6 +1611,7 @@ async fn oauth_token(code: &str, verifier: &str) -> Result<RequestWithDate<OAuth
         HTTP_CLIENT
             .post("https://login.live.com/oauth20_token.srf")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1546,6 +1663,7 @@ async fn direct_oauth_token(
         HTTP_CLIENT
             .post(DIRECT_OAUTH_TOKEN_URL)
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1587,6 +1705,7 @@ async fn xbox_authenticate_rps(access_token: &str) -> Result<String> {
             .post("https://user.auth.xboxlive.com/user/authenticate")
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "Properties": {
                     "AuthMethod": "RPS",
@@ -1671,6 +1790,7 @@ async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
             .post("https://xsts.auth.xboxlive.com/xsts/authorize")
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "Properties": {
                     "SandboxId": "RETAIL",
@@ -1688,7 +1808,7 @@ async fn xsts_authorize_direct(xbox_token: String) -> Result<DeviceToken> {
     })?;
 
     let status = res.status();
-    let current_date = get_date_header(res.headers());
+    let _current_date = get_date_header(res.headers());
     let text = res
         .text()
         .await
@@ -1732,6 +1852,7 @@ async fn oauth_refresh(refresh_token: &str) -> Result<RequestWithDate<OAuthToken
         HTTP_CLIENT
             .post("https://login.live.com/oauth20_token.srf")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1779,6 +1900,7 @@ async fn oauth_refresh_direct(refresh_token: &str) -> Result<RequestWithDate<OAu
         HTTP_CLIENT
             .post(DIRECT_OAUTH_TOKEN_URL)
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .form(&query)
             .send()
     })
@@ -1902,7 +2024,17 @@ struct MinecraftToken {
     // pub username: String,
     pub access_token: String,
     // pub token_type: String,
-    // pub expires_in: u64,
+    /// Lifetime of the Minecraft access token in seconds (~86400). Tracked so the refresh
+    /// guard keys on the *Minecraft* token rather than the Microsoft OAuth token.
+    #[serde(default)]
+    pub expires_in: u64,
+}
+
+/// Absolute expiry for a freshly minted Minecraft access token. Mirrors Prism's
+/// `currentTime + expires_in`, with a defensive 24h fallback when the field is absent (0).
+pub(crate) fn mc_token_expiry(expires_in: u64) -> DateTime<Utc> {
+    let secs = if expires_in == 0 { 24 * 3600 } else { expires_in as i64 };
+    Utc::now() + Duration::seconds(secs)
 }
 
 async fn minecraft_token(
@@ -1922,6 +2054,7 @@ async fn minecraft_token(
         HTTP_CLIENT
             .post("https://api.minecraftservices.com/launcher/login")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .json(&json!({
                 "platform": "PC_LAUNCHER",
                 "xtoken": format!("XBL3.0 x={uhs};{token}"),
@@ -1966,6 +2099,7 @@ async fn minecraft_profile(
         HTTP_CLIENT
             .get("https://api.minecraftservices.com/minecraft/profile")
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .bearer_auth(token)
             .send()
     })
@@ -2016,6 +2150,7 @@ async fn minecraft_entitlements(
                 Uuid::new_v4()
             ))
             .header("Accept", "application/json")
+            .timeout(AUTH_REQUEST_TIMEOUT)
             .bearer_auth(token)
             .send()
     })
@@ -2057,6 +2192,62 @@ async fn minecraft_entitlements(
     Ok(entitlements)
 }
 
+pub fn keep_cached_credentials_reason(err: &AppError) -> Option<&'static str> {
+    match err {
+        AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
+            source,
+            ..
+        }) => {
+            if source.is_connect() {
+                Some("Connection error")
+            } else if source.is_timeout() {
+                Some("Timeout")
+            } else {
+                None
+            }
+        }
+        AppError::MinecraftAuthenticationError(
+            MinecraftAuthenticationError::DeserializeResponse { status_code, .. },
+        ) => {
+            if status_code.as_u16() == 429 || status_code.is_server_error() {
+                Some("Transient outage")
+            } else if status_code.is_success() {
+                Some("Unparseable response on a success status")
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn is_offline_error(err: &AppError) -> bool {
+    matches!(
+        err,
+        AppError::MinecraftAuthenticationError(MinecraftAuthenticationError::Request {
+            source,
+            ..
+        }) if source.is_connect() || source.is_timeout()
+    )
+}
+
+async fn emit_offline_mode(username: &str) {
+    let Ok(state) = State::get().await else {
+        return;
+    };
+    let payload = EventPayload {
+        event_id: uuid::Uuid::new_v4(),
+        event_type: EventType::OfflineMode,
+        target_id: None,
+        message: String::from(username),
+        progress: None,
+        error: None,
+    };
+    if let Err(e) = state.emit_event(payload).await {
+        error!("[Token Check] Failed to emit offline-mode event: {}", e);
+    }
+}
+
 // auth utils
 async fn auth_retry<F>(
     reqwest_request: impl Fn() -> F,
@@ -2066,7 +2257,9 @@ where
 {
     const RETRY_COUNT: usize = 5; // Does command 9 times
     const RETRY_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+    const RETRY_BUDGET: std::time::Duration = std::time::Duration::from_secs(15);
 
+    let start = std::time::Instant::now();
     let mut resp = reqwest_request().await;
     for i in 0..RETRY_COUNT {
         match &resp {
@@ -2074,15 +2267,22 @@ where
                 break;
             }
             Err(err) => {
-                if err.is_connect() || err.is_timeout() {
-                    if i < RETRY_COUNT - 1 {
-                        info!("Request failed with connect error, retrying...",);
-                        tokio::time::sleep(RETRY_WAIT).await;
-                        resp = reqwest_request().await;
-                    } else {
-                        break;
-                    }
+                if !(err.is_connect() || err.is_timeout()) {
+                    break;
                 }
+                if i >= RETRY_COUNT - 1 {
+                    break;
+                }
+                if start.elapsed() >= RETRY_BUDGET {
+                    info!(
+                        "Request still failing after {:?} of retries; treating as unreachable.",
+                        start.elapsed()
+                    );
+                    break;
+                }
+                info!("Request failed with connect error, retrying...",);
+                tokio::time::sleep(RETRY_WAIT).await;
+                resp = reqwest_request().await;
             }
         }
     }
@@ -2171,7 +2371,8 @@ async fn send_signed_request<T: DeserializeOwned>(
             .post(url)
             .header("Content-Type", "application/json; charset=utf-8")
             .header("Accept", "application/json")
-            .header("Signature", &signature);
+            .header("Signature", &signature)
+            .timeout(AUTH_REQUEST_TIMEOUT);
 
         if url != "https://sisu.xboxlive.com/authorize" {
             request = request.header("x-xbl-contract-version", "1");
@@ -2303,7 +2504,7 @@ pub async fn start_oauth_callback_server(
                         }
                         // Inject error into HTML template via URL parameters
                         // The JavaScript in the template will handle displaying the error
-                        let error_url = format!("?error={}&error_description={}", 
+                        let _error_url = format!("?error={}&error_description={}", 
                             urlencoding::encode(error),
                             urlencoding::encode(error_description));
                         Html(error_html_shared.as_str().to_string())

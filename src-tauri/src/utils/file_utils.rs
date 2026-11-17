@@ -1,12 +1,90 @@
 use crate::error::{AppError, Result};
-use async_zip::error::ZipError;
 use async_zip::tokio::read::seek::ZipFileReader;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
-use image::{imageops::FilterType, DynamicImage, ImageFormat};
-use log::debug;
-use std::path::Path;
+use log::{debug, warn};
+use std::collections::HashMap;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use tokio::fs::File;
+
+/// Writes `contents` to `path` atomically: readers see either the previous file or the
+/// complete new one, never a half-written mix.
+///
+/// Neither Rust nor Java has a native atomic *write* — the portable pattern is temp file
+/// → fsync → rename (Java's rename equivalent is `Files.move(.., ATOMIC_MOVE)`).
+/// `tempfile::persist()` only does the rename and explicitly does not sync, so the fsync
+/// is on us: without it a crash can persist the rename while the data is still in the
+/// page cache, leaving a truncated file.
+///
+/// The temp file is created in the target directory, so it shares the filesystem (rename
+/// stays atomic) and concurrent writers get distinct temp names. Blocking std::fs on a
+/// worker thread because the handle must be closed before the rename — Windows fails the
+/// rename otherwise, and tokio's File closes on drop asynchronously.
+pub async fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
+    let path = path.as_ref().to_path_buf();
+    let contents = contents.as_ref().to_vec();
+
+    tokio::task::spawn_blocking(move || write_atomic_sync(&path, &contents))
+        .await
+        .map_err(|e| AppError::Other(format!("Atomic write task failed: {e}")))?
+}
+
+pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
+    // A bare filename has a parent of Some("") — the temp file still belongs next to it
+    let dir = match path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+        _ => std::path::PathBuf::from("."),
+    };
+
+    let mut tmp = tempfile::NamedTempFile::new_in(&dir).map_err(AppError::Io)?;
+    tmp.write_all(contents).map_err(AppError::Io)?;
+    tmp.as_file().sync_all().map_err(AppError::Io)?;
+    tmp.persist(path).map_err(|e| AppError::Io(e.error))?;
+    Ok(())
+}
+
+pub async fn scan_files(root: &Path) -> HashMap<PathBuf, u64> {
+    let root = root.to_path_buf();
+    tokio::task::spawn_blocking(move || scan_files_sync(root))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_files_sync(root: PathBuf) -> HashMap<PathBuf, u64> {
+    let mut files = HashMap::new();
+    let mut pending = vec![root];
+    while let Some(dir) = pending.pop() {
+        let reader = match std::fs::read_dir(&dir) {
+            Ok(reader) => reader,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                warn!("Could not list {}: {}", dir.display(), e);
+                continue;
+            }
+        };
+        for entry in reader.flatten() {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            let path = entry.path();
+            if metadata.is_dir() {
+                pending.push(path);
+            } else {
+                files.insert(path, metadata.len());
+            }
+        }
+    }
+    files
+}
+
+pub async fn scan_object_store(objects_dir: &Path) -> HashMap<String, u64> {
+    scan_files(objects_dir)
+        .await
+        .into_iter()
+        .filter_map(|(path, size)| Some((path.file_name()?.to_string_lossy().into_owned(), size)))
+        .collect()
+}
 
 /// Helper function to read a specific zip entry by index and encode it as Base64
 async fn read_zip_entry_as_base64(
@@ -56,7 +134,7 @@ pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<
     let file = File::open(archive_path)
         .await
         .map_err(|e| AppError::Io(e))?;
-    let mut reader = tokio::io::BufReader::new(file);
+    let reader = tokio::io::BufReader::new(file);
 
     let mut zip = ZipFileReader::with_tokio(reader).await.map_err(|e| {
         AppError::ArchiveReadError(format!(
@@ -142,34 +220,6 @@ pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<
 
     debug!("No PNG found in archive: {}", archive_path.display());
     Err(AppError::PngNotFoundInArchive(archive_path.to_path_buf()))
-}
-
-pub async fn get_jar_icon_test() {
-    // Verwende einen Raw-String für den Windows-Pfad
-    let path_str = r"C:\Users\sheesh\AppData\Roaming\norisk\NoRiskClientV3\meta\mod_cache\§fAbsolute §7[§f16x§7]§8.zip";
-    let archive_path = Path::new(path_str);
-
-    match find_first_png_in_archive_as_base64(archive_path).await {
-        Ok(base64_icon) => {
-            log::debug!(
-                "Erstes PNG als Base64 gefunden (erste 50 Zeichen): {}...",
-                &base64_icon[..50.min(base64_icon.len())]
-            );
-            // Hier kannst du den base64_icon String verwenden
-        }
-        Err(AppError::PngNotFoundInArchive(path)) => {
-            log::debug!("Fehler: Kein PNG im Archiv gefunden: {:?}", path);
-        }
-        Err(AppError::FileNotFound(path)) => {
-            log::debug!("Fehler: Archivdatei nicht gefunden: {:?}", path);
-        }
-        Err(AppError::ArchiveReadError(msg)) => {
-            log::debug!("Fehler beim Lesen des Archivs: {}", msg);
-        }
-        Err(e) => {
-            log::debug!("Ein unerwarteter Fehler ist aufgetreten: {}", e);
-        }
-    }
 }
 
 

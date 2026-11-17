@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../lib/utils";
@@ -74,14 +72,14 @@ export function ThemeSelector({ disabled }: ThemeSelectorProps) {
             <div className="flex flex-col items-start">
               <span
                 className={cn(
-                  "font-minecraft-ten text-base transition-colors",
+                  "font-minecraft text-base transition-colors",
                   isSelected ? "text-white" : "text-white/80"
                 )}
               >
                 {theme.name}
               </span>
               {(!debugFlag && !isThemeUnlocked(theme.id)) && theme.unlockRequirement && (
-                <span className="text-xs text-white/40 font-minecraft-ten">
+                <span className="text-xs text-white/40 font-minecraft">
                   {theme.unlockRequirement.type === "advent-door" && (
                     <>Unlock: Open door {theme.unlockRequirement.day}</>
                   )}

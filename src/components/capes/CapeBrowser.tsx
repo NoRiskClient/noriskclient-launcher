@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,19 +10,17 @@ import {
 } from "../../services/cape-service";
 import type {
   BrowseCapesOptions,
+  CapesBrowseResponse,
   CosmeticCape,
   GetPlayerCapesPayloadOptions,
   PaginationInfo,
 } from "../../types/noriskCapes";
 import { CapeList } from "./CapeList";
+import { NO_CAPE_ID, createNoCapePlaceholder } from "./noCape";
 import type { CapeFiltersData } from "./CapeFilters";
 import { Icon } from "@iconify/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Modal } from "../ui/Modal";
-import { SkinView3DWrapper } from "../common/SkinView3DWrapper";
-import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -38,8 +34,18 @@ import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
 import { ConfirmDeletionModal } from "./ConfirmDeletionModal";
 import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
-import { translateCapeError, isCapeInReview } from "../../utils/cape-error-translations";
+import { isCapeInReview } from "../../utils/cape-error-translations";
+import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+
+const PAGE_SIZE = 20;
+
+const pageOf = (page: number, response: CapesBrowseResponse): PaginationInfo => ({
+  currentPage: page,
+  pageSize: PAGE_SIZE,
+  totalItems: page * PAGE_SIZE + response.capes.length,
+  totalPages: response.nextCursor ? page + 2 : page + 1,
+});
 
 
 
@@ -58,8 +64,6 @@ export function CapeBrowser(): JSX.Element {
   const [isEquippingCapeId, setIsEquippingCapeId] = useState<string | null>(
     null,
   );
-  const [isUploading, setIsUploading] = useState(false);
-  const [isUnequipping, setIsUnequipping] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<CapeFiltersData>({
     sortBy: "",
@@ -85,7 +89,7 @@ export function CapeBrowser(): JSX.Element {
     showOwnedOnly ? setMyPagination : setAllPagination;
 
   const accentColor = useThemeStore((state) => state.accentColor);
-  const { favoriteCapeIds, isFavorite } = useCapeFavoritesStore();
+  const { favoriteCapeIds } = useCapeFavoritesStore();
   const { ownedCapes: vanillaCapes, isLoading: isLoadingVanilla, error: vanillaError, fetchOwnedCapes, equippedCape } = useVanillaCapeStore();
 
   // Computed loading states based on current filter or search
@@ -114,7 +118,7 @@ export function CapeBrowser(): JSX.Element {
   // Computed equipped cape ID based on current tab
   const equippedCapeId = useMemo(() => {
     if (filters.showVanillaOnly) {
-      return equippedCape?.id || null;
+      return equippedCape?.id || NO_CAPE_ID;
     }
     // For NoRisk capes, we don't have equipped state yet
     return null;
@@ -138,7 +142,7 @@ export function CapeBrowser(): JSX.Element {
       // Add "No Cape" option at the beginning
       const hasEquippedCape = vanillaCapes.some(cape => cape.equipped);
       const noCapeOption: VanillaCape = {
-        id: "no-cape",
+        id: NO_CAPE_ID,
         name: t('capes.noCape'),
         description: t('capes.removeEquippedCape'),
         url: "", // Empty URL for no cape
@@ -156,8 +160,15 @@ export function CapeBrowser(): JSX.Element {
     }
 
     // For favorites, let CapeList handle the filtering - just provide all available capes
-    return filters.showOwnedOnly ? myCapes : allCapes;
-  }, [filters.showOwnedOnly, filters.showVanillaOnly, myCapes, allCapes, vanillaCapes, favoriteCapeIds, searchQuery]); // Add searchQuery to trigger re-render when search changes
+    if (filters.showOwnedOnly) {
+      return myCapes;
+    }
+
+    if (filters.showFavoritesOnly) {
+      return allCapes;
+    }
+    return [createNoCapePlaceholder(), ...allCapes];
+  }, [filters.showOwnedOnly, filters.showFavoritesOnly, filters.showVanillaOnly, myCapes, allCapes, vanillaCapes, favoriteCapeIds, searchQuery]); // Add searchQuery to trigger re-render when search changes
 
   const paginationInfo = useMemo(() => {
     // When searching, always use allPagination for search results
@@ -183,27 +194,24 @@ export function CapeBrowser(): JSX.Element {
     { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
   ];
 
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [previewImagePath, setPreviewImagePath] = useState<string | null>(null);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [showElytraPreview, setShowElytraPreview] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
 
 
   // Helper function to format and translate error messages
-  const formatErrorMessage = (error: string): string => {
-    return translateCapeError(error);
+  const formatErrorMessage = (error: unknown): string => {
+    return translateApiError(error, t('common.unknownError'));
   };
 
   // Helper function to determine if error is a warning (cape in review)
-  const isWarningMessage = (error: string): boolean => {
-    return isCapeInReview(error);
+  const isWarningMessage = (error: unknown): boolean => {
+    const key = (error as any)?.translatable_key as string | undefined;
+    if (key) return key.includes("in_review");
+    const raw = typeof error === "string" ? error : (error as any)?.message ?? "";
+    return isCapeInReview(raw);
   };
 
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
+  const nextCursorRef = useRef<string | null>(null);
   const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
@@ -223,14 +231,14 @@ export function CapeBrowser(): JSX.Element {
       try {
         setIsLoadingAll(true);
         const browseOptions: BrowseCapesOptions = {
-          page: 0,
-          page_size: 20,
+          limit: PAGE_SIZE,
           sort_by: undefined,
           time_frame: undefined,
         };
         const response = await browseCapes(browseOptions);
+        nextCursorRef.current = response.nextCursor;
         setAllCapes(response.capes);
-        setAllPagination(response.pagination);
+        setAllPagination(pageOf(0, response));
       } catch (error) {
         console.error("Failed to load ALL capes:", error);
       } finally {
@@ -378,8 +386,8 @@ export function CapeBrowser(): JSX.Element {
         } else {
           // Browse all capes
           const browseOptions: BrowseCapesOptions = {
-            page: pageToFetch,
-            page_size: 20,
+            cursor: append ? nextCursorRef.current ?? undefined : undefined,
+            limit: PAGE_SIZE,
             sort_by:
               currentFilters.sortBy === "" ? undefined : currentFilters.sortBy,
             time_frame:
@@ -388,6 +396,7 @@ export function CapeBrowser(): JSX.Element {
                 : currentFilters.timeFrame,
           };
           response = await browseCapes(browseOptions);
+          nextCursorRef.current = response.nextCursor;
 
           // Get the correct setters based on current filter
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
@@ -403,7 +412,7 @@ export function CapeBrowser(): JSX.Element {
             }
             return newCapes;
           });
-          setPagination(response.pagination);
+          setPagination(pageOf(pageToFetch, response));
         }
       } catch (err: any) {
         console.error("Error fetching capes:", err);
@@ -617,18 +626,16 @@ export function CapeBrowser(): JSX.Element {
   };
 
   const handleEquipCape = async (capeHash: string) => {
+    if (capeHash === NO_CAPE_ID) {
+      await handleUnequipCape(filters.showVanillaOnly);
+      return;
+    }
+
     setIsEquippingCapeId(capeHash);
 
-    let promise;
-    if (filters.showVanillaOnly) {
-      // For vanilla capes, use the vanilla store
-      // Special handling for "no-cape" option - unequip all capes
-      const actualCapeId = capeHash === "no-cape" ? null : capeHash;
-      promise = useVanillaCapeStore.getState().equipCape(actualCapeId);
-    } else {
-      // For NoRisk capes, use the regular equip function
-      promise = equipCape(capeHash);
-    }
+    const promise = filters.showVanillaOnly
+      ? useVanillaCapeStore.getState().equipCape(capeHash)
+      : equipCape(capeHash);
 
     toast.promise(promise, {
       loading: t('capes.equippingCape'),
@@ -639,21 +646,26 @@ export function CapeBrowser(): JSX.Element {
       error: (err: any) => {
         setIsEquippingCapeId(null);
         console.error("Error equipping cape:", err);
-        return t('capes.failedToEquipCape', { error: err.message || t('common.unknownError') });
+        return t('capes.failedToEquipCape', { error: translateApiError(err, t('common.unknownError')) });
       },
     });
   };
 
-  const handleUnequipCape = async () => {
-    setIsUnequipping(true);
+  const handleUnequipCape = async (alsoUnequipVanillaCape = false) => {
+    setIsEquippingCapeId(NO_CAPE_ID);
     try {
-      await unequipCape();
+      await Promise.all([
+        unequipCape(),
+        ...(alsoUnequipVanillaCape
+          ? [useVanillaCapeStore.getState().equipCape(null)]
+          : []),
+      ]);
       toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
-      toast.error(t('capes.failedToUnequipCape', { error: err.message || t('common.unknownError') }));
+      toast.error(t('capes.failedToUnequipCape', { error: translateApiError(err, t('common.unknownError')) }));
     } finally {
-      setIsUnequipping(false);
+      setIsEquippingCapeId(null);
     }
   };
 
@@ -669,7 +681,7 @@ export function CapeBrowser(): JSX.Element {
             hideModal('delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape:", err);
-            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+            toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
           }
         }}
         onCancelDelete={() => hideModal('delete-cape-modal')}
@@ -690,7 +702,7 @@ export function CapeBrowser(): JSX.Element {
             hideModal('mod-delete-cape-modal');
           } catch (err: any) {
             console.error("Error deleting cape (moderator):", err);
-            toast.error(t('capes.failedToDeleteCape', { error: err.message || t('common.unknownError') }));
+            toast.error(t('capes.failedToDeleteCape', { error: translateApiError(err, t('common.unknownError')) }));
           }
         }}
         onCancelDelete={() => hideModal('mod-delete-cape-modal')}
@@ -707,11 +719,8 @@ export function CapeBrowser(): JSX.Element {
       });
       if (!selectedFile) return;
       const filePath = selectedFile as string;
-      setPreviewImagePath(filePath);
       try {
         const imageUrl = convertFileSrc(filePath);
-        setPreviewImageUrl(imageUrl);
-        setShowPreviewModal(true);
 
         showModal('upload-cape-modal', (
           <UploadCapeModal
@@ -724,12 +733,12 @@ export function CapeBrowser(): JSX.Element {
         ));
       } catch (err: any) {
         console.error("Error creating preview URL:", err);
-        toast.error(t('capes.couldntPreviewFile', { error: err.message || t('common.unknownError') }));
+        toast.error(t('capes.couldntPreviewFile', { error: translateApiError(err, t('common.unknownError')) }));
       }
     } catch (err: any) {
       console.error("Error selecting cape file:", err);
       toast.error(
-        t('capes.failedToSelectCapeFile', { error: err.message || t('common.unknownError') }),
+        t('capes.failedToSelectCapeFile', { error: translateApiError(err, t('common.unknownError')) }),
       );
     }
   };
@@ -753,13 +762,6 @@ export function CapeBrowser(): JSX.Element {
 
   const handleCancelUpload = () => {
     hideModal('upload-cape-modal');
-    setPreviewImagePath(null);
-    setPreviewImageUrl(null);
-    setShowPreviewModal(false);
-    setShowElytraPreview(false);
-    setUploadError(null);
-    setUploadWarning(null);
-    setIsUploading(false);
   };
 
 
@@ -784,7 +786,7 @@ export function CapeBrowser(): JSX.Element {
       loading: t('capes.downloadingTemplate'),
       success: t('capes.templateDownloadedSuccess'),
       error: (err: any) =>
-        t('capes.failedToDownloadTemplate', { error: err.message || t('common.unknownError') }),
+        t('capes.failedToDownloadTemplate', { error: translateApiError(err, t('common.unknownError')) }),
     });
   };
 
@@ -794,8 +796,11 @@ export function CapeBrowser(): JSX.Element {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* Group Tabs */}
+      <div className={`flex-1 overflow-y-auto no-scrollbar${activeAccount ? "" : " flex flex-col"}`}>
+        {/* Group tabs and search. Hidden while signed out: every filter here
+            needs an account, so the bar would only offer dead controls above an
+            empty list. */}
+        {activeAccount && (<>
         <div className="mb-4">
               <div className="flex items-center gap-2 flex-wrap">
                 <button
@@ -811,7 +816,7 @@ export function CapeBrowser(): JSX.Element {
                       });
                     }
                   }}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     !filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -839,7 +844,7 @@ export function CapeBrowser(): JSX.Element {
                     }
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -860,7 +865,7 @@ export function CapeBrowser(): JSX.Element {
                     setSearchQuery("");
                     setCurrentPage(0);
                   }}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -882,7 +887,7 @@ export function CapeBrowser(): JSX.Element {
                     setCurrentPage(0);
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-minecraft text-2xl transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -937,7 +942,7 @@ export function CapeBrowser(): JSX.Element {
                       <div className="relative" ref={templateMenuRef}>
                         <button
                           onClick={() => setShowTemplateMenu(!showTemplateMenu)}
-                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                          className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                           title={t('capes.downloadTemplate')}
                         >
                           <div className="w-4 h-4 flex items-center justify-center">
@@ -950,14 +955,14 @@ export function CapeBrowser(): JSX.Element {
                           <div className="absolute top-full left-0 mt-1 z-50 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg overflow-hidden min-w-[180px]">
                             <button
                               onClick={() => handleDownloadTemplate(false)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
                               <Icon icon="solar:download-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithoutElytra')}</span>
                             </button>
                             <button
                               onClick={() => handleDownloadTemplate(true)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-minecraft text-xl lowercase transition-all duration-200"
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
                               <Icon icon="solar:download-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithElytra')}</span>
@@ -968,7 +973,7 @@ export function CapeBrowser(): JSX.Element {
 
                       <button
                         onClick={handleUploadClick}
-                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-minecraft text-2xl lowercase transition-all duration-200"
+                        className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
                         title={t('capes.uploadCape')}
                       >
                         <div className="w-4 h-4 flex items-center justify-center">
@@ -981,6 +986,7 @@ export function CapeBrowser(): JSX.Element {
                 </div>
               </div>
             </div>
+            </>)}
 
             {/* Cape List */}
             <CapeList

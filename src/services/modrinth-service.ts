@@ -8,16 +8,17 @@ import type {
   ModrinthSearchResponse,
   ModrinthSortType,
   ModrinthVersion,
-  ModrinthCategory,
-  ModrinthLoader,
-  ModrinthGameVersion,
+  ModrinthTags,
   ModrinthTeamMember,
 } from "../types/modrinth";
 import type {
   UnifiedModVersionsParams,
   UnifiedVersionResponse,
 } from "../types/unified";
+import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
+
+let inFlightTags: Promise<ModrinthTags> | null = null;
 
 export class ModrinthService {
   static async searchProjects(
@@ -64,11 +65,13 @@ export class ModrinthService {
     projectIdOrSlug: string,
     loaders?: string[],
     gameVersions?: string[],
+    cacheBehaviour?: CacheBehaviour,
   ): Promise<ModrinthVersion[]> {
     return invoke<ModrinthVersion[]>("get_modrinth_mod_versions", {
       projectIdOrSlug,
       loaders,
       gameVersions,
+      cacheBehaviour,
     });
   }
 
@@ -83,15 +86,23 @@ export class ModrinthService {
     );
   }
 
-  static async getProjectDetails(ids: string[]): Promise<ModrinthProject[]> {
+  static async getProjectDetails(
+    ids: string[],
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthProject[]> {
     return invoke<ModrinthProject[]>("get_modrinth_project_details", {
       ids,
+      cacheBehaviour,
     });
   }
 
-  static async getProjectMembers(projectIdOrSlug: string): Promise<ModrinthTeamMember[]> {
+  static async getProjectMembers(
+    projectIdOrSlug: string,
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthTeamMember[]> {
     return invoke<ModrinthTeamMember[]>("get_modrinth_project_members", {
       projectIdOrSlug,
+      cacheBehaviour,
     });
   }
 
@@ -123,26 +134,33 @@ export class ModrinthService {
     });
   }
 
-  static async getModrinthCategories(): Promise<ModrinthCategory[]> {
-    return invoke<ModrinthCategory[]>("get_modrinth_categories_command");
-  }
+  static async getModrinthTags(
+    cacheBehaviour?: CacheBehaviour,
+  ): Promise<ModrinthTags> {
+    if (cacheBehaviour) {
+      return invoke<ModrinthTags>("get_modrinth_tags_command", { cacheBehaviour });
+    }
 
-  static async getModrinthLoaders(): Promise<ModrinthLoader[]> {
-    return invoke<ModrinthLoader[]>("get_modrinth_loaders_command");
-  }
-
-  static async getModrinthGameVersions(): Promise<ModrinthGameVersion[]> {
-    return invoke<ModrinthGameVersion[]>("get_modrinth_game_versions_command");
+    if (!inFlightTags) {
+      inFlightTags = invoke<ModrinthTags>("get_modrinth_tags_command", {}).finally(
+        () => {
+          inFlightTags = null;
+        },
+      );
+    }
+    return inFlightTags;
   }
 
   static async getVersionsByHashes(
     hashes: string[],
+    cacheBehaviour?: CacheBehaviour,
   ): Promise<Record<string, ModrinthVersion>> {
     // The backend command `get_modrinth_versions_by_hashes` implicitly uses "sha1"
     return invoke<Record<string, ModrinthVersion>>(
       "get_modrinth_versions_by_hashes",
       {
         hashes,
+        cacheBehaviour,
         // hashAlgorithm: "sha1", // Not needed as backend command defaults/is specific to sha1
       },
     );

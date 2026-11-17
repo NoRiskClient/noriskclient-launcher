@@ -1,12 +1,9 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { 
-  getSizeClasses,
   getBorderRadiusClass,
   createRadiusStyle,
   getVariantColors,
@@ -56,10 +53,8 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
     title,
     ...props
   }, ref) => {
-    const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
       const accentColor = useThemeStore((state) => state.accentColor);
-    const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const borderRadius = useThemeStore((state) => state.borderRadius);    const handleClick = () => {
       if (!disabled) {
         const event = {
@@ -124,8 +119,6 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
             {...accessibilityProps}            disabled={disabled}
             onClick={onClick || handleClick}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}className={cn(
               "relative flex-shrink-0 flex items-center justify-center backdrop-blur-md",
@@ -145,7 +138,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
           >
             {(checked || indeterminate) && (
               <Icon
-                icon={indeterminate ? "mingcute:minus-line" : "mingcute:check-line"}
+                icon={indeterminate ? "mdi:minus" : "mingcute:check-line"}
                 className={cn(
                   "text-white transition-all duration-200",
                   iconSizes[effectiveSize]
@@ -158,7 +151,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
           {(label || description) && (
             <div className="flex flex-col gap-1">
               {label && (                <label                  className={cn(
-                    "text-white font-minecraft cursor-pointer select-none lowercase",
+                    "text-white font-smallcaps cursor-pointer select-none",
                     getTextSizeClass((effectiveSize as ComponentSize) || "md", "checkbox"),
                     disabled && "opacity-50 cursor-not-allowed"
                   )}
@@ -183,7 +176,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
         {error && (
           <div
             id={`checkbox-error-${id || ""}`}            className={cn(
-              "text-red-400 font-minecraft ml-8 lowercase",
+              "text-red-400 font-smallcaps ml-8",
               getTextSizeClass("sm", "checkbox")
             )}
             role="alert"

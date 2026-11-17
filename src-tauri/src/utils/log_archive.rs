@@ -1,4 +1,5 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
+use crate::state::process_state::CrashModInfo;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -8,6 +9,7 @@ use uuid::Uuid;
 
 const MAX_SESSIONS: usize = 10;
 const STARTUP_PURGE_THRESHOLD: u64 = 500 * 1024 * 1024;
+pub const SESSION_LOG_FILE: &str = "nrc-process.log";
 
 pub struct SessionInfo<'a> {
     pub process_id: Uuid,
@@ -19,6 +21,7 @@ pub struct SessionInfo<'a> {
     pub norisk_pack: Option<&'a str>,
     pub account_name: Option<&'a str>,
     pub start_time: DateTime<Utc>,
+    pub mods: &'a [CrashModInfo],
 }
 
 #[derive(Serialize, Deserialize)]
@@ -33,6 +36,8 @@ struct SessionRecord {
     norisk_pack: Option<String>,
     account_name: Option<String>,
     start_time: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    mods: Vec<CrashModInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     end_time: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,6 +83,7 @@ pub fn create_session(info: &SessionInfo) -> std::io::Result<(String, PathBuf)> 
         norisk_pack: info.norisk_pack.map(str::to_string),
         account_name: info.account_name.map(str::to_string),
         start_time: info.start_time.to_rfc3339(),
+        mods: info.mods.to_vec(),
         end_time: None,
         exit_code: None,
         success: None,
@@ -86,7 +92,37 @@ pub fn create_session(info: &SessionInfo) -> std::io::Result<(String, PathBuf)> 
         let _ = std::fs::write(session_dir.join("session.json"), json);
     }
 
-    Ok((session_id, session_dir.join("nrc-process.log")))
+    Ok((session_id, session_dir.join(SESSION_LOG_FILE)))
+}
+
+pub fn newest_session_log_for_profile(profile_id: Uuid) -> Option<PathBuf> {
+    let wanted = profile_id.to_string();
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    for entry in std::fs::read_dir(archive_root()).ok()?.flatten() {
+        let Ok(meta) = std::fs::symlink_metadata(entry.path()) else {
+            continue;
+        };
+        if !meta.is_dir() {
+            continue;
+        }
+        let Some(record) = std::fs::read_to_string(entry.path().join("session.json"))
+            .ok()
+            .and_then(|raw| serde_json::from_str::<SessionRecord>(&raw).ok())
+        else {
+            continue;
+        };
+        if record.profile_id != wanted {
+            continue;
+        }
+        let modified = std::fs::metadata(entry.path().join(SESSION_LOG_FILE))
+            .and_then(|m| m.modified())
+            .or_else(|_| meta.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
+        if best.as_ref().is_none_or(|(t, _)| modified > *t) {
+            best = Some((modified, PathBuf::from(entry.file_name()).join(SESSION_LOG_FILE)));
+        }
+    }
+    best.map(|(_, p)| p)
 }
 
 pub async fn finalize_game_session(session_id: &str, exit_code: Option<i32>, success: bool) {
@@ -127,9 +163,9 @@ pub async fn cleanup_oversized_logs() {
         }
         let session_path = entry.path();
 
-        let mut candidates: Vec<String> = vec!["nrc-process.log".to_string()];
+        let mut candidates: Vec<String> = vec![SESSION_LOG_FILE.to_string()];
         for i in 1..=crate::utils::bounded_log_writer::ROTATED_BACKUP_COUNT {
-            candidates.push(format!("nrc-process.log.{}.gz", i));
+            candidates.push(format!("{}.{}.gz", SESSION_LOG_FILE, i));
         }
         for log_name in candidates {
             let log_path = session_path.join(log_name);

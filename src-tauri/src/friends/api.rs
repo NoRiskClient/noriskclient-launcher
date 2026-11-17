@@ -1,11 +1,12 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+use crate::utils::http_client::{nrc_delete, nrc_get, nrc_post, nrc_put};
 use crate::friends::models::{
-    ApiFriendsInformationDto, ApiFriendsFriendUser, ApiFriendsUser, FriendRequestState,
-    FriendRequestUser, FriendRequestWithUsers, FriendsFriendUser, FriendsUser, OnlineState,
+    ApiFriendsInformationDto, ApiFriendsUser, FriendRequestState, FriendRequestUser,
+    FriendRequestWithUsers, FriendsFriendUser, FriendsUser, OnlineState,
 };
 use crate::minecraft::api::norisk_api::NoRiskApi;
-use log::{debug, error};
+use log::{debug, error, trace};
 use uuid::Uuid;
 
 const MOJANG_API_URL: &str = "https://api.mojang.com";
@@ -73,43 +74,16 @@ impl FriendsApi {
         let base_url = NoRiskApi::get_api_base(is_experimental);
         let url = format!("{}/friends/{}", base_url, uuid);
 
-        debug!("[Friends API] Fetching friends for {}", uuid);
+        trace!("[Friends API] Fetching friends for {}", uuid);
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch friends: {}", e))
-            })?;
+        let api_response = nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<ApiFriendsInformationDto>("Friends get")
+            .await?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Friends API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Response body: {}", &body_text[..body_text.len().min(500)]);
-
-        let api_response: ApiFriendsInformationDto = serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse friends response: {}", e))
-        })?;
-
-        debug!("[Friends API] Raw pending count: {}", api_response.pending.len());
+        trace!("[Friends API] Raw pending count: {}", api_response.pending.len());
         for (i, val) in api_response.pending.iter().enumerate() {
-            debug!("[Friends API] Pending item {}: {}", i, val);
+            trace!("[Friends API] Pending item {}: {}", i, val);
         }
 
         let pending: Vec<FriendRequestWithUsers> = api_response
@@ -185,7 +159,7 @@ impl FriendsApi {
                     })
                     .collect();
 
-                debug!("[Friends API] Parsed request: id={}, sender={}, receiver={}", id, sender, receiver);
+                trace!("[Friends API] Parsed request: id={}, sender={}, receiver={}", id, sender, receiver);
 
                 Some(FriendRequestWithUsers {
                     id,
@@ -214,39 +188,12 @@ impl FriendsApi {
         let base_url = NoRiskApi::get_api_base(is_experimental);
         let url = format!("{}/friends/user", base_url);
 
-        debug!("[Friends API] Fetching current user data");
+        trace!("[Friends API] Fetching current user data");
 
-        let response = HTTP_CLIENT
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to fetch user data: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Friends API error: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] User response body: {}", &body_text[..body_text.len().min(500)]);
-
-        let api_response: ApiFriendsUser = serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse user response: {}", e))
-        })?;
+        let api_response = nrc_get(&url)
+            .bearer(norisk_token)
+            .json::<ApiFriendsUser>("Friends get user")
+            .await?;
 
         Ok(FriendsUser::from_api(api_response, username.to_string()))
     }
@@ -263,27 +210,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Sending friend request to {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends send request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to send friend request: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to send friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
     }
 
     pub async fn accept_friend_request(
@@ -298,27 +228,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Accepting friend request from {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends accept request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to accept friend request: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to accept friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
     }
 
     pub async fn deny_friend_request(
@@ -333,27 +246,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Denying friend request from {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends deny request")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to deny friend request: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to deny friend request: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
     }
 
     pub async fn remove_friend(
@@ -368,27 +264,10 @@ impl FriendsApi {
 
         debug!("[Friends API] Removing friend {} ({})", target_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_delete(&url)
+            .bearer(norisk_token)
+            .expect_success("Friends remove")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to remove friend: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to remove friend: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
     }
 
     pub async fn update_status(
@@ -401,39 +280,11 @@ impl FriendsApi {
 
         debug!("[Friends API] Updating status to {:?}", new_status);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .header("Content-Type", "application/json")
-            .json(&new_status)
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json_body(&new_status)
+            .json::<OnlineState>("Friends update status")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to update status: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to update status: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Status response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse status response: {}", e))
-        })
     }
 
     pub async fn update_privacy_setting(
@@ -455,29 +306,11 @@ impl FriendsApi {
 
         debug!("[Friends API] Updating privacy {} to {}", endpoint, value);
 
-        let response = HTTP_CLIENT
-            .put(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .header("Content-Type", "application/json")
-            .json(&value)
-            .send()
+        nrc_put(&url)
+            .bearer(norisk_token)
+            .json_body(&value)
+            .expect_success("Friends update privacy")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to update privacy setting: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to update privacy setting: {} - {}",
-                status, error_body
-            )));
-        }
-
-        Ok(())
     }
 
     pub async fn toggle_ping(
@@ -492,36 +325,9 @@ impl FriendsApi {
 
         debug!("[Friends API] Toggling ping for {} ({})", friend_name, target_uuid);
 
-        let response = HTTP_CLIENT
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", norisk_token))
-            .send()
+        nrc_post(&url)
+            .bearer(norisk_token)
+            .json::<bool>("Friends toggle ping")
             .await
-            .map_err(|e| {
-                error!("[Friends API] Request failed: {}", e);
-                AppError::RequestError(format!("Failed to toggle ping: {}", e))
-            })?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
-            error!("[Friends API] Error response: {} - {}", status, error_body);
-            return Err(AppError::RequestError(format!(
-                "Failed to toggle ping: {} - {}",
-                status, error_body
-            )));
-        }
-
-        let body_text = response.text().await.map_err(|e| {
-            error!("[Friends API] Failed to get response body: {}", e);
-            AppError::ParseError(format!("Failed to get response body: {}", e))
-        })?;
-
-        debug!("[Friends API] Toggle ping response: {}", &body_text[..body_text.len().min(500)]);
-
-        serde_json::from_str(&body_text).map_err(|e| {
-            error!("[Friends API] Parse error: {} - Body: {}", e, &body_text[..body_text.len().min(500)]);
-            AppError::ParseError(format!("Failed to parse toggle ping response: {}", e))
-        })
     }
 }

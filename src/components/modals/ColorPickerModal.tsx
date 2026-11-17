@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
@@ -11,6 +9,8 @@ import { toast } from "react-hot-toast";
 interface ColorPickerModalProps {
   onClose: () => void;
   onColorSelected?: (color: string) => void;
+  initialColor?: string;
+  applyToTheme?: boolean;
 }
 
 // HSV to RGB conversion
@@ -82,14 +82,20 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
-export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalProps) {
+export function ColorPickerModal({
+  onClose,
+  onColorSelected,
+  initialColor,
+  applyToTheme = true,
+}: ColorPickerModalProps) {
   const { t } = useTranslation();
   const { accentColor, setCustomAccentColor } = useThemeStore();
+  const seed = initialColor ?? accentColor.value;
   const [hsv, setHsv] = useState(() => {
-    const rgb = hexToRgb(accentColor.value);
+    const rgb = hexToRgb(seed);
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
   });
-  const [hex, setHex] = useState(accentColor.value);
+  const [hex, setHex] = useState(seed);
   const [isDraggingSaturation, setIsDraggingSaturation] = useState(false);
   const [isDraggingHue, setIsDraggingHue] = useState(false);
 
@@ -98,10 +104,11 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
 
   // Update HSV when accent color changes
   useEffect(() => {
+    if (initialColor !== undefined) return;
     const rgb = hexToRgb(accentColor.value);
     setHsv(rgbToHsv(rgb.r, rgb.g, rgb.b));
     setHex(accentColor.value);
-  }, [accentColor.value]);
+  }, [accentColor.value, initialColor]);
 
   // Update hex when HSV changes
   useEffect(() => {
@@ -153,9 +160,11 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
 
   const handleApply = () => {
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      setCustomAccentColor(hex);
       onColorSelected?.(hex);
-      toast.success(t('color_picker.toast.applied'));
+      if (applyToTheme) {
+        setCustomAccentColor(hex);
+        toast.success(t('color_picker.toast.applied'));
+      }
       onClose();
     } else {
       toast.error(t('color_picker.toast.invalid_hex'));
@@ -246,17 +255,17 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
         {/* Color Values */}
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.hex')}</label>
+            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.hex')}</label>
             <input
               type="text"
               value={hex}
               onChange={(e) => handleHexChange(e.target.value)}
-              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               placeholder="#000000"
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.r')}</label>
+            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.r')}</label>
             <input
               type="number"
               value={rgb.r}
@@ -264,13 +273,13 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
                 const newRgb = { ...rgb, r: parseInt(e.target.value) || 0 };
                 setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
               }}
-              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.g')}</label>
+            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.g')}</label>
             <input
               type="number"
               value={rgb.g}
@@ -278,13 +287,13 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
                 const newRgb = { ...rgb, g: parseInt(e.target.value) || 0 };
                 setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
               }}
-              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
             />
           </div>
           <div>
-            <label className="block text-sm font-minecraft-ten text-white/70 mb-1">{t('color_picker.b')}</label>
+            <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.b')}</label>
             <input
               type="number"
               value={rgb.b}
@@ -292,7 +301,7 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
                 const newRgb = { ...rgb, b: parseInt(e.target.value) || 0 };
                 setHsv(rgbToHsv(newRgb.r, newRgb.g, newRgb.b));
               }}
-              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft-ten focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
               min="0"
               max="255"
             />
@@ -307,10 +316,10 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
               style={{ backgroundColor: hex }}
             />
             <div>
-              <h5 className="font-minecraft text-lg text-white">
+              <h5 className="font-smallcaps text-xs text-white">
                 {t('color_picker.selected_color')}
               </h5>
-              <p className="text-sm text-white/70 font-minecraft-ten">
+              <p className="text-sm text-white/70 font-minecraft">
                 {hex}
               </p>
             </div>

@@ -6,6 +6,8 @@ export type QualityLevel = "low" | "medium" | "high";
 interface QualitySettingsState {
   qualityLevel: QualityLevel;
   setQualityLevel: (level: QualityLevel) => void;
+  cosmeticRenderer3d: boolean;
+  setCosmeticRenderer3d: (enabled: boolean) => void;
 }
 
 export const useQualitySettingsStore = create<QualitySettingsState>()(
@@ -13,6 +15,8 @@ export const useQualitySettingsStore = create<QualitySettingsState>()(
     (set) => ({
       qualityLevel: "medium",
       setQualityLevel: (level) => set({ qualityLevel: level }),
+      cosmeticRenderer3d: true,
+      setCosmeticRenderer3d: (enabled) => set({ cosmeticRenderer3d: enabled }),
     }),
     {
       name: "norisk-quality-settings-storage",

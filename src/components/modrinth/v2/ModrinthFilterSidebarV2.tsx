@@ -1,8 +1,7 @@
-"use client";
-
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
+import { sanitizeSvgIcon } from '../../../utils/html-sanitize';
 import type {
   ModrinthProjectType,
   ModrinthCategory,
@@ -12,7 +11,6 @@ import type {
 import type { AccentColor } from '../../../store/useThemeStore';
 import { useThemeStore } from '../../../store/useThemeStore';
 import { Icon } from '@iconify/react';
-import { SearchWithFilters } from '../../ui/SearchWithFilters';
 import { CheckboxV2 } from '../../ui/CheckboxV2';
 import { gsap } from "gsap";
 
@@ -43,7 +41,6 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   activeCount = 0
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen || activeCount > 0);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
@@ -103,7 +100,7 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
         ref={buttonRef}
         onClick={toggleAccordion}
         className={cn(
-          "w-full px-3 py-2.5 text-left font-minecraft text-white flex justify-between items-center focus:outline-none transition-colors lowercase text-2xl",
+          "w-full px-3 py-2.5 text-left font-smallcaps text-white flex justify-between items-center focus:outline-none transition-colors text-base",
           isOpen && "border-b border-white/10", 
           "hover:bg-white/5",
           "relative z-10"
@@ -182,7 +179,7 @@ const FilterOption = ({
       ref={buttonRef}
       onClick={handleClick}
       className={cn(
-        "w-full flex items-center justify-between p-1.5 text-xl font-minecraft transition-colors duration-200 cursor-pointer rounded-md mb-1 bg-black/20 border border-white/10 hover:border-white/20",
+        "w-full flex items-center justify-between p-1.5 text-sm font-smallcaps transition-colors duration-200 cursor-pointer rounded-md mb-1 bg-black/20 border border-white/10 hover:border-white/20",
         isSelected ? "text-white" : "text-gray-300 hover:text-white"
       )}
       style={{
@@ -194,7 +191,7 @@ const FilterOption = ({
         {typeof icon === "string" ? (
           <span
             className="w-4 h-4 mr-1.5 flex-shrink-0"
-            dangerouslySetInnerHTML={{ __html: icon }}
+            dangerouslySetInnerHTML={{ __html: sanitizeSvgIcon(icon) }}
           />
         ) : icon ? (
           <span className="mr-1.5 flex-shrink-0">{icon}</span>
@@ -334,7 +331,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
                   placeholder={t('placeholders.search_version')}
                   value={gameVersionSearchTerm}
                   onChange={(e) => onGameVersionSearchTermChange(e.target.value)}
-                  className="bg-transparent text-white placeholder-white/50 font-minecraft-ten text-xs flex-1 outline-none min-w-0"
+                  className="bg-transparent text-white placeholder-white/50 font-minecraft text-xs flex-1 outline-none min-w-0"
                 />
               </div>
             </div>

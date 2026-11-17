@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +15,7 @@ interface ModalProps {
   footer?: React.ReactNode;
   width?: "sm" | "md" | "lg" | "xl" | "full";
   closeOnClickOutside?: boolean;
+  hideCloseButton?: boolean;
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
@@ -32,6 +31,7 @@ export function Modal({
   footer,
   width = "md",
   closeOnClickOutside = true,
+  hideCloseButton = false,
   headerActions,
   variant = "default",
   className,
@@ -44,9 +44,6 @@ export function Modal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
   const [isClosing, setIsClosing] = useState(false);
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -119,12 +116,12 @@ export function Modal({
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md-anyos"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md glass-scrim"
       onClick={handleBackdropClick}
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "glass-panel relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
@@ -152,14 +149,14 @@ export function Modal({
             backgroundColor: `${accentColor.value}30`,
           }}
         >
-          <div className="flex items-start space-x-3">
+          <div className="flex items-center space-x-3">
             {titleIcon && (
-              <span className="text-white flex-shrink-0 pt-1.5">
+              <span className="text-white flex-shrink-0 flex items-center">
                 {titleIcon}
               </span>
             )}
             <div className="flex flex-col">
-              <h2 className="text-3xl font-minecraft text-white lowercase">
+              <h2 className="text-lg font-smallcaps text-white">
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}
@@ -167,17 +164,19 @@ export function Modal({
           </div>
           <div className="flex items-center space-x-2">
             {headerActions}
-            <IconButton
-              ref={closeButtonRef}
-              icon={<Icon icon="solar:close-circle-bold" />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              variant="ghost"
-              size="sm"
-              aria-label={t('common.close_modal')}
-            />
+            {!hideCloseButton && (
+              <IconButton
+                ref={closeButtonRef}
+                icon={<Icon icon="solar:close-circle-bold" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                variant="ghost"
+                size="sm"
+                aria-label={t('common.close_modal')}
+              />
+            )}
           </div>
         </div>
 
