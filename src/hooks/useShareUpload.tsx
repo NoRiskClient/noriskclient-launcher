@@ -2,10 +2,10 @@ import { useCallback } from "react";
 import { create } from "zustand";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 import { ProgressToast } from "../components/ui/ProgressToast";
-import { openExternalUrl } from "../services/tauri-service";
+import { showShareSuccess } from "../components/share/share-toast";
+import { logError } from "../utils/logging-utils";
 import {
   onShareProgress,
   shareErrorKey,
@@ -57,31 +57,10 @@ export function useShareUpload() {
       try {
         const { pageUrl } = await shareMedia(target, progressId, options);
         finished = true;
-        const copied = await writeText(pageUrl).then(
-          () => true,
-          () => false,
-        );
-        toast.success(
-          (shown) => (
-            <span className="flex items-center gap-3">
-              <span>{copied ? t("share.done_copied") : t("share.done")}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  toast.dismiss(shown.id);
-                  openExternalUrl(pageUrl).catch((e) => console.error("Could not open the share", e));
-                }}
-                className="shrink-0 px-2 py-1 rounded-md border border-white/15 text-white/70 hover:text-white hover:border-white/35 transition-colors"
-              >
-                {t("share.open")}
-              </button>
-            </span>
-          ),
-          { id: toastId, duration: 10_000 },
-        );
+        await showShareSuccess(pageUrl, toastId);
       } catch (e) {
         finished = true;
-        console.error("Could not share", e);
+        logError(`Could not share: ${e}`);
         toast.error(t(shareErrorKey(e)), { id: toastId, duration: 6_000 });
       } finally {
         unlisten?.();

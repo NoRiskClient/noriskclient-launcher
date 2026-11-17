@@ -6,6 +6,7 @@
  * stack-trace-inherit filter logic.
  */
 
+import { shareLogWithToast } from "../../../share/share-toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
@@ -18,7 +19,6 @@ import {
   getLogFileContent,
   getProfileLogFiles,
   openLogFileDirectory,
-  uploadLog,
   parseLogLinesFromString,
   LOG_LEVELS,
   type LogLevel,
@@ -185,19 +185,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
     if (!rawContent || !selectedPath || isUploading) return;
     setIsUploading(true);
     try {
-      const url = await toast.promise(
-        uploadLog(rawContent, getFilename(selectedPath)),
-        {
-          loading: t("profiles.v3.logs.uploading"),
-          success: (u: string) => t("profiles.v3.logs.uploadSuccess", { url: u }),
-          error: (err) => t("profiles.v3.logs.uploadFailed", { error: parseErrorMessage(err) }),
-        },
-      );
-      // Copy URL to clipboard so the user can paste it straight into a chat.
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(t("profiles.v3.logs.urlCopied"));
-      } catch { /* clipboard blocked — fine */ }
+      await shareLogWithToast(rawContent, getFilename(selectedPath));
     } finally {
       if (mountedRef.current) setIsUploading(false);
     }

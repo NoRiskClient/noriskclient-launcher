@@ -1,3 +1,4 @@
+import { shareLogWithToast } from "../share/share-toast";
 import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
@@ -6,11 +7,8 @@ import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useLogSettingsStore } from "../../store/useLogSettingsStore";
 import { LogEntry, LogLevel } from "../../store/useProcessStore";
-import { openExternalUrl } from "../../services/tauri-service";
-import { uploadLog } from "../../services/log-service";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { parseErrorMessage } from "../../utils/error-utils";
 
 // Hex colors for filter buttons
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -482,18 +480,7 @@ export function LogViewerCore({
         .join("\n");
 
       const name = selectedLogPath?.split(/[\\/]/).pop() || "latest.log";
-      const url = await uploadLog(logText, name);
-
-      await writeText(url);
-      toast.success(t('logs.uploaded_url_copied'));
-      await openExternalUrl(url);
-    } catch (error) {
-      console.error("Failed to upload logs:", error);
-      // Extract error message properly from Tauri CommandError
-      const errorMessage = error && typeof error === 'object' && 'message' in error
-        ? (error as { message: string }).message
-        : parseErrorMessage(error);
-      toast.error(errorMessage || t('logs.upload_failed'));
+      await shareLogWithToast(logText, name);
     } finally {
       setIsUploading(false);
     }
