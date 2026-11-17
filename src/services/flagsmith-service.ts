@@ -292,32 +292,25 @@ export const getModNoRiskStatus = (
   modrinthProjectId?: string | null,
   versionId?: string | null,
 ): 'blocked' | 'warning' | null => {
-  console.log('[getModNoRiskStatus] Called with filename:', filename, 'projectId:', modrinthProjectId, 'versionId:', versionId, 'cachedConfig:', cachedBlockedModsConfig);
-
   if (!cachedBlockedModsConfig) {
-    console.log('[getModNoRiskStatus] Config not cached, returning null');
     // Silently return null if config is not loaded. The UI should trigger the load.
     return null;
   }
 
   const config = cachedBlockedModsConfig;
-  console.log('[getModNoRiskStatus] Checking against config:', config);
 
   // 1. Check exact filename match (blocked)
   if (config.exact_filenames?.includes(filename)) {
-    console.log('[getModNoRiskStatus] MATCHED exact filename - BLOCKED!');
     return 'blocked';
   }
 
   // 2. Check Modrinth project ID for blocking
   if (modrinthProjectId && config.modrinth_project_ids?.includes(modrinthProjectId)) {
-    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - BLOCKED!');
     return 'blocked';
   }
 
   // 3. Check version ID (mod_ids) (blocked)
   if (versionId && config.mod_ids?.includes(versionId)) {
-    console.log('[getModNoRiskStatus] MATCHED version ID (mod_id) - BLOCKED!');
     return 'blocked';
   }
 
@@ -328,7 +321,6 @@ export const getModNoRiskStatus = (
         // The pattern from Flagsmith is already a complete regex.
         const regex = new RegExp(pattern);
         if (regex.test(filename)) {
-          console.log('[getModNoRiskStatus] MATCHED filename pattern - BLOCKED!', pattern);
           return 'blocked';
         }
       } catch (e) {
@@ -339,10 +331,8 @@ export const getModNoRiskStatus = (
 
   // 5. Check Modrinth project ID for warnings (only if not blocked)
   if (modrinthProjectId && config.warning_project_ids?.includes(modrinthProjectId)) {
-    console.log('[getModNoRiskStatus] MATCHED Modrinth project ID - WARNING!');
     return 'warning';
   }
 
-  console.log('[getModNoRiskStatus] No match found, returning null');
   return null;
 };

@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ScreenshotsTabV3 — Gallery-Grid mit Hover-Overlay + Fullscreen-Modal.
  * Ersetzt V2 ScreenshotsTab. Reused V2 ProfileScreenshotModal unveraendert.

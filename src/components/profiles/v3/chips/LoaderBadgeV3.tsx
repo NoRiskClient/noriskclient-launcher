@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LoaderBadgeV3 — the loader icon sitting on the bottom-right corner of the
  * profile picture, a clickable trigger for LoaderPickerV3. Frameless: the

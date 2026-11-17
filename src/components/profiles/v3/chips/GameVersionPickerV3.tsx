@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * GameVersionPickerV3 — presentational command-palette picker for a Minecraft
  * version. Data and mutation are owned by `useHeroChipEditors`; this

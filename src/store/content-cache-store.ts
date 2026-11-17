@@ -23,7 +23,6 @@ interface ContentCacheState {
   getEntry: <T>(key: string) => ContentCacheEntry<T> | undefined;
   setEntry: <T>(key: string, patch: Partial<ContentCacheEntry<T>>) => void;
   invalidate: (key: string) => void;
-  invalidateProfile: (profileId: string) => void;
 
   modpackVersions: Record<string, UnifiedModpackVersionsResponse>;
   getModpackVersions: (sourceKey: string) => UnifiedModpackVersionsResponse | undefined;
@@ -73,15 +72,6 @@ export const useContentCacheStore = create<ContentCacheState>((set, get) => ({
       if (!state.entries[key]) return state;
       const entries = { ...state.entries };
       delete entries[key];
-      return { entries };
-    }),
-
-  invalidateProfile: (profileId) =>
-    set((state) => {
-      const entries = { ...state.entries };
-      for (const key of Object.keys(entries)) {
-        if (key.startsWith(`${profileId}:`)) delete entries[key];
-      }
       return { entries };
     }),
 

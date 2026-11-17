@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { EmptyState } from "../ui/EmptyState";

@@ -1,5 +1,3 @@
-"use client";
-
 import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 
 import { useCallback, useEffect, useState } from "react";

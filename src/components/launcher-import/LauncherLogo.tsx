@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 
 import { launcherIcon } from "../../lib/launcher-meta";

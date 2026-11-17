@@ -1,5 +1,3 @@
-"use client";
-
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";

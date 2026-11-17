@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import { listen, Event as TauriEvent } from "@tauri-apps/api/event";
 import { EventPayload as FrontendEventPayload, EventType as FrontendEventType } from "../types/events";

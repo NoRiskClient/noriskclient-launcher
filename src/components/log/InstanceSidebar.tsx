@@ -5,8 +5,8 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen, emitTo, type UnlistenFn } from "@tauri-apps/api/event";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useProcessStore, getProcessStatus, ProcessMetrics } from "../../store/useProcessStore";
-import { useLaunchStateStore, LaunchState } from "../../store/launch-state-store";
-import { ProcessMetadata, ProcessState } from "../../types/processState";
+import { useLaunchStateStore } from "../../store/launch-state-store";
+import { ProcessMetadata } from "../../types/processState";
 import { EventType } from "../../types/events";
 import * as ProcessService from "../../services/process-service";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
@@ -95,9 +95,6 @@ function processToInstance(process: ProcessMetadata, metrics?: ProcessMetrics, e
     accountName: process.account_name || undefined,
   };
 }
-
-import { loaderIconSrc } from "../../lib/loader-icons";
-const getLoaderIcon = loaderIconSrc;
 
 // Get status color
 const getStatusColor = (status: InstanceStatus): string => {

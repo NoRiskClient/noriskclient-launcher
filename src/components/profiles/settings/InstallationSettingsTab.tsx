@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { ModLoader, Profile } from "../../../types/profile";
@@ -47,7 +45,6 @@ export function InstallationSettingsTab({
   const [searchQuery, setSearchQuery] = useState("");
 
   const resolvedLoaderVersion = useResolvedLoaderVersion(editedProfile, refreshTrigger);
-  const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
   );

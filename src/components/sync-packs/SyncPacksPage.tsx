@@ -1,5 +1,3 @@
-"use client";
-
 import { toast } from "react-hot-toast";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

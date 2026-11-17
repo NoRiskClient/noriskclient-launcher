@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { BlogPost } from '../types/wordPress';
 import type { LauncherUpdate, UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
-import type { AdventCalendarDay, Reward } from '../types/advent';
+import type { AdventCalendarDay } from '../types/advent';
 import type { UserNotification } from '../types/notification';
 import type {
   AfkPointsBalance,

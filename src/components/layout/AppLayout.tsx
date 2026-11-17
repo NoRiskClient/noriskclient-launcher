@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
@@ -22,7 +20,6 @@ import { NebulaGrid } from ".././effects/NebulaGrid";
 import { NebulaVoxels } from ".././effects/NebulaVoxels";
 import { NebulaLightning } from ".././effects/NebulaLightning";
 import { NebulaLiquidChrome } from ".././effects/NebulaLiquidChrome";
-import { RetroGridEffect } from "../effects/RetroGridEffect";
 import PlainBackground from "../effects/PlainBackground";
 import CustomMediaBackground from "../effects/CustomMediaBackground";
 import { Snowfall } from "../../features/snow-effect/Snowfall";
@@ -45,7 +42,7 @@ import { ProfileWizardV2Modal } from "../modals/ProfileWizardV2Modal";
 import { ProfileSettingsModal } from "../modals/ProfileSettingsModal";
 import { SettingsModal } from "../modals/SettingsModal";
 import { ProfileDuplicateModal } from "../modals/ProfileDuplicateModal";
-import { exit, relaunch } from '@tauri-apps/plugin-process';
+import { exit } from '@tauri-apps/plugin-process';
 import { Tooltip } from "../ui/Tooltip";
 import { HeaderInfoCarousel } from "../header/HeaderInfoCarousel";
 import { toast } from 'react-hot-toast';
@@ -98,10 +95,10 @@ export function AppLayout({
     { id: "settings", icon: "solar:settings-bold", label: t("nav.settings"), isAction: true },
   ];
   const { qualityLevel } = useQualitySettingsStore();
-  const { isBackgroundAnimationEnabled, accentColor: themeAccentColor, accentColor } = useThemeStore();
+  const { accentColor: themeAccentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const { connectWebSocket, loadCurrentUser, loadFriends } = useFriendsStore();
+  const { loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
 
   // TODO: Re-enable when WebSocket is stable
@@ -459,35 +456,6 @@ function HeaderBar({ minimizeRef, maximizeRef, closeRef }: HeaderBarProps) {
     } finally {
       setIsUpdating(false);
     }
-  };
-
-  // Calculate complementary/update highlight color based on current accent
-  const getUpdateHighlightColor = () => {
-    const hexToRgb = (hex: string) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result
-        ? {
-            r: Number.parseInt(result[1], 16),
-            g: Number.parseInt(result[2], 16),
-            b: Number.parseInt(result[3], 16),
-          }
-        : { r: 245, g: 158, b: 11 }; // fallback to amber
-    };
-
-    const rgb = hexToRgb(accentColor.value);
-
-    // Calculate a complementary warning color
-    // Mix current accent with amber/yellow for good visibility
-    const accentWeight = 0.4; // How much of the accent color to include
-    const warningWeight = 0.9; // How much of the warning color (amber)
-
-    const warningRgb = { r: 245, g: 158, b: 100 }; // Amber base
-
-    const mixedR = Math.round(rgb.r * accentWeight + warningRgb.r * warningWeight);
-    const mixedG = Math.round(rgb.g * accentWeight + warningRgb.g * warningWeight);
-    const mixedB = Math.round(rgb.b * accentWeight + warningRgb.b * warningWeight);
-
-    return `rgb(${mixedR}, ${mixedG}, ${mixedB})`;
   };
 
   useEffect(() => {

@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ProfileDetailViewV3 — Redesign des Profile-Detail-Views.
  *
@@ -82,13 +80,6 @@ interface ProfileDetailViewV3Props {
 }
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
-const Chip: React.FC<{ icon?: string; children: React.ReactNode }> = ({ icon, children }) => (
-  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft">
-    {icon && <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />}
-    {children}
-  </span>
-);
-
 const Stat: React.FC<{ icon: string; label: string; value: string; muted?: boolean }> = ({ icon, label, value, muted }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-colors min-w-[160px] max-w-[240px]">
     <Icon icon={icon} className={`w-5 h-5 flex-shrink-0 ${muted ? "text-white/25" : "text-white/60"}`} />

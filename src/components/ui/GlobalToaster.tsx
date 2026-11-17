@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";

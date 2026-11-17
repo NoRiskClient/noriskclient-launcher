@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ThemedDropdown — Accent-getoentes Dropdown-Primitive fuer V3.
  *

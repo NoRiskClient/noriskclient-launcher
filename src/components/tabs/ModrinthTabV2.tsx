@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useMemo } from "react";
 import { ModrinthSearchV2 } from "../modrinth/v2/ModrinthSearchV2";
 import type { Profile } from "../../types/profile";

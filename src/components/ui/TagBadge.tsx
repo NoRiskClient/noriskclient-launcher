@@ -1,16 +1,10 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { ThemedSurface } from "./ThemedSurface";
 import { 
   getVariantColors, 
-  getSizeClasses,
-  getBorderRadiusClass,
   getAccessibilityProps,
-  getTextSizeClass,
   type ComponentSize,
   type ComponentVariant 
 } from "./design-system";
@@ -45,7 +39,6 @@ export const TagBadge = forwardRef<HTMLElement, TagBadgeProps>(
   ) => {
     const badgeRef = useRef<HTMLElement>(null);
     const accentColor = useThemeStore((state) => state.accentColor);
-    const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const isClickable = !!onClick && !disabled;

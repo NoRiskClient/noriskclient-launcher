@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { type Event as TauriEvent, listen } from "@tauri-apps/api/event";

@@ -1,5 +1,3 @@
-"use client";
-
 import { Fragment, type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Icon } from "@iconify/react";

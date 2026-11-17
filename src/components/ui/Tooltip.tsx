@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
