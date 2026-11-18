@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use log::{debug, error, info, warn};
+use log::{debug, error};
 use std::path::Path;
 use sysinfo::Disks;
 
@@ -18,16 +18,6 @@ impl DiskSpaceInfo {
     /// Get available space in human readable format
     pub fn available_human(&self) -> String {
         format_bytes(self.available_bytes)
-    }
-
-    /// Get total space in human readable format
-    pub fn total_human(&self) -> String {
-        format_bytes(self.total_bytes)
-    }
-
-    /// Get used space in human readable format
-    pub fn used_human(&self) -> String {
-        format_bytes(self.used_bytes)
     }
 
     /// Check if there's enough space for the required bytes with a buffer
@@ -170,34 +160,6 @@ impl DiskSpaceUtils {
     #[cfg(not(unix))]
     fn statvfs_single(_path: &Path) -> Option<DiskSpaceInfo> {
         None
-    }
-
-    /// Check if there's enough space for a download with buffer
-    pub async fn check_space_for_download<P: AsRef<Path>>(
-        path: P,
-        required_bytes: u64,
-        buffer_percentage: f64,
-    ) -> Result<bool> {
-        let space_info = Self::get_disk_space(path).await?;
-        let has_space = space_info.has_enough_space(required_bytes, buffer_percentage);
-
-        if has_space {
-            info!(
-                "Disk space check passed: {} available, {} required (+{}% buffer)",
-                space_info.available_human(),
-                format_bytes(required_bytes),
-                (buffer_percentage * 100.0) as u32
-            );
-        } else {
-            warn!(
-                "Insufficient disk space: {} available, {} required (+{}% buffer)",
-                space_info.available_human(),
-                format_bytes(required_bytes),
-                (buffer_percentage * 100.0) as u32
-            );
-        }
-
-        Ok(has_space)
     }
 
     /// Check space and return detailed error if insufficient

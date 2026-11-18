@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * ProfileLeftRailV3 — einheitliche Linke-Achsen-Navigation fuer den
  * Detail-View. Merged die frueheren Main-Tabs (content/worlds/screenshots/logs)

@@ -2,6 +2,7 @@ use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::utils::hash_utils;
+use crate::utils::verified_files;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use futures::stream::StreamExt;
 use log::{debug, error, trace, warn};
@@ -132,11 +133,6 @@ impl DownloadConfig {
         self
     }
 
-    pub fn with_user_agent<S: Into<String>>(mut self, user_agent: S) -> Self {
-        self.user_agent = Some(user_agent.into());
-        self
-    }
-
     pub fn with_progress_callback<F>(mut self, callback: F) -> Self
     where
         F: Fn(u64, Option<u64>) + Send + Sync + 'static,
@@ -147,11 +143,6 @@ impl DownloadConfig {
 
     pub fn with_disk_space_check(mut self, check: bool) -> Self {
         self.check_disk_space = check;
-        self
-    }
-
-    pub fn with_disk_space_buffer(mut self, buffer_percentage: f64) -> Self {
-        self.disk_space_buffer = buffer_percentage;
         self
     }
 
@@ -269,16 +260,6 @@ impl DownloadUtils {
         expected_sha1: &str,
     ) -> Result<()> {
         let config = DownloadConfig::default().with_sha1(expected_sha1);
-        Self::download_file(url, target_path, config).await
-    }
-
-    /// Download with size verification
-    pub async fn download_with_size<P: AsRef<Path>>(
-        url: &str,
-        target_path: P,
-        expected_size: u64,
-    ) -> Result<()> {
-        let config = DownloadConfig::default().with_size(expected_size);
         Self::download_file(url, target_path, config).await
     }
 
@@ -530,13 +511,16 @@ impl DownloadUtils {
 
         // Check SHA1 hash (slower - reads entire file)
         if let Some(expected_sha1) = config.expected_sha1.as_ref().filter(|_| config.hash_existing_files) {
-            let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
-            if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
-                debug!(
-                    "SHA1 mismatch for existing file {:?}: expected {}, got {}",
-                    target_path, expected_sha1, calculated_hash
-                );
-                return Ok(false);
+            if !verified_files::is_verified(target_path, Some(expected_sha1)).await {
+                let calculated_hash = hash_utils::calculate_sha1_from_file(target_path).await?;
+                if !calculated_hash.eq_ignore_ascii_case(expected_sha1) {
+                    debug!(
+                        "SHA1 mismatch for existing file {:?}: expected {}, got {}",
+                        target_path, expected_sha1, calculated_hash
+                    );
+                    return Ok(false);
+                }
+                verified_files::mark_verified(target_path, Some(expected_sha1)).await;
             }
         }
 
@@ -614,6 +598,10 @@ impl DownloadUtils {
                 error!("{}", error_msg);
                 return Err(AppError::Download(error_msg));
             }
+        }
+
+        if let Some(expected_sha1) = &config.expected_sha1 {
+            verified_files::mark_verified(target_path, Some(expected_sha1)).await;
         }
 
         trace!("Downloaded file passed all verifications: {:?}", target_path);

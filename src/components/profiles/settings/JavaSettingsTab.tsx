@@ -1,23 +1,27 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { Profile } from "../../../types/profile";
-import { Button } from "../../ui/buttons/Button";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { RangeSlider } from "../../ui/RangeSlider";
-import { Input, SearchStyleTextArea } from "../../ui/Input";
-import { Checkbox } from "../../ui/Checkbox";
-import { Card } from "../../ui/Card";
+import { SearchStyleTextArea } from "../../ui/Input";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { Chip, IconAction, Section } from "./SettingsSection";
 import { gsap } from "gsap";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
-import { cn } from "../../../lib/utils";
 import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalCustomJvmArgs, setGlobalCustomJvmArgs } from "../../../services/launcher-config-service";
 import type { MemorySettings } from "../../../types/launcherConfig";
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../../utils/error-utils";
+
+const MEMORY_PRESETS_GB = [2, 4, 6, 8, 12, 16];
+const HIGH_MEMORY_SHARE = 0.75;
+
+function formatGb(mb: number): string {
+  const gb = mb / 1024;
+  return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
+}
 
 interface JavaSettingsTabProps {
   editedProfile: Profile;
@@ -28,13 +32,12 @@ interface JavaSettingsTabProps {
   setTempRamMb: (value: number) => void;
 }
 
-// New type for Java Installation
 interface JavaInstallation {
   path: string;
   major_version: number;
   vendor: string;
   architecture: string;
-  is_default?: boolean; // Optional: if your backend provides this
+  is_default?: boolean;
 }
 
 export function JavaSettingsTab({
@@ -57,35 +60,20 @@ export function JavaSettingsTab({
     (state) => state.isBackgroundAnimationEnabled,
   );
   const tabRef = useRef<HTMLDivElement>(null);
-  const javaInstallRef = useRef<HTMLDivElement>(null);
-  const memoryRef = useRef<HTMLDivElement>(null);
-  const argsRef = useRef<HTMLDivElement>(null);
 
-  // New state variables for Java detection and validation
   const [detectedJavaInstallations, setDetectedJavaInstallations] = useState<
     JavaInstallation[]
   >([]);
   const [isDetectingJava, setIsDetectingJava] = useState(false);
-  const [javaDetectionError, setJavaDetectionError] = useState<string | null>(
-    null,
-  );
   const [customJavaPathInput, setCustomJavaPathInput] = useState(
     editedProfile.settings?.java_path || "",
   );
   const [isValidatingJavaPath, setIsValidatingJavaPath] = useState(false);
-  const [validationResult, setValidationResult] = useState<
-    "valid" | "invalid" | "error" | null
-  >(null);
-  const [validationMessage, setValidationMessage] = useState<string | null>(
-    null,
-  );
   
-  // Global memory settings for standard profiles
   const [globalMemorySettings, setGlobalMemorySettingsState] = useState<MemorySettings | null>(null);
   const [isLoadingGlobalMemory, setIsLoadingGlobalMemory] = useState(false);
   const [isSystemRamLoaded, setIsSystemRamLoaded] = useState(false);
 
-  // Global JVM args for standard profiles
   const [globalJvmArgs, setGlobalJvmArgsState] = useState<string | null>(null);
   const [isLoadingGlobalJvmArgs, setIsLoadingGlobalJvmArgs] = useState(false);
   
@@ -99,35 +87,11 @@ export function JavaSettingsTab({
           { opacity: 1, duration: 0.4, ease: "power2.out" },
         );
       }
-
-      const elements = [
-        javaInstallRef.current,
-        memoryRef.current,
-        argsRef.current,
-      ].filter(Boolean);
-
-      if (elements.length > 0) {
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 20 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.4,
-            stagger: 0.1,
-            ease: "power2.out",
-            delay: 0.2,
-          },
-        );
-      }
     }
   }, [isBackgroundAnimationEnabled]);
 
   const detectJavaInstallations = async () => {
     setIsDetectingJava(true);
-    setJavaDetectionError(null);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const installations: JavaInstallation[] = await invoke(
         "detect_java_installations_command",
@@ -144,14 +108,12 @@ export function JavaSettingsTab({
           : installations.find((inst) => inst.is_default) || installations[0];
         if (preselected) {
           setCustomJavaPathInput(preselected.path);
-          // await testCustomJavaPath(preselected.path); // Optionally auto-test
         }
       }
     } catch (error) {
       console.error("Error detecting Java installations:", error);
       const errorMessage =
         parseErrorMessage(error);
-      setJavaDetectionError(errorMessage); // Store for internal reference if needed
       toast.error(t('java.detect_failed', { error: errorMessage }));
       setDetectedJavaInstallations([]);
     } finally {
@@ -163,21 +125,18 @@ export function JavaSettingsTab({
     detectJavaInstallations();
   }, []);
 
-  // Track when systemRam changes from initial value
   useEffect(() => {
     if (systemRam !== 8192) {
       setIsSystemRamLoaded(true);
     }
   }, [systemRam]);
 
-  // Load global memory settings for standard profiles
   useEffect(() => {
     if (editedProfile.is_standard_version) {
       setIsLoadingGlobalMemory(true);
       getGlobalMemorySettings()
         .then((settings) => {
           setGlobalMemorySettingsState(settings);
-          // Synchronize tempRamMb with global settings for standard profiles
           setTempRamMb(settings.max);
         })
         .catch((error) => {
@@ -188,19 +147,16 @@ export function JavaSettingsTab({
           setIsLoadingGlobalMemory(false);
         });
     } else {
-      // For custom profiles, we're not loading anything
       setIsLoadingGlobalMemory(false);
     }
   }, [editedProfile.is_standard_version, setTempRamMb]);
 
-  // Load global JVM args for standard profiles
   useEffect(() => {
     if (editedProfile.is_standard_version) {
       setIsLoadingGlobalJvmArgs(true);
       getGlobalCustomJvmArgs()
         .then((args) => {
           setGlobalJvmArgsState(args);
-          // Initialize useCustomArgs based on whether global args exist
           setUseCustomArgs((args?.length || 0) > 0);
         })
         .catch((error) => {
@@ -242,14 +198,11 @@ export function JavaSettingsTab({
       return;
     }
     setIsValidatingJavaPath(true);
-    setValidationResult(null);
-    setValidationMessage(null);
     try {
       const isValid: boolean = await invoke("validate_java_path_command", {
         path: currentPath,
       });
       if (isValid) {
-        setValidationResult("valid");
         toast.success(t('java.path_valid'));
         updateProfile({
           settings: {
@@ -259,12 +212,10 @@ export function JavaSettingsTab({
           },
         });
       } else {
-        setValidationResult("invalid");
         toast.error(t('java.path_invalid'));
       }
     } catch (error: any) {
       console.error(`Error validating Java path ${currentPath}:`, error);
-      setValidationResult("error");
       const message = error?.message?.includes("Java path does not exist")
         ? t('java.path_not_exist')
         : error?.message || parseErrorMessage(error);
@@ -276,14 +227,12 @@ export function JavaSettingsTab({
 
   const recommendedMaxRam = Math.min(recommendedRam, systemRam);
   
-  // Use global memory settings for standard profiles, profile settings for custom profiles
   const memory = editedProfile.is_standard_version
     ? (globalMemorySettings || { min: 1024, max: recommendedMaxRam })
     : (editedProfile.settings?.memory || { min: 1024, max: recommendedMaxRam });
 
   const handleMemoryChange = async (value: number) => {
     if (editedProfile.is_standard_version) {
-      // For standard profiles, save to global settings
       const newGlobalSettings: MemorySettings = {
         min: memory.min,
         max: value,
@@ -297,7 +246,6 @@ export function JavaSettingsTab({
         toast.error(t('java.save_ram_failed'));
       }
     } else {
-      // For custom profiles, save to profile settings
       const newSettings = { ...editedProfile.settings };
       if (!newSettings.memory) {
         newSettings.memory = {
@@ -313,17 +261,15 @@ export function JavaSettingsTab({
 
   const handleJavaPathInputChange = (newPath: string) => {
     setCustomJavaPathInput(newPath);
-    setValidationResult(null);
   };
 
   const handleDetectedJavaListItemClick = (installation: JavaInstallation) => {
     setCustomJavaPathInput(installation.path);
-    testCustomJavaPath(installation.path); // Auto-test selected detected path
+    testCustomJavaPath(installation.path);
   };
 
   const handleJavaArgsChange = async (args: string) => {
     if (editedProfile.is_standard_version) {
-      // For standard profiles, save to global settings
       try {
         await setGlobalCustomJvmArgs(args || null);
         setGlobalJvmArgsState(args || null);
@@ -332,7 +278,6 @@ export function JavaSettingsTab({
         toast.error(t('java.save_jvm_failed'));
       }
     } else {
-      // For custom profiles, save to profile settings
       const newSettings = { ...editedProfile.settings };
       newSettings.custom_jvm_args = args;
       updateProfile({ settings: newSettings });
@@ -355,7 +300,6 @@ export function JavaSettingsTab({
       updateProfile({
         settings: { ...editedProfile.settings, use_custom_java_path: false },
       });
-      setValidationResult(null);
     }
   };
 
@@ -369,7 +313,6 @@ export function JavaSettingsTab({
     ].join(" ");
 
     if (editedProfile.is_standard_version) {
-      // For standard profiles, save to global settings
       try {
         if (checked) {
           const argsToSet = globalJvmArgs || defaultArgs;
@@ -384,7 +327,6 @@ export function JavaSettingsTab({
         toast.error(t('java.save_jvm_failed'));
       }
     } else {
-      // For custom profiles, save to profile settings
       const newSettings = { ...editedProfile.settings };
       if (checked) {
         if (!newSettings.custom_jvm_args) {
@@ -396,257 +338,192 @@ export function JavaSettingsTab({
       updateProfile({ settings: newSettings });
     }
 
-    if (checked && isBackgroundAnimationEnabled) {
-      const textareaContainer = argsRef.current?.querySelector(
-        ".custom-args-textarea",
-      );
-      if (textareaContainer) {
-        gsap.fromTo(
-          textareaContainer,
-          { opacity: 0, height: 0 },
-          {
-            opacity: 1,
-            height: "auto",
-            duration: 0.3,
-            ease: "power2.out",
-          },
-        );
-      }
-    }
   };
 
 
+  const isStandard = editedProfile.is_standard_version;
+  const memoryLoading = (isStandard && (isLoadingGlobalMemory || !globalMemorySettings)) || !isSystemRamLoaded;
+  const presets = MEMORY_PRESETS_GB.map((gb) => gb * 1024).filter((mb) => mb <= systemRam);
+  const selectRam = (value: number) => {
+    setTempRamMb(value);
+    if (isStandard) handleMemoryChange(value);
+  };
+
   return (
-    <div ref={tabRef} className="space-y-6 select-none">
-      <div ref={memoryRef} className="space-y-4">
-        <div>
-          <h3 className="text-lg font-smallcaps text-white mb-3">
-            {editedProfile.is_standard_version ? t('profiles.settings.globalMemoryAllocated') : t('profiles.settings.memoryAllocated')}
-          </h3>
-          <Card
-            variant="flat"
-            className="p-4 border border-white/10 bg-black/20"
-          >
-            {(editedProfile.is_standard_version && (isLoadingGlobalMemory || !globalMemorySettings)) || !isSystemRamLoaded ? (
-              <div className="flex items-center justify-center py-8">
-                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
-                <span className="text-white font-smallcaps">
-                  {t('profiles.settings.loadingSettings')}
-                </span>
-              </div>
-            ) : (
-              <>
-                <RangeSlider
-                  value={tempRamMb}
-                  onChange={(value) => {
-                    setTempRamMb(value);
-                    // For standard profiles, save to global settings immediately
-                    if (editedProfile.is_standard_version) {
-                      handleMemoryChange(value);
-                    }
-                  }}
-                  min={512}
-                  max={systemRam}
-                  step={512}
-                  valueLabel={`${tempRamMb} MB (${(tempRamMb / 1024).toFixed(1)} GB)`}
-                  minLabel="512 MB"
-                  maxLabel={`${systemRam} MB`}
-                  variant="flat"
-                  recommendedRange={[4096, 8192]}
-                  unit="MB"
-                />
-                <div className="mt-3 text-xs text-white/70 tracking-wide font-minecraft">
-                  {t('profiles.settings.recommended')}: {recommendedMaxRam} MB (
-                  {(recommendedMaxRam / 1024).toFixed(1)} GB)
-                  {editedProfile.is_standard_version && (
-                    <div className="mt-1 text-accent font-minecraft">
-                      {t('profiles.settings.appliesToAllStandard')}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </Card>
-        </div>
-      </div>
-
-      <div ref={javaInstallRef} className="space-y-4">
-        <div>
-
-          <div className="mb-3">
-            <Checkbox
-              checked={useCustomJava}
-              onChange={(e) => handleCustomJavaToggle(e.target.checked)}
-              label={t('profiles.settings.customJavaInstallation')}
-              className="text-base"
+    <div ref={tabRef} className="space-y-4 select-none">
+      <Section
+        title={isStandard ? t("profiles.settings.globalMemoryAllocated") : t("profiles.settings.memoryAllocated")}
+        aside={!memoryLoading && <span className="font-minecraft text-2xl text-white">{formatGb(tempRamMb)}</span>}
+      >
+        {memoryLoading ? (
+          <div className="flex items-center gap-2 py-2 font-smallcaps text-white/60">
+            <Icon icon="svg-spinners:ring-resize" className="h-5 w-5" />
+            {t("profiles.settings.loadingSettings")}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((mb) => (
+                <Chip
+                  key={mb}
+                  active={mb === tempRamMb}
+                  marked={mb === recommendedMaxRam}
+                  accent={accentColor.value}
+                  onClick={() => selectRam(mb)}
+                  className="px-3 py-1 text-sm"
+                >
+                  {formatGb(mb)}
+                </Chip>
+              ))}
+            </div>
+            <RangeSlider
+              value={tempRamMb}
+              onChange={selectRam}
+              min={512}
+              max={systemRam}
+              step={512}
+              showValue={false}
               variant="flat"
             />
-          </div>
-
-          {!useCustomJava && (
-            <div className="mt-3">
-              <div className="text-base text-white font-smallcaps mb-2 tracking-wide select-none">
-                {t('profiles.settings.usingDefaultJava')}
-              </div>
-              <div className="text-xs text-white/70 font-minecraft break-all lowercase tracking-wide select-none">
-                {t('profiles.settings.defaultJavaDescription')}
-              </div>
+            <div className="flex justify-between font-minecraft text-xs text-white/40">
+              <span>{formatGb(512)}</span>
+              <span>
+                {t("profiles.settings.recommended")}: {formatGb(recommendedMaxRam)}
+              </span>
+              <span>{formatGb(systemRam)}</span>
             </div>
-          )}
-
-          {useCustomJava && (
-            <div className="mt-3 space-y-4">
-              {isDetectingJava && (
-                <div className="flex items-center text-white/70 font-smallcaps">
-                  <Icon
-                    icon="svg-spinners:ring-resize"
-                    className="w-5 h-5 mr-2"
-                  />
-                  <span>{t('profiles.settings.detectingJava')}</span>
-                </div>
-              )}
-
-              <div>
-                <label
-                  htmlFor="custom-java-path-input"
-                  className="block text-xs text-white/70 font-minecraft mt-3 mb-2 tracking-wide"
-                >
-                  {t('profiles.settings.manualJavaPath')}
-                </label>
-                <div className="flex gap-3">
-                  <Input
-                    id="custom-java-path-input"
-                    value={customJavaPathInput}
-                    onChange={(e) => handleJavaPathInputChange(e.target.value)}
-                    placeholder={t('placeholders.java_path')}
-                    className="flex-1 text-base py-3"
-                    variant="flat"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={browseForJavaPath}
-                    shadowDepth="short"
-                    icon={
-                      <Icon
-                        icon="solar:folder-with-files-bold"
-                        className="w-5 h-5 text-white"
-                      />
-                    }
-                    className="text-base"
-                    aria-label={t('profiles.settings.browse_java')}
-                  >
-                    {t('profiles.settings.browse')}
-                  </Button>
-                </div>
-              </div>
-
-              {detectedJavaInstallations.length > 0 && !isDetectingJava && (
-                <div className="space-y-2 pt-2">
-                  <h4 className="text-xs text-white/70 font-minecraft mb-2 tracking-wide">
-                    {t('profiles.settings.detectedJavaInstallations')}
-                  </h4>
-                  <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 p-2 bg-black/10 rounded-lg">
-                    {detectedJavaInstallations.map((java) => (
-                      <button
-                        key={java.path}
-                        onClick={() => handleDetectedJavaListItemClick(java)}
-                        title={java.path}
-                        className={cn(
-                          "w-full text-left p-2 border transition-all duration-150 font-minecraft text-xs rounded-md",
-                          customJavaPathInput === java.path
-                            ? "bg-accent/30 border-accent text-white"
-                            : "bg-black/20 border-white/10 hover:bg-black/30 hover:border-white/20 text-white/80",
-                        )}
-                        style={
-                          customJavaPathInput === java.path
-                            ? {
-                                borderColor: accentColor.value,
-                                backgroundColor: `${accentColor.value}20`,
-                              }
-                            : {}
-                        }
-                      >
-                        <span className="block truncate">{java.path}</span>
-                        <span className="block text-xs opacity-70 font-minecraft truncate">
-                          (v{java.major_version} - {java.vendor} -{" "}
-                          {java.architecture})
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Button
-                variant="default"
-                size="md"
-                onClick={() => testCustomJavaPath()}
-                disabled={isValidatingJavaPath || !customJavaPathInput}
-                icon={
-                  isValidatingJavaPath ? (
-                    <Icon
-                      icon="svg-spinners:ring-resize"
-                      className="w-5 h-5"
-                    />
-                  ) : (
-                    <Icon icon="solar:test-tube-bold" className="w-5 h-5" />
-                  )
-                }
-                className="text-base mt-2 w-full sm:w-auto"
-              >
-                {isValidatingJavaPath ? t('profiles.settings.testing') : t('profiles.settings.testAndUsePath')}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div ref={argsRef} className="space-y-4">
-        <div>
-
-        <div className="mb-3">
-          <Checkbox
-            checked={useCustomArgs}
-            onChange={(e) => handleCustomArgsToggle(e.target.checked)}
-            label={editedProfile.is_standard_version ? t('profiles.settings.globalCustomJavaArgs') : t('profiles.settings.customJavaArgs')}
-            className="text-base"
-            variant="flat"
-            disabled={editedProfile.is_standard_version && isLoadingGlobalJvmArgs}
-          />
-        </div>
-
-        {useCustomArgs && (
-          <div className="custom-args-textarea">
-            {editedProfile.is_standard_version && isLoadingGlobalJvmArgs ? (
-              <div className="flex items-center justify-center py-8">
-                <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 text-white mr-3" />
-                <span className="text-white font-smallcaps">{t('profiles.settings.loadingSettings')}</span>
-              </div>
-            ) : (
-              <>
-                <SearchStyleTextArea
-                  value={editedProfile.is_standard_version
-                    ? (globalJvmArgs || "")
-                    : (editedProfile.settings?.custom_jvm_args || "")}
-                  onChange={(e) => handleJavaArgsChange(e.target.value)}
-                  placeholder={t('profiles.settings.enterJavaArgs')}
-                  minHeight="100px"
-                />
-                <p className="mt-2 text-xs text-white/50 font-minecraft tracking-wide">
-                  {t('profiles.settings.javaArgsHint')}
-                  {editedProfile.is_standard_version && (
-                    <span className="block mt-1 text-accent">
-                      {t('profiles.settings.appliesToAllStandard')}
-                    </span>
-                  )}
-                </p>
-              </>
+            {tempRamMb > systemRam * HIGH_MEMORY_SHARE && (
+              <p className="flex items-center gap-2 font-minecraft text-xs text-amber-300/90">
+                <Icon icon="solar:danger-triangle-bold" className="h-4 w-4 shrink-0" />
+                {t("profiles.settings.memoryTooHigh")}
+              </p>
+            )}
+            {isStandard && (
+              <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.appliesToAllStandard")}</p>
             )}
           </div>
         )}
-      </div>
-    </div>
+      </Section>
+
+      <Section
+        title={t("profiles.settings.customJavaInstallation")}
+        aside={<ToggleSwitch checked={useCustomJava} onChange={handleCustomJavaToggle} size="sm" />}
+      >
+        {!useCustomJava ? (
+          <p className="flex items-center gap-2 font-minecraft text-sm text-white/60">
+            <Icon icon="solar:magic-stick-3-bold" className="h-4 w-4 shrink-0" />
+            {t("profiles.settings.defaultJavaDescription")}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {isDetectingJava ? (
+              <div className="flex items-center gap-2 font-smallcaps text-white/60">
+                <Icon icon="svg-spinners:ring-resize" className="h-5 w-5" />
+                {t("profiles.settings.detectingJava")}
+              </div>
+            ) : (
+              detectedJavaInstallations.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.detectedJavaInstallations")}</p>
+                  <div className="custom-scrollbar max-h-48 space-y-1.5 overflow-y-auto">
+                    {detectedJavaInstallations.map((java) => {
+                      const selected = customJavaPathInput === java.path;
+                      return (
+                        <Chip
+                          key={java.path}
+                          active={selected}
+                          accent={accentColor.value}
+                          onClick={() => handleDetectedJavaListItemClick(java)}
+                          title={java.path}
+                          className="flex w-full items-center gap-3 px-3 py-2 text-left"
+                        >
+                          <span className="shrink-0 rounded border border-white/15 px-1.5 py-0.5 text-xs">
+                            Java {java.major_version}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm">{java.vendor}</span>
+                            <span className="block truncate text-xs normal-case text-white/40">{java.path}</span>
+                          </span>
+                          <span className="shrink-0 text-xs text-white/40">{java.architecture}</span>
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
+            )}
+
+            <div className="space-y-1.5">
+              <label htmlFor="custom-java-path-input" className="block font-minecraft text-xs text-white/50">
+                {t("profiles.settings.manualJavaPath")}
+              </label>
+              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 py-1.5 pl-3 pr-1.5 transition-colors focus-within:border-white/30 hover:border-white/20">
+                <Icon icon="solar:file-bold" className="h-4 w-4 shrink-0 text-white/40" />
+                <input
+                  id="custom-java-path-input"
+                  value={customJavaPathInput}
+                  onChange={(e) => handleJavaPathInputChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && customJavaPathInput) testCustomJavaPath();
+                  }}
+                  placeholder={t("placeholders.java_path")}
+                  spellCheck={false}
+                  autoComplete="off"
+                  title={customJavaPathInput}
+                  className="min-w-0 flex-1 bg-transparent font-minecraft text-sm normal-case text-white placeholder-white/30 outline-none"
+                />
+                <IconAction
+                  icon="solar:folder-with-files-bold"
+                  label={t("profiles.settings.browse_java")}
+                  onClick={browseForJavaPath}
+                />
+                <IconAction
+                  icon="solar:check-circle-bold"
+                  label={t("profiles.settings.testAndUsePath")}
+                  tone="accent"
+                  busy={isValidatingJavaPath}
+                  disabled={!customJavaPathInput}
+                  onClick={() => testCustomJavaPath()}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title={isStandard ? t("profiles.settings.globalCustomJavaArgs") : t("profiles.settings.customJavaArgs")}
+        aside={
+          <ToggleSwitch
+            checked={useCustomArgs}
+            onChange={handleCustomArgsToggle}
+            size="sm"
+            disabled={isStandard && isLoadingGlobalJvmArgs}
+          />
+        }
+      >
+        {!useCustomArgs ? (
+          <p className="font-minecraft text-sm text-white/60">{t("profiles.settings.javaArgsHint")}</p>
+        ) : isStandard && isLoadingGlobalJvmArgs ? (
+          <div className="flex items-center gap-2 font-smallcaps text-white/60">
+            <Icon icon="svg-spinners:ring-resize" className="h-5 w-5" />
+            {t("profiles.settings.loadingSettings")}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <SearchStyleTextArea
+              value={isStandard ? globalJvmArgs || "" : editedProfile.settings?.custom_jvm_args || ""}
+              onChange={(e) => handleJavaArgsChange(e.target.value)}
+              placeholder={t("profiles.settings.enterJavaArgs")}
+              minHeight="90px"
+            />
+            <p className="font-minecraft text-xs text-white/50">
+              {t("profiles.settings.javaArgsHint")}
+              {isStandard && <span className="mt-1 block">{t("profiles.settings.appliesToAllStandard")}</span>}
+            </p>
+          </div>
+        )}
+      </Section>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * LogsTabV3 — functional log-reader.
  *
@@ -8,6 +6,7 @@
  * stack-trace-inherit filter logic.
  */
 
+import { shareLogWithToast } from "../../../share/share-toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Icon } from "@iconify/react";
@@ -20,7 +19,6 @@ import {
   getLogFileContent,
   getProfileLogFiles,
   openLogFileDirectory,
-  uploadLogToMclogs,
   parseLogLinesFromString,
   LOG_LEVELS,
   type LogLevel,
@@ -184,26 +182,14 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
   }, [selectedPath]);
 
   const handleUpload = useCallback(async () => {
-    if (!rawContent || isUploading) return;
+    if (!rawContent || !selectedPath || isUploading) return;
     setIsUploading(true);
     try {
-      const url = await toast.promise(
-        uploadLogToMclogs(rawContent),
-        {
-          loading: t("profiles.v3.logs.uploading"),
-          success: (u: string) => t("profiles.v3.logs.uploadSuccess", { url: u }),
-          error: (err) => t("profiles.v3.logs.uploadFailed", { error: parseErrorMessage(err) }),
-        },
-      );
-      // Copy URL to clipboard so the user can paste it straight into a chat.
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(t("profiles.v3.logs.urlCopied"));
-      } catch { /* clipboard blocked — fine */ }
+      await shareLogWithToast(rawContent, getFilename(selectedPath));
     } finally {
       if (mountedRef.current) setIsUploading(false);
     }
-  }, [rawContent, isUploading, t]);
+  }, [rawContent, selectedPath, isUploading, t]);
 
   const scrollToBottom = useCallback(() => {
     if (virtuosoRef.current && visibleLines.length > 0) {

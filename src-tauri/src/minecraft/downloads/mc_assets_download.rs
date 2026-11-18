@@ -5,10 +5,10 @@ use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
 use crate::utils::download_utils::{DownloadConfig, DownloadUtils};
+use crate::utils::file_utils::scan_object_store;
 use crate::utils::mc_utils;
 use futures::stream::{iter, StreamExt};
 use log::{debug, error, info, trace, warn};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -138,7 +138,7 @@ impl MinecraftAssetsDownloadService {
         // This replaces 4585 individual fs::try_exists + fs::metadata calls with a single directory scan
         let objects_path = assets_path.join("objects");
         let existing_files = measure_time!("Assets cache scan", {
-            Self::scan_existing_assets(&objects_path).await
+            scan_object_store(&objects_path).await
         });
         info!("[Assets Download] Found {} cached assets on disk", existing_files.len());
 
@@ -331,12 +331,6 @@ impl MinecraftAssetsDownloadService {
         }
     }
 
-    /// Wrapper method to maintain compatibility with existing calls
-    pub async fn download_assets(&self, asset_index: &AssetIndex) -> Result<()> {
-        self.download_assets_with_progress(asset_index, Uuid::nil())
-            .await
-    }
-
     async fn download_asset_index(&self, asset_index: &AssetIndex) -> Result<AssetIndexContent> {
         let index_path = self
             .assets_path
@@ -360,41 +354,6 @@ impl MinecraftAssetsDownloadService {
         // Read and parse the downloaded index
         let content = fs::read(&index_path).await?;
         Ok(serde_json::from_slice(&content)?)
-    }
-
-    /// Scans the objects directory and returns a HashMap of hash -> file size.
-    /// This replaces thousands of individual filesystem calls with a single batch scan.
-    async fn scan_existing_assets(objects_path: &PathBuf) -> HashMap<String, u64> {
-        let mut existing = HashMap::new();
-
-        // Read all prefix directories (00, 01, ..., ff)
-        let mut prefix_dirs = match fs::read_dir(objects_path).await {
-            Ok(dir) => dir,
-            Err(_) => return existing,
-        };
-
-        while let Ok(Some(prefix_entry)) = prefix_dirs.next_entry().await {
-            if !prefix_entry.path().is_dir() {
-                continue;
-            }
-
-            // Read all hash files in this prefix directory
-            let mut hash_files = match fs::read_dir(prefix_entry.path()).await {
-                Ok(dir) => dir,
-                Err(_) => continue,
-            };
-
-            while let Ok(Some(hash_entry)) = hash_files.next_entry().await {
-                if let Ok(metadata) = hash_entry.metadata().await {
-                    if metadata.is_file() {
-                        let file_name = hash_entry.file_name().to_string_lossy().to_string();
-                        existing.insert(file_name, metadata.len());
-                    }
-                }
-            }
-        }
-
-        existing
     }
 
     /// Helper method for emitting progress events

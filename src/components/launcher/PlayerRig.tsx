@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SkinRenderer } from '@noriskclient/nrc-skin-renderer/react';

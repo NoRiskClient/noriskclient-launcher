@@ -1,10 +1,17 @@
-"use client";
-
 import React, { useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
 import type { Profile } from "../../types/profile";
+
+export const CONTEXT_MENU_WIDTH = 176;
+
+export function clampMenuPosition(x: number, y: number, height: number): { x: number; y: number } {
+  return {
+    x: Math.max(8, Math.min(x, window.innerWidth - CONTEXT_MENU_WIDTH - 8)),
+    y: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
+  };
+}
 
 export interface ContextMenuItem<T = Profile> {
   /** Unique identifier for the menu item */

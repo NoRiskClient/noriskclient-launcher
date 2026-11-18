@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Mod } from "../types/profile";
 import type { InstallContentPayload } from "../types/content";
 import type {
   CreateSyncPackParams,

@@ -96,14 +96,6 @@ pub struct NoRiskToken {
 }
 
 impl NoRiskCredentials {
-    pub async fn get_token(&self) -> Result<String> {
-        Ok(self
-            .production
-            .as_ref()
-            .ok_or(AppError::NoCredentialsError)?
-            .value
-            .clone())
-    }
 
     /// Gets the appropriate NoRisk token based on the experimental mode setting.
     ///
@@ -1211,11 +1203,17 @@ impl MinecraftAuthStore {
 
         // Refresh on the Minecraft token's own expiry (12h buffer, Prism-style); None = legacy
         // account → refresh once to populate the field.
-        let mc_stale = match creds.mc_access_token_expires {
-            Some(exp) => exp <= Utc::now() + Duration::hours(12),
-            None => true,
-        };
-        if mc_stale {
+        if mc_token_stale(creds) {
+            let _refreshing = MC_TOKEN_REFRESH.lock().await;
+            if let Some(stored) = self.get_account_by_id(creds.id).await? {
+                if !mc_token_stale(&stored) {
+                    return Ok(Some(stored));
+                }
+            }
+            if refresh_unreachable_recently(creds.id) {
+                return Ok(None);
+            }
+
             info!("[Token Check] Minecraft token stale or nearing expiry, initiating proactive refresh");
             let old_credentials = creds.clone();
 
@@ -1248,6 +1246,7 @@ impl MinecraftAuthStore {
                         if is_offline_error(&err) {
                             emit_offline_mode(&creds.username).await;
                         }
+                        remember_refresh_unreachable(creds.id);
                         return Ok(None);
                     }
                     info!("[Token Check] Error during token refresh: {:?}", err);
@@ -1453,6 +1452,29 @@ const DIRECT_OAUTH_AUTHORIZE_URL: &str = "https://login.microsoftonline.com/cons
 const DIRECT_OAUTH_TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 
 const AUTH_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+const REFRESH_RETRY_PAUSE: std::time::Duration = std::time::Duration::from_secs(5);
+
+static MC_TOKEN_REFRESH: Mutex<()> = Mutex::const_new(());
+static REFRESH_UNREACHABLE: std::sync::Mutex<Option<(Uuid, std::time::Instant)>> =
+    std::sync::Mutex::new(None);
+
+fn mc_token_stale(creds: &Credentials) -> bool {
+    creds
+        .mc_access_token_expires
+        .map_or(true, |exp| exp <= Utc::now() + Duration::hours(12))
+}
+
+fn refresh_unreachable_recently(id: Uuid) -> bool {
+    REFRESH_UNREACHABLE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .is_some_and(|(at_id, at)| at_id == id && at.elapsed() < REFRESH_RETRY_PAUSE)
+}
+
+fn remember_refresh_unreachable(id: Uuid) {
+    *REFRESH_UNREACHABLE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+        Some((id, std::time::Instant::now()));
+}
 
 pub struct RequestWithDate<T> {
     pub date: DateTime<Utc>,

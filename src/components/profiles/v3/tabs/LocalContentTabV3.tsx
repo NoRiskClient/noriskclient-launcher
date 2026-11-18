@@ -1,7 +1,4 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type React from "react";
 import { VirtuosoGrid } from "react-virtuoso";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -17,7 +14,6 @@ import {
 import { useVersionOptions } from "../../../../hooks/useVersionOptions";
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
 import * as FlagsmithService from "../../../../services/flagsmith-service";
-import UnifiedService from "../../../../services/unified-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
 import { ContentType as BackendContentType } from "../../../../types/content";

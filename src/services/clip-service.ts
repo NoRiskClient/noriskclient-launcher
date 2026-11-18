@@ -31,6 +31,7 @@ export interface ClipEntry {
   createdAt: number;
   durationSeconds: number | null;
   game: string | null;
+  server: string | null;
   thumbnail: string | null;
   favourite: boolean;
 }

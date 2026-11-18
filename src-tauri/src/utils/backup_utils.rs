@@ -1,7 +1,7 @@
 use crate::config::{LAUNCHER_DIRECTORY, ProjectDirsExt};
 use crate::error::{AppError, Result};
 use chrono::{DateTime, Datelike, Utc};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -391,46 +391,6 @@ pub async fn restore_from_backup<P: AsRef<Path>>(
     }
 }
 
-/// Restores a specific user-chosen backup file over `target_path`. Validates the
-/// backup lives inside the profiles backup dir, refuses empty/corrupt backups,
-/// and snapshots the current file as `profiles.corrupted.<ts>` first.
-pub async fn restore_specific_backup(target_path: &Path, backup_path: &Path) -> Result<PathBuf> {
-    // Security: the backup must resolve inside <backup_root>/profiles.
-    let backups_dir = get_backup_root().join("profiles");
-    let canon_dir = fs::canonicalize(&backups_dir).await.map_err(AppError::Io)?;
-    let canon_backup = fs::canonicalize(backup_path).await.map_err(AppError::Io)?;
-    if !canon_backup.starts_with(&canon_dir) {
-        return Err(AppError::Other(format!(
-            "Refusing to restore from outside the backups directory: {}",
-            backup_path.display()
-        )));
-    }
-
-    if !is_valid_profiles_backup(&canon_backup).await {
-        return Err(AppError::Other(format!(
-            "Backup is empty or unreadable: {}",
-            backup_path.display()
-        )));
-    }
-
-    if target_path.exists() {
-        let corrupted_path = target_path.with_extension(format!(
-            "corrupted.{}",
-            Utc::now().format("%Y%m%d_%H%M%S")
-        ));
-        fs::copy(target_path, &corrupted_path).await?;
-        info!("Saved current profiles file as: {}", corrupted_path.display());
-    }
-
-    fs::copy(&canon_backup, target_path).await.map_err(AppError::Io)?;
-    info!(
-        "Restored '{}' from chosen backup '{}'",
-        target_path.display(),
-        canon_backup.display()
-    );
-    Ok(target_path.to_path_buf())
-}
-
 /// Lists all available backups for a file
 pub async fn list_backups<P: AsRef<Path>>(
     source_path: P,
@@ -468,52 +428,6 @@ pub async fn list_backups<P: AsRef<Path>>(
     Ok(backups)
 }
 
-/// Gets backup statistics
-pub async fn get_backup_stats(category: Option<&str>) -> Result<BackupStats> {
-    let backup_base = ensure_backup_dir(category).await?;
-
-    let mut total_backups = 0;
-    let mut total_size = 0u64;
-    let mut oldest_backup: Option<DateTime<Utc>> = None;
-    let mut newest_backup: Option<DateTime<Utc>> = None;
-
-    if let Ok(mut entries) = fs::read_dir(&backup_base).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let path = entry.path();
-            if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
-                if filename.ends_with(".backup") {
-                    total_backups += 1;
-
-                    if let Ok(metadata) = fs::metadata(&path).await {
-                        total_size += metadata.len();
-
-                        if let Ok(modified) = metadata.modified() {
-                            let modified_dt: DateTime<Utc> = modified.into();
-
-                            oldest_backup = Some(match oldest_backup {
-                                Some(oldest) => oldest.min(modified_dt),
-                                None => modified_dt,
-                            });
-
-                            newest_backup = Some(match newest_backup {
-                                Some(newest) => newest.max(modified_dt),
-                                None => modified_dt,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(BackupStats {
-        total_backups,
-        total_size,
-        oldest_backup,
-        newest_backup,
-    })
-}
-
 /// Statistics about backups
 #[derive(Debug)]
 pub struct BackupStats {
@@ -541,40 +455,5 @@ pub async fn safe_write_with_backup<P: AsRef<Path>, C: AsRef<[u8]>>(
 
     info!("Successfully wrote file with backup: {}", file_path.display());
     Ok(())
-}
-
-/// Validates a backup file
-pub async fn validate_backup(backup_path: &Path) -> Result<bool> {
-    if !backup_path.exists() {
-        return Ok(false);
-    }
-
-    // Check if metadata file exists
-    let meta_path = backup_path.with_extension("backup.meta");
-    if !meta_path.exists() {
-        warn!("Backup metadata missing for: {}", backup_path.display());
-        return Ok(false);
-    }
-
-    // Try to read metadata
-    match fs::read_to_string(&meta_path).await {
-        Ok(metadata) => {
-            // Basic validation - check if required fields are present
-            let has_original_path = metadata.contains("original_path=");
-            let has_backup_time = metadata.contains("backup_time=");
-            let has_file_size = metadata.contains("file_size=");
-
-            if !has_original_path || !has_backup_time || !has_file_size {
-                warn!("Backup metadata incomplete for: {}", backup_path.display());
-                return Ok(false);
-            }
-
-            Ok(true)
-        }
-        Err(e) => {
-            error!("Failed to read backup metadata '{}': {}", meta_path.display(), e);
-            Ok(false)
-        }
-    }
 }
 

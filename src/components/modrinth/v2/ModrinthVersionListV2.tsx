@@ -1,12 +1,9 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ModrinthGameVersion,
   ModrinthSearchHit,
-  ModrinthVersion,
 } from "../../../types/modrinth";
 import type { UnifiedVersion } from "../../../types/unified";
 import type { AccentColor } from "../../../store/useThemeStore";

@@ -1,8 +1,8 @@
 use crate::error::{AppError, Result};
 use crate::integrations::curseforge::CurseForgeManifest;
 use crate::integrations::mrpack::{
-    ModrinthIndex, FABRIC_LOADER_DEPENDENCY, FORGE_DEPENDENCY, MINECRAFT_DEPENDENCY,
-    NEOFORGE_DEPENDENCY, QUILT_LOADER_DEPENDENCY,
+    is_manifest_mod_path, ModrinthIndex, FABRIC_LOADER_DEPENDENCY, FORGE_DEPENDENCY,
+    MINECRAFT_DEPENDENCY, NEOFORGE_DEPENDENCY, QUILT_LOADER_DEPENDENCY,
 };
 use crate::state::profile_state::{ModSource, Profile};
 use crate::utils::import_safety::{mod_label, parse_untrusted_profile, ImportSecurityReport};
@@ -225,7 +225,11 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
         }
     }
 
-    let mod_files: Vec<_> = index.files.iter().filter(|f| is_mod_path(&f.path)).collect();
+    let mod_files: Vec<_> = index
+        .files
+        .iter()
+        .filter(|f| is_manifest_mod_path(&f.path))
+        .collect();
 
     let mut provenance = ProvenanceReport::default();
     let mut hashed = Vec::new();
@@ -317,7 +321,7 @@ fn collect_third_party_hosts(index: &ModrinthIndex) -> Vec<String> {
     let mut hosts: Vec<String> = index
         .files
         .iter()
-        .filter(|file| !is_mod_path(&file.path))
+        .filter(|file| !is_manifest_mod_path(&file.path))
         .flat_map(|file| file.downloads.iter())
         .filter(|url| !crate::integrations::modrinth::is_whitelisted_modpack_url(url))
         .filter_map(|url| {
@@ -528,12 +532,6 @@ fn count_entries_under(zip: &PackZip, prefixes: &[&str]) -> usize {
             })
         })
         .count()
-}
-
-fn is_mod_path(path: &str) -> bool {
-    path.replace('\\', "/")
-        .trim_start_matches("./")
-        .starts_with("mods/")
 }
 
 fn base_name(path: &str) -> String {

@@ -1,7 +1,5 @@
 import { NoriskModIdentifier, type LocalContentItem as ProfileLocalContentItem } from "./profile";
-import type { ModrinthVersion } from "./modrinth";
 import { ModPlatform, type UnifiedVersion } from "./unified";
-import type { CurseForgeFile } from "./curseforge";
 
 /**
  * Payload for uninstalling content from a profile.

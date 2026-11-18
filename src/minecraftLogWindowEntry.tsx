@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import { MinecraftLogWindow } from "./components/log/MinecraftLogWindow";
 import { GlobalToaster } from "./components/ui/GlobalToaster";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
-import i18n from "./i18n/i18n";
+import i18n, { i18nReady } from "./i18n/i18n";
 import { revealAfterFirstPaint } from "./utils/reveal-window";
 import "./styles/globals.css";
 import type { ProcessMetadata } from "./types/processState";
@@ -24,14 +24,16 @@ if (crashedProcessParam) {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <I18nextProvider i18n={i18n}>
-      <MinecraftLogWindow crashedProcess={crashedProcess} />
-      <GlobalToaster />
-      <GlobalModalPortal />
-    </I18nextProvider>
-  </React.StrictMode>,
-);
+i18nReady.then(() => {
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <I18nextProvider i18n={i18n}>
+        <MinecraftLogWindow crashedProcess={crashedProcess} />
+        <GlobalToaster />
+        <GlobalModalPortal />
+      </I18nextProvider>
+    </React.StrictMode>,
+  );
 
-revealAfterFirstPaint();
+  revealAfterFirstPaint();
+});

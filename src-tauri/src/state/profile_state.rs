@@ -250,8 +250,6 @@ fn default_true() -> bool {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NoriskInformation {
     #[serde(default)]
-    pub keep_local_assets: bool,
-    #[serde(default)]
     pub is_experimental: bool,
     #[serde(default = "default_true")]
     pub copy_initial_mc_data: bool,
@@ -1627,66 +1625,22 @@ impl ProfileManager {
         game_versions: Option<Vec<String>>,
         add_dependencies: bool, // Allow caller to decide
     ) -> Result<()> {
-           // Always use the same behavior for all profiles (add to profile mods + optional deps)
-           // if profile.is_standard_version {
-           //     let mods_dir = self.get_profile_mods_path(&profile)?;
-           //     tokio::fs::create_dir_all(&mods_dir).await?;
-           //
-           //     let target_path = mods_dir.join(&file_name);
-           //     let tmp_path = target_path.with_extension("jar.nrc_tmp");
-           //
-           //     let mut config = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
-           //     if let Some(sha1) = &file_hash_sha1 { config = config.with_sha1(sha1); }
-           //     crate::utils::download_utils::DownloadUtils::download_file(
-           //         &download_url,
-           //         &tmp_path,
-           //         config,
-           //     ).await?;
-           //     // Atomic move
-           //     tokio::fs::rename(&tmp_path, &target_path).await?;
-           //
-           //     // Optionally install required dependencies if requested
-           //     if add_dependencies {
-           //         // Fetch version details to read dependencies
-           //         if let Ok(ver_details) = modrinth::get_version_details(version_id.clone()).await {
-           //             for dep in ver_details.dependencies.iter().filter(|d| d.dependency_type == ModrinthDependencyType::Required) {
-           //                 if let Some(dep_project_id) = &dep.project_id {
-           //                     // Find a compatible version by loader/profile game version
-           //                     if let Ok(dep_versions) = modrinth::get_mod_versions(dep_project_id.clone(), Some(vec![profile.loader.as_str().to_string()]), Some(vec![profile.game_version.clone()])).await {
-           //                         if let Some(best) = dep_versions.iter().max_by_key(|v| &v.date_published) {
-           //                             if let Some(primary) = best.files.iter().find(|f| f.primary) {
-           //                                 let dep_tmp = mods_dir.join(&primary.filename).with_extension("jar.nrc_tmp");
-           //                                 let dep_target = mods_dir.join(&primary.filename);
-           //                                 let mut cfg = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
-           //                                 if let Some(s) = &primary.hashes.sha1 { cfg = cfg.with_sha1(s); }
-           //                                 let _ = crate::utils::download_utils::DownloadUtils::download_file(&primary.url, &dep_tmp, cfg).await;
-           //                                 let _ = tokio::fs::rename(&dep_tmp, &dep_target).await;
-           //                             }
-           //                         }
-           //                     }
-           //                 }
-           //             }
-           //         }
-           //     }
-           //     Ok(())
-           // } else {
-               // Use the same behavior for all profiles (add to profile mods + optional deps)
-               self.add_modrinth_mod_internal(
-                   profile_id,
-                   project_id,
-                   version_id,
-                   file_name,
-                   download_url,
-                   file_hash_sha1,
-                   mod_name,
-                   version_number,
-                   loaders,
-                   game_versions,
-                   add_dependencies,
-                   HashSet::new(),
-               )
-               .await
-           // }
+        // Use the same behavior for all profiles (add to profile mods + optional deps)
+        self.add_modrinth_mod_internal(
+            profile_id,
+            project_id,
+            version_id,
+            file_name,
+            download_url,
+            file_hash_sha1,
+            mod_name,
+            version_number,
+            loaders,
+            game_versions,
+            add_dependencies,
+            HashSet::new(),
+        )
+        .await
     }
 
     // Set the enabled status of a specific mod within a profile

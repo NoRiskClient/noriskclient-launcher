@@ -12,7 +12,6 @@ macro_rules! measure_time {
 
 pub mod content_copy;
 pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von DataPacks
-pub mod debug_utils;
 pub mod disk_space_utils; // Disk space utility for checking available space before downloads
 pub mod download_utils; // Central download utility for robust file downloads
 pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan cleanup (trash)
@@ -21,6 +20,7 @@ pub mod export_utils;
 pub mod hash_utils;
 pub mod capture_runtime;
 pub mod clip_library;
+pub mod mp4_probe;
 pub mod clip_overlay;
 #[cfg(windows)]
 pub mod hotkey_hook;
@@ -29,6 +29,7 @@ pub mod main_window;
 pub mod window_focus;
 pub mod screens;
 pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-only
+pub mod game_sessions;
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it
 pub mod screen_time;
 #[cfg(windows)]
@@ -40,6 +41,7 @@ pub mod import_safety; // Strips execution/path primitives out of untrusted impo
 pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally
 pub mod bounded_log_writer;
+pub mod metered_network;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
 pub mod perf_utils;
@@ -51,7 +53,9 @@ pub mod security_utils; // Security utilities for masking sensitive data
 pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-Servern
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks
 pub mod system_info; // <-- Hinzufügen
+pub mod background_updater;
 pub mod updater_utils;
+pub mod verified_files;
 pub mod world_utils; // <-- Hinzugefügt
 pub mod trash_utils; // <-- New trash module
 pub mod backup_utils; // <-- New backup module for critical files

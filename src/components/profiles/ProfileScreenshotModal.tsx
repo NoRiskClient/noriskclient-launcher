@@ -1,15 +1,11 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "../ui/Modal";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { ScreenshotInfo as ActualScreenshotInfo } from "../../types/profile";
 import { IconButton } from "../ui/buttons/IconButton";
-import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
-import { Image as TauriImage } from "@tauri-apps/api/image";
-import { revealItemInDir } from "../../utils/opener-utils";
+import { copyScreenshotImage, revealScreenshot } from "../../utils/screenshot-actions";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +13,8 @@ interface ProfileScreenshotModalProps {
   isOpen: boolean;
   onClose: () => void;
   screenshot: ActualScreenshotInfo | null;
+  sharing: boolean;
+  onShare: () => void;
   onScreenshotDeleted: (deletedPath: string) => void;
 }
 
@@ -24,6 +22,8 @@ export function ProfileScreenshotModal({
   isOpen,
   onClose,
   screenshot,
+  sharing,
+  onShare,
   onScreenshotDeleted,
 }: ProfileScreenshotModalProps) {
   const { t } = useTranslation();
@@ -44,26 +44,9 @@ export function ProfileScreenshotModal({
 
   const handleCopyImage = async () => {
     if (!screenshot?.path || isCopyingImage) return;
-
     setIsCopyingImage(true);
-
-    const copyPromise = writeImage(screenshot.path);
-
-    toast.promise(
-      copyPromise,
-      {
-        loading: t('screenshots.copying'),
-        success: () => {
-          setIsCopyingImage(false);
-          return t('screenshots.copy_success');
-        },
-        error: (err) => {
-          setIsCopyingImage(false);
-          console.error("Failed to copy screenshot image:", err);
-          return t('screenshots.copy_failed', { error: err.toString() });
-        },
-      }
-    );
+    await copyScreenshotImage(screenshot.path, t);
+    setIsCopyingImage(false);
   };
 
   const handleDeleteScreenshot = async () => {
@@ -99,13 +82,7 @@ export function ProfileScreenshotModal({
 
   const handleOpenFolder = async () => {
     if (!screenshot?.path) return;
-    try {
-      await revealItemInDir(screenshot.path);
-      // No explicit success toast needed as the OS will show the folder
-    } catch (error) {
-      console.error("Failed to reveal item in folder:", error);
-      toast.error(t('profiles.errors.open_folder_failed'));
-    }
+    await revealScreenshot(screenshot.path, t);
   };
 
   return (
@@ -141,6 +118,15 @@ export function ProfileScreenshotModal({
         {/* Action Buttons - Visual Only */}
         {isModalImageLoaded && ( // Show buttons only when image is loaded
           <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+            <IconButton
+              icon={sharing ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:cloud-upload-bold" />}
+              title={t('screenshots.share')}
+              onClick={onShare}
+              disabled={sharing}
+              variant="flat"
+              size="sm"
+              className="rounded-md w-9 h-9 flex items-center justify-center"
+            />
             <IconButton
               icon={isCopyingImage ? <Icon icon="eos-icons:loading" /> : <Icon icon="solar:copy-bold-duotone" />}
               title={t('screenshots.copy_image')}

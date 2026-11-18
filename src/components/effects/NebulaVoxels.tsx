@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";
@@ -73,9 +71,6 @@ export function NebulaVoxels({
       qualityLevel === "low" ? 0.3 : qualityLevel === "high" ? 0.8 : 0.5;
     const adjustedCubeCount = Math.floor(cubeCount * qualityMultiplier);
     const adjustedSpeed = speed * qualityMultiplier;
-    const targetFps =
-      qualityLevel === "low" ? 15 : qualityLevel === "high" ? 30 : 24;
-    const frameInterval = 1000 / targetFps;
 
     const hexToRgb = (hex: string) => {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -310,7 +305,6 @@ export function NebulaVoxels({
 
       // Calculate effective animation time (excluding paused periods)
       const effectiveTimestamp = timestamp - totalPausedDurationRef.current;
-      const elapsed = effectiveTimestamp - lastFrameTimeRef.current;
       
       // Temporarily remove frameInterval check to debug
       // if (elapsed < frameInterval) return;

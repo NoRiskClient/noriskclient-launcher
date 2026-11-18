@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import type { ModLoader } from "../../../types/profile";
@@ -11,8 +9,8 @@ import { SearchStyleInput } from "../../ui/Input";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { Card } from "../../ui/Card";
 import { Checkbox } from "../../ui/Checkbox";
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { NoriskModEntryDefinition, NoriskModpacksConfig, NoriskPackDefinition } from "../../../types/noriskPacks";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { NoriskModEntryDefinition } from "../../../types/noriskPacks";
 import { loadPacks, usePacks } from "../../../hooks/usePacks";
 import { useTranslation } from "react-i18next";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
@@ -67,7 +65,6 @@ export function ProfileWizardV2Step3({
     const { packs: noriskPacks, loading: packsLoading } = usePacks();
     const [packCompatibilityWarning, setPackCompatibilityWarning] = useState<string | null>(null);
     const [showYellowWarning, setShowYellowWarning] = useState(false);
-    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
     const [useSharedMinecraftFolder, setUseSharedMinecraftFolder] = useState(
         defaultGroup && defaultGroup.toLowerCase() !== "modpacks"
     ); // Default to true when group exists and is not "modpacks"

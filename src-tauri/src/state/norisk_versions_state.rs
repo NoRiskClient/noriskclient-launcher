@@ -170,15 +170,6 @@ impl NoriskVersionManager {
         self.save_config().await // Save the updated config
     }
 
-    /// Prints the current configuration to the console for debugging.
-    #[allow(dead_code)]
-    pub async fn print_current_config(&self) {
-        let _config_guard = self.config.read().await;
-        //println!("--- Current Norisk Versions Config ---");
-        //println!("{:#?}", *config_guard);
-        //println!("--- End Norisk Versions Config ---");
-    }
-
     /// Returns a standard profile by ID if found
     pub async fn get_profile_by_id(&self, id: Uuid) -> Option<Profile> {
         let config = self.config.read().await;

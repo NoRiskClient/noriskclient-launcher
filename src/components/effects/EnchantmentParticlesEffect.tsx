@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";

@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
@@ -19,7 +17,6 @@ import * as ProfileService from "../../services/profile-service";
 import { useDeleteProfile } from "../../hooks/useDeleteProfile";
 import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { useThemeStore } from "../../store/useThemeStore";
-import { ExportProfileModal } from "../profiles/ExportProfileModal";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
@@ -176,12 +173,6 @@ export function ProfilesTabV2() {
   }, [fetchProfiles]);
 
   // Handler functions from ProfilesTab.tsx
-  const handleCreateProfile = () => {
-    console.log("[ProfilesTabV2] handleCreateProfile called.");
-    fetchProfiles();
-    navigate("/profiles");
-  };
-
   const handleDeleteProfile = (profileId: string) => {
     const profile = profiles.find((p) => p.id === profileId);
     if (profile) requestDelete(profile);

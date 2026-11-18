@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, type ReactNode, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
@@ -39,9 +37,6 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   const cardRef = useRef<HTMLDivElement>(null);
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
-  );
   const [isHovered, setIsHovered] = useState(false);
 
   const mergedRef = (node: HTMLDivElement) => {
@@ -147,7 +142,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
         borderColor: getBorderColor(),
         borderBottomColor: getBorderBottomColor(),
         boxShadow: getBoxShadow(),
-        filter: isHovered ? "brightness(1.1)" : "brightness(1)",
+        filter: isHovered ? "brightness(1.1)" : undefined,
         ...createRadiusStyle(borderRadius, 1.2),
       }}
       onClick={onClick}

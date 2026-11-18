@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { NewsSection } from "../news/NewsSection";
 import { ErrorMessage } from "../ui/ErrorMessage";
@@ -53,9 +51,6 @@ export function PlayTab() {
     const profileToSelect = profiles.find((p) => p.id === versionId) || null;
     setSelectedProfile(profileToSelect);
   };
-
-  const currentDisplayProfile =
-    storeSelectedProfile || (profiles.length > 0 ? profiles[0] : null);
 
   const versions = profiles.map((profile) => ({
     id: profile.id,

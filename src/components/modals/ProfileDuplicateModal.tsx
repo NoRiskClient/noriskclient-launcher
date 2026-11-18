@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
@@ -7,7 +5,6 @@ import { Modal } from "../ui/Modal";
 import { SearchStyleInput } from "../ui/Input";
 import { Button } from "../ui/buttons/Button";
 import { Icon } from "@iconify/react";
-import { invoke } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
 import { useProfileStore } from "../../store/profile-store";
 import { copyProfile } from "../../services/profile-service";

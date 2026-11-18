@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -82,7 +80,6 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   const [versions, setVersions] = useState<UnifiedVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [installingVersions, setInstallingVersions] = useState<Record<string, boolean>>({});
   const [installingModpackVersions, setInstallingModpackVersions] = useState<Record<string, boolean>>({});
   const [installingProfiles, setInstallingProfiles] = useState<Record<string, boolean>>({});
   const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
@@ -525,7 +522,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
               version={version}
               project={projectAsSearchHit}
               versionStatus={null}
-              isInstalling={installingVersions[version.id] || false}
+              isInstalling={false}
               isInstallingModpackVersion={installingModpackVersions[version.id] || false}
               accentColor={accentColor}
               isHovered={hoveredVersionId === version.id}

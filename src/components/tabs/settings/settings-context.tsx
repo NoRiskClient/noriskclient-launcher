@@ -1,6 +1,4 @@
-"use client";
-
-import { createContext, useCallback, useContext } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { LauncherConfig } from "../../../types/launcherConfig";
 
@@ -21,14 +19,31 @@ export function useSettingsConfig(): SettingsConfigValue {
   return ctx;
 }
 
+const KEYWORD_LANGUAGE = "de";
+
 export function useSettingsKeywords() {
   const { i18n } = useTranslation();
+  const [keywordLanguageLoaded, setKeywordLanguageLoaded] = useState(() =>
+    i18n.hasResourceBundle(KEYWORD_LANGUAGE, "translation"),
+  );
+
+  useEffect(() => {
+    if (keywordLanguageLoaded) return;
+    let active = true;
+    i18n.loadLanguages(KEYWORD_LANGUAGE).then(() => {
+      if (active) setKeywordLanguageLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [i18n, keywordLanguageLoaded]);
+
   return useCallback(
     (key: string, ...extra: string[]) => [
       i18n.getFixedT("en")(key),
-      i18n.getFixedT("de")(key),
+      i18n.getFixedT(KEYWORD_LANGUAGE)(key),
       ...extra,
     ],
-    [i18n],
+    [i18n, keywordLanguageLoaded],
   );
 }
