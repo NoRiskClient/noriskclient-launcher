@@ -3,6 +3,7 @@ mod config_state;
 mod content_cache_state;
 mod db;
 mod event_state;
+mod launcher_news_cache;
 mod profile_state;
 mod profile_store;
 mod sync_pack_state;

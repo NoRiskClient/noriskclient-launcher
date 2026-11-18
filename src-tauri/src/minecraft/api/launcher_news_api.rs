@@ -1,23 +1,15 @@
-use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
 use crate::integrations::lenient;
 use crate::minecraft::api::norisk_api::NoRiskApi;
-use crate::utils::file_utils::write_atomic;
+use crate::state::content_cache_state::ContentCacheManager;
 use crate::utils::http_client::nrc_get;
-use chrono::Utc;
-use log::{debug, warn};
-use once_cell::sync::Lazy;
+use log::warn;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 const NEWS_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-const CACHE_MAX_AGE_MS: i64 = 5 * 60 * 1000;
-const CACHE_KEEP_MS: i64 = 24 * 60 * 60 * 1000;
-
-static CACHE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+const NEWS_CACHE_KIND: &str = "launcher_news";
+const NEWS_CACHE_TTL_MS: u64 = 5 * 60 * 1000;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(default)]
@@ -45,19 +37,6 @@ pub struct LauncherNewsPage {
     pub total_pages: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-struct NewsCacheFile {
-    pages: HashMap<String, CachedPage>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct CachedPage {
-    fetched_at: i64,
-    page: LauncherNewsPage,
-}
-
 pub struct LauncherNewsApi;
 
 impl LauncherNewsApi {
@@ -70,63 +49,33 @@ impl LauncherNewsApi {
             .await
     }
 
-    pub async fn get_page_cached(is_experimental: bool, page: u32, limit: u32) -> Result<LauncherNewsPage> {
+    pub async fn get_page_cached(
+        cache: &ContentCacheManager,
+        is_experimental: bool,
+        page: u32,
+        limit: u32,
+    ) -> Result<LauncherNewsPage> {
         if is_experimental {
             return Self::get_page(true, page, limit).await;
         }
-        let _one_at_a_time = CACHE_LOCK.lock().await;
-        let path = cache_path();
         let key = format!("{page}:{limit}");
-        let mut cache = read_cache(&path).await;
-        let now = Utc::now().timestamp_millis();
-
-        if let Some(cached) = cache.pages.get(&key) {
-            let age = now - cached.fetched_at;
-            if (0..CACHE_MAX_AGE_MS).contains(&age) {
-                debug!("[News] page {key} from the file ({}s old)", age / 1000);
-                return Ok(cached.page.clone());
-            }
+        let cached = cache.get_entry::<LauncherNewsPage>(NEWS_CACHE_KIND, &key).await;
+        if let Some(fresh) = cached.as_ref().filter(|entry| entry.is_fresh()).and_then(|entry| entry.data.clone()) {
+            return Ok(fresh);
         }
 
         match Self::get_page(false, page, limit).await {
             Ok(fresh) => {
-                cache.pages.retain(|_, cached| now - cached.fetched_at < CACHE_KEEP_MS);
-                cache.pages.insert(key, CachedPage { fetched_at: now, page: fresh.clone() });
-                save_cache(&path, &cache).await;
+                cache.put_entry(NEWS_CACHE_KIND, &key, None, Some(&fresh), NEWS_CACHE_TTL_MS).await;
                 Ok(fresh)
             }
-            Err(err) => match cache.pages.remove(&key) {
+            Err(err) => match cached.and_then(|entry| entry.data) {
                 Some(stale) => {
                     warn!("[News] loading page {key} failed, showing the last answer: {err}");
-                    Ok(stale.page)
+                    Ok(stale)
                 }
                 None => Err(err),
             },
         }
-    }
-}
-
-fn cache_path() -> PathBuf {
-    LAUNCHER_DIRECTORY.root_dir().join("launcher_news.json")
-}
-
-async fn read_cache(path: &PathBuf) -> NewsCacheFile {
-    tokio::fs::read(path)
-        .await
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default()
-}
-
-async fn save_cache(path: &PathBuf, cache: &NewsCacheFile) {
-    let bytes = match serde_json::to_vec(cache) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            warn!("[News] could not serialise the news cache: {err}");
-            return;
-        }
-    };
-    if let Err(err) = write_atomic(path, bytes).await {
-        warn!("[News] could not write {}: {err}", path.display());
     }
 }

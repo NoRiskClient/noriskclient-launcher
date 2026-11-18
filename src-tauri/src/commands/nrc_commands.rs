@@ -13,7 +13,7 @@ pub async fn get_launcher_news_command(page: u32, limit: u32) -> Result<Launcher
     debug!("Executing get_launcher_news_command (page {page}, limit {limit})");
     let state = State::get().await?;
     let is_experimental = state.config_manager.is_experimental_mode().await;
-    Ok(LauncherNewsApi::get_page_cached(is_experimental, page, limit).await?)
+    Ok(LauncherNewsApi::get_page_cached(&state.content_cache, is_experimental, page, limit).await?)
 }
 
 #[tauri::command]
