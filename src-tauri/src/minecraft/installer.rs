@@ -974,10 +974,19 @@ pub async fn install_minecraft_version(
         launch_params = launch_params.with_additional_jvm_args(jvm_args);
     }
 
-    let mitigation_args = base64_intrinsics_mitigation(java_major);
+    let mitigation_args = base64_intrinsics_mitigation(
+        java_major,
+        piston_meta
+            .arguments
+            .iter()
+            .flat_map(|arguments| arguments.simple_jvm())
+            .chain(launch_params.additional_jvm_args.iter().map(String::as_str)),
+    );
     if !mitigation_args.is_empty() {
-        let mut jvm_args = mitigation_args;
-        jvm_args.extend(launch_params.additional_jvm_args.clone());
+        let jvm_args = mitigation_args
+            .into_iter()
+            .chain(launch_params.additional_jvm_args.clone())
+            .collect();
         launch_params = launch_params.with_additional_jvm_args(jvm_args);
     }
 

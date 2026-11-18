@@ -4,15 +4,22 @@ use log::{info, trace};
 use std::path::PathBuf;
 
 pub const BASE64_INTRINSICS_MIN_JAVA: u32 = 11;
+pub const BASE64_INTRINSICS_MITIGATION: [&str; 2] =
+    ["-XX:+UnlockDiagnosticVMOptions", "-XX:-UseBASE64Intrinsics"];
 
-pub fn base64_intrinsics_mitigation(java_major: u32) -> Vec<String> {
+pub fn base64_intrinsics_mitigation<'a>(
+    java_major: u32,
+    existing_args: impl IntoIterator<Item = &'a str>,
+) -> Vec<String> {
     if java_major < BASE64_INTRINSICS_MIN_JAVA {
         return Vec::new();
     }
-    vec![
-        "-XX:+UnlockDiagnosticVMOptions".to_string(),
-        "-XX:-UseBASE64Intrinsics".to_string(),
-    ]
+    let existing_args: Vec<&str> = existing_args.into_iter().collect();
+    BASE64_INTRINSICS_MITIGATION
+        .iter()
+        .filter(|flag| !existing_args.contains(flag))
+        .map(|flag| flag.to_string())
+        .collect()
 }
 
 pub struct JvmArguments {
