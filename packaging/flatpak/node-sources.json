@@ -741,20 +741,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/@types/react-virtualized/-/react-virtualized-9.22.2.tgz",
-        "sha512": "d0483f304dce1d8586c6cfbf9f855e95f62b857b2c8ab79969ad54aa3e521244e949a06ee5cb4518e095c5c3aaa465d188476b93feee868f6d9596abc822231c",
-        "dest-filename": "@types-react-virtualized-9.22.2.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/@types/react-window/-/react-window-1.8.8.tgz",
-        "sha512": "f0bb3aeb46c747501403692e46f546f43ff85e9442eb08c068f4fd76297b0a473be9e3fd4ca599c309a07eaf10d4b00d5f740d0e7a14e19a78f00df0fb32baf5",
-        "dest-filename": "@types-react-window-1.8.8.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/@types/react/-/react-18.3.20.tgz",
         "sha512": "20f68264decf4a164aff7b7a43cee97d39119baa0b4dde2fcedca88fe71b1d417583715f55bdad1482fbf6e0912847efd7a021a83301cb03f6556dca21952f72",
         "dest-filename": "@types-react-18.3.20.tgz",
@@ -1077,13 +1063,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/clsx/-/clsx-1.2.1.tgz",
-        "sha512": "11c47aaf96bc6e3ea9bb7c9cb1afc4fdc2951ae4e064965db325181ce92c1bf50722229f8f1cd1c58269c9507061a41e3af8216a5f5f71ce0f89d960cee80042",
-        "dest-filename": "clsx-1.2.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
         "sha512": "7989b441606d52b0566561b4777f3a386030d7a67df793e2395a3607b6e35926c779d1a5e5ed1959aabae6438681448d7ac1080e407d2126d383f24af5d84264",
         "dest-filename": "clsx-2.1.1.tgz",
@@ -1234,13 +1213,6 @@
         "url": "https://registry.npmjs.org/dlv/-/dlv-1.1.3.tgz",
         "sha512": "f87972b728e53ca9c81bc5ee446f16be604ff31b3c3fbd72f9228a4ba6575a81202ee78fc6d0e8504887ed691d78f5ab439241a44e9aa15a9f65f2544248d7c0",
         "dest-filename": "dlv-1.1.3.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/dom-helpers/-/dom-helpers-5.2.1.tgz",
-        "sha512": "9d109aec22b7553accd8d986908cb871b2bb219960044fcf60c9f9e6bad779faf9c570cfd0b76d7cf9db9450e855d7007ec949ee8afa8aa0149f1d0208621640",
-        "dest-filename": "dom-helpers-5.2.1.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {
@@ -2106,13 +2078,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz",
-        "sha512": "cd88b0b5951c6325caa3f9e9f7a00664072493e1565ac51d2777071869a577bf8086f716990c86098521d6173843fa643a16fae5d411fe9a82c8ad1c39a1f3e1",
-        "dest-filename": "memoize-one-5.2.1.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/merge2/-/merge2-1.4.1.tgz",
         "sha512": "f2aed51203095b827cb5c7d53f2f20d3d35c43065d6f0144aa17bf5999282338e7ff74c60f0b4e098b571b10373bcb4fce97330820e0bfe3f63f9cb4d1924e3a",
         "dest-filename": "merge2-1.4.1.tgz",
@@ -2862,20 +2827,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz",
-        "sha512": "7c10126c0e8b9ce53d74e536796eda43cc666014975085abf94985f5bd5e7d905acc634efab7174ff89c74a9d89b6a53c1c472955518c16ec7d4f1df2de915cc",
-        "dest-filename": "react-lifecycles-compat-3.0.4.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/react-loading-skeleton/-/react-loading-skeleton-3.5.0.tgz",
-        "sha512": "831c52c8b6eb1007574ca81f6e904415908efcfd79dc39ea48241abb6fa8ea5372d6380c46bd8c99198eccc9b2af049a4982d107c83b6f4c1a60f9948f3ec885",
-        "dest-filename": "react-loading-skeleton-3.5.0.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/react-markdown/-/react-markdown-10.1.0.tgz",
         "sha512": "a8ac55a292d3fd3c80e815f751ee4dc1a6ceb00ce6d10ee400fc2ae8bfb0583c22b18b3b47cbd9d27457aaaeab92e79ba31a648ef2c653d7d689f897fd9645c5",
         "dest-filename": "react-markdown-10.1.0.tgz",
@@ -2904,30 +2855,9 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/react-virtualized-auto-sizer/-/react-virtualized-auto-sizer-1.0.26.tgz",
-        "sha512": "09b94dca2355c36a3e86c6b9ff8f4d1f6a201b167eb7eddac1e46f352abb4d58c3225c24ee2af895e9dc120e47c47792cf035aad290d922bb4a8948e5edc66e4",
-        "dest-filename": "react-virtualized-auto-sizer-1.0.26.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/react-virtualized/-/react-virtualized-9.22.6.tgz",
-        "sha512": "5398fb2ae510b7701a31ab65309d1425d76a4a25fe2a6d182714aa6c0cc8886c39126373d2484ccaa3f687382ee3e414b66f903c8af1cd45f8ada2719952671e",
-        "dest-filename": "react-virtualized-9.22.6.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/react-virtuoso/-/react-virtuoso-4.12.7.tgz",
         "sha512": "9e3269efae217ba162d69f3d3d45b493691bc96bbdc3fcbe3307719b02b692f770c335436f3d9cdb0323e71752aee045560153b08ed9f39871651eda48706b6d",
         "dest-filename": "react-virtuoso-4.12.7.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
-        "url": "https://registry.npmjs.org/react-window/-/react-window-1.8.11.tgz",
-        "sha512": "f9245b5154f6b1c69d805496c7e4753fbe78c473c4aaf71f49f557d7441883a3ce3b3f9636090de3ca52f81b5934830688bd4762b484882930b0c4b5e50a2011",
-        "dest-filename": "react-window-1.8.11.tgz",
         "dest": "flatpak-node/yarn-mirror"
     },
     {

@@ -24,7 +24,6 @@ interface ProfileState {
   updateProfile: (id: string, updates: UpdateProfileParams) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
   launchProfile: (id: string) => Promise<void>;
-  installProfile: (id: string) => Promise<void>;
   abortProfileLaunch: (id: string) => Promise<void>;
   isProfileLaunching: (id: string) => Promise<boolean>;
   copyProfile: (
@@ -146,16 +145,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       await ProfileService.launchProfile(id);
     } catch (error) {
       console.error(`Failed to launch profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  installProfile: async (id: string) => {
-    try {
-      //@ts-ignore
-      await ProfileService.installProfile(id);
-    } catch (error) {
-      console.error(`Failed to install profile ${id}:`, error);
       throw error;
     }
   },

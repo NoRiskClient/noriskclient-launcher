@@ -146,7 +146,7 @@
   dependencies:
     "@babel/helper-plugin-utils" "^7.25.9"
 
-"@babel/runtime@^7.0.0", "@babel/runtime@^7.17.8", "@babel/runtime@^7.26.0", "@babel/runtime@^7.7.2", "@babel/runtime@^7.8.7":
+"@babel/runtime@^7.17.8", "@babel/runtime@^7.26.0":
   version "7.27.1"
   resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.27.1.tgz"
   integrity sha512-1x3D2xEk2fRo3PAhwQwu5UubzgiVWSXTBfWpVd2Mx2AzRqJuDJCsgaDVZ7HB5iGzDW1Hl1sWN2mFyKjmR9uAog==
@@ -1258,21 +1258,6 @@
   resolved "https://registry.npmjs.org/@types/react-reconciler/-/react-reconciler-0.28.9.tgz"
   integrity sha512-HHM3nxyUZ3zAylX8ZEyrDNd2XZOnQ0D5XfunJF5FLQnZbHHYq4UWvW1QfelQNXv1ICNkwYhfxjwfnqivYB6bFg==
 
-"@types/react-virtualized@^9.22.2":
-  version "9.22.2"
-  resolved "https://registry.npmjs.org/@types/react-virtualized/-/react-virtualized-9.22.2.tgz"
-  integrity sha512-0Eg/ME3OHYWGxs+/n4VelfYrhXssireZaa1Uqj5SEkTpSaBu5ctFGOCVxcOqpGXRiEdrk/7uho9tlZaryCIjHA==
-  dependencies:
-    "@types/prop-types" "*"
-    "@types/react" "*"
-
-"@types/react-window@^1.8.8":
-  version "1.8.8"
-  resolved "https://registry.npmjs.org/@types/react-window/-/react-window-1.8.8.tgz"
-  integrity sha512-8Ls660bHR1AUA2kuRvVG9D/4XpRC6wjAaPT9dil7Ckc76eP9TKWZwwmgfq8Q1LANX3QNDnoU4Zp48A3w+zK69Q==
-  dependencies:
-    "@types/react" "*"
-
 "@types/react@*", "@types/react@^18.3.1":
   version "18.3.20"
   resolved "https://registry.npmjs.org/@types/react/-/react-18.3.20.tgz"
@@ -1606,11 +1591,6 @@ cli-columns@^4.0.0:
     string-width "^4.2.3"
     strip-ansi "^6.0.1"
 
-clsx@^1.0.4:
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/clsx/-/clsx-1.2.1.tgz"
-  integrity sha512-EcR6r5a8bj6pu3ycsa/E/cKVGuTgZJZdsyUYHOksG/UHIiKfjxzRxYJpyVBwYaQeOvghal9fcc4PidlgzugAQg==
-
 clsx@^2.1.1:
   version "2.1.1"
   resolved "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz"
@@ -1743,14 +1723,6 @@ dlv@^1.1.3:
   version "1.1.3"
   resolved "https://registry.npmjs.org/dlv/-/dlv-1.1.3.tgz"
   integrity sha512-+HlytyjlPKnIG8XuRG8WvmBP8xs8P71y+SKKS6ZXWoEgLuePxtDoUEiH7WkdePWrQ5JBpE6aoVqfZfJUQkjXwA==
-
-dom-helpers@^5.1.3:
-  version "5.2.1"
-  resolved "https://registry.npmjs.org/dom-helpers/-/dom-helpers-5.2.1.tgz"
-  integrity sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==
-  dependencies:
-    "@babel/runtime" "^7.8.7"
-    csstype "^3.0.2"
 
 dompurify@^3.4.12:
   version "3.4.17"
@@ -2799,11 +2771,6 @@ mdast-util-to-string@^4.0.0:
   dependencies:
     "@types/mdast" "^4.0.0"
 
-"memoize-one@>=3.1.1 <6":
-  version "5.2.1"
-  resolved "https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz"
-  integrity sha512-zYiwtZUcYyXKo/np96AGZAckk+FWWsUdJ3cHGGmld7+AhvcWmQyGCYUh1hc4Q/pkOhb65dQR/pqCyK0cOaHz4Q==
-
 merge2@^1.3.0:
   version "1.4.1"
   resolved "https://registry.npmjs.org/merge2/-/merge2-1.4.1.tgz"
@@ -3734,7 +3701,7 @@ promzard@^3.0.1:
   dependencies:
     read "^5.0.0"
 
-prop-types@^15.6.0, prop-types@^15.7.2:
+prop-types@^15.6.0:
   version "15.8.1"
   resolved "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz"
   integrity sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==
@@ -3800,16 +3767,6 @@ react-is@^16.13.1:
   resolved "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
-react-lifecycles-compat@^3.0.4:
-  version "3.0.4"
-  resolved "https://registry.npmjs.org/react-lifecycles-compat/-/react-lifecycles-compat-3.0.4.tgz"
-  integrity sha512-fBASbA6LnOU9dOU2eW7aQ8xmYBSXUIWr+UmF9b1efZBazGNO+rcXT/icdKnYm2pTwcRylVUYwW7H1PHfLekVzA==
-
-react-loading-skeleton@^3.5.0:
-  version "3.5.0"
-  resolved "https://registry.npmjs.org/react-loading-skeleton/-/react-loading-skeleton-3.5.0.tgz"
-  integrity sha512-gxxSyLbrEAdXTKgfbpBEFZCO/P153DnqSCQau2+o6lNy1jgMRr2MmRmOzMmyrwSaSYLRB8g7b0waYPmUjz7IhQ==
-
 react-markdown@^10.1.0:
   version "10.1.0"
   resolved "https://registry.npmjs.org/react-markdown/-/react-markdown-10.1.0.tgz"
@@ -3865,35 +3822,10 @@ react-use-measure@^2.1.1:
   resolved "https://registry.npmjs.org/react-use-measure/-/react-use-measure-2.1.7.tgz"
   integrity sha512-KrvcAo13I/60HpwGO5jpW7E9DfusKyLPLvuHlUyP5zqnmAPhNc6qTRjUQrdTADl0lpPpDVU2/Gg51UlOGHXbdg==
 
-react-virtualized-auto-sizer@^1.0.26:
-  version "1.0.26"
-  resolved "https://registry.npmjs.org/react-virtualized-auto-sizer/-/react-virtualized-auto-sizer-1.0.26.tgz"
-  integrity sha512-CblNyiNVw2o+hsa5/49NH2ogGxZ+t+3aweRvNSq7TVjDIlwk7ir4lencEg5HxHeSzwNarSkNkiu0qJSOXtxm5A==
-
-react-virtualized@^9.22.6:
-  version "9.22.6"
-  resolved "https://registry.npmjs.org/react-virtualized/-/react-virtualized-9.22.6.tgz"
-  integrity sha512-U5j7KuUQt3AaMatlMJ0UJddqSiX+Km0YJxSqbAzIiGw5EmNz0khMyqP2hzgu4+QUtm+QPIrxzUX4raJxmVJnHg==
-  dependencies:
-    "@babel/runtime" "^7.7.2"
-    clsx "^1.0.4"
-    dom-helpers "^5.1.3"
-    loose-envify "^1.4.0"
-    prop-types "^15.7.2"
-    react-lifecycles-compat "^3.0.4"
-
 react-virtuoso@^4.12.7:
   version "4.12.7"
   resolved "https://registry.npmjs.org/react-virtuoso/-/react-virtuoso-4.12.7.tgz"
   integrity sha512-njJp764he6Fi1p89PUW0k2kbyWu9w/y+MwdxmwK2kvdwwzVDbz2c2wMj5xdSruBFVgFTsI7Z85hxZR7aSHBrbQ==
-
-react-window@^1.8.11:
-  version "1.8.11"
-  resolved "https://registry.npmjs.org/react-window/-/react-window-1.8.11.tgz"
-  integrity sha512-+SRbUVT2scadgFSWx+R1P754xHPEqvcfSfVX10QYg6POOz+WNgkN48pS+BtZNIMGiL1HYrSEiCkwsMS15QogEQ==
-  dependencies:
-    "@babel/runtime" "^7.0.0"
-    memoize-one ">=3.1.1 <6"
 
 react@18.3.1:
   version "18.3.1"
