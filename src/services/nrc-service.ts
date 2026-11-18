@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BlogPost } from '../types/wordPress';
+import type { LauncherNewsPage } from '../types/launcherNews';
 import type { LauncherUpdate, UpdateInfo } from '../types/updater';
 import type { Profile } from '../types/profile';
 import type { AdventCalendarDay } from '../types/advent';
@@ -16,15 +16,8 @@ import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } fro
 import { refreshPermissions } from './permission-service';
 import { logInfo, logError } from '../utils/logging-utils';
 
-/**
- * Fetches the latest news and changelog posts from the backend.
- *
- * @returns A promise that resolves to an array of BlogPost objects.
- * @throws If the backend command fails.
- */
-export const fetchNewsAndChangelogs = (): Promise<BlogPost[]> => {
-  // Directly invoke and return the promise. Errors will propagate to the caller.
-  return invoke('get_news_and_changelogs_command');
+export const fetchLauncherNews = (page: number, limit: number): Promise<LauncherNewsPage> => {
+  return invoke('get_launcher_news_command', { page, limit });
 };
 
 /**

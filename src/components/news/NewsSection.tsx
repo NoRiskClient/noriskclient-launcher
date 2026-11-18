@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
-import { fetchNewsAndChangelogs } from "../../services/nrc-service";
+import { useInView } from "react-intersection-observer";
+import { fetchLauncherNews } from "../../services/nrc-service";
 import { openExternalUrl } from "../../services/tauri-service";
 import { cn } from "../../lib/utils";
 import { NewsCard } from "../ui/NewsCard";
 import { useThemeStore } from "../../store/useThemeStore";
-import { useNewsStore } from "../../store/useNewsStore";
+import { NEWS_PAGE_SIZE, useNewsStore } from "../../store/useNewsStore";
+import { newsLocale } from "../../types/launcherNews";
 
 interface NewsSectionProps {
   className?: string;
@@ -21,38 +23,37 @@ export function NewsSection({ className }: NewsSectionProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const newsSectionWidth = useThemeStore((state) => state.newsSectionWidth);
   const setNewsSectionWidth = useThemeStore((state) => state.setNewsSectionWidth);
+  const locale = newsLocale(useThemeStore((state) => state.language));
 
-  // News Store
-  const {
-    posts,
-    error,
-    setPosts,
-    setError,
-    isCacheValid,
-  } = useNewsStore();
+  const { items, page, totalPages, error, setFirstPage, appendPage, setError } = useNewsStore();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreFailed, setMoreFailed] = useState(false);
 
-  // Fade strength configuration (0-100%)
-  const fadeStrength = 90; // 90% opacity at bottom
+  const fadeStrength = 90;
 
   const loadNews = useCallback(async () => {
-    // Setze nur Error zurück, aber zeige keine Loading-Animation
-    // Das alte wird weiter angezeigt während wir neu laden
-    setError(null);
-
     try {
-      const fetchedPosts = await fetchNewsAndChangelogs();
-      setPosts(fetchedPosts);
-      console.log("[NewsSection] News data updated");
+      setFirstPage(await fetchLauncherNews(1, NEWS_PAGE_SIZE));
+      setError(null);
     } catch (err) {
       console.error("[NewsSection] Error fetching news:", err);
-      // Bei Fehler zeige alten Cache falls verfügbar
-      if (!isCacheValid() || posts.length === 0) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred",
-        );
-      }
+      setError(err instanceof Error ? err.message : "An unknown error occurred");
     }
-  }, [isCacheValid, posts.length, setError, setPosts]);
+  }, [setError, setFirstPage]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || page >= totalPages) return;
+    setLoadingMore(true);
+    setMoreFailed(false);
+    try {
+      appendPage(await fetchLauncherNews(page + 1, NEWS_PAGE_SIZE));
+    } catch (err) {
+      console.error("[NewsSection] Error fetching more news:", err);
+      setMoreFailed(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [appendPage, loadingMore, page, totalPages]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
@@ -69,32 +70,23 @@ export function NewsSection({ className }: NewsSectionProps) {
     if (!isResizing) return;
 
     const deltaX = e.clientX - startX;
-    const newWidth = Math.max(120, Math.min(500, startWidth - deltaX)); // Min 120px, Max 500px
+    const newWidth = Math.max(120, Math.min(500, startWidth - deltaX));
     setNewsSectionWidth(newWidth);
   }, [isResizing, startX, startWidth, setNewsSectionWidth]);
 
-  // Initial load effect - zeige Cache falls verfügbar, dann lade neu
   useEffect(() => {
-    // Bei ersten Laden: zeige Cache sofort falls verfügbar
-    if (posts.length === 0 && isCacheValid()) {
-      console.log("[NewsSection] Showing cached news on initial load");
-    }
-
-    // Lade immer neu (auch wenn Cache vorhanden)
     loadNews();
-  }, [loadNews]); // loadNews ändert sich nur wenn sich die Dependencies ändern
+  }, [loadNews]);
 
-  // Auto-refresh effect - alle 5 Minuten neu laden
   useEffect(() => {
     const interval = setInterval(() => {
       console.log("[NewsSection] Auto-refreshing news...");
       loadNews();
-    }, 5 * 60 * 1000); // 5 Minuten
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [loadNews]);
 
-  // Global mouse event listeners for resize functionality
   useEffect(() => {
     if (isResizing) {
       document.addEventListener("mousemove", handleResizeMove);
@@ -109,8 +101,7 @@ export function NewsSection({ className }: NewsSectionProps) {
 
 
   const renderContent = () => {
-    // Bei Fehler und keinen gecachten Daten
-    if (error && posts.length === 0) {
+    if (error && items.length === 0) {
       return (
         <div className="text-center p-2">
           <Icon
@@ -122,8 +113,7 @@ export function NewsSection({ className }: NewsSectionProps) {
       );
     }
 
-    // Bei keinen Daten überhaupt
-    if (posts.length === 0) {
+    if (items.length === 0) {
       return (
         <div className="text-center p-2">
           <Icon
@@ -137,48 +127,36 @@ export function NewsSection({ className }: NewsSectionProps) {
 
     return (
       <div className="flex flex-col space-y-1 w-full">
-        {posts.map((post) => {
-          const rawTitle = post.yoast_head_json?.title || t('news.item');
-          const suffixToRemove = " - NoRisk Client Blog";
-          let displayTitle = rawTitle;
-          if (rawTitle.endsWith(suffixToRemove)) {
-            displayTitle = rawTitle.substring(
-              0,
-              rawTitle.length - suffixToRemove.length,
-            );
-          }
-
-          const imageUrl =
-            post.yoast_head_json?.og_image?.[0]?.url || "/placeholder.svg";
-          const postUrl = post.yoast_head_json?.og_url || "#";
+        {items.map((item) => {
+          const displayTitle = item.title[locale] || item.title.en || t('news.item');
+          const postUrl = item.url?.[locale] || item.url?.en;
 
           return (
-            <div key={post.id} className="news-item w-full flex flex-col">
-              <p
-                className="font-smallcaps text-base text-white/70 truncate"
-                title={displayTitle}
-              >
-                {displayTitle}
-              </p>
-              <div className="relative w-full pt-[56.25%]">
-                <NewsCard
-                  id={`news-item-card-${post.id}`}
-                  className="absolute top-0 left-0 w-full h-full news-item-card"
-                  title={displayTitle}
-                  imageUrl={imageUrl}
-                  postUrl={postUrl}
-                  onClick={() => {
-                    if (postUrl !== "#") {
-                      openExternalUrl(postUrl).catch((err) =>
-                        console.error("Failed to open URL:", err),
-                      );
-                    }
-                  }}
-                />
-              </div>
-            </div>
+            <NewsCard
+              key={item.id}
+              title={displayTitle}
+              imageUrl={item.thumbnailUrl}
+              accent={accentColor.value}
+              onOpen={
+                postUrl
+                  ? () => openExternalUrl(postUrl).catch((err) => console.error("Failed to open URL:", err))
+                  : undefined
+              }
+            />
           );
         })}
+        {page < totalPages &&
+          (moreFailed ? (
+            <button
+              type="button"
+              className="self-center my-2 px-3 py-1 text-sm font-smallcaps text-white/70 hover:text-white"
+              onClick={() => void loadMore()}
+            >
+              {t('common.try_again')}
+            </button>
+          ) : (
+            <LoadMore loading={loadingMore} onVisible={loadMore} />
+          ))}
       </div>
     );
   };
@@ -194,7 +172,6 @@ export function NewsSection({ className }: NewsSectionProps) {
         boxShadow: `0 0 15px ${accentColor.value}30 inset`,
       }}
     >
-      {/* Resize handle */}
       <div
         className={cn(
           "absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize z-10",
@@ -220,7 +197,6 @@ export function NewsSection({ className }: NewsSectionProps) {
       <div className="flex-1 overflow-y-auto no-scrollbar relative">
         {renderContent()}
 
-        {/* Fade overlay at bottom - sticky positioned */}
         <div
           className="sticky bottom-0 left-0 right-0 h-20 pointer-events-none z-10"
           style={{
@@ -233,6 +209,20 @@ export function NewsSection({ className }: NewsSectionProps) {
           }}
         />
       </div>
+    </div>
+  );
+}
+
+function LoadMore({ loading, onVisible }: { loading: boolean; onVisible: () => void }) {
+  const { ref, inView } = useInView({ rootMargin: "300px" });
+
+  useEffect(() => {
+    if (inView && !loading) onVisible();
+  }, [inView, loading, onVisible]);
+
+  return (
+    <div ref={ref} className="flex justify-center py-3">
+      {loading && <Icon icon="eos-icons:loading" className="w-5 h-5 text-white/50" />}
     </div>
   );
 }

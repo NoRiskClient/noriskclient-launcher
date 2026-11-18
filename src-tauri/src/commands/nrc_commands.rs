@@ -1,6 +1,6 @@
 use crate::error::{AppError, CommandError};
 use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
-use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
+use crate::minecraft::api::launcher_news_api::{LauncherNewsApi, LauncherNewsPage};
 use crate::state::state_manager::State;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::info;
@@ -8,15 +8,12 @@ use log::{debug, error};
 use tauri::{AppHandle, Manager, Url, UserAttentionType, WebviewUrl, WebviewWindowBuilder};
 use crate::utils::updater_utils;
 
-/// Fetches news and changelog posts from the WordPress API.
-///
-/// # Returns
-///
-/// * `Result<Vec<BlogPost>, CommandError>` - A vector of blog posts or an error.
 #[tauri::command]
-pub async fn get_news_and_changelogs_command() -> Result<Vec<BlogPost>, CommandError> {
-    info!("Executing get_news_and_changelogs_command");
-    Ok(WordPressApi::get_news_and_changelogs().await?)
+pub async fn get_launcher_news_command(page: u32, limit: u32) -> Result<LauncherNewsPage, CommandError> {
+    debug!("Executing get_launcher_news_command (page {page}, limit {limit})");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    Ok(LauncherNewsApi::get_page_cached(&state.content_cache, is_experimental, page, limit).await?)
 }
 
 #[tauri::command]
