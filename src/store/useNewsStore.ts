@@ -11,7 +11,6 @@ interface NewsState {
 }
 
 interface NewsActions {
-  // Keeps further pages that are already loaded.
   setFirstPage: (page: LauncherNewsPage) => void;
   appendPage: (page: LauncherNewsPage) => void;
   setError: (error: string | null) => void;

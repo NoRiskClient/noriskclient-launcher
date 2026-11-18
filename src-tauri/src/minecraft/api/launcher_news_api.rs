@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::integrations::lenient;
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::utils::file_utils::write_atomic;
 use crate::utils::http_client::nrc_get;
@@ -16,10 +17,10 @@ const NEWS_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const CACHE_MAX_AGE_MS: i64 = 5 * 60 * 1000;
 const CACHE_KEEP_MS: i64 = 24 * 60 * 60 * 1000;
 
-// Parallel calls wait for each other, so they cause one request.
 static CACHE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct LocalizedText {
     pub en: String,
     pub de: String,
@@ -29,7 +30,6 @@ pub struct LocalizedText {
 #[serde(rename_all = "camelCase")]
 pub struct LauncherNewsItem {
     pub id: String,
-    pub kind: String,
     pub thumbnail_url: String,
     pub url: Option<LocalizedText>,
     pub title: LocalizedText,
@@ -39,16 +39,15 @@ pub struct LauncherNewsItem {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LauncherNewsPage {
+    #[serde(deserialize_with = "lenient::vec")]
     pub items: Vec<LauncherNewsItem>,
     pub page: u32,
     pub total_pages: u32,
-    pub total: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 struct NewsCacheFile {
-    // "<page>:<limit>"
     pages: HashMap<String, CachedPage>,
 }
 
@@ -62,7 +61,7 @@ struct CachedPage {
 pub struct LauncherNewsApi;
 
 impl LauncherNewsApi {
-    pub async fn get_page(is_experimental: bool, page: u32, limit: u32) -> Result<LauncherNewsPage> {
+    async fn get_page(is_experimental: bool, page: u32, limit: u32) -> Result<LauncherNewsPage> {
         let url = format!("{}/launcher/news", NoRiskApi::get_api_base(is_experimental));
         nrc_get(&url)
             .query(&[("page", page.to_string()), ("limit", limit.to_string())])
@@ -71,8 +70,6 @@ impl LauncherNewsApi {
             .await
     }
 
-    // From the file while younger than five minutes; also the fallback when the backend fails.
-    // Experimental mode always asks the backend.
     pub async fn get_page_cached(is_experimental: bool, page: u32, limit: u32) -> Result<LauncherNewsPage> {
         if is_experimental {
             return Self::get_page(true, page, limit).await;

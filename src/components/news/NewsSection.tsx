@@ -27,7 +27,6 @@ export function NewsSection({ className }: NewsSectionProps) {
 
   const { items, page, totalPages, error, setFirstPage, appendPage, setError } = useNewsStore();
   const [loadingMore, setLoadingMore] = useState(false);
-  // No automatic retry: it would loop while the trigger stays in view.
   const [moreFailed, setMoreFailed] = useState(false);
 
   const fadeStrength = 90;
@@ -129,38 +128,21 @@ export function NewsSection({ className }: NewsSectionProps) {
     return (
       <div className="flex flex-col space-y-1 w-full">
         {items.map((item) => {
-          const displayTitle = item.title[locale] || t('news.item');
-          const imageUrl = item.thumbnailUrl || "/placeholder.svg";
-          const postUrl = item.url?.[locale] || "#";
+          const displayTitle = item.title[locale] || item.title.en || t('news.item');
+          const postUrl = item.url?.[locale] || item.url?.en;
 
           return (
-            <div key={item.id} className="news-item w-full flex flex-col">
-              <p
-                className="font-smallcaps text-base text-white/70 truncate"
-                title={displayTitle}
-              >
-                {displayTitle}
-              </p>
-              <div className="relative w-full pt-[56.25%]">
-                <NewsCard
-                  id={`news-item-card-${item.id}`}
-                  className={cn(
-                    "absolute top-0 left-0 w-full h-full news-item-card",
-                    postUrl !== "#" && "cursor-pointer",
-                  )}
-                  title={displayTitle}
-                  imageUrl={imageUrl}
-                  postUrl={postUrl}
-                  onClick={() => {
-                    if (postUrl !== "#") {
-                      openExternalUrl(postUrl).catch((err) =>
-                        console.error("Failed to open URL:", err),
-                      );
-                    }
-                  }}
-                />
-              </div>
-            </div>
+            <NewsCard
+              key={item.id}
+              title={displayTitle}
+              imageUrl={item.thumbnailUrl}
+              accent={accentColor.value}
+              onOpen={
+                postUrl
+                  ? () => openExternalUrl(postUrl).catch((err) => console.error("Failed to open URL:", err))
+                  : undefined
+              }
+            />
           );
         })}
         {page < totalPages &&

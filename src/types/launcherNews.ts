@@ -5,7 +5,6 @@ export interface LocalizedText {
 
 export interface LauncherNewsItem {
   id: string;
-  kind: "promo" | "blog";
   thumbnailUrl: string;
   url: LocalizedText | null;
   title: LocalizedText;
@@ -16,7 +15,6 @@ export interface LauncherNewsPage {
   items: LauncherNewsItem[];
   page: number;
   totalPages: number;
-  total: number;
 }
 
 export type NewsLocale = keyof LocalizedText;
