@@ -13,6 +13,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import type { LoaderVersionReason } from "../../../../types/profile";
+import { withoutStableTag } from "../../../../utils/loader-version";
 
 // Only surface a badge when the effective version comes from something OTHER
 // than the plain stored loader_version — pack policy or explicit override —
@@ -41,7 +42,7 @@ interface LoaderVersionPickerV3Props {
 // that come from norisk_pack don't carry it — normalize on both sides so the
 // highlight still lights up the right row.
 const stripStable = (v: string | null | undefined): string | null =>
-  v ? v.replace(/\s*\(stable\)\s*$/i, "") : null;
+  v ? withoutStableTag(v) : null;
 
 export function LoaderVersionPickerV3({
   loader,
