@@ -78,6 +78,8 @@ pub struct NoriskPackDefinition {
     /// Optional: StartUpHelper configuration for this pack.
     #[serde(rename = "startupHelper", default)]
     pub startup_helper: Option<StartUpHelper>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jvm: Option<serde_json::Value>,
 }
 
 /// Configuration for copying additional files from the noriskclient/new directory
@@ -963,6 +965,35 @@ impl NoriskModpacksConfig {
         Ok(merged)
     }
 
+    fn resolve_jvm_rules_for_pack(
+        &self,
+        pack_id: &str,
+        visited: &mut HashSet<String>,
+    ) -> Result<Vec<serde_json::Value>> {
+        if !visited.insert(pack_id.to_string()) {
+            return Err(AppError::Other(format!(
+                "Circular inheritance detected while resolving JVM rules for pack ID: {}",
+                pack_id
+            )));
+        }
+        let base_definition = self.packs.get(pack_id).ok_or_else(|| {
+            AppError::Other(format!("Pack ID '{}' not found", pack_id))
+        })?;
+        let mut rules = Vec::new();
+        for parent_id in base_definition.inherits_from.iter().flatten() {
+            rules.extend(self.resolve_jvm_rules_for_pack(parent_id, visited)?);
+        }
+        match &base_definition.jvm {
+            Some(serde_json::Value::Array(own)) => rules.extend(own.iter().cloned()),
+            Some(other) if !other.is_null() => {
+                warn!("Pack '{}': JVM rules are not a list, ignoring them", pack_id)
+            }
+            _ => {}
+        }
+        visited.remove(pack_id);
+        Ok(rules)
+    }
+
     // Helper function to get a fully resolved pack definition (including mods)
     // This combines the base definition with the resolved mods.
     pub fn get_resolved_pack_definition(&self, pack_id: &str) -> Result<NoriskPackDefinition> {
@@ -978,6 +1009,8 @@ impl NoriskModpacksConfig {
         let resolved_loader_policy =
             self.resolve_loader_policy_for_pack(pack_id, &mut visited_lp)?;
 
+        let resolved_jvm_rules = self.resolve_jvm_rules_for_pack(pack_id, &mut HashSet::new())?;
+
         Ok(NoriskPackDefinition {
             display_name: base_definition.display_name.clone(),
             description: base_definition.description.clone(),
@@ -989,6 +1022,7 @@ impl NoriskModpacksConfig {
             listing: base_definition.listing.clone(),
             loader_policy: resolved_loader_policy, // RESOLVED loader policy
             startup_helper: base_definition.startup_helper.clone(), // Added missing field
+            jvm: (!resolved_jvm_rules.is_empty()).then(|| serde_json::Value::Array(resolved_jvm_rules)),
         })
     }
 

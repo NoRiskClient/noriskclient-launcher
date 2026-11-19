@@ -6,4 +6,5 @@ mod loader_overwrite;
 mod logging_config_download;
 mod minecraft_auth;
 mod mod_resolver;
+mod pack_jvm_rules;
 mod share_details;
