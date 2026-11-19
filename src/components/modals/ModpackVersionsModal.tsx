@@ -235,6 +235,7 @@ export function ModpackVersionsModal({
   const { t } = useTranslation();
   const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(initialVersions);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<UnifiedVersion | null>(null);
 
   // Load fresh versions when modal opens by loading the current profile
   React.useEffect(() => {
@@ -285,7 +286,6 @@ export function ModpackVersionsModal({
   );
 
   const installedVersionId = versions.installed_version?.id;
-  const [selectedVersion, setSelectedVersion] = useState<UnifiedVersion | null>(null);
 
   const handleVersionSelect = (version: UnifiedVersion) => {
     // Don't allow selecting already installed version
@@ -358,13 +358,6 @@ export function ModpackVersionsModal({
       onVersionSwitch(selectedVersion);
     }
   };
-
-  // Reset selection when modal closes
-  React.useEffect(() => {
-    if (!isOpen) {
-      setSelectedVersion(null);
-    }
-  }, [isOpen]);
 
   return (
     <Modal
