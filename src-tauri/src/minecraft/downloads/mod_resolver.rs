@@ -165,16 +165,15 @@ impl ModResolutionReport {
     }
 }
 
-// --- Helper function to check if a filename is blocked by Flagsmith config ---
-async fn is_filename_blocked_by_config(filename: &str, enable_flagsmith_blocking: bool) -> bool {
-    if !enable_flagsmith_blocking {
+async fn is_filename_blocked_by_config(filename: &str, enable_blocked_mods_check: bool) -> bool {
+    if !enable_blocked_mods_check {
         return false; // Skip blocking if no NoRisk pack is selected
     }
     
-    match crate::commands::flagsmith_commands::is_filename_blocked(filename.to_string()).await {
+    match crate::commands::blocked_mods_commands::is_filename_blocked(filename.to_string()).await {
         Ok(is_blocked) => {
             if is_blocked {
-                info!("Filename '{}' is blocked by Flagsmith configuration", filename);
+                info!("Filename '{}' is blocked by the blocked mods configuration", filename);
             }
             is_blocked
         }
@@ -185,16 +184,15 @@ async fn is_filename_blocked_by_config(filename: &str, enable_flagsmith_blocking
     }
 }
 
-// --- Helper function to check if a Modrinth project ID is blocked by Flagsmith config ---
-async fn is_modrinth_project_id_blocked_by_config(project_id: &str, enable_flagsmith_blocking: bool) -> bool {
-    if !enable_flagsmith_blocking {
+async fn is_modrinth_project_id_blocked_by_config(project_id: &str, enable_blocked_mods_check: bool) -> bool {
+    if !enable_blocked_mods_check {
         return false; // Skip blocking if no NoRisk pack is selected
     }
     
-    match crate::commands::flagsmith_commands::is_modrinth_project_id_blocked(project_id.to_string()).await {
+    match crate::commands::blocked_mods_commands::is_modrinth_project_id_blocked(project_id.to_string()).await {
         Ok(is_blocked) => {
             if is_blocked {
-                info!("Modrinth project ID '{}' is blocked by Flagsmith configuration", project_id);
+                info!("Modrinth project ID '{}' is blocked by the blocked mods configuration", project_id);
             }
             is_blocked
         }
@@ -248,12 +246,12 @@ async fn try_add_mod_to_final_list(
     mod_type_str: &str,
     mod_name: &str,
     project_id: Option<&str>, // Only for Modrinth mods
-    enable_flagsmith_blocking: bool, // Flag to enable/disable Flagsmith blocking
+    enable_blocked_mods_check: bool,
     sha1: Option<String>, // Known SHA1 hash (Modrinth/CurseForge)
 ) -> ModResolutionStatus {
     // 1. Check Modrinth Project ID if applicable
     if let Some(pid) = project_id {
-        if is_modrinth_project_id_blocked_by_config(pid, enable_flagsmith_blocking).await {
+        if is_modrinth_project_id_blocked_by_config(pid, enable_blocked_mods_check).await {
             info!(
                 "Skipping {} mod '{}' (project ID: {}) because project ID is blocked by configuration",
                 mod_type_str, mod_name, pid
@@ -263,7 +261,7 @@ async fn try_add_mod_to_final_list(
     }
 
     // 2. Check filename
-    if is_filename_blocked_by_config(&filename, enable_flagsmith_blocking).await {
+    if is_filename_blocked_by_config(&filename, enable_blocked_mods_check).await {
         info!(
             "Skipping {} mod '{}' because filename '{}' is blocked by configuration",
             mod_type_str, mod_name, filename
@@ -315,7 +313,7 @@ async fn resolve_pack_entry(
     loader_str: &str,
     mod_cache_dir: &PathBuf,
     final_mods: &mut HashMap<String, TargetMod>,
-    enable_flagsmith_blocking: bool,
+    enable_blocked_mods_check: bool,
 ) -> ModOutcome {
     let mod_name = mod_entry.display_name.as_deref().unwrap_or(&mod_entry.id);
 
@@ -413,7 +411,7 @@ async fn resolve_pack_entry(
         mod_type_str,
         mod_name,
         project_id,
-        enable_flagsmith_blocking,
+        enable_blocked_mods_check,
         None,
     )
     .await;
@@ -427,7 +425,7 @@ pub async fn resolve_profile_mod(
     minecraft_version: &str,
     mod_cache_dir: &PathBuf,
     final_mods: &mut HashMap<String, TargetMod>,
-    enable_flagsmith_blocking: bool,
+    enable_blocked_mods_check: bool,
 ) -> ModOutcome {
     let mod_id_string = mod_info.id.to_string();
     let mod_name = mod_info.display_name.as_deref().unwrap_or(&mod_id_string);
@@ -531,7 +529,7 @@ pub async fn resolve_profile_mod(
         mod_type_str,
         mod_name,
         project_id,
-        enable_flagsmith_blocking,
+        enable_blocked_mods_check,
         get_sha1_from_source(&mod_info.source),
     )
     .await;
@@ -572,13 +570,12 @@ pub async fn resolve_target_mods(
     let mut final_mods: HashMap<String, TargetMod> = HashMap::new(); // Key: Canonical Mod Identifier
     let mut report = ModResolutionReport::new(minecraft_version, loader_str);
 
-    // Enable Flagsmith blocking only if a NoRisk pack is selected
-    let enable_flagsmith_blocking = profile.selected_norisk_pack_id.is_some();
+    let enable_blocked_mods_check = profile.selected_norisk_pack_id.is_some();
 
-    if enable_flagsmith_blocking {
-        debug!("Flagsmith mod blocking is enabled (NoRisk pack selected)");
+    if enable_blocked_mods_check {
+        debug!("Blocked mods check is enabled (NoRisk pack selected)");
     } else {
-        debug!("Flagsmith mod blocking is disabled (no NoRisk pack selected)");
+        debug!("Blocked mods check is disabled (no NoRisk pack selected)");
     }
 
     // 1. Process Pack Mods (Only Modrinth)
@@ -596,7 +593,7 @@ pub async fn resolve_target_mods(
                         loader_str,
                         mod_cache_dir,
                         &mut final_mods,
-                        enable_flagsmith_blocking,
+                        enable_blocked_mods_check,
                     )
                     .await;
                     report.pack.insert(mod_entry.id.clone(), outcome);
@@ -624,7 +621,7 @@ pub async fn resolve_target_mods(
             minecraft_version,
             mod_cache_dir,
             &mut final_mods,
-            enable_flagsmith_blocking,
+            enable_blocked_mods_check,
         )
         .await;
         report.profile.insert(mod_info.id, outcome);
@@ -639,8 +636,7 @@ pub async fn resolve_target_mods(
         let mut custom_mods_added = 0;
         for info in custom_mods {
             if info.is_enabled {
-                // Check if filename is blocked by Flagsmith config first (no project ID check for custom mods)
-                if is_filename_blocked_by_config(&info.filename, enable_flagsmith_blocking).await {
+                if is_filename_blocked_by_config(&info.filename, enable_blocked_mods_check).await {
                     info!(
                         "Skipping custom mod '{}' because filename is blocked by configuration",
                         info.filename

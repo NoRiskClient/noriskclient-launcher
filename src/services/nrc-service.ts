@@ -12,7 +12,7 @@ import type {
   DailyClaimState,
 } from '../types/afkpoints';
 import { useProfileStore } from '../store/profile-store';
-import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './flagsmith-service';
+import { getBlockedModsConfig, getPackRolloutConfig, getPackFallbackConfig } from './feature-flags-service';
 import { refreshPermissions } from './permission-service';
 import { logInfo, logError } from '../utils/logging-utils';
 
@@ -63,7 +63,6 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
   //console.log("[TEST] 5-second delay finished.");
 
   try {
-    // Fire and forget: Load blocked mods config from Flagsmith
     getBlockedModsConfig()
       .then((config) => {
         logInfo(`Blocked mods config loaded: ${JSON.stringify(config)}`);
@@ -72,7 +71,6 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
         logError(`Failed to load blocked mods config: ${error}`);
       });
 
-    // Fire and forget: Load pack rollout aliases from Flagsmith
     getPackRolloutConfig()
       .then((config) => {
         logInfo(`Pack rollout config loaded: ${JSON.stringify(config)}`);
@@ -81,7 +79,6 @@ export const refreshNrcDataOnMount = async (): Promise<void> => {
         logError(`Failed to load pack rollout config: ${error}`);
       });
 
-    // Fire and forget: Load pack fallback id from Flagsmith
     getPackFallbackConfig()
       .then((config) => {
         logInfo(`Pack fallback config loaded: ${JSON.stringify(config)}`);

@@ -1,6 +1,7 @@
 pub mod applixir_command;
 pub mod assets_command;
 pub mod deep_link_handler;
+pub mod feature_flags_command;
 pub mod support_command;
 pub mod cape_command;
 pub mod cosmetic_command;
@@ -14,7 +15,7 @@ pub mod content_command;
 pub mod crash_fix_command;
 pub mod curseforge_commands;
 pub mod file_command;
-pub mod flagsmith_commands;
+pub mod blocked_mods_commands;
 pub mod friends_command;
 pub mod java_command;
 pub mod minecraft_auth_command;

@@ -328,6 +328,7 @@ impl MinecraftAuthStore {
 
         let data = serde_json::to_string_pretty(&store)?;
         write_atomic(&self.store_path, data).await?;
+        crate::feature_flags::check_in_background();
 
         debug!("[Storage] Save operation completed successfully");
         Ok(())

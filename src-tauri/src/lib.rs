@@ -4,6 +4,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod error;
+pub mod feature_flags;
 pub mod friends;
 pub mod integrations;
 pub mod logging;

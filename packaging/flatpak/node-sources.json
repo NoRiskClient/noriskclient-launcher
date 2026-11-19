@@ -1028,13 +1028,6 @@
     },
     {
         "type": "file",
-        "url": "https://registry.npmjs.org/flagsmith/-/flagsmith-9.2.2.tgz",
-        "sha512": "f54348e5176dbf8af7ac4aee4f7b0b8a7643287d68edca3c912a299860c1e6af5f0961d72dad472db8c0c1ef713e832d58ca5d4bc82a2dd63651905d7f1b9576",
-        "dest-filename": "flagsmith-9.2.2.tgz",
-        "dest": "flatpak-node/yarn-mirror"
-    },
-    {
-        "type": "file",
         "url": "https://registry.npmjs.org/foreground-child/-/foreground-child-3.3.1.tgz",
         "sha512": "8085e32aab45b96120cc544903d58241e4892d90e380950e302333c6dbc5abfdfb2a88ccd41146b9faac0b2d2be2a4909982ec65831ec91ab321638cba9d37b3",
         "dest-filename": "foreground-child-3.3.1.tgz",

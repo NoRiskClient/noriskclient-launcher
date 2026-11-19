@@ -256,19 +256,4 @@ pub async fn is_modrinth_project_id_blocked(project_id: String) -> Result<bool, 
     Ok(is_blocked)
 }
 
-/// Refresh the blocked mods configuration from Flagsmith
-/// This is called by the frontend to trigger a background refresh
-#[tauri::command]
-pub async fn refresh_blocked_mods_config() -> Result<(), CommandError> {
-    debug!("Command called: refresh_blocked_mods_config");
-    
-    // This command serves as a trigger for the frontend to know that
-    // it should fetch the latest config from Flagsmith and then call
-    // set_blocked_mods_config with the updated data
-    
-    info!("Blocked mods config refresh triggered - frontend should update the configuration");
-    debug!("Command completed: refresh_blocked_mods_config");
-    Ok(())
-}
-
 // Note: Removed matches_pattern function - now using regex directly 

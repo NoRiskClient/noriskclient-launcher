@@ -12,7 +12,7 @@ import {
   getLauncherConfig,
   setLauncherConfig,
 } from "../../services/launcher-config-service";
-import { getPackRolloutConfig } from "../../services/flagsmith-service";
+import { getPackRolloutConfig } from "../../services/feature-flags-service";
 
 const ACTIVE_COLOR = "#f59e0b";
 const FALLBACK_PCT = 5;

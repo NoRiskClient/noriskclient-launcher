@@ -19,7 +19,7 @@ import type {
   UnifiedVersion
 } from '../../../types/unified';
 import { ModPlatform, UnifiedSortType, UnifiedProjectType } from '../../../types/unified';
-import { getBlockedModsConfig, getModNoRiskStatus } from '../../../services/flagsmith-service';
+import { getBlockedModsConfig, getModNoRiskStatus } from '../../../services/feature-flags-service';
 import type {
   ModrinthProjectType,
   ModrinthCategory,

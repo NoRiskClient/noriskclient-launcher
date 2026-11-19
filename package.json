@@ -27,7 +27,6 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "clsx": "^2.1.1",
     "dompurify": "^3.4.12",
-    "flagsmith": "^9.2.2",
     "framer-motion": "^12.23.24",
     "gsap": "^3.12.7",
     "i18next": "^25.8.4",

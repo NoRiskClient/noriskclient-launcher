@@ -768,6 +768,7 @@ impl ConfigManager {
                         "Changing experimental mode: {} -> {}",
                         current.is_experimental, new_config.is_experimental
                     );
+                    crate::feature_flags::check_in_background();
                 }
                 if current.auto_check_updates != new_config.auto_check_updates {
                     info!(

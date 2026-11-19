@@ -39,8 +39,6 @@ import { setScreenTimeTab, trackEvent } from "./services/analytics-service";
 
 let launcherStartTracked = false;
 
-import flagsmith from 'flagsmith';
-import { FlagsmithProvider } from 'flagsmith/react';
 import { Button } from "./components/ui/buttons/Button";
 import { GuardedButton } from "./components/ui/buttons/GuardedButton";
 import { LauncherNoticeBanner } from "./components/ui/LauncherNoticeBanner";
@@ -515,35 +513,33 @@ export function App() {
   useGlobalDragAndDrop();
 
   return (
-    <FlagsmithProvider flagsmith={flagsmith}>
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
-        <ThemeInitializer />
-        <ScrollbarProvider />
-        <GlobalToaster />
-        <LauncherNoticeBanner />
-        <GlobalCrashReportModal />
-        <ImportPackConfirmModal />
-        <DragDropOverlay />
-        <LegalAcceptanceModal />
-        {showWelcome && <WelcomeScreen />}
-        <GlobalModalPortal />
-        <MacCapturePermissionMonitor />
-        <ChildProtectionModal />
-        <NotificationModal />
-        {ready && (
-          <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
-            <Outlet />
-          </AppLayout>
-        )}
-        <LegalUpdateBanner />
-        {!legalNotice && shouldShowAnalyticsBanner() && (
-          <AnalyticsConsentBanner
-            onAccept={handleAnalyticsAccept}
-            onDecline={handleAnalyticsDecline}
-            onDismiss={handleAnalyticsDismiss}
-          />
-        )}
-      </div>
-    </FlagsmithProvider>
+    <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <ThemeInitializer />
+      <ScrollbarProvider />
+      <GlobalToaster />
+      <LauncherNoticeBanner />
+      <GlobalCrashReportModal />
+      <ImportPackConfirmModal />
+      <DragDropOverlay />
+      <LegalAcceptanceModal />
+      {showWelcome && <WelcomeScreen />}
+      <GlobalModalPortal />
+      <MacCapturePermissionMonitor />
+      <ChildProtectionModal />
+      <NotificationModal />
+      {ready && (
+        <AppLayout activeTab={activeTab} onNavChange={handleNavChange}>
+          <Outlet />
+        </AppLayout>
+      )}
+      <LegalUpdateBanner />
+      {!legalNotice && shouldShowAnalyticsBanner() && (
+        <AnalyticsConsentBanner
+          onAccept={handleAnalyticsAccept}
+          onDecline={handleAnalyticsDecline}
+          onDismiss={handleAnalyticsDismiss}
+        />
+      )}
+    </div>
   );
 }

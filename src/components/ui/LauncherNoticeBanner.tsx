@@ -5,7 +5,7 @@ import {
   getLauncherNotices,
   type LauncherNotice,
   type LauncherNoticeSeverity,
-} from "../../services/flagsmith-service";
+} from "../../services/feature-flags-service";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { BannerCard } from "./BannerCard";

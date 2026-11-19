@@ -278,6 +278,7 @@ async fn main() {
                     std::process::exit(1);
                 }
                 info!("State initialization finished successfully.");
+                feature_flags::start(state_init_app_handle.clone());
 
                 // Sweep last session's throwaway temp profiles into the trash
                 // (non-blocking, best-effort). The trash's purge_expired retention
@@ -681,12 +682,11 @@ async fn main() {
             commands::crash_fix_command::apply_crash_fix,
             commands::crash_fix_command::revert_crash_fix,
             commands::nrc_commands::log_message_command,
-            commands::flagsmith_commands::set_blocked_mods_config,
-            commands::flagsmith_commands::get_blocked_mods_config,
-            commands::flagsmith_commands::is_filename_blocked,
-            commands::flagsmith_commands::is_mod_id_blocked,
-            commands::flagsmith_commands::is_modrinth_project_id_blocked,
-            commands::flagsmith_commands::refresh_blocked_mods_config,
+            commands::blocked_mods_commands::set_blocked_mods_config,
+            commands::blocked_mods_commands::get_blocked_mods_config,
+            commands::blocked_mods_commands::is_filename_blocked,
+            commands::blocked_mods_commands::is_mod_id_blocked,
+            commands::blocked_mods_commands::is_modrinth_project_id_blocked,
             commands::pack_rollout_commands::set_pack_rollout_config,
             commands::pack_rollout_commands::get_pack_rollout_config,
             commands::pack_rollout_commands::get_pack_rollout_status,
@@ -694,6 +694,7 @@ async fn main() {
             commands::pack_rollout_commands::is_pack_rollout_active,
             commands::pack_rollout_commands::is_pack_aliased,
             commands::pack_fallback_commands::set_pack_fallback_config,
+            commands::feature_flags_command::get_feature_flags,
             commands::pack_fallback_commands::get_pack_fallback_config,
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,

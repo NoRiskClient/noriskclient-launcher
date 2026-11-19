@@ -8,7 +8,7 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { openExternalUrl } from "../../../services/tauri-service";
-import { isApplixirEnabled } from "../../../services/flagsmith-service";
+import { isApplixirEnabled } from "../../../services/feature-flags-service";
 import { showApplixirAd } from "../../../services/nrc-service";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 
