@@ -14,7 +14,7 @@ use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
 use crate::minecraft::launch::launch_summary::LaunchSummary;
-use crate::minecraft::{MinecraftLaunchParameters, MinecraftLauncher};
+use crate::minecraft::{base64_intrinsics_mitigation, MinecraftLaunchParameters, MinecraftLauncher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
@@ -242,6 +242,7 @@ pub async fn install_minecraft_version(
     // Check if profile uses a custom Java path
     let step_start = Instant::now();
     let mut custom_java_valid = false;
+    let mut java_major = java_version;
     let java_path = if profile.settings.use_custom_java_path && profile.settings.java_path.is_some()
     {
         // Try to use the custom Java path
@@ -280,6 +281,7 @@ pub async fn install_minecraft_version(
                             java_info.major_version, java_version
                         );
                         custom_java_valid = true;
+                        java_major = java_info.major_version;
                         path
                     } else {
                         info!(
@@ -969,6 +971,22 @@ pub async fn install_minecraft_version(
         info!("Adding log4j configuration: {}", log4j_argument);
         let mut jvm_args = launch_params.additional_jvm_args.clone();
         jvm_args.push(log4j_argument);
+        launch_params = launch_params.with_additional_jvm_args(jvm_args);
+    }
+
+    let mitigation_args = base64_intrinsics_mitigation(
+        java_major,
+        piston_meta
+            .arguments
+            .iter()
+            .flat_map(|arguments| arguments.simple_jvm())
+            .chain(launch_params.additional_jvm_args.iter().map(String::as_str)),
+    );
+    if !mitigation_args.is_empty() {
+        let jvm_args = mitigation_args
+            .into_iter()
+            .chain(launch_params.additional_jvm_args.clone())
+            .collect();
         launch_params = launch_params.with_additional_jvm_args(jvm_args);
     }
 
