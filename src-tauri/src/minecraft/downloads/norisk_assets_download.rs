@@ -3,7 +3,6 @@ use crate::error::{AppError, Result};
 use crate::minecraft::api::NoRiskApi;
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
-use crate::minecraft::dto::piston_meta::AssetObject;
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
@@ -507,12 +506,6 @@ impl NoriskClientAssetsDownloadService {
             );
         }
 
-        let assets_list: Vec<(String, AssetObject)> = assets
-            .objects
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-
         let mut downloads = Vec::new();
         let task_counter = Arc::new(AtomicUsize::new(1));
         let completed_counter = Arc::new(AtomicUsize::new(0));
@@ -521,7 +514,7 @@ impl NoriskClientAssetsDownloadService {
         trace!(
             "[NRC Assets Download '{}'] Preparing {} potential jobs...",
             asset_id,
-            assets_list.len()
+            assets.objects.len()
         );
         let mut job_count = 0;
 
@@ -538,50 +531,38 @@ impl NoriskClientAssetsDownloadService {
             scan_object_store(&objects_dir).await
         });
 
-        for (name, asset) in assets_list {
-            let hash = asset.hash.clone();
-
-            let hash_prefix = &hash[0..2];
-            let target_path = objects_dir.join(hash_prefix).join(&hash);
-
-            let name_clone = name.clone();
-            let task_counter_clone = Arc::clone(&task_counter);
-            let completed_counter_clone = Arc::clone(&completed_counter);
-            let total_to_download_clone = Arc::clone(&total_to_download);
-            let asset_id_clone = asset_id.to_string();
-            let stats = self.stats.clone();
-
-            // Fast in-memory check instead of filesystem call
-            if cached_objects.contains_key(&hash) {
-                trace!(
-                    "[NRC Assets Download '{}'] Skipping asset {} (hash {} already exists)",
-                    asset_id_clone,
-                    name_clone,
-                    hash
-                );
-                if let Some(stats) = &stats {
+        for (name, asset) in &assets.objects {
+            if cached_objects.contains_key(&asset.hash) {
+                if let Some(stats) = &self.stats {
                     stats.record_cached();
                 }
                 continue;
             }
 
+            let hash = &asset.hash;
+            let target_path = objects_dir.join(&hash[..2]).join(hash);
+            let task_counter_clone = Arc::clone(&task_counter);
+            let completed_counter_clone = Arc::clone(&completed_counter);
+            let total_to_download_clone = Arc::clone(&total_to_download);
+            let stats = self.stats.clone();
+
             job_count += 1;
             total_to_download_clone.fetch_add(1, Ordering::SeqCst);
             downloads.push(async move {
                 let task_id = task_counter_clone.fetch_add(1, Ordering::SeqCst);
-                trace!("[NRC Assets Download '{}' Task {}] Starting download for: {}", asset_id_clone, task_id, name_clone);
+                trace!("[NRC Assets Download '{}' Task {}] Starting download for: {}", asset_id, task_id, name);
 
                 // ?v= = content hash, so Cloudflare can cache each version. No auth, the bucket is public.
                 let url = format!(
                     "https://cdn.norisk.gg/assets/{}/assets/{}?v={}",
-                    asset_id_clone, name_clone, hash
+                    asset_id, name, hash
                 );
 
                 let response = match HTTP_CLIENT.get(&url).send().await {
                     Ok(resp) => resp,
                     Err(e) => {
-                        error!("[NRC Assets Download '{}' Task {}] Request error for {}: {}", asset_id_clone, task_id, name_clone, e);
-                        return Err(AppError::Download(format!("Request failed for {}: {}", name_clone, e)));
+                        error!("[NRC Assets Download '{}' Task {}] Request error for {}: {}", asset_id, task_id, name, e);
+                        return Err(AppError::Download(format!("Request failed for {}: {}", name, e)));
                     }
                 };
 
@@ -589,21 +570,21 @@ impl NoriskClientAssetsDownloadService {
                     let status = response.status();
                     let error_text = response.text().await.unwrap_or_else(|_| "No error details".to_string());
                     error!("[NRC Assets Download '{}' Task {}] Failed download for {}: Status {}, Error: {}",
-                           asset_id_clone, task_id, name_clone, status, error_text);
-                    return Err(AppError::Download(format!("Download failed for {} - Status {}: {}", name_clone, status, error_text)));
+                           asset_id, task_id, name, status, error_text);
+                    return Err(AppError::Download(format!("Download failed for {} - Status {}: {}", name, status, error_text)));
                 }
 
                 let bytes = match response.bytes().await {
                     Ok(b) => b,
                     Err(e) => {
-                         error!("[NRC Assets Download '{}' Task {}] Error reading bytes for {}: {}", asset_id_clone, task_id, name_clone, e);
-                         return Err(AppError::Download(format!("Read bytes failed for {}: {}", name_clone, e)));
+                         error!("[NRC Assets Download '{}' Task {}] Error reading bytes for {}: {}", asset_id, task_id, name, e);
+                         return Err(AppError::Download(format!("Read bytes failed for {}: {}", name, e)));
                     }
                 };
 
                 if let Some(parent) = target_path.parent() {
                     if let Err(e) = fs::create_dir_all(parent).await {
-                        error!("[NRC Assets Download '{}' Task {}] Error creating dir for {}: {}", asset_id_clone, task_id, name_clone, e);
+                        error!("[NRC Assets Download '{}' Task {}] Error creating dir for {}: {}", asset_id, task_id, name, e);
                          return Err(AppError::Io(e));
                     }
                 }
@@ -611,13 +592,13 @@ impl NoriskClientAssetsDownloadService {
                 let mut file = match fs::File::create(&target_path).await {
                     Ok(f) => f,
                     Err(e) => {
-                        error!("[NRC Assets Download '{}' Task {}] Error creating file for {}: {}", asset_id_clone, task_id, name_clone, e);
+                        error!("[NRC Assets Download '{}' Task {}] Error creating file for {}: {}", asset_id, task_id, name, e);
                          return Err(AppError::Io(e));
                     }
                 };
 
                 if let Err(e) = file.write_all(&bytes).await {
-                    error!("[NRC Assets Download '{}' Task {}] Error writing file for {}: {}", asset_id_clone, task_id, name_clone, e);
+                    error!("[NRC Assets Download '{}' Task {}] Error writing file for {}: {}", asset_id, task_id, name, e);
                      return Err(AppError::Io(e));
                 }
 
@@ -628,8 +609,8 @@ impl NoriskClientAssetsDownloadService {
                 }
 
                 trace!("[NRC Assets Download '{}' Task {}] Finished download for: {} ({}/{})",
-                      asset_id_clone, task_id, name_clone, completed, total);
-                Ok((hash, bytes.len() as u64))
+                      asset_id, task_id, name, completed, total);
+                Ok((hash.clone(), bytes.len() as u64))
             });
         }
 

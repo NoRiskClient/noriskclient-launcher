@@ -44,14 +44,14 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     Ok(())
 }
 
-pub async fn scan_files(root: &Path) -> HashMap<PathBuf, u64> {
+pub async fn scan_object_store(root: &Path) -> HashMap<String, u64> {
     let root = root.to_path_buf();
-    tokio::task::spawn_blocking(move || scan_files_sync(root))
+    tokio::task::spawn_blocking(move || scan_object_store_sync(root))
         .await
         .unwrap_or_default()
 }
 
-fn scan_files_sync(root: PathBuf) -> HashMap<PathBuf, u64> {
+fn scan_object_store_sync(root: PathBuf) -> HashMap<String, u64> {
     let mut files = HashMap::new();
     let mut pending = vec![root];
     while let Some(dir) = pending.pop() {
@@ -67,23 +67,14 @@ fn scan_files_sync(root: PathBuf) -> HashMap<PathBuf, u64> {
             let Ok(metadata) = entry.metadata() else {
                 continue;
             };
-            let path = entry.path();
             if metadata.is_dir() {
-                pending.push(path);
+                pending.push(entry.path());
             } else {
-                files.insert(path, metadata.len());
+                files.insert(entry.file_name().to_string_lossy().into_owned(), metadata.len());
             }
         }
     }
     files
-}
-
-pub async fn scan_object_store(objects_dir: &Path) -> HashMap<String, u64> {
-    scan_files(objects_dir)
-        .await
-        .into_iter()
-        .filter_map(|(path, size)| Some((path.file_name()?.to_string_lossy().into_owned(), size)))
-        .collect()
 }
 
 /// Helper function to read a specific zip entry by index and encode it as Base64

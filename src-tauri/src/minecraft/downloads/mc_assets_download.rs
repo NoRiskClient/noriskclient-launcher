@@ -1,6 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
-use crate::minecraft::dto::piston_meta::{AssetIndex, AssetIndexContent, AssetObject};
+use crate::minecraft::dto::piston_meta::{AssetIndex, AssetIndexContent};
 use crate::minecraft::launch::launch_summary::DownloadStats;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::State;
@@ -121,22 +121,19 @@ impl MinecraftAssetsDownloadService {
         )
         .await?;
 
-        let assets: Vec<(String, AssetObject)> = asset_index_content.objects.into_iter().collect();
         let mut downloads = Vec::new();
-        let assets_path = self.assets_path.clone();
         let task_counter = Arc::new(AtomicUsize::new(1)); // Start counter at 1
         let completed_counter = Arc::new(AtomicUsize::new(0));
         let total_to_download = Arc::new(AtomicUsize::new(0));
-        let _total_assets = assets.len();
 
         trace!(
             "[Assets Download] Preparing {} potential jobs...",
-            assets.len()
+            asset_index_content.objects.len()
         );
 
         // Build a HashMap of existing files (hash -> size) from the objects directory
         // This replaces 4585 individual fs::try_exists + fs::metadata calls with a single directory scan
-        let objects_path = assets_path.join("objects");
+        let objects_path = self.assets_path.join("objects");
         let existing_files = measure_time!("Assets cache scan", {
             scan_object_store(&objects_path).await
         });
@@ -144,34 +141,33 @@ impl MinecraftAssetsDownloadService {
 
         let mut job_count = 0;
 
-        for (name, asset) in assets {
-            let hash = asset.hash.clone();
+        for (name, asset) in asset_index_content.objects {
+            let hash = asset.hash;
             let size = asset.size;
-            let name_clone = name.clone();
-            let task_counter_clone = Arc::clone(&task_counter);
-            let completed_counter_clone = Arc::clone(&completed_counter);
-            let total_to_download_clone = Arc::clone(&total_to_download);
-            let target_path = objects_path.join(&hash[..2]).join(&hash);
-            let stats = self.stats.clone();
 
             // Fast in-memory check instead of filesystem calls
             if let Some(&cached_size) = existing_files.get(&hash) {
                 if cached_size as i64 == size {
-                    trace!("[Assets Download] Skipping asset {} (already exists with correct size)", name_clone);
+                    trace!("[Assets Download] Skipping asset {} (already exists with correct size)", name);
                     if let Some(stats) = &self.stats {
                         stats.record_cached();
                     }
                     continue;
                 }
-                warn!("[Assets Download] Asset {} exists but size mismatch (expected {}, got {}), redownloading.", name_clone, size, cached_size);
+                warn!("[Assets Download] Asset {} exists but size mismatch (expected {}, got {}), redownloading.", name, size, cached_size);
             }
 
+            let task_counter_clone = Arc::clone(&task_counter);
+            let completed_counter_clone = Arc::clone(&completed_counter);
+            let total_to_download_clone = Arc::clone(&total_to_download);
+            let target_path = objects_path.join(&hash[..2]).join(&hash);
+            let stats = self.stats.clone();
             job_count += 1;
             total_to_download_clone.fetch_add(1, Ordering::SeqCst);
 
             downloads.push(async move {
                 let task_id = task_counter_clone.fetch_add(1, Ordering::SeqCst);
-                trace!("[Assets Download Task {}] Starting download for: {}", task_id, name_clone);
+                trace!("[Assets Download Task {}] Starting download for: {}", task_id, name);
                 
                 let url = format!(
                     "https://resources.download.minecraft.net/{}/{}",
@@ -196,13 +192,13 @@ impl MinecraftAssetsDownloadService {
 
                         trace!(
                             "[Assets Download Task {}] Finished download for: {} ({}/{})",
-                            task_id, name_clone, completed, total
+                            task_id, name, completed, total
                         );
                         Ok(())
                     }
                     Err(e) => {
-                        error!("[Assets Download Task {}] Failed to download asset {}: {}", task_id, name_clone, e);
-                        Err(AppError::Download(format!("Failed to download asset {}: {}", name_clone, e)))
+                        error!("[Assets Download Task {}] Failed to download asset {}: {}", task_id, name, e);
+                        Err(AppError::Download(format!("Failed to download asset {}: {}", name, e)))
                     }
                 }
             });

@@ -1,26 +1,26 @@
-use noriskclient_launcher_v3_lib::utils::file_utils::{scan_files, scan_object_store};
+use noriskclient_launcher_v3_lib::utils::file_utils::scan_object_store;
 use std::fs;
 
 #[tokio::test]
-async fn scan_files_lists_every_nested_file_with_its_size() {
+async fn object_store_lists_nested_files_by_name_and_size() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     fs::create_dir_all(root.join("a/b")).unwrap();
     fs::write(root.join("top.txt"), b"1234").unwrap();
     fs::write(root.join("a/b/deep.bin"), b"12").unwrap();
 
-    let files = scan_files(root).await;
+    let files = scan_object_store(root).await;
 
     assert_eq!(files.len(), 2);
-    assert_eq!(files[&root.join("top.txt")], 4);
-    assert_eq!(files[&root.join("a/b/deep.bin")], 2);
+    assert_eq!(files["top.txt"], 4);
+    assert_eq!(files["deep.bin"], 2);
 }
 
 #[tokio::test]
-async fn scan_files_of_missing_root_is_empty() {
+async fn missing_object_store_is_empty() {
     let dir = tempfile::tempdir().unwrap();
 
-    let files = scan_files(&dir.path().join("missing")).await;
+    let files = scan_object_store(&dir.path().join("missing")).await;
 
     assert!(files.is_empty());
 }
