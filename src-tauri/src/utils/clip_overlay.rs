@@ -29,7 +29,7 @@ pub fn create(app: &AppHandle) -> Result<()> {
     let window = WebviewWindowBuilder::new(
         app,
         OVERLAY_LABEL,
-        WebviewUrl::App("index.html?overlay=clip".into()),
+        WebviewUrl::App("clip-overlay.html".into()),
     )
     .title("NoRiskClient Clip")
     .inner_size(WIDTH, HEIGHT)
