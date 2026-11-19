@@ -2,11 +2,8 @@ use crate::state::state_manager::State;
 use log::{error, info, warn};
 use serde::Serialize;
 use std::sync::Mutex;
-use crate::utils::window_focus::bring_to_front;
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, Webview};
 use url::Url;
-
-pub const MAIN_WINDOW_LABEL: &str = "main";
 
 #[derive(Clone, Serialize)]
 pub struct AuthBridgeRequest {
@@ -147,7 +144,7 @@ fn handle_support_request(app_handle: &AppHandle, url: &Url) {
     };
 
     info!("[DeepLink] Support request received");
-    focus_main_window(app_handle);
+    crate::utils::main_window::show(app_handle);
     deliver(app_handle, SUPPORT_REQUEST_EVENT, SupportDeepLinkRequest { code });
 }
 
@@ -161,7 +158,7 @@ async fn handle_twitch_deep_link(app_handle: &AppHandle, url: &Url) {
             return;
         }
     };
-    focus_main_window(app_handle);
+    crate::utils::main_window::show(app_handle);
     info!("[DeepLink] Twitch {} request received", action);
     deliver(
         app_handle,
@@ -178,23 +175,14 @@ pub fn is_deep_link_launch(argv: &[String]) -> bool {
         .any(|arg| url::Url::parse(arg).is_ok_and(|u| u.scheme() == "norisk"))
 }
 
-pub fn is_main_window(window: &WebviewWindow) -> bool {
-    window.label() == MAIN_WINDOW_LABEL
-}
-
-fn focus_main_window(app_handle: &AppHandle) {
-    let Some(window) = app_handle.get_webview_window(MAIN_WINDOW_LABEL) else {
-        return;
-    };
-    if let Err(error) = bring_to_front(&window) {
-        warn!("[DeepLink] Could not focus main window: {}", error);
-    }
+pub fn is_main_window(webview: &Webview) -> bool {
+    webview.label() == crate::utils::main_window::LABEL
 }
 
 /// Handles `norisk://auth/bridge?sessionId=xxx` deep links.
 /// Emits a confirmation request to the frontend before proceeding.
 async fn handle_auth_bridge(app_handle: &AppHandle, url: &Url) {
-    focus_main_window(app_handle);
+    crate::utils::main_window::show(app_handle);
 
     let session_id = match url
         .query_pairs()

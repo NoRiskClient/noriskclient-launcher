@@ -2,8 +2,12 @@ use tauri::{AppHandle, CloseRequestApi, Emitter, Manager, Runtime, Window};
 
 pub const LABEL: &str = "main";
 
+pub fn window<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
+    app.get_window(LABEL)
+}
+
 pub fn show<R: Runtime>(app: &AppHandle<R>) {
-    match app.get_webview_window(LABEL) {
+    match window(app) {
         Some(window) => {
             if let Err(e) = crate::utils::window_focus::bring_to_front(&window) {
                 log::error!("Failed to bring the main window to the front: {e}");
@@ -14,7 +18,7 @@ pub fn show<R: Runtime>(app: &AppHandle<R>) {
 }
 
 pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
-    let Some(window) = app.get_webview_window(LABEL) else {
+    let Some(window) = window(app) else {
         log::warn!("Main window not available; nothing to toggle");
         return;
     };

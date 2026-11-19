@@ -242,7 +242,7 @@ pub async fn begin_login<R: Runtime>(
             .await?;
 
         // Close any existing sign-in window
-        if let Some(window) = app.get_webview_window("signin") {
+        if let Some(window) = app.get_webview_window(crate::ipc_guard::MINECRAFT_SIGN_IN_LABEL) {
             window.close().map_err(|e| AppError::Other(e.to_string()))?;
         }
 
@@ -250,7 +250,7 @@ pub async fn begin_login<R: Runtime>(
         let window =
             tauri::WebviewWindowBuilder::new(
                 &app,
-                "signin",
+                crate::ipc_guard::MINECRAFT_SIGN_IN_LABEL,
                 tauri::WebviewUrl::External(flow.redirect_uri.parse().map_err(|_| {
                     AppError::AccountError("Error parsing auth redirect URL".to_string())
                 })?),

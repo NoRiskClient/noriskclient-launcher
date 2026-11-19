@@ -40,13 +40,13 @@ pub async fn confirm_auth_bridge(session_id: String) -> Result<AuthBridgeResult,
 #[tauri::command]
 pub fn take_pending_deep_links(
     app_handle: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    webview: tauri::Webview,
 ) -> Vec<PendingDeepLinkEvent> {
     use tauri::Manager;
-    if !is_main_window(&window) {
+    if !is_main_window(&webview) {
         log::warn!(
-            "[DeepLink] take_pending_deep_links rejected for window '{}'",
-            window.label()
+            "[DeepLink] take_pending_deep_links rejected for webview '{}'",
+            webview.label()
         );
         return Vec::new();
     }

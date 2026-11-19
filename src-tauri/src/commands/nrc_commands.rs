@@ -48,7 +48,7 @@ pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
         )))
     })?;
 
-    if let Some(window) = app.get_webview_window("discord-signin") {
+    if let Some(window) = app.get_webview_window(crate::ipc_guard::DISCORD_SIGN_IN_LABEL) {
         debug!("Closing existing discord-signin window.");
         if let Err(e) = window.close().map_err(|e_close| {
             CommandError::from(AppError::Other(format!(
@@ -63,7 +63,7 @@ pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
     let start_time = Utc::now();
 
     let window =
-        WebviewWindowBuilder::new(&app, "discord-signin", WebviewUrl::External(external_url))
+        WebviewWindowBuilder::new(&app, crate::ipc_guard::DISCORD_SIGN_IN_LABEL, WebviewUrl::External(external_url))
             .title("Discord X NoRiskClient")
             .always_on_top(true)
             .center()
@@ -219,7 +219,7 @@ pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
         )))
     })?;
 
-    if let Some(window) = app.get_webview_window("github-signin") {
+    if let Some(window) = app.get_webview_window(crate::ipc_guard::GITHUB_SIGN_IN_LABEL) {
         debug!("Closing existing github-signin window.");
         if let Err(e) = window.close().map_err(|e_close| {
             CommandError::from(AppError::Other(format!(
@@ -234,7 +234,7 @@ pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
     let start_time = Utc::now();
 
     let window =
-        WebviewWindowBuilder::new(&app, "github-signin", WebviewUrl::External(external_url))
+        WebviewWindowBuilder::new(&app, crate::ipc_guard::GITHUB_SIGN_IN_LABEL, WebviewUrl::External(external_url))
             .title("GitHub X NoRiskClient")
             .always_on_top(true)
             .center()

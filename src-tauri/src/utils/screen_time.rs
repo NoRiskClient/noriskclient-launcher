@@ -4,7 +4,7 @@ use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::commands::analytics_command::track_with_frontend_identity;
 
@@ -186,7 +186,7 @@ async fn report() {
 }
 
 fn presence(app: &AppHandle) -> Presence {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = crate::utils::main_window::window(app) else {
         return Presence {
             visible: false,
             focused: false,

@@ -7,6 +7,7 @@ pub mod error;
 pub mod feature_flags;
 pub mod friends;
 pub mod integrations;
+pub mod ipc_guard;
 pub mod logging;
 pub mod minecraft;
 pub mod state;

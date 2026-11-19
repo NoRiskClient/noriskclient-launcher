@@ -687,7 +687,7 @@ pub async fn clip_open_editor(
     let _opening = EDITOR_OPENING.lock().await;
     *EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()) = Some(clip.clone());
 
-    if let Some(window) = app.get_webview_window(EDITOR_LABEL) {
+    if let Some(window) = app.get_window(EDITOR_LABEL) {
         app.emit_to(EDITOR_LABEL, "clip_editor_open", &clip).map_err(|e| {
             crate::error::AppError::Other(format!("could not hand the clip to the editor: {e}"))
         })?;

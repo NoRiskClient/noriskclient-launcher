@@ -1,4 +1,4 @@
-pub fn bring_to_front<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) -> tauri::Result<()> {
+pub fn bring_to_front<R: tauri::Runtime>(window: &tauri::Window<R>) -> tauri::Result<()> {
     window.show()?;
     window.unminimize()?;
     let _ = window.set_always_on_top(true);

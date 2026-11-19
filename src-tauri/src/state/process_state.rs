@@ -17,7 +17,6 @@ use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use sysinfo::{CpuRefreshKind, Pid, ProcessesToUpdate, System};
-use tauri::Manager;
 use tokio::fs::{self as async_fs};
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
@@ -613,7 +612,7 @@ impl ProcessManager {
             let launcher_config = global_state.config_manager.get_config().await;
             if launcher_config.hide_on_process_start {
                 log::info!("Hiding main window as configured (hide_on_process_start = true)");
-                if let Some(main_window) = self.app_handle.get_webview_window("main") {
+                if let Some(main_window) = crate::utils::main_window::window(&self.app_handle) {
                     if let Err(e) = main_window.hide() {
                         log::error!("Failed to hide main window: {}", e);
                     } else {

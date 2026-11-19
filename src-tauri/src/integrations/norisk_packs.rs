@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use tauri::Manager; // Required for app_handle.get_window() and window.emit()
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::BufReader;
@@ -768,7 +767,7 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
                     Ok(profile_id) => {
                         info!("Profile {} imported successfully.", profile_id);
                         // Attempt to bring the main window to the front and focus it.
-                        if let Some(window) = import_app_handle.get_webview_window("main") {
+                        if let Some(window) = crate::utils::main_window::window(&import_app_handle) {
                             if let Err(e) = window.unminimize() {
                                 warn!("Failed to unminimize window: {:?}", e);
                             }
@@ -787,7 +786,7 @@ pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
                             e // Use {:?} for CommandError
                         );
                         // Optionally, send an event to the frontend to show an error toast/dialog
-                        if let Some(_window) = import_app_handle.get_webview_window("main") {
+                        if let Some(_window) = crate::utils::main_window::window(&import_app_handle) {
                             let _error_message = format!(
                                 "Failed to import noriskpack ({}): {:?}",
                                 file_path_to_import.display(),

@@ -198,7 +198,7 @@ pub async fn open_minecraft_log_window<R: tauri::Runtime>(
 ) -> Result<(), CommandError> {
     let window_label = "minecraft_log_window";
 
-    if let Some(window) = app.get_webview_window(window_label) {
+    if let Some(window) = app.get_window(window_label) {
         crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
                 "Failed to bring minecraft log window to front: {}",
@@ -297,7 +297,7 @@ pub async fn open_single_log_window<R: tauri::Runtime>(
 pub async fn focus_main_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), CommandError> {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = crate::utils::main_window::window(&app) {
         crate::utils::window_focus::bring_to_front(&window).map_err(|e| {
             CommandError::from(crate::error::AppError::Other(format!(
                 "Failed to bring main window to front: {}",

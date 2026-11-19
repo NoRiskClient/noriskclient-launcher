@@ -318,7 +318,7 @@ async fn main() {
                 }
 
                 info!("Updater process finished. Attempting to show main window...");
-                if let Some(main_window) = state_init_app_handle.get_webview_window("main") {
+                if let Some(main_window) = utils::main_window::window(&state_init_app_handle) {
                     match main_window.show() {
                         Ok(_) => {
                             info!("Main window shown successfully.");
@@ -454,7 +454,7 @@ async fn main() {
             utils::screen_time::spawn(app_handle.clone());
 
             // --- Register Focus Event Listener for Discord RPC ---
-            if let Some(main_window) = app.get_webview_window("main") {
+            if let Some(main_window) = utils::main_window::window(&app_handle) {
                 let focus_app_handle = app_handle.clone();
                 main_window.listen("tauri://focus", move |_event| {
                     let _listener_app_handle = focus_app_handle.clone();
@@ -478,7 +478,9 @@ async fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(noriskclient_launcher_v3_lib::ipc_guard::guard(
+            noriskclient_launcher_v3_lib::ipc_guard::launcher_permits,
+            tauri::generate_handler![
             utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
             utils::mod_cache_cleanup::clean_mod_cache_command,
             list_system_fonts,
@@ -826,7 +828,7 @@ async fn main() {
             commands::share::share_screenshot,
             commands::share::share_log,
             commands::share::share_choices,
-        ])
+        ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(
