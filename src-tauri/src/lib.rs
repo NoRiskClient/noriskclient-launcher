@@ -1,5 +1,6 @@
 #[macro_use]
 pub mod utils;
+pub mod ads;
 pub mod cli;
 pub mod commands;
 pub mod config;

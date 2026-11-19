@@ -12,6 +12,7 @@ pub const REMOTE_SIGN_IN_LABELS: &[&str] = &[
 
 pub fn allows(webview_label: &str) -> bool {
     !REMOTE_SIGN_IN_LABELS.contains(&webview_label)
+        && !crate::ads::policy::is_ad_webview(webview_label)
 }
 
 pub fn launcher_permits<R: Runtime>(webview: &Webview<R>) -> bool {

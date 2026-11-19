@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { useInView } from "react-intersection-observer";
@@ -10,11 +10,14 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { NEWS_PAGE_SIZE, useNewsStore } from "../../store/useNewsStore";
 import { newsLocale } from "../../types/launcherNews";
 
+const AD_COLUMN_MIN_WIDTH = 340;
+
 interface NewsSectionProps {
   className?: string;
+  ad?: ReactNode;
 }
 
-export function NewsSection({ className }: NewsSectionProps) {
+export function NewsSection({ className, ad }: NewsSectionProps) {
   const { t } = useTranslation();
   const newsRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
@@ -127,7 +130,10 @@ export function NewsSection({ className }: NewsSectionProps) {
 
     return (
       <div className="flex flex-col space-y-1 w-full">
-        {items.map((item) => {
+        {items.map((item, index) => {
+          if (index === 0 && ad) {
+            return <Fragment key={item.id}>{ad}</Fragment>;
+          }
           const displayTitle = item.title[locale] || item.title.en || t('news.item');
           const postUrl = item.url?.[locale] || item.url?.en;
 
@@ -166,7 +172,7 @@ export function NewsSection({ className }: NewsSectionProps) {
       ref={newsRef}
       className={cn("h-full flex flex-col !p-3 z-0 relative", className)}
       style={{
-        width: `${newsSectionWidth}px`,
+        width: `${ad ? Math.max(newsSectionWidth, AD_COLUMN_MIN_WIDTH) : newsSectionWidth}px`,
         borderLeft: `2px solid ${accentColor.value}60`,
         borderRight: `2px solid ${accentColor.value}60`,
         boxShadow: `0 0 15px ${accentColor.value}30 inset`,

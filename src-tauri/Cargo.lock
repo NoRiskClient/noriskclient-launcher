@@ -4032,7 +4032,9 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid 1.16.0",
+ "webview2-com",
  "windows 0.58.0",
+ "windows-core 0.62.0",
  "zbus",
  "zip 2.6.1",
 ]

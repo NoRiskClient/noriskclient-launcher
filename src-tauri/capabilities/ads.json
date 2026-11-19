@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "ads",
+  "description": "Lets the ad page report clicks, open ad links and tell the launcher when its privacy dialog needs an answer. Only the ad webview on our ad domain gets it.",
+  "local": false,
+  "remote": {
+    "urls": ["https://ads.norisk.gg/*"]
+  },
+  "webviews": ["ads"],
+  "permissions": ["ads:default"]
+}

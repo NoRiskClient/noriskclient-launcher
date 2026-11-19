@@ -17,6 +17,7 @@ import { GeneralTab } from "./settings/GeneralTab";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { AdvancedTab } from "./settings/AdvancedTab";
 import { ClipsTab } from "./settings/ClipsTab";
+import { AdsTab, useAdSettings } from "./settings/AdsTab";
 import { SettingsConfigProvider } from "./settings/settings-context";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
@@ -24,12 +25,13 @@ import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
 import { isMacOS, supportsClips } from "../../utils/platform";
 
-type SettingsTabId = "general" | "appearance" | "clips" | "advanced" | "debug";
+type SettingsTabId = "general" | "appearance" | "clips" | "ads" | "advanced" | "debug";
 
 const SETTINGS_TAB_IDS: SettingsTabId[] = [
   "general",
   "appearance",
   "clips",
+  "ads",
   "advanced",
   "debug",
 ];
@@ -59,6 +61,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         : null)
     : null;
 
+  const { available: adSettingsAvailable } = useAdSettings();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -99,6 +102,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
           { id: "clips-storage", label: t("settings.clips.storage.title") },
         ]
       : [],
+    ads: [{ id: "ads", label: t("settings.sections.ads") }],
     advanced: [
       { id: "login_cache", label: t("settings.sections.login_cache") },
       { id: "gamedir", label: t("settings.game_data_dir.title") },
@@ -118,6 +122,9 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
     { id: "appearance", label: t("settings.tabs.appearance"), icon: "solar:palette-bold", children: sectionDefs.appearance },
     ...(supportsClips()
       ? [{ id: "clips" as const, label: t("settings.tabs.clips"), icon: "solar:videocamera-record-bold", children: sectionDefs.clips }]
+      : []),
+    ...(adSettingsAvailable
+      ? [{ id: "ads" as const, label: t("settings.tabs.ads"), icon: "solar:shield-check-bold", children: sectionDefs.ads }]
       : []),
     { id: "advanced", label: t("settings.tabs.advanced"), icon: "solar:tuning-bold", children: sectionDefs.advanced },
     { id: "debug", label: t("settings.tabs.debug"), icon: "solar:bug-bold", children: sectionDefs.debug },
@@ -310,11 +317,12 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       general: <GeneralTab />,
       appearance: <AppearanceTab />,
       clips: <ClipsTab />,
+      ads: <AdsTab />,
       advanced: <AdvancedTab />,
     };
 
     if (sidebarQuery && !onlyTab) {
-      const order: SettingsTabId[] = ["general", "appearance", "advanced"];
+      const order: SettingsTabId[] = ["general", "appearance", "ads", "advanced"];
       const ordered = [activeTab, ...order.filter((id) => id !== activeTab)].filter(
         (id) => bodyOf[id],
       ) as SettingsTabId[];

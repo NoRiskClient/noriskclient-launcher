@@ -28,6 +28,9 @@ import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
+import { AdConsentOverlay } from "../ads/AdConsentOverlay";
+import { useLauncherAdsStore } from "../../store/launcher-ads-store";
+import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 // TODO: Re-enable when WebSocket is stable
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
@@ -100,6 +103,12 @@ export function AppLayout({
   const { selectedTheme, isThemeActive } = useLauncherTheme();
   const { loadCurrentUser, loadFriends } = useFriendsStore();
   const { loadChats } = useChatStore();
+  const refreshAds = useLauncherAdsStore((state) => state.refresh);
+  const activeAccountId = useMinecraftAuthStore((state) => state.activeAccount?.id);
+
+  useEffect(() => {
+    void refreshAds();
+  }, [refreshAds, activeAccountId]);
 
   // TODO: Re-enable when WebSocket is stable
   // useFriendsWebSocket();
@@ -389,6 +398,7 @@ export function AppLayout({
       <SettingsModal />
       <ProfileDuplicateModal />
       <FriendsSidebar />
+      <AdConsentOverlay />
     </div>
   );
 }

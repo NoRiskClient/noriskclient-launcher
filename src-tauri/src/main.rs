@@ -197,6 +197,7 @@ async fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(noriskclient_launcher_v3_lib::ads::plugin())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -366,6 +367,11 @@ async fn main() {
             });
 
             tauri::WebviewWindowBuilder::from_config(&app_handle, &app.config().app.windows[0])?
+                .on_page_load(|webview, payload| {
+                    if payload.event() == tauri::webview::PageLoadEvent::Started {
+                        noriskclient_launcher_v3_lib::ads::launcher_page_reloaded(webview.app_handle());
+                    }
+                })
                 .build()?;
             let updater_window = match updater_utils::create_updater_window(&app_handle) {
                 Ok(win) => {
@@ -481,6 +487,13 @@ async fn main() {
         .invoke_handler(noriskclient_launcher_v3_lib::ipc_guard::guard(
             noriskclient_launcher_v3_lib::ipc_guard::launcher_permits,
             tauri::generate_handler![
+            commands::ads_command::ads_refresh,
+            commands::ads_command::ads_set_bounds,
+            commands::ads_command::ads_hide,
+            commands::ads_command::ads_cover,
+            commands::ads_command::ads_show_consent,
+            commands::ads_command::ads_status,
+            commands::ads_command::ads_consent_action,
             utils::mod_cache_cleanup::debug_list_expected_cache_filenames,
             utils::mod_cache_cleanup::clean_mod_cache_command,
             list_system_fonts,

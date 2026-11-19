@@ -1,3 +1,4 @@
+pub mod ads_command;
 pub mod applixir_command;
 pub mod assets_command;
 pub mod deep_link_handler;

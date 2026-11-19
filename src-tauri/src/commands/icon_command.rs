@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 const CREATOR_CODE_VALID_MS: u64 = 14 * 24 * 60 * 60 * 1000;
 
-async fn minimal_user(target: &Uuid) -> Result<NoRiskUserMinimal, CommandError> {
+pub(crate) async fn minimal_user(target: &Uuid) -> Result<NoRiskUserMinimal, CommandError> {
     let ctx = account_ctx(None).await?;
     let requester = ctx
         .account_uuid

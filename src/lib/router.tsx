@@ -2,6 +2,7 @@ import { createHashRouter, Navigate } from "react-router-dom";
 import { App } from "../App";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { PlayTab } from "../components/tabs/PlayTab";
+import { useLauncherAdsStore } from "../store/launcher-ads-store";
 // DISABLED: Advent Calendar (seasonal feature)
 // import { AdventCalendarTab } from "../components/advent-calendar/AdventCalendarTab";
 
@@ -81,3 +82,10 @@ export const router = createHashRouter([
     ],
   },
 ]);
+
+const navigateNow = router.navigate.bind(router);
+
+router.navigate = (async (...args: Parameters<typeof navigateNow>) => {
+  await useLauncherAdsStore.getState().release();
+  return navigateNow(...args);
+}) as typeof router.navigate;
