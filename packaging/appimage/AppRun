@@ -1,0 +1,35 @@
+#! /usr/bin/env bash
+
+# Replaces the AppRun that linuxdeploy generates (see the "Fix AppImage" step in
+# .github/workflows/build.yml).
+#
+# The WebKitGTK bundled from the Ubuntu 22.04 build image never enters accelerated
+# compositing on some setups (seen with NVIDIA on Wayland and X11): every frame is
+# painted on the CPU and WebKitWebProcess pins one core even while the launcher is
+# idle. When the system has its own WebKitGTK 4.1, put the system library directory
+# first so the binary uses the system WebKit/GTK stack instead (LD_LIBRARY_PATH wins
+# over the binary's $ORIGIN/../lib RUNPATH). Libraries the system lacks still load
+# from the AppImage. The GTK hook is skipped in that case because it points GTK at
+# the bundled modules and forces GDK_BACKEND=x11, which only the bundled stack needs.
+#
+# Set NORISK_BUNDLED_WEBKIT=1 to always use the bundled libraries.
+# https://github.com/NoRiskClient/noriskclient-launcher/issues/320
+
+set -e
+
+this_dir="$(readlink -f "$(dirname "$0")")"
+
+if [ -z "$NORISK_BUNDLED_WEBKIT" ]; then
+    system_webkit="$(PATH="$PATH:/sbin:/usr/sbin" ldconfig -p 2>/dev/null \
+        | awk '/libwebkit2gtk-4\.1\.so\.0 .*x86-64/ { print $NF; exit }')"
+    if [ -n "$system_webkit" ] && [ -f "$system_webkit" ]; then
+        export LD_LIBRARY_PATH="$(dirname "$system_webkit")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        # Not AppRun.wrapped: it prepends the bundled library directories to
+        # LD_LIBRARY_PATH, which would put the bundled WebKit first again.
+        exec "$this_dir"/usr/bin/noriskclient-launcher-v3 "$@"
+    fi
+fi
+
+source "$this_dir"/apprun-hooks/"linuxdeploy-plugin-gtk.sh"
+
+exec "$this_dir"/AppRun.wrapped "$@"

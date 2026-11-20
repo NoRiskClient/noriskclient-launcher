@@ -260,7 +260,7 @@ jobs:
           args: --verbose ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }} # Füge --target hinzu, wenn es gesetzt ist
           packageManager: yarn # Set packageManager to yarn
       
-      - name: Fix AppImage (Remove Wayland libs & Resign)
+      - name: Fix AppImage (Remove Wayland libs, prefer system WebKit & Resign)
         if: matrix.platform == 'ubuntu-22.04'
         env:
           # Pass the secrets directly to the environment
@@ -279,6 +279,10 @@ jobs:
           
           echo "Removing conflicting libraries..."
           find squashfs-root -name "*wayland*" -delete
+
+          echo "Installing AppRun that prefers the system WebKitGTK (#320)..."
+          cp "$GITHUB_WORKSPACE/packaging/appimage/AppRun" squashfs-root/AppRun
+          chmod 755 squashfs-root/AppRun
           chmod -R a+rX squashfs-root
 
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
