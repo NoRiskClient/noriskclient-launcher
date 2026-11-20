@@ -6,8 +6,10 @@ use crate::minecraft::{NeoForgeApi, NeoForgePatcher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
+use crate::utils::download_utils::DownloadUtils;
 use log::info;
 use std::path::PathBuf;
+use super::forge_installer::declared_patched_client_jar;
 use uuid::Uuid;
 
 pub struct NeoForgeInstaller {
@@ -195,53 +197,23 @@ impl NeoForgeInstaller {
                 .download_installer_libraries(&neoforge_profile)
                 .await?;
 
-            // Prüfen, ob Patching übersprungen werden kann
-            let mut should_run_patcher = true;
+            let patched_client_jar = neoforge_profile
+                .data
+                .get("PATCHED")
+                .and_then(|patched| declared_patched_client_jar(&patched.client))
+                .map(|jar| LAUNCHER_DIRECTORY.meta_dir().join("libraries").join(jar));
 
-            if let Some(patched) = neoforge_profile.data.get("PATCHED") {
-                let client_path_str = &patched.client;
-                // Maven-Koordinaten extrahieren: [group:artifact:version:classifier]
-                if client_path_str.starts_with('[') && client_path_str.ends_with(']') {
-                    let maven_coords = &client_path_str[1..client_path_str.len() - 1];
-                    let parts: Vec<&str> = maven_coords.split(':').collect();
-
-                    if parts.len() >= 4 {
-                        let (group, artifact, version, classifier) =
-                            (parts[0], parts[1], parts[2], parts[3]);
-
-                        // Berechne Dateipfad
-                        let group_path = group.replace('.', "/");
-                        let file_name = format!("{}-{}-{}.jar", artifact, version, classifier);
-
-                        let library_path = LAUNCHER_DIRECTORY
-                            .meta_dir()
-                            .join("libraries")
-                            .join(group_path)
-                            .join(artifact)
-                            .join(version)
-                            .join(file_name);
-
-                        info!(
-                            "Checking for pre-patched NeoForge client: {}",
-                            library_path.display()
-                        );
-
-                        // Prüfe ob die Datei existiert
-                        if library_path.exists() {
-                            info!(
-                                "✅ Pre-patched NeoForge client found: {}",
-                                library_path.display()
-                            );
-                            should_run_patcher = false;
-                        } else {
-                            info!(
-                                "❌ Patched NeoForge client file not found, patching required: {}",
-                                library_path.display()
-                            );
-                        }
-                    }
+            let should_run_patcher = match &patched_client_jar {
+                Some(jar) if DownloadUtils::is_zip_file_complete(jar).await => {
+                    info!("✅ Pre-patched NeoForge client found: {}", jar.display());
+                    false
                 }
-            }
+                Some(jar) => {
+                    info!("Patched NeoForge client missing, running processors: {}", jar.display());
+                    true
+                }
+                None => true,
+            };
 
             if should_run_patcher {
                 state
