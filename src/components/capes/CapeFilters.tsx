@@ -61,19 +61,17 @@ export function CapeFilters({
     {
       value: "mostUsed",
       label: t('capes.mostUsed'),
-      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
+      icon: <Icon icon="solar:fire-bold" className="w-5 h-5" />,
     },
     {
       value: "newest",
       label: t('capes.newest'),
-      icon: <Icon icon="solar:sort-by-time-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:sort-from-top-to-bottom-bold" className="w-5 h-5" />,
     },
     {
       value: "oldest",
       label: t('capes.oldest'),
-      icon: (
-        <Icon icon="mdi:arrow-up-bold-circle-outline" className="w-5 h-5" />
-      ),
+      icon: <Icon icon="solar:sort-from-bottom-to-top-bold" className="w-5 h-5" />,
     },
   ];
 

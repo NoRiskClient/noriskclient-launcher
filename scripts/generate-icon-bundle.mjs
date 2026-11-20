@@ -14,8 +14,19 @@ const attributionFile = join(root, "THIRD_PARTY_ICONS.md");
 const COLLECTIONS = [
   "solar", "pixel", "mdi", "simple-icons", "circle-flags", "ph",
   "material-symbols", "mingcute", "svg-spinners", "lucide",
-  "line-md", "ic", "fluent", "eos-icons",
+  "line-md", "ic", "fluent", "eos-icons", "nrc",
 ];
+
+const ownIconsDir = join(root, "scripts", "icons");
+
+function ownCollection() {
+  const icons = {};
+  for (const file of readdirSync(ownIconsDir)) {
+    const svg = readFileSync(join(ownIconsDir, file), "utf8");
+    icons[file.replace(/\.svg$/, "")] = { body: svg.replace(/^\s*<svg[^>]*>|<\/svg>\s*$/g, "") };
+  }
+  return { prefix: "nrc", width: 24, height: 24, icons };
+}
 
 /** `prefix:name` shaped string literals that are not icons (tailwind variants, CSS values). */
 const NOT_ICONS = new Set([
@@ -72,7 +83,7 @@ for (const prefix of COLLECTIONS) {
     continue;
   }
 
-  const collection = JSON.parse(
+  const collection = prefix === "nrc" ? ownCollection() : JSON.parse(
     readFileSync(require.resolve(`@iconify-json/${prefix}/icons.json`), "utf8"),
   );
   const subset = getIcons(collection, names);
@@ -89,9 +100,10 @@ for (const prefix of COLLECTIONS) {
   }
 
   delete subset.lastModified;
-  total += names.length;
   chunks.push(`addCollection(${JSON.stringify(subset)});`);
   console.log(`  ${prefix}: ${names.length}`);
+  if (prefix === "nrc") continue;
+  total += names.length;
 
   const info = JSON.parse(
     readFileSync(require.resolve(`@iconify-json/${prefix}/info.json`), "utf8"),

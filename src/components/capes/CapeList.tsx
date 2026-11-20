@@ -145,7 +145,7 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
             title={t('capes.deleteCape')}
             disabled={isCurrentlyEquipping}
           >
-            <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           </button>
         )}
 

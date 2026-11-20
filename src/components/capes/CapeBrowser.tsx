@@ -196,9 +196,9 @@ export function CapeBrowser(): JSX.Element {
 
   // Filter options for SearchWithFilters
   const sortOptions = [
-    { value: "mostUsed", label: t('capes.mostUsed'), icon: "solar:heart-bold" },
-    { value: "newest", label: t('capes.newest'), icon: "solar:sort-by-time-linear" },
-    { value: "oldest", label: t('capes.oldest'), icon: "mdi:arrow-up-bold-circle-outline" },
+    { value: "mostUsed", label: t('capes.mostUsed'), icon: "solar:fire-bold" },
+    { value: "newest", label: t('capes.newest'), icon: "solar:sort-from-top-to-bottom-bold" },
+    { value: "oldest", label: t('capes.oldest'), icon: "solar:sort-from-bottom-to-top-bold" },
   ];
 
   const filterOptions = [

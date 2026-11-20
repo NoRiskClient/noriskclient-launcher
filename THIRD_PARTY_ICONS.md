@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 308 icons from the sets below. The artwork is redistributed
+The launcher bundles 305 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -20,7 +20,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Material Design Icons (`mdi`)
 
-- 17 icons used of 7447
+- 16 icons used of 7447
 - Author: [Pictogrammers](https://github.com/Templarian/MaterialDesign)
 - Licence: [Apache 2.0](https://github.com/Templarian/MaterialDesign/blob/master/LICENSE) (`Apache-2.0`)
 
@@ -38,7 +38,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Phosphor (`ph`)
 
-- 6 icons used of 9072
+- 4 icons used of 9072
 - Author: [Phosphor Icons](https://github.com/phosphor-icons/core)
 - Licence: [MIT](https://github.com/phosphor-icons/core/blob/main/LICENSE) (`MIT`)
 

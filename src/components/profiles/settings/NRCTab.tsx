@@ -118,7 +118,7 @@ export function NRCTab({ profile, editedProfile, updateProfile }: NRCTabProps) {
         title={t("nrc.repair_title")}
         description={t("nrc.repair_description")}
         aside={
-          <SectionButton icon="solar:shield-check-bold" busy={isRepairing} onClick={handleRepair}>
+          <SectionButton icon="solar:sledgehammer-bold" busy={isRepairing} onClick={handleRepair}>
             {isRepairing ? t("nrc.repairing") : t("nrc.repair")}
           </SectionButton>
         }

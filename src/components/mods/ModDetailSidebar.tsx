@@ -7,6 +7,7 @@ import type { UnifiedProjectDetails } from "../../types/unified";
 import { UnifiedDependencyType } from "../../types/unified";
 import type { AccentColor } from "../../store/useThemeStore";
 import { openExternalUrl } from "../../services/tauri-service";
+import { LOADER_ICONS } from "../../lib/loader-icons";
 
 interface ModDetailSidebarProps {
   project: UnifiedProjectDetails;
@@ -70,15 +71,6 @@ function getDonationIcon(platform: string): string {
   return "solar:heart-bold";
 }
 
-
-// Helper to get loader icon
-function getLoaderIcon(loader: string): string {
-  const lower = loader.toLowerCase();
-  if (lower === "forge") return "simple-icons:curseforge"; // No dedicated forge icon, use curseforge
-  if (lower === "neoforge") return "simple-icons:curseforge";
-  return "solar:cpu-bolt-bold"; // simple-icons has no fabric or quilt brand
-
-}
 
 // Helper to format environment support
 function formatSideSupport(side: string | null): { label: string; color: string } {
@@ -220,7 +212,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
                       key={loader}
                       className="px-2 py-0.5 bg-white/10 rounded text-white/80 text-[10px] capitalize flex items-center gap-1"
                     >
-                      <Icon icon={getLoaderIcon(loader)} className="w-3 h-3" />
+                      {LOADER_ICONS[loader] && <img src={LOADER_ICONS[loader]} alt="" className="w-3 h-3 object-contain" />}
                       {loader}
                     </span>
                   ))}
