@@ -30,6 +30,7 @@ pub struct FeatureFlags {
 }
 
 impl FeatureFlags {
+    #[cfg(feature = "test-api")]
     pub fn is_on(&self, key: &str) -> bool {
         self.flags.get(key).is_some_and(|flag| flag.enabled)
     }
@@ -85,6 +86,7 @@ impl FlagStore {
         self.load(source, false).await
     }
 
+    #[cfg(feature = "test-api")]
     pub async fn refresh(&self, source: &FlagSource) -> (Arc<FeatureFlags>, bool) {
         self.load(source, true).await
     }

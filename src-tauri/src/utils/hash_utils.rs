@@ -142,6 +142,7 @@ impl Murmur2 {
     }
 }
 
+#[cfg(feature = "test-api")]
 pub fn curseforge_fingerprint_from_bytes(bytes: &[u8]) -> u64 {
     let filtered: Vec<u8> = bytes
         .iter()

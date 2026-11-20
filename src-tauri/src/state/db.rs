@@ -204,6 +204,7 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
         .map_err(|e| AppError::Other(format!("SQLite migration failed: {}", e)))
 }
 
+#[cfg(feature = "test-api")]
 pub async fn open_in_memory() -> Result<SqlitePool> {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)

@@ -76,6 +76,7 @@ impl OptionsDocument {
         out
     }
 
+    #[cfg(feature = "test-api")]
     pub fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }

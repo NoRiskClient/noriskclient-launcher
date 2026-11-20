@@ -50,6 +50,7 @@ impl ImportSecurityReport {
             && self.stripped_profile_flags.is_empty()
     }
 
+    #[cfg(feature = "test-api")]
     pub fn has_critical_findings(&self) -> bool {
         self.stripped_java_path.is_some()
             || self.stripped_jvm_args.is_some()

@@ -386,6 +386,7 @@ pub(crate) async fn emit_export_progress(
 }
 
 /// Collect all files recursively (like Modrinth's add_all_recursive_folder_paths)
+#[cfg(feature = "test-api")]
 pub fn collect_all_files_recursive<'a>(
     dir_path: &'a Path,
     file_list: &'a mut Vec<PathBuf>,

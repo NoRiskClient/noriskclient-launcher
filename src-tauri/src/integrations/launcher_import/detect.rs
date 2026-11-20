@@ -40,6 +40,7 @@ pub async fn open(
     Ok((adapter, resolved))
 }
 
+#[cfg(feature = "test-api")]
 pub async fn resolve_root(launcher: ExternalLauncher, root: &Path) -> Result<LauncherRoot> {
     open(launcher, root).await.map(|(_, resolved)| resolved)
 }
