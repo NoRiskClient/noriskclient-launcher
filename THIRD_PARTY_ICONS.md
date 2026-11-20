@@ -1,6 +1,6 @@
 # Third-party icon artwork
 
-The launcher bundles 313 icons from the sets below. The artwork is redistributed
+The launcher bundles 308 icons from the sets below. The artwork is redistributed
 unmodified; only the icons actually used are included, extracted from the `@iconify-json/*`
 packages by `scripts/generate-icon-bundle.mjs`.
 
@@ -20,7 +20,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Material Design Icons (`mdi`)
 
-- 18 icons used of 7447
+- 17 icons used of 7447
 - Author: [Pictogrammers](https://github.com/Templarian/MaterialDesign)
 - Licence: [Apache 2.0](https://github.com/Templarian/MaterialDesign/blob/master/LICENSE) (`Apache-2.0`)
 
@@ -56,7 +56,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## SVG Spinners (`svg-spinners`)
 
-- 4 icons used of 46
+- 2 icons used of 46
 - Author: [Utkarsh Verma](https://github.com/n3r4zzurr0/svg-spinners)
 - Licence: [MIT](https://github.com/n3r4zzurr0/svg-spinners/blob/main/LICENSE) (`MIT`)
 
@@ -65,12 +65,6 @@ GENERATED — run `yarn icons` to refresh.
 - 1 icon used of 1745
 - Author: [Lucide Contributors](https://github.com/lucide-icons/lucide)
 - Licence: [ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE) (`ISC`)
-
-## Material Line Icons (`line-md`)
-
-- 1 icon used of 1218
-- Author: [Vjacheslav Trushkin](https://github.com/cyberalien/line-md)
-- Licence: [MIT](https://github.com/cyberalien/line-md/blob/main/license.txt) (`MIT`)
 
 ## Google Material Icons (`ic`)
 
@@ -83,9 +77,3 @@ GENERATED — run `yarn icons` to refresh.
 - 1 icon used of 19583
 - Author: [Microsoft Corporation](https://github.com/microsoft/fluentui-system-icons)
 - Licence: [MIT](https://github.com/microsoft/fluentui-system-icons/blob/main/LICENSE) (`MIT`)
-
-## EOS Icons (`eos-icons`)
-
-- 1 icon used of 253
-- Author: [SUSE UX/UI team](https://gitlab.com/SUSE-UIUX/eos-icons)
-- Licence: [MIT](https://gitlab.com/SUSE-UIUX/eos-icons/-/blob/master/LICENSE) (`MIT`)

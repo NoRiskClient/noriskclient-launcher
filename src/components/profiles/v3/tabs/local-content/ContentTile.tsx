@@ -242,8 +242,8 @@ export function ContentTile({
             }`}
           >
             <Icon
-              icon={isQuickUpdating ? "solar:refresh-bold" : "solar:arrow-up-bold"}
-              className={`w-4 h-4 ${isQuickUpdating ? "animate-spin" : ""}`}
+              icon={isQuickUpdating ? "svg-spinners:ring-resize" : "solar:arrow-up-bold"}
+              className="w-4 h-4"
             />
           </button>
         </Tooltip>

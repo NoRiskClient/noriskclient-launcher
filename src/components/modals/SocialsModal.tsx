@@ -291,7 +291,7 @@ export function SocialsModal() {
                         size="sm"
                         onClick={handleResetMobileAppToken}
                         disabled={isProcessingMobileApp || isLoadingMobileApp}
-                        icon={<Icon icon={isLoadingMobileApp ? "mdi:loading" : "mdi:refresh"} className={isLoadingMobileApp ? "animate-spin" : ""} />}
+                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "mdi:refresh"} />}
                         widthClassName="w-[140px]"
                       >
                         {t('socials.button.reset')}
@@ -302,7 +302,7 @@ export function SocialsModal() {
                         size="sm"
                         onClick={handleShowQrCode}
                         disabled={isProcessingMobileApp || isLoadingMobileApp}
-                        icon={<Icon icon={isLoadingMobileApp ? "mdi:loading" : "mdi:qrcode"} className={isLoadingMobileApp ? "animate-spin" : ""} />}
+                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "mdi:qrcode"} />}
                         widthClassName="w-[140px]"
                       >
                         {t('socials.button.show_qr')}

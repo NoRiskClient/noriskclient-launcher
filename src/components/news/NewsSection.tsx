@@ -149,7 +149,7 @@ function LoadMore({ loading, onVisible }: { loading: boolean; onVisible: () => v
 
   return (
     <div ref={ref} className="flex justify-center py-3">
-      {loading && <Icon icon="eos-icons:loading" className="w-5 h-5 text-white/50" />}
+      {loading && <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" />}
     </div>
   );
 }

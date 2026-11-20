@@ -439,7 +439,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       label: manager.isUpdatingAll
         ? t("profiles.v3.toolbar.updateAll")
         : `${t("profiles.v3.toolbar.updateAll")} (${manager.updatableContentCount})`,
-      icon: manager.isUpdatingAll || manager.isCheckingUpdates ? "solar:refresh-bold" : "solar:refresh-circle-bold",
+      icon: "solar:refresh-circle-bold",
       variant: "highlight" as const,
       disabled: manager.isUpdatingAll,
       loading: manager.isUpdatingAll || manager.isCheckingUpdates,

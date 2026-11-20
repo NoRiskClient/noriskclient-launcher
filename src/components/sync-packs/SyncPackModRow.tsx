@@ -142,8 +142,8 @@ export function SyncPackModRow({
                 className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 transition-colors hover:border-white/20 hover:bg-black/60 hover:!text-white disabled:opacity-30"
               >
                 <Icon
-                  icon="solar:refresh-bold"
-                  className={`h-3.5 w-3.5 ${resolving ? "animate-spin" : ""}`}
+                  icon={resolving ? "svg-spinners:ring-resize" : "solar:refresh-bold"}
+                  className="h-3.5 w-3.5"
                 />
               </button>
             </Tooltip>

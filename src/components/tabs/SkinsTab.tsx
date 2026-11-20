@@ -196,7 +196,7 @@ const SkinPreview = memo(
           >
             {isRenderLoading && canShowSpinner ? (
               <div className="flex flex-col items-center justify-center space-y-2">
-                <div className="w-8 h-8 border-4 border-t-transparent border-[var(--accent)] rounded-full animate-spin"></div>
+                <Icon icon="svg-spinners:ring-resize" className="w-8 h-8 text-[var(--accent)]" />
                 <p className="font-smallcaps text-xs text-white/70">{t('skins.loading')}</p>
               </div>
             ) : !isRenderLoading ? (

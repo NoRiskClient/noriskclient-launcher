@@ -371,12 +371,7 @@ export function AdventCalendarTab() {
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin">
-            <Icon
-              icon="solar:refresh-bold"
-              className="w-8 h-8 text-white/50"
-            />
-          </div>
+          <Icon icon="svg-spinners:ring-resize" className="w-8 h-8 text-white/50" />
         </div>
       )}
 

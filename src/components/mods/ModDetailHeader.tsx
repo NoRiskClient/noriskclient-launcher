@@ -452,8 +452,7 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             <div className="flex items-center gap-1">
               <ActionButton
                 label={isInstalling ? "Installing..." : "Install"}
-                icon={isInstalling ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
-                iconClassName={isInstalling ? "animate-spin-slow" : ""}
+                icon={isInstalling ? "svg-spinners:ring-resize" : "solar:download-minimalistic-bold"}
                 variant={isInstalling ? "secondary" : "primary"}
                 size="sm"
                 disabled={isInstalling}

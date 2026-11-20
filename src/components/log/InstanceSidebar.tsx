@@ -228,7 +228,7 @@ function InstanceItem({
                 />
               )}
               {instance.status === "starting" && (
-                <Icon icon="svg-spinners:pulse-3" className="w-3 h-3" />
+                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
               )}
               {instance.status === "crashed" && (
                 <Icon icon="solar:danger-triangle-bold" className="w-3 h-3" />
@@ -455,7 +455,7 @@ export function InstanceSidebar({
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         {isLoading && instances.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-white/50 text-sm font-minecraft">
-            <Icon icon="svg-spinners:pulse-3" className="w-6 h-6 mr-2" />
+            <Icon icon="svg-spinners:ring-resize" className="w-6 h-6 mr-2" />
             {t('instances.loading')}
           </div>
         ) : instances.length === 0 ? (

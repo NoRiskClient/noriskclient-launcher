@@ -39,7 +39,7 @@ export function NotificationModal() {
       <div className="p-4 space-y-2 min-h-[200px] max-h-[60vh] overflow-y-auto custom-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Icon icon="mdi:loading" className="w-8 h-8 animate-spin text-white/50" />
+            <Icon icon="svg-spinners:ring-resize" className="w-8 h-8 text-white/50" />
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-white/50">

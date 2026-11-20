@@ -46,7 +46,7 @@ export function AccountLinkRow({
             size="sm"
             onClick={onUnlink}
             disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-off"} className={isLoading ? "animate-spin" : ""} />}
+            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "mdi:link-off"} />}
             widthClassName="w-[140px]"
           >
             {t('socials.button.unlink')}
@@ -57,7 +57,7 @@ export function AccountLinkRow({
             size="sm"
             onClick={onLink}
             disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-variant"} className={isLoading ? "animate-spin" : ""} />}
+            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "mdi:link-variant"} />}
             widthClassName="w-[140px]"
           >
             {t('socials.button.link')}

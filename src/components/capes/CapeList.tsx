@@ -586,8 +586,8 @@ export function CapeList({
       <div ref={ref} className="flex justify-center items-center p-8">
         {isFetchingMore ? (
           <Icon
-            icon="eos-icons:loading"
-            className="w-8 h-8 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8"
             style={{ color: accentColor.value }}
           />
         ) : (

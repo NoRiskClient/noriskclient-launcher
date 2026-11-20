@@ -147,26 +147,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
         </div>
       ) : isLoading ? (
         <div className="flex justify-center items-center py-8">
-          <svg
-            className="animate-spin h-8 w-8 text-blue-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
+          <Icon icon="svg-spinners:ring-resize" className="h-8 w-8 text-blue-500" />
           <span className="ml-3 text-gray-300 font-minecraft">
             {t('modrinth.finding_compatible_versions')}
           </span>
@@ -229,7 +210,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                             variant="secondary"
                             disabled
                             shadowDepth="short"
-                            icon={ <svg /* spinner */ className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" > <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg>}
+                            icon={ <Icon icon="svg-spinners:ring-resize" className="h-3 w-3 text-white" />}
                             iconPosition="left"
                             className="flex-shrink-0"
                           >
@@ -274,26 +255,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                             variant={installingProfiles[profile.id] ? "secondary" : "success"}
                             shadowDepth="short"
                             icon={installingProfiles[profile.id] ? 
-                                <svg
-                                    className="animate-spin h-3 w-3 text-white"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    >
-                                    <circle
-                                        className="opacity-25"
-                                        cx="12"
-                                        cy="12"
-                                        r="10"
-                                        stroke="currentColor"
-                                        strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                        className="opacity-75"
-                                        fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                    </svg> : <Icon icon="solar:download-minimalistic-bold" className="w-3.5 h-3.5" />}
+                                <Icon icon="svg-spinners:ring-resize" className="h-3 w-3 text-white" /> : <Icon icon="solar:download-minimalistic-bold" className="w-3.5 h-3.5" />}
                             iconPosition="left"
                             className="flex-shrink-0"
                           >
@@ -409,7 +371,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                 disabled={isCreatingProfile || !quickProfileName.trim()}
                 shadowDepth="short"
                 size="sm"
-                icon={isCreatingProfile ? <Icon icon="line-md:loading-twotone-loop" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold-duotone" className="w-4 h-4" />}
+                icon={isCreatingProfile ? <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold-duotone" className="w-4 h-4" />}
               >
                 {isCreatingProfile ? (sourceProfileToCopyId ? t('modrinth.copying') : t('modrinth.creating')) : (sourceProfileToCopyId ? t('modrinth.copy_and_install') : t('modrinth.create_and_install'))}
               </Button>

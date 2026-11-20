@@ -272,7 +272,7 @@ export function ProfileIcon({
         </>
       ) : displaySpinner ? (
         <Icon 
-            icon="eos-icons:loading" 
+            icon="svg-spinners:ring-resize" 
             className={cn(effectiveIconClassName, placeholderFinalIconClassName)} 
             style={placeholderIconStyle}
         />

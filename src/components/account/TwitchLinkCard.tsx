@@ -403,7 +403,7 @@ function TwitchDeviceLoginModal({
             <div className="mt-4 w-full">
               <div className="flex items-center justify-between text-xs text-white/60">
                 <span className="flex items-center gap-2">
-                  <Icon icon="svg-spinners:3-dots-fade" className="w-4 h-4" style={{ color: accentColor.value }} />
+                  <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" style={{ color: accentColor.value }} />
                   {payload?.stage === "awaiting_user" ? t("twitch.waiting") : t("twitch.starting")}
                 </span>
                 {payload?.expires_in != null && <span>{formatRemaining(payload.expires_in)}</span>}

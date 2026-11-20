@@ -163,8 +163,8 @@ export const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
 
         <div className="relative flex items-center justify-center">
           <Icon
-            icon="solar:refresh-bold"
-            className={cn("animate-spin", sizeStyles.icon)}
+            icon="svg-spinners:ring-resize"
+            className={sizeStyles.icon}
             style={{ color: colors.text }}
           />
 
