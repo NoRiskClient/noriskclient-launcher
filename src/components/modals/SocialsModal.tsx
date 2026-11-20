@@ -233,7 +233,7 @@ export function SocialsModal() {
     <Modal
       title={t('socials.title')}
       titleIcon={
-        <Icon icon="fluent:people-community-20-filled" className="w-7 h-7" />
+        <Icon icon="solar:users-group-rounded-bold" className="w-7 h-7" />
       }
       onClose={closeModal}
       width="md"
@@ -242,7 +242,7 @@ export function SocialsModal() {
         {/* Referral Section */}
         <div className="flex flex-col items-center text-center space-y-4">
           <Icon
-            icon="mdi:gift-outline"
+            icon="solar:gift-bold"
             className="w-16 h-16 text-accent"
           />
           <p className="text-white/90 font-minecraft text-sm select-none">
@@ -266,7 +266,7 @@ export function SocialsModal() {
               variant="default"
               size="sm"
               onClick={handleCopyLink}
-              icon={<Icon icon="mdi:content-copy" className="w-4 h-4" />}
+              icon={<Icon icon="solar:copy-bold" className="w-4 h-4" />}
             />
           </div>
         </div>
@@ -280,7 +280,7 @@ export function SocialsModal() {
           <div className="space-y-2">
               <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
                 <div className="flex items-center">
-                  <Icon icon="material-symbols:phone-android" className="w-6 h-6 mr-3 text-white/80" />
+                  <Icon icon="solar:smartphone-bold" className="w-6 h-6 mr-3 text-white/80" />
                   <span className="text-white/90 font-minecraft text-xs">{t('socials.mobile_app')}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function SocialsModal() {
                         size="sm"
                         onClick={handleResetMobileAppToken}
                         disabled={isProcessingMobileApp || isLoadingMobileApp}
-                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "mdi:refresh"} />}
+                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "solar:refresh-bold"} />}
                         widthClassName="w-[140px]"
                       >
                         {t('socials.button.reset')}
@@ -302,7 +302,7 @@ export function SocialsModal() {
                         size="sm"
                         onClick={handleShowQrCode}
                         disabled={isProcessingMobileApp || isLoadingMobileApp}
-                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "mdi:qrcode"} />}
+                        icon={<Icon icon={isLoadingMobileApp ? "svg-spinners:ring-resize" : "solar:qr-code-bold"} />}
                         widthClassName="w-[140px]"
                       >
                         {t('socials.button.show_qr')}
@@ -321,7 +321,7 @@ export function SocialsModal() {
                   <IconButton
                     variant="ghost"
                     size="sm"
-                    icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
+                    icon={<Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />}
                     className="invisible"
                     disabled
                   />
@@ -344,7 +344,7 @@ export function SocialsModal() {
             </div>
 
           <AccountLinkRow
-            icon="ic:baseline-discord"
+            icon="simple-icons:discord"
             name="Discord"
             isLoading={isLoadingDiscord}
             isLinked={isDiscordLinked}
@@ -355,7 +355,7 @@ export function SocialsModal() {
           />
 
           <AccountLinkRow
-            icon="mdi:github"
+            icon="simple-icons:github"
             name="GitHub"
             isLoading={isLoadingGithub}
             isLinked={isGithubLinked}

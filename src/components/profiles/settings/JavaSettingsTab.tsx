@@ -446,7 +446,7 @@ export function JavaSettingsTab({
                   className="min-w-0 flex-1 bg-transparent font-minecraft text-sm normal-case text-white placeholder-white/30 outline-none"
                 />
                 <IconAction
-                  icon="solar:folder-with-files-bold"
+                  icon="solar:folder-open-bold"
                   label={t("profiles.settings.browse_java")}
                   onClick={browseForJavaPath}
                 />

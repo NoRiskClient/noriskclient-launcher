@@ -28,7 +28,7 @@ export function RailIntro({ title, tag, description, feedbackUrl, feedbackLabel 
             onClick={() => void openExternalUrl(feedbackUrl).catch(() => {})}
             className="ml-auto text-white/35 hover:text-white transition-colors"
           >
-            <Icon icon="ic:baseline-discord" className="w-4 h-4" />
+            <Icon icon="simple-icons:discord" className="w-4 h-4" />
           </button>
         )}
       </div>

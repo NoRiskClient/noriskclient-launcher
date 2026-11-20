@@ -82,7 +82,7 @@ export const FriendListItem = memo(function FriendListItem({ friend }: FriendLis
         }}
       >
         <div className="flex items-center gap-2">
-          <Icon icon="solar:trash-bin-minimalistic-bold" className="w-5 h-5 text-red-400 flex-shrink-0" />
+          <Icon icon="solar:trash-bin-trash-bold" className="w-5 h-5 text-red-400 flex-shrink-0" />
           <span className="text-sm font-minecraft text-red-400">
             {t('friends.remove_confirm')}
           </span>

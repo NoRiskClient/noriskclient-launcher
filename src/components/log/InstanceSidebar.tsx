@@ -181,7 +181,7 @@ function InstanceItem({
             />
           ) : (
             <Icon
-              icon="mdi:minecraft"
+              icon="solar:box-bold"
               className="w-6 h-6"
               style={{ color: accentColor.value }}
             />
@@ -602,7 +602,7 @@ export function InstanceSidebar({
               className="px-2 py-1.5 rounded text-xs font-minecraft bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
               title={t('logs.open_folder')}
             >
-              <Icon icon="solar:folder-bold" className="w-3.5 h-3.5" />
+              <Icon icon="solar:folder-open-bold" className="w-3.5 h-3.5" />
             </button>
 
             {/* Spacer */}

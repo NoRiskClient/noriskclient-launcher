@@ -242,7 +242,7 @@ export function CopyContentDialog({
   return (
     <Modal
       title={t("profiles.v3.copy.title", { type: typeNamePlural })}
-      titleIcon={<Icon icon="solar:copy-bold-duotone" className="w-6 h-6" />}
+      titleIcon={<Icon icon="solar:copy-bold" className="w-6 h-6" />}
       titleSubtitle={t("profiles.v3.copy.subtitle", { count: items.length, profile: sourceProfile.name })}
       onClose={outcomes ? onCopied : onClose}
       width="lg"

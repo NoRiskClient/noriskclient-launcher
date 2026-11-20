@@ -461,7 +461,7 @@ function ClipCard({
     { id: "share", label: t("clips.gallery.share"), icon: "solar:cloud-upload-bold", onClick: onShare },
     { id: "vertical", label: t("clips.gallery.vertical"), icon: "solar:smartphone-bold", onClick: onVertical },
     { id: "gif", label: t("clips.gallery.gif"), icon: "solar:gallery-bold", onClick: onGif },
-    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: onReveal },
+    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-open-bold", onClick: onReveal },
     {
       id: "delete",
       label: t("clips.gallery.delete"),

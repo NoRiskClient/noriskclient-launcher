@@ -167,7 +167,7 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
 
   const tabConfig = [
     { id: "general", label: t('profiles.settings.general'), icon: "solar:settings-bold" },
-    { id: "installation", label: t('profiles.settings.installation'), icon: "solar:download-bold" },
+    { id: "installation", label: t('profiles.settings.installation'), icon: "solar:download-minimalistic-bold" },
     { id: "java", label: t('profiles.settings.javaMemory'), icon: "solar:code-bold" },
     { id: "window", label: t('profiles.settings.window'), icon: "solar:window-frame-bold" },
     { id: "nrc", label: t('profiles.settings.nrc'), icon: "solar:shield-check-bold" },

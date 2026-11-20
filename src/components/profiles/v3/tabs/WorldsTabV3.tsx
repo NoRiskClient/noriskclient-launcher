@@ -553,7 +553,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           )
         ) : shownWorlds.length === 0 && shownServers.length === 0 ? (
           <EmptyStateV3
-            icon="solar:planet-bold-duotone"
+            icon="solar:planet-bold"
             title={searchQuery ? t("worlds.no_match_search", { query: searchQuery }) : t("worlds.none_found")}
             hint={searchQuery ? undefined : t("worlds.create_in_minecraft")}
           />
@@ -650,10 +650,10 @@ const WorldTile: React.FC<WorldTileProps> = ({
           <ThemedDropdownItem icon="solar:copy-bold" onClick={() => { onCopy(); onMenuToggle(false); }}>
             {t("worlds.copy")}
           </ThemedDropdownItem>
-          <ThemedDropdownItem icon="solar:folder-linear" onClick={() => { onOpenFolder(); onMenuToggle(false); }}>
+          <ThemedDropdownItem icon="solar:folder-open-bold" onClick={() => { onOpenFolder(); onMenuToggle(false); }}>
             {t("profiles.v3.tile.openFolder")}
           </ThemedDropdownItem>
-          <ThemedDropdownItem icon="solar:trash-bin-trash-linear" tone="danger" onClick={() => { onDelete(); onMenuToggle(false); }}>
+          <ThemedDropdownItem icon="solar:trash-bin-trash-bold" tone="danger" onClick={() => { onDelete(); onMenuToggle(false); }}>
             {t("profiles.v3.tile.delete")}
           </ThemedDropdownItem>
         </RowMenu>
@@ -743,19 +743,19 @@ const ServerTile: React.FC<ServerTileProps> = ({
       />
       <RowActions visible={menuOpen}>
         <RowMenu open={menuOpen} onToggle={onMenuToggle}>
-          <ThemedDropdownItem icon="solar:refresh-linear" onClick={() => { onReping(); onMenuToggle(false); }}>
+          <ThemedDropdownItem icon="solar:refresh-bold" onClick={() => { onReping(); onMenuToggle(false); }}>
             {t("profiles.v3.servers.reping")}
           </ThemedDropdownItem>
           <ThemedDropdownItem
-            icon="solar:clipboard-linear"
+            icon="solar:clipboard-bold"
             onClick={() => { if (address) navigator.clipboard.writeText(address); onMenuToggle(false); }}
           >
             {t("profiles.v3.servers.copyAddress")}
           </ThemedDropdownItem>
-          <ThemedDropdownItem icon="solar:pen-linear" onClick={() => { onEdit(); onMenuToggle(false); }}>
+          <ThemedDropdownItem icon="solar:pen-bold" onClick={() => { onEdit(); onMenuToggle(false); }}>
             {t("profiles.v3.servers.edit")}
           </ThemedDropdownItem>
-          <ThemedDropdownItem icon="solar:trash-bin-trash-linear" tone="danger" onClick={() => { onRemove(); onMenuToggle(false); }}>
+          <ThemedDropdownItem icon="solar:trash-bin-trash-bold" tone="danger" onClick={() => { onRemove(); onMenuToggle(false); }}>
             {t("profiles.v3.servers.remove")}
           </ThemedDropdownItem>
         </RowMenu>

@@ -218,7 +218,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
             >
               <Icon icon="solar:file-text-bold" className="w-4 h-4 shrink-0 text-white/50" />
               <span className="flex-1 truncate text-left">{selectedPath ? getFilename(selectedPath) : t("profiles.v3.logs.noFile")}</span>
-              <Icon icon="solar:alt-arrow-down-linear" className="w-3.5 h-3.5 opacity-60 shrink-0" />
+              <Icon icon="solar:alt-arrow-down-bold" className="w-3.5 h-3.5 opacity-60 shrink-0" />
             </button>
             <ThemedDropdown open={fileMenuOpen} onClose={() => setFileMenuOpen(false)} width="w-60" scrollable>
               {logFiles.map((path) => {
@@ -226,7 +226,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
                 return (
                   <ThemedDropdownItem
                     key={path}
-                    icon={name === "latest.log" ? "solar:pin-bold" : "solar:file-text-linear"}
+                    icon={name === "latest.log" ? "solar:pin-bold" : "solar:file-text-bold"}
                     selected={selectedPath === path}
                     onClick={() => { setSelectedPath(path); setFileMenuOpen(false); }}
                   >
@@ -312,7 +312,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
           </div>
         ) : logFiles.length === 0 && !isLoadingList ? (
           <EmptyStateV3
-            icon="solar:clipboard-text-bold-duotone"
+            icon="solar:clipboard-text-bold"
             title={t("profiles.v3.logs.emptyFiles")}
             hint={t("profiles.v3.logs.emptyFilesHint")}
           />
@@ -326,7 +326,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         ) : visibleLines.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <EmptyStateV3
-              icon="solar:magnifer-linear"
+              icon="solar:magnifer-bold"
               title={searchQuery
                 ? t("profiles.v3.logs.noMatchSearch", { query: searchQuery })
                 : t("profiles.v3.logs.noMatchFilter")}

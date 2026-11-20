@@ -262,7 +262,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               }}
               aria-label={t('common.clear_search')}
             >
-              <Icon icon="lucide:x" />
+              <Icon icon="nrc:close" />
             </button>
           )}
         </div>
@@ -330,7 +330,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
                   )}
                   aria-label={t('common.clear_search')}
                 >
-                  <Icon icon="lucide:x" />
+                  <Icon icon="nrc:close" />
                 </button>
               )}
             </div>

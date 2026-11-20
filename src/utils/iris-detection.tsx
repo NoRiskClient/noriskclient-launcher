@@ -297,7 +297,7 @@ export function IrisRequiredModal({
       {onInstallIris && (
         <Button
           onClick={onInstallIris}
-          icon={<Icon icon="ph:download-simple-bold" className="w-4 h-4" />}
+          icon={<Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />}
         >
           {t('iris.install_iris')}
         </Button>

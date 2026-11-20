@@ -129,7 +129,7 @@ export function ProfileCardV2({
     {
       id: "pin",
       label: pinned ? t('profiles.unpin') : t('profiles.pin'),
-      icon: pinned ? "solar:pin-bold-duotone" : "solar:pin-bold",
+      icon: pinned ? "solar:pin-linear" : "solar:pin-bold",
       onClick: (profile) => togglePin(profile.id),
     },
     {
@@ -153,7 +153,7 @@ export function ProfileCardV2({
     {
       id: "export",
       label: t('profiles.export'),
-      icon: "solar:download-bold",
+      icon: "solar:export-bold",
       onClick: (profile) => {
         showModal(`export-profile-${profile.id}`, (
           <ExportProfileModal
@@ -167,7 +167,7 @@ export function ProfileCardV2({
     {
       id: "open-folder",
       label: t('profiles.openFolder'),
-      icon: "solar:folder-bold",
+      icon: "solar:folder-open-bold",
       onClick: (profile) => {
         if (onOpenFolder) {
           onOpenFolder(profile);

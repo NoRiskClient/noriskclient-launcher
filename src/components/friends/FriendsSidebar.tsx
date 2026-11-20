@@ -161,7 +161,7 @@ export function FriendsSidebar() {
                   style={{ backgroundColor: `${accentColor.value}20`, border: `1px solid ${accentColor.value}50`, color: accentColor.value }}
                   title={t('common.close')}
                 >
-                  <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+                  <Icon icon="nrc:close" className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -411,7 +411,7 @@ function RequestsTab({
             className="w-14 h-14 mx-auto mb-4 rounded-xl flex items-center justify-center"
             style={{ backgroundColor: `${accentColor}15`, border: `1px solid ${accentColor}40` }}
           >
-            <Icon icon="solar:letter-linear" className="w-7 h-7" style={{ color: accentColor }} />
+            <Icon icon="solar:letter-bold" className="w-7 h-7" style={{ color: accentColor }} />
           </div>
           <p className="text-white/50 text-xs font-minecraft">{t('friends.no_requests_title')}</p>
           <p className="text-white/30 text-sm mt-1 font-smallcaps">{t('friends.no_requests_desc')}</p>

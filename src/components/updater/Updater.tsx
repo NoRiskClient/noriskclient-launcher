@@ -167,7 +167,7 @@ export default function Updater() {
           <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
         );
       case "downloading":
-        return <Icon icon="solar:download-bold" className="w-4 h-4" />;
+        return <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />;
       case "installing":
         return <Icon icon="solar:box-bold" className="w-4 h-4" />;
       case "uptodate":
@@ -338,7 +338,7 @@ export default function Updater() {
               variant="destructive"
               size="sm"
               onClick={handleManualClose}
-              icon={<Icon icon="solar:close-circle-bold" className="w-4 h-4" />}
+              icon={<Icon icon="nrc:close" className="w-4 h-4" />}
             >
               {t('common.close')}
             </Button>

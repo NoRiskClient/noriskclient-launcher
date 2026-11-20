@@ -227,7 +227,7 @@ export function RolloutIndicator() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<Icon icon="ic:baseline-discord" className="w-5 h-5" />}
+                  icon={<Icon icon="simple-icons:discord" className="w-5 h-5" />}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();

@@ -220,7 +220,7 @@ export function SyncPacksPage() {
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
-          <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+          <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
           <span className="text-xs font-minecraft uppercase tracking-wider">
             {t("profiles.back")}
           </span>

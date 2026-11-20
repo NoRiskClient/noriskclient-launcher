@@ -179,7 +179,7 @@ export function BrowseContentSideSheetV3({
                 className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
                 title={t("common.back")}
               >
-                <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+                <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
                 <span className="text-xs font-minecraft uppercase tracking-wider">
                   {title}
                 </span>
@@ -211,7 +211,7 @@ export function BrowseContentSideSheetV3({
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
               title={t("common.close")}
             >
-              <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+              <Icon icon="nrc:close" className="w-4 h-4" />
             </button>
           </div>
         </div>

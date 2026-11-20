@@ -115,7 +115,7 @@ export function SettingsPanel() {
             color: accentColor.value,
           }}
         >
-          <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+          <Icon icon="nrc:close" className="w-4 h-4" />
         </button>
       </div>
 

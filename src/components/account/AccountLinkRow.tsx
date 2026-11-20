@@ -46,7 +46,7 @@ export function AccountLinkRow({
             size="sm"
             onClick={onUnlink}
             disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "mdi:link-off"} />}
+            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "solar:link-broken-bold"} />}
             widthClassName="w-[140px]"
           >
             {t('socials.button.unlink')}
@@ -57,7 +57,7 @@ export function AccountLinkRow({
             size="sm"
             onClick={onLink}
             disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "mdi:link-variant"} />}
+            icon={<Icon icon={isLoading ? "svg-spinners:ring-resize" : "solar:link-bold"} />}
             widthClassName="w-[140px]"
           >
             {t('socials.button.link')}
@@ -67,7 +67,7 @@ export function AccountLinkRow({
           variant="ghost"
           size="sm"
           onClick={() => visitUrl && openExternalUrl(visitUrl)}
-          icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
+          icon={<Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />}
           disabled={!visitUrl}
           className={!visitUrl ? "invisible" : ""}
         />

@@ -337,10 +337,10 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
       }
       titleIcon={
         creationResult ? 
-          (creationResult === 'success' ? <Icon icon="solar:check-circle-bold-duotone" className="w-5 h-5 mr-2" /> : <Icon icon="solar:close-circle-bold-duotone" className="w-5 h-5 mr-2" />) :
+          (creationResult === 'success' ? <Icon icon="solar:check-circle-bold" className="w-5 h-5 mr-2" /> : <Icon icon="solar:close-circle-bold" className="w-5 h-5 mr-2" />) :
         showQuickProfileView ? 
-          (sourceProfileToCopyId ? <Icon icon="solar:copy-bold-duotone" className="w-5 h-5 mr-2" /> : <Icon icon="solar:folder-with-files-bold-duotone" className="w-5 h-5 mr-2" />) : 
-          <Icon icon="solar:bolt-bold-duotone" className="w-5 h-5" />
+          (sourceProfileToCopyId ? <Icon icon="solar:copy-bold" className="w-5 h-5 mr-2" /> : <Icon icon="solar:folder-with-files-bold" className="w-5 h-5 mr-2" />) : 
+          <Icon icon="solar:bolt-bold" className="w-5 h-5" />
       }
       onClose={handleModalClose}
       width="md"
@@ -360,7 +360,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                 disabled={isCreatingProfile}
                 shadowDepth="short"
                 size="sm"
-                icon={<Icon icon="solar:arrow-left-linear" className="w-4 h-4" />}
+                icon={<Icon icon="solar:arrow-left-bold" className="w-4 h-4" />}
                 className="mr-auto"
               >
                 {t('modrinth.back_to_profiles')}
@@ -371,7 +371,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                 disabled={isCreatingProfile || !quickProfileName.trim()}
                 shadowDepth="short"
                 size="sm"
-                icon={isCreatingProfile ? <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold-duotone" className="w-4 h-4" />}
+                icon={isCreatingProfile ? <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" /> : <Icon icon="solar:ssd-round-bold" className="w-4 h-4" />}
               >
                 {isCreatingProfile ? (sourceProfileToCopyId ? t('modrinth.copying') : t('modrinth.creating')) : (sourceProfileToCopyId ? t('modrinth.copy_and_install') : t('modrinth.create_and_install'))}
               </Button>
@@ -383,7 +383,7 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
                 <Button
                   variant="secondary"
                   onClick={switchToQuickProfileView}
-                  icon={<Icon icon="solar:add-folder-line-duotone" className="w-4 h-4 mr-1" />}
+                  icon={<Icon icon="solar:add-folder-bold" className="w-4 h-4 mr-1" />}
                   shadowDepth="short"
                   size="sm"
                   className="mr-auto"

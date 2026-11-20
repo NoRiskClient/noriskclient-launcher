@@ -317,7 +317,7 @@ ${gameLog}`
       <Button
         onClick={handleContactSupport}
         variant="default"
-        icon={<Icon icon="solar:letter-linear" className="w-5 h-5" />}
+        icon={<Icon icon="solar:letter-bold" className="w-5 h-5" />}
         disabled={isProcessing}
         className="flex-1 justify-center whitespace-nowrap"
       >

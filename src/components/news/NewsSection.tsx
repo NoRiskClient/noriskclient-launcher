@@ -63,7 +63,7 @@ export function NewsSection({ className }: { className?: string }) {
       return (
         <div className="text-center p-2">
           <Icon
-            icon="pixel:exclamation-triangle-solid"
+            icon="solar:danger-triangle-bold"
             className="w-8 h-8 text-red-400 mx-auto mb-2"
           />
           <p className="text-red-400">{t('common.error')}: {error}</p>
@@ -75,7 +75,7 @@ export function NewsSection({ className }: { className?: string }) {
       return (
         <div className="text-center p-2">
           <Icon
-            icon="pixel:newspaper-solid"
+            icon="solar:posts-carousel-vertical-bold"
             className="w-8 h-8 text-white/50 mx-auto mb-2"
           />
           <p className="text-white/70">{t('news.no_news_available')}</p>

@@ -25,11 +25,11 @@ export interface ContentTab {
 }
 
 export const CONTENT_TABS: ContentTab[] = [
-  { key: "mods", contentType: "Mod", icon: "solar:bolt-bold-duotone", labelKey: "profiles.content.mods", nameKey: "profiles.content.mod", pluralKey: "profiles.content.mods", addKey: "profiles.content.addMods" },
-  { key: "resourcepacks", contentType: "ResourcePack", icon: "solar:gallery-bold-duotone", labelKey: "profiles.content.resourcePacks", nameKey: "profiles.content.resourcePack", pluralKey: "profiles.content.resourcePacks", addKey: "profiles.content.addResourcePacks" },
-  { key: "shaderpacks", contentType: "ShaderPack", icon: "solar:sun-bold-duotone", labelKey: "profiles.content.shaderPacks", nameKey: "profiles.content.shaderPack", pluralKey: "profiles.content.shaderPacks", addKey: "profiles.content.addShaderPacks" },
-  { key: "datapacks", contentType: "DataPack", icon: "solar:database-bold-duotone", labelKey: "profiles.content.dataPacks", nameKey: "profiles.content.dataPack", pluralKey: "profiles.content.dataPacks", addKey: "profiles.content.addDataPacks" },
-  { key: "nrc", contentType: "NoRiskMod", icon: "solar:shield-check-bold-duotone", labelKey: "profiles.content.noriskClient", nameKey: "profiles.content.noriskMod", pluralKey: "profiles.content.noriskMods", addKey: "profiles.content.addNoriskMods" },
+  { key: "mods", contentType: "Mod", icon: "solar:bolt-bold", labelKey: "profiles.content.mods", nameKey: "profiles.content.mod", pluralKey: "profiles.content.mods", addKey: "profiles.content.addMods" },
+  { key: "resourcepacks", contentType: "ResourcePack", icon: "solar:gallery-bold", labelKey: "profiles.content.resourcePacks", nameKey: "profiles.content.resourcePack", pluralKey: "profiles.content.resourcePacks", addKey: "profiles.content.addResourcePacks" },
+  { key: "shaderpacks", contentType: "ShaderPack", icon: "solar:sun-bold", labelKey: "profiles.content.shaderPacks", nameKey: "profiles.content.shaderPack", pluralKey: "profiles.content.shaderPacks", addKey: "profiles.content.addShaderPacks" },
+  { key: "datapacks", contentType: "DataPack", icon: "solar:database-bold", labelKey: "profiles.content.dataPacks", nameKey: "profiles.content.dataPack", pluralKey: "profiles.content.dataPacks", addKey: "profiles.content.addDataPacks" },
+  { key: "nrc", contentType: "NoRiskMod", icon: "solar:shield-check-bold", labelKey: "profiles.content.noriskClient", nameKey: "profiles.content.noriskMod", pluralKey: "profiles.content.noriskMods", addKey: "profiles.content.addNoriskMods" },
 ];
 
 export const contentTabOf = (key: NavKey) => CONTENT_TABS.find((tab) => tab.key === key);
@@ -73,9 +73,9 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
     {
       labelKey: "profiles.v3.leftRail.world",
       items: [
-        { key: "worlds",      icon: "solar:planet-bold-duotone",      labelKey: "profiles.tabs.worlds" },
-        { key: "screenshots", icon: "solar:camera-bold-duotone",      labelKey: "profiles.tabs.screenshots" },
-        { key: "logs",        icon: "solar:code-square-bold-duotone", labelKey: "profiles.tabs.logs" },
+        { key: "worlds",      icon: "solar:planet-bold",      labelKey: "profiles.tabs.worlds" },
+        { key: "screenshots", icon: "solar:camera-bold",      labelKey: "profiles.tabs.screenshots" },
+        { key: "logs",        icon: "solar:code-square-bold", labelKey: "profiles.tabs.logs" },
       ],
     },
   ];

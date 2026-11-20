@@ -103,7 +103,7 @@ export function SyncModTile({
           />
         ) : (
           <Icon
-            icon={isJar ? "solar:box-minimalistic-bold" : "solar:bolt-bold-duotone"}
+            icon={isJar ? "solar:box-minimalistic-bold" : "solar:bolt-bold"}
             className="w-6 h-6 text-white/50"
           />
         )}
@@ -155,7 +155,7 @@ export function SyncModTile({
                 )}
                 <span className="truncate">{entry.version_name || "—"}</span>
                 {switchable && !busy && (
-                  <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 flex-shrink-0 opacity-60" />
+                  <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3 flex-shrink-0 opacity-60" />
                 )}
               </button>
               <VersionSelectDropdown
@@ -241,12 +241,12 @@ export function SyncModTile({
               {t(offEverywhere ? "profiles.v3.syncMods.menu.onEverywhere" : "profiles.v3.syncMods.menu.offEverywhere")}
             </ThemedDropdownItem>
           )}
-          <ThemedDropdownItem icon="solar:pen-linear" onClick={menuAction(() => sync.openPack(entry.pack_id))}>
+          <ThemedDropdownItem icon="solar:pen-bold" onClick={menuAction(() => sync.openPack(entry.pack_id))}>
             {t("profiles.v3.syncMods.menu.editPack")}
           </ThemedDropdownItem>
           <ThemedDropdownDivider />
           <ThemedDropdownItem
-            icon="solar:trash-bin-trash-linear"
+            icon="solar:trash-bin-trash-bold"
             tone="danger"
             onClick={menuAction(() => void sync.remove(entry))}
           >

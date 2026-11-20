@@ -50,7 +50,7 @@ export function RouteErrorBoundary() {
             onClick={() => { navigate(-1); }}
             className="h-9 px-4 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
-            <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+            <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
             {t("errorBoundary.back")}
           </button>
         </div>
@@ -62,7 +62,7 @@ export function RouteErrorBoundary() {
               className="text-[11px] text-white/50 hover:text-white/80 font-minecraft uppercase tracking-wider flex items-center gap-1"
             >
               <Icon
-                icon="solar:alt-arrow-down-linear"
+                icon="solar:alt-arrow-down-bold"
                 className={`w-3 h-3 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
               />
               {t("errorBoundary.details")}

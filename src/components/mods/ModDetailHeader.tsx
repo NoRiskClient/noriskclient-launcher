@@ -34,12 +34,12 @@ interface ModDetailHeaderProps {
 
 function getProjectTypeIcon(type: string): string {
   switch (type) {
-    case "mod": return "pixel:bolt-solid";
-    case "modpack": return "pixel:folder-open-solid";
-    case "resourcepack": return "pixel:image-solid";
-    case "shader": return "pixel:sun-solid";
-    case "datapack": return "pixel:archive-solid";
-    default: return "pixel:archive-solid";
+    case "mod": return "solar:bolt-bold";
+    case "modpack": return "solar:box-bold";
+    case "resourcepack": return "solar:gallery-bold";
+    case "shader": return "solar:sun-bold";
+    case "datapack": return "solar:database-bold";
+    default: return "solar:widget-bold";
   }
 }
 

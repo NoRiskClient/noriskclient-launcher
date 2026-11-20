@@ -79,17 +79,17 @@ export function CapeFilters({
     {
       value: "",
       label: t('capes.allTime'),
-      icon: <Icon icon="solar:calendar-mark-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-mark-bold" className="w-5 h-5" />,
     },
     {
       value: "weekly",
       label: t('capes.weekly'),
-      icon: <Icon icon="mdi:calendar-week-outline" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-bold" className="w-5 h-5" />,
     },
     {
       value: "monthly",
       label: t('capes.monthly'),
-      icon: <Icon icon="solar:calendar-date-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-date-bold" className="w-5 h-5" />,
     },
   ];
 
@@ -126,7 +126,7 @@ export function CapeFilters({
         onClick={handleOwnedToggle}
         variant={currentFilters.showOwnedOnly ? "flat" : "flat-secondary"}
         size="md"
-        icon={<Icon icon="solar:user-id-broken" className="w-5 h-5" />}
+        icon={<Icon icon="solar:user-id-bold" className="w-5 h-5" />}
         className="min-w-0 h-[42px]"
         disabled={!activeAccount}
         title={

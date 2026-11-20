@@ -609,7 +609,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         )}
         {isNrc && !selectedPackId ? (
           <EmptyStateV3
-            icon="solar:shield-check-bold-duotone"
+            icon="solar:shield-check-bold"
             title={t("profiles.v3.content.noPackTitle")}
             hint={t("profiles.v3.content.noPackHint")}
           />
@@ -624,7 +624,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           )
         ) : gridEntries.length === 0 ? (
           <EmptyStateV3
-            icon={emptyStateIconOverride ?? "solar:widget-bold-duotone"}
+            icon={emptyStateIconOverride ?? "solar:widget-bold"}
             title={manager.searchQuery
               ? t("profiles.v3.content.noMatch", { type: itemTypeNamePlural.toLowerCase(), query: manager.searchQuery })
               : t("profiles.v3.content.noItems", { type: itemTypeNamePlural.toLowerCase() })}

@@ -391,7 +391,7 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
               url={project.links.wiki}
             />
             <LinkItem
-              icon="ic:baseline-discord"
+              icon="simple-icons:discord"
               label={t('mod_detail.links.discord')}
               url={project.links.discord}
             />

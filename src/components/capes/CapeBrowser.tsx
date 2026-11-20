@@ -202,9 +202,9 @@ export function CapeBrowser(): JSX.Element {
   ];
 
   const filterOptions = [
-    { value: "", label: t('capes.allTime'), icon: "solar:calendar-mark-linear" },
-    { value: "weekly", label: t('capes.weekly'), icon: "mdi:calendar-week-outline" },
-    { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
+    { value: "", label: t('capes.allTime'), icon: "solar:calendar-mark-bold" },
+    { value: "weekly", label: t('capes.weekly'), icon: "solar:calendar-bold" },
+    { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-bold" },
   ];
 
 
@@ -969,7 +969,7 @@ export function CapeBrowser(): JSX.Element {
                           title={t('capes.downloadTemplate')}
                         >
                           <div className="w-4 h-4 flex items-center justify-center">
-                            <Icon icon="solar:download-bold" className="w-4 h-4" />
+                            <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                           </div>
                           <span>{t('capes.template')}</span>
                           <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3" />
@@ -980,14 +980,14 @@ export function CapeBrowser(): JSX.Element {
                               onClick={() => handleDownloadTemplate(false)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithoutElytra')}</span>
                             </button>
                             <button
                               onClick={() => handleDownloadTemplate(true)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithElytra')}</span>
                             </button>
                           </div>

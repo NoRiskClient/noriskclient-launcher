@@ -80,7 +80,7 @@ export function PackPicker({
             <span className="truncate">{pending ? "" : selectedLabel}</span>
           </span>
           <Icon
-            icon="solar:alt-arrow-down-linear"
+            icon="solar:alt-arrow-down-bold"
             className={`opacity-60 flex-shrink-0 transition-transform ${isSm ? "w-3 h-3" : "w-4 h-4"} ${open ? "rotate-180" : ""}`}
           />
         </button>
@@ -97,7 +97,7 @@ export function PackPicker({
           {allowNone && (
             <>
               <ThemedDropdownItem
-                icon="solar:close-circle-linear"
+                icon="solar:close-circle-bold"
                 selected={!value}
                 onClick={() => pick(null)}
               >
@@ -132,7 +132,7 @@ export function PackPicker({
             <>
               <ThemedDropdownDivider />
               <ThemedDropdownItem
-                icon={showHidden ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"}
+                icon={showHidden ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
                 onClick={() => setShowHidden(v => !v)}
               >
                 {showHidden ? t("profiles.v3.pack.showLess") : t("profiles.v3.pack.showMore")}

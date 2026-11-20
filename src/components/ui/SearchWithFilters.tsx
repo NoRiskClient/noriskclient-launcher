@@ -107,7 +107,7 @@ export function SearchWithFilters({
               aria-label="Clear search"
               className="text-white/60 hover:text-white transition-colors duration-200 shrink-0"
             >
-              <Icon icon="lucide:x" className="w-4 h-4" />
+              <Icon icon="nrc:close" className="w-4 h-4" />
             </button>
           )}
         </div>

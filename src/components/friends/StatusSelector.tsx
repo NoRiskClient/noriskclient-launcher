@@ -75,7 +75,7 @@ export function StatusSelector({ currentStatus }: StatusSelectorProps) {
         />
         <span className="text-sm text-white font-minecraft">{t(current.labelKey)}</span>
         <Icon
-          icon="solar:alt-arrow-down-linear"
+          icon="solar:alt-arrow-down-bold"
           className={cn(
             "w-4 h-4 ml-auto transition-transform duration-200",
             isOpen && "rotate-180"

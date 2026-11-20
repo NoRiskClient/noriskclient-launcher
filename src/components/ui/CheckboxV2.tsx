@@ -136,7 +136,7 @@ export function CheckboxV2({
       >
         {(checked || indeterminate) && (
           <Icon
-            icon={indeterminate ? "mdi:minus" : "mingcute:check-line"}
+            icon={indeterminate ? "nrc:minus" : "nrc:check"}
             className={`${getIconSize()} transition-all duration-200`}
           />
         )}

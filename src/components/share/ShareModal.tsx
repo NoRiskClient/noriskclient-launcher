@@ -104,7 +104,7 @@ export function ShareModal({ subject, choices, onClose, onShare }: Props) {
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <Icon
-                  icon={isClip ? "solar:videocamera-bold" : "solar:gallery-bold-duotone"}
+                  icon={isClip ? "solar:videocamera-bold" : "solar:gallery-bold"}
                   className="h-6 w-6 text-white/20"
                 />
               </div>

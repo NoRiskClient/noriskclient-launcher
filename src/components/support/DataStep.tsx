@@ -44,7 +44,7 @@ function ItemPreview({
           onClick={onBack}
           className="flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 font-minecraft text-sm text-white/85 tracking-wide hover:bg-white/15"
         >
-          <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+          <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
           {t("support_request.back")}
         </button>
         {def && <Icon icon={def.icon} className="w-5 h-5 text-white/70" />}

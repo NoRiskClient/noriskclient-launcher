@@ -117,7 +117,7 @@ export function SyncPackModRow({
         }
         trailing={
           <Icon
-            icon="solar:alt-arrow-down-linear"
+            icon="solar:alt-arrow-down-bold"
             className="h-4 w-4 flex-shrink-0 text-white/15 transition-all group-hover/row:text-white/40"
             style={{ transform: isExpanded ? "rotate(180deg)" : undefined }}
           />

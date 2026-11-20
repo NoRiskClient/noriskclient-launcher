@@ -65,10 +65,10 @@ export function FloatingActionBar(props: FloatingActionBarProps) {
   }, []);
 
   const toggle = !allSelected
-    ? { onClick: onSelectAll, icon: "solar:check-square-linear", label: t("profiles.v3.fab.selectAll") }
+    ? { onClick: onSelectAll, icon: "solar:check-square-bold", label: t("profiles.v3.fab.selectAll") }
     : onRestore
-      ? { onClick: onRestore, icon: "solar:undo-left-linear", label: t("profiles.v3.fab.selectPrevious") }
-      : { onClick: onClear, icon: "solar:close-square-linear", label: t("profiles.v3.fab.selectNone") };
+      ? { onClick: onRestore, icon: "solar:undo-left-bold", label: t("profiles.v3.fab.selectPrevious") }
+      : { onClick: onClear, icon: "solar:close-square-bold", label: t("profiles.v3.fab.selectNone") };
   const bar = (
     <div
       ref={barRef}
@@ -129,7 +129,7 @@ export function FloatingActionBar(props: FloatingActionBarProps) {
           className="h-11 w-11 hover:bg-white/5 text-white/55 hover:text-white flex items-center justify-center transition-colors"
           title={t("profiles.v3.fab.clearSelection")}
         >
-          <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+          <Icon icon="nrc:close" className="w-4 h-4" />
         </button>
       </div>
     </div>

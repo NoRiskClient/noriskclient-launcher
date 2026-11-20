@@ -79,7 +79,7 @@ export function VersionSelectDropdown({
             icon={
               latestOption.selected
                 ? "solar:check-circle-bold"
-                : "solar:refresh-circle-linear"
+                : "solar:refresh-circle-bold"
             }
             className="w-3.5 h-3.5 flex-shrink-0"
             style={
@@ -153,7 +153,7 @@ export function VersionSelectDropdown({
                 />
               ) : (
                 <Icon
-                  icon="solar:tag-linear"
+                  icon="solar:tag-bold"
                   className="w-3.5 h-3.5 flex-shrink-0 text-white/40"
                 />
               )}

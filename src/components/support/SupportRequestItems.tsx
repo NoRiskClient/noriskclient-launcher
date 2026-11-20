@@ -38,7 +38,7 @@ export function SupportKidItemRow({
           {selected ? summary || t(supportItemKey(type, "description")) : t("support_request.data.deselected")}
         </div>
       </div>
-      <Icon icon="solar:alt-arrow-right-linear" className="w-5 h-5 shrink-0 text-white/35" />
+      <Icon icon="solar:alt-arrow-right-bold" className="w-5 h-5 shrink-0 text-white/35" />
     </button>
   );
 }

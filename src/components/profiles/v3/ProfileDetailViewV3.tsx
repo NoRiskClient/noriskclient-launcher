@@ -223,7 +223,7 @@ export function ProfileDetailViewV3({
     {
       id: "export",
       label: t('profiles.export'),
-      icon: "solar:download-bold",
+      icon: "solar:export-bold",
       onClick: () => handleOpenExportModal(),
     },
     ...(currentProfile.modpack_info && modpackVersions ? [{
@@ -235,7 +235,7 @@ export function ProfileDetailViewV3({
     {
       id: "open-folder",
       label: t('profiles.openFolder'),
-      icon: "solar:folder-bold",
+      icon: "solar:folder-open-bold",
       onClick: () => handleOpenFolder(),
     },
     {
@@ -327,7 +327,7 @@ export function ProfileDetailViewV3({
           onClick={onClose}
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
-          <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+          <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
           <span className="text-xs font-minecraft uppercase tracking-wider">{t('profiles.back')}</span>
           <span className="text-white/30">/</span>
           <span
@@ -349,7 +349,7 @@ export function ProfileDetailViewV3({
               onClick={handleOpenFolder}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
             >
-              <Icon icon="solar:folder-linear" className="w-4 h-4" />
+              <Icon icon="solar:folder-open-bold" className="w-4 h-4" />
             </button>
           </Tooltip>
           <Tooltip content={t('profiles.duplicate')} position="top" delay={0}>
@@ -357,7 +357,7 @@ export function ProfileDetailViewV3({
               onClick={handleDuplicateProfile}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
             >
-              <Icon icon="solar:copy-linear" className="w-4 h-4" />
+              <Icon icon="solar:copy-bold" className="w-4 h-4" />
             </button>
           </Tooltip>
           <Tooltip content={t('profiles.export')} position="top" delay={0}>
@@ -365,7 +365,7 @@ export function ProfileDetailViewV3({
               onClick={handleOpenExportModal}
               className="p-2 rounded hover:bg-white/5 text-white/50 hover:text-white transition-colors"
             >
-              <Icon icon="solar:upload-linear" className="w-4 h-4" />
+              <Icon icon="solar:upload-bold" className="w-4 h-4" />
             </button>
           </Tooltip>
           <div className="w-px h-5 bg-white/10 mx-1" />
@@ -543,7 +543,7 @@ export function ProfileDetailViewV3({
                     )}
                     {versionsReady && (
                       <Icon
-                        icon="solar:pen-linear"
+                        icon="solar:pen-bold"
                         className="w-3.5 h-3.5 ml-0.5 flex-shrink-0 opacity-40 group-hover:opacity-80 transition-opacity"
                       />
                     )}

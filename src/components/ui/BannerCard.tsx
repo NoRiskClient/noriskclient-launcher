@@ -50,7 +50,7 @@ export function BannerCard({
           className="absolute top-3 right-3 p-1 text-gray-400 hover:text-white transition-colors"
           title={dismissTitle}
         >
-          <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+          <Icon icon="nrc:close" className="w-5 h-5" />
         </button>
       )}
       {children}

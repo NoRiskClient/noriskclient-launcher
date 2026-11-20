@@ -10,7 +10,7 @@ export function ErrorMessage({ message, className = "" }: ErrorMessageProps) {
     <div
       className={`bg-red-900/50 border border-red-700/50 text-white font-smallcaps text-xs p-3 ${className}`}
     >
-      <Icon icon="pixel:exclamation-triangle-solid" className="inline-block mr-2 w-4 h-4" />
+      <Icon icon="solar:danger-triangle-bold" className="inline-block mr-2 w-4 h-4" />
       {message}
     </div>
   );

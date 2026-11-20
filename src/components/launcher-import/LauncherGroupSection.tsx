@@ -65,7 +65,7 @@ export function LauncherGroupSection({
         className="group/head flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
       >
         <Icon
-          icon="solar:alt-arrow-right-linear"
+          icon="solar:alt-arrow-right-bold"
           className="h-4 w-4 flex-shrink-0 text-white/30 transition-transform group-hover/head:text-white/60"
           style={{ transform: collapsed ? undefined : "rotate(90deg)" }}
         />
@@ -112,7 +112,7 @@ export function LauncherGroupSection({
               }}
               className="flex h-6 w-6 items-center justify-center rounded text-white/40 opacity-0 transition-all hover:bg-white/10 hover:text-white group-hover/head:opacity-100"
             >
-              <Icon icon="solar:close-circle-linear" className="h-4 w-4" />
+              <Icon icon="nrc:close" className="h-4 w-4" />
             </button>
           </Tooltip>
         )}

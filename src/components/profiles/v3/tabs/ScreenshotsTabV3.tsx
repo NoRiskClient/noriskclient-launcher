@@ -287,7 +287,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
           )
         ) : visibleScreenshots.length === 0 ? (
           <EmptyStateV3
-            icon="solar:gallery-bold-duotone"
+            icon="solar:gallery-bold"
             title={t("profiles.v3.screenshots.empty")}
             hint={t("profiles.v3.screenshots.emptyHint")}
           />
@@ -361,7 +361,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
     { id: "open", label: t("screenshots.view"), icon: "solar:eye-bold", onClick: onOpen },
     { id: "share", label: t("screenshots.share"), icon: "solar:cloud-upload-bold", onClick: onShare },
     { id: "copy", label: t("screenshots.copy_image"), icon: "solar:copy-bold", onClick: (s) => void copyScreenshotImage(s.path, t) },
-    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-with-files-bold", onClick: (s) => void revealScreenshot(s.path, t) },
+    { id: "reveal", label: t("clips.gallery.reveal"), icon: "solar:folder-open-bold", onClick: (s) => void revealScreenshot(s.path, t) },
     { id: "delete", label: t("clips.gallery.delete"), icon: "solar:trash-bin-trash-bold", destructive: true, separator: true, onClick: onDelete },
   ];
   // Intersection-Observer: Preview wird erst angefordert wenn das Tile in

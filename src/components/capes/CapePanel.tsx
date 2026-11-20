@@ -50,9 +50,8 @@ export function CapePanel({ selection, equippedCapeId, busy, canFavorite, onEqui
             aria-label={favoriteLabel}
           >
             <Icon
-              icon={isFavorite ? "ph:heart-fill" : "ph:heart"}
-              className="w-4 h-4"
-              style={{ color: isFavorite ? "#ef4444" : undefined }}
+              icon={isFavorite ? "solar:star-bold" : "solar:star-linear"}
+              className={isFavorite ? "w-4 h-4 text-yellow-400" : "w-4 h-4"}
             />
           </button>
         )}

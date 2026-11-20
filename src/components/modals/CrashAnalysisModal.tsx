@@ -247,7 +247,7 @@ export function CrashAnalysisModal({ result, logUrl, profileId, onClose }: Props
                   style={{ color: l.color }}
                 >
                   {t("crash_analysis.view_issue")}
-                  <Icon icon="solar:arrow-right-up-linear" className="inline-block w-3.5 h-3.5 ml-0.5 align-[-0.15em]" />
+                  <Icon icon="solar:arrow-right-up-bold" className="inline-block w-3.5 h-3.5 ml-0.5 align-[-0.15em]" />
                 </button>
               </>
             )}
@@ -266,7 +266,7 @@ export function CrashAnalysisModal({ result, logUrl, profileId, onClose }: Props
             onClick={() => setShowDetails((s) => !s)}
             className="flex items-center gap-1.5 text-white/40 hover:text-white/70 font-minecraft text-sm transition-colors"
           >
-            <Icon icon={showDetails ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} className="w-4 h-4" />
+            <Icon icon={showDetails ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"} className="w-4 h-4" />
             {t("crash_analysis.technical_details")}
           </button>
 
@@ -306,8 +306,8 @@ function LogLinks({ url, openTextKey }: { url: string; openTextKey: string }) {
       .catch(() => toast.error(t("crash_analysis.toast.copy_failed")));
   return (
     <>
-      <LinkRow icon="solar:document-text-linear" text={t(openTextKey)} onClick={() => openExternalUrl(url).catch(() => {})} />
-      <LinkRow icon="solar:copy-linear" text={t("crash_analysis.copy_log_link")} onClick={copy} />
+      <LinkRow icon="solar:document-text-bold" text={t(openTextKey)} onClick={() => openExternalUrl(url).catch(() => {})} />
+      <LinkRow icon="solar:copy-bold" text={t("crash_analysis.copy_log_link")} onClick={copy} />
     </>
   );
 }

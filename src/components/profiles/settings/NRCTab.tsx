@@ -78,7 +78,7 @@ export function NRCTab({ profile, editedProfile, updateProfile }: NRCTabProps) {
           <span className="flex items-center gap-2">
             {t("nrc.pack_label")}
             <span title={t("nrc.info_description")} className="cursor-help text-white/40 hover:text-white/70">
-              <Icon icon="solar:info-circle-linear" className="h-4 w-4" />
+              <Icon icon="solar:info-circle-bold" className="h-4 w-4" />
             </span>
           </span>
         }

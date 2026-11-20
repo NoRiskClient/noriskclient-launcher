@@ -57,7 +57,7 @@ export function MinecraftAccountManager({
             onClick={onClose}
             className="text-white/70 hover:text-white transition-colors"
           >
-            <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+            <Icon icon="nrc:close" className="w-5 h-5" />
           </button>
         </DropdownHeader>
 

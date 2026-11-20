@@ -166,7 +166,7 @@ export function TwitchLinkCard() {
 
   return (
     <AccountLinkRow
-      icon="mdi:twitch"
+      icon="simple-icons:twitch"
       name="Twitch"
       info={t("socials.twitch_info")}
       iconClassName={isLinked ? "text-purple-400" : "text-white/50"}
@@ -212,7 +212,7 @@ function TwitchScopeInfoModal({
   return (
     <Modal
       title={t("twitch.scopeInfoTitle")}
-      titleIcon={<Icon icon="mdi:twitch" className="w-5 h-5" />}
+      titleIcon={<Icon icon="simple-icons:twitch" className="w-5 h-5" />}
       onClose={onClose}
       width="md"
     >
@@ -240,7 +240,7 @@ function TwitchScopeInfoModal({
                 <span className="flex-1 text-white/90">{t(`twitch.scope.${key}.title`)}</span>
                 <code className="text-[10px] font-mono text-white/30">{scope}</code>
                 <Tooltip content={t(`twitch.scope.${key}.description`)}>
-                  <Icon icon="solar:info-circle-linear" className="w-4 h-4 text-white/30 hover:text-white/70" />
+                  <Icon icon="solar:info-circle-bold" className="w-4 h-4 text-white/30 hover:text-white/70" />
                 </Tooltip>
               </div>
             );
@@ -254,7 +254,7 @@ function TwitchScopeInfoModal({
 
         <TwitchPrimaryAction
           label={t("twitch.scopeInfoContinue")}
-          icon="mdi:twitch"
+          icon="simple-icons:twitch"
           onClick={() => onContinue(available.filter((scope) => selected.has(scope)))}
           disabled={!available.some((scope) => selected.has(scope))}
         />
@@ -362,7 +362,7 @@ function TwitchDeviceLoginModal({
   return (
     <Modal
       title={t("twitch.linkTitle")}
-      titleIcon={<Icon icon="mdi:twitch" className="w-5 h-5" />}
+      titleIcon={<Icon icon="simple-icons:twitch" className="w-5 h-5" />}
       onClose={onClose}
       width="sm"
     >
@@ -372,7 +372,7 @@ function TwitchDeviceLoginModal({
             <Icon icon="solar:danger-triangle-bold" className="w-10 h-10 text-red-400" />
             <h3 className="mt-3 text-white font-smallcaps">{t("twitch.linkError")}</h3>
             <p className="mt-1 text-sm text-white/70 leading-relaxed">{error}</p>
-            <TwitchPrimaryAction label={t("common.try_again")} icon="solar:restart-bold" onClick={retry} />
+            <TwitchPrimaryAction label={t("common.try_again")} icon="solar:refresh-bold" onClick={retry} />
           </>
         ) : (
           <>
@@ -418,7 +418,7 @@ function TwitchDeviceLoginModal({
 
             <TwitchPrimaryAction
               label={t("twitch.openTwitch")}
-              icon="mdi:open-in-new"
+              icon="solar:arrow-right-up-bold"
               onClick={() => verificationUri && openExternalUrl(verificationUri)}
               disabled={!verificationUri}
             />

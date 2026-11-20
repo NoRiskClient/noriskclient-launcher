@@ -44,7 +44,7 @@ export function ProfileIconV2({
         isEditable={false}
         variant="bare"
         className="w-full h-full"
-        placeholderIcon="ph:package-duotone"
+        placeholderIcon="solar:box-bold"
         iconClassName={iconSizes[size]}
       />
     </div>

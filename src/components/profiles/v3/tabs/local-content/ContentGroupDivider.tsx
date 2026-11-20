@@ -31,7 +31,7 @@ export function ContentGroupDivider({
         className="group/divider flex min-w-0 flex-1 items-center gap-2.5 py-1 text-left"
       >
         <Icon
-          icon="solar:alt-arrow-down-linear"
+          icon="solar:alt-arrow-down-bold"
           className="h-3.5 w-3.5 flex-shrink-0 text-white/35 transition-transform duration-200 group-hover/divider:text-white/70"
           style={{ transform: collapsed ? "rotate(-90deg)" : undefined }}
         />
@@ -62,7 +62,7 @@ export function ContentGroupDivider({
           className="flex flex-shrink-0 items-center gap-1 rounded px-2 py-1 font-minecraft text-[10px] uppercase tracking-wider text-white/40 transition-colors hover:bg-white/10 hover:text-white"
         >
           {openLabel}
-          <Icon icon="solar:arrow-right-up-linear" className="h-3 w-3" />
+          <Icon icon="solar:arrow-right-up-bold" className="h-3 w-3" />
         </button>
       )}
     </div>
