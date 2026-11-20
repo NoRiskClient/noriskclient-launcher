@@ -49,7 +49,7 @@ export default function Updater() {
   const progressRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const appWindow = getCurrentWindow();
-  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const accentColor = useThemeStore((state) => state.accentColor);
   const currentEffect = useBackgroundEffectStore(
