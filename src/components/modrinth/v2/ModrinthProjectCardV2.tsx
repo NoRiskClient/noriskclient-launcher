@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import type {
   ModrinthGameVersion,
 } from "../../../types/modrinth";
@@ -12,7 +12,6 @@ import { TagBadge } from "../../ui/TagBadge";
 import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
-import { preloadIcons } from "../../../lib/icon-utils";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
@@ -177,14 +176,6 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
   }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-
-    useEffect(() => {
-      preloadIcons([
-        "solar:download-minimalistic-bold",
-        "solar:alt-arrow-up-bold",
-        "solar:alt-arrow-down-bold",
-      ]);
-    }, []);
 
     const handleTitleClick = (e: React.MouseEvent) => {
       e.preventDefault();

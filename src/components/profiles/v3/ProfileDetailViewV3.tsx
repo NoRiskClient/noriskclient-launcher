@@ -16,20 +16,6 @@ import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { preloadIcons } from "../../../lib/icon-utils";
-
-preloadIcons([
-  "solar:gamepad-bold", "solar:box-bold", "solar:folder-bold",
-  "solar:widget-bold", "solar:user-bold", "solar:pen-linear",
-  "solar:lock-keyhole-minimalistic-bold",
-  "solar:play-bold", "solar:stop-bold", "solar:settings-bold",
-  "solar:refresh-bold",
-  "solar:arrow-left-linear", "solar:folder-linear", "solar:copy-linear",
-  "solar:upload-linear", "solar:menu-dots-bold", "solar:refresh-circle-bold",
-  "solar:clock-circle-bold", "solar:hourglass-bold", "solar:ssd-round-bold",
-  "solar:copy-bold", "solar:download-bold", "solar:archive-bold",
-  "solar:trash-bin-trash-bold",
-]);
 
 import type { Profile } from "../../../types/profile";
 import { setDiscordState } from "../../../utils/discordRpc";

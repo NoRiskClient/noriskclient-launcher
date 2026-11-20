@@ -31,7 +31,6 @@ import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useVanillaCapeStore } from "../../store/useVanillaCapeStore";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
-import { preloadIcons } from "../../lib/icon-utils";
 import { deleteCape, checkIsModerator, getCapeImageUrl } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
@@ -231,10 +230,6 @@ export function CapeBrowser(): JSX.Element {
     if (!activeAccount) return;
     checkIsModerator().then(setIsModerator).catch(() => setIsModerator(false));
   }, [activeAccount]);
-
-  useEffect(() => {
-    preloadIcons(["solar:add-square-bold-duotone"]);
-  }, []);
 
   // Initial load for ALL capes
   useEffect(() => {

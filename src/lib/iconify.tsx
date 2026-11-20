@@ -1,23 +1,7 @@
-import {
-  Icon as IconifyIcon,
-  addCollection,
-  addIcon,
-  InlineIcon,
-} from "@iconify/react/dist/offline.js";
+import { Icon as IconifyIcon } from "@iconify/react/dist/offline.js";
 import type { IconProps } from "@iconify/react/dist/offline.js";
 import { useEffect } from "react";
 import "./icon-bundle";
-
-export { addCollection, addIcon, InlineIcon };
-export type { IconProps };
-export type {
-  IconifyIconProps,
-  IconifyIconCustomisations,
-  IconifyIconSize,
-  IconifyRenderMode,
-} from "@iconify/react/dist/offline.js";
-
-export function loadIcons(_icons: string[]): void {}
 
 const warned = new Set<string>();
 
