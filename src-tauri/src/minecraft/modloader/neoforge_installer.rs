@@ -136,20 +136,8 @@ impl NeoForgeInstaller {
             })
             .await?;
 
-        let neoforge_version = neoforge_installer_download
-            .extract_version_json(&target_neoforge_version)
-            .await?;
-        let profile_json = neoforge_installer_download
-            .extract_install_profile(&target_neoforge_version)
-            .await?;
-        neoforge_installer_download
-            .extract_data_folder(&target_neoforge_version)
-            .await?;
-        neoforge_installer_download
-            .extract_maven_folder(&target_neoforge_version)
-            .await?;
-        neoforge_installer_download
-            .extract_jars(&target_neoforge_version)
+        let (neoforge_version, profile_json) = neoforge_installer_download
+            .extract_installer(&target_neoforge_version)
             .await?;
 
         state

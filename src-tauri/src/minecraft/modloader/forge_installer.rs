@@ -141,20 +141,8 @@ impl ForgeInstaller {
             })
             .await?;
 
-        let forge_version = forge_installer_download
-            .extract_version_json(&target_forge_version)
-            .await?;
-        let profile_json = forge_installer_download
-            .extract_install_profile(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_data_folder(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_maven_folder(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_jars(&target_forge_version)
+        let (forge_version, profile_json) = forge_installer_download
+            .extract_installer(&target_forge_version)
             .await?;
 
         state
