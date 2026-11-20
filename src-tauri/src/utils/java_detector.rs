@@ -42,60 +42,6 @@ pub struct JavaInstallation {
 }
 
 impl JavaInstallation {
-    /// Returns true if this Java installation is suitable for Minecraft
-    pub fn is_suitable_for_minecraft(&self) -> bool {
-        // Minecraft generally needs at least Java 8
-        self.major_version >= 8
-    }
-
-    /// Checks if this Java installation is recommended for the given Minecraft version
-    pub fn is_recommended_for_minecraft(&self, mc_version: &str) -> bool {
-        let mc_version_parts: Vec<&str> = mc_version.split('.').collect();
-
-        if mc_version_parts.is_empty() {
-            return false;
-        }
-
-        // Parse major version
-        let major = match mc_version_parts[0].parse::<u32>() {
-            Ok(v) => v,
-            Err(_) => return false,
-        };
-
-        match major {
-            // Minecraft 1.16.5+ recommended Java 16
-            1 if mc_version_parts.len() > 1 => {
-                let minor = match mc_version_parts[1].parse::<u32>() {
-                    Ok(v) => v,
-                    Err(_) => return false,
-                };
-
-                match minor {
-                    // Minecraft 1.0-1.16.4 uses Java 8
-                    0..=16 => {
-                        if minor == 16 {
-                            // Check patch level for 1.16
-                            if mc_version_parts.len() > 2 {
-                                if let Ok(patch) = mc_version_parts[2].parse::<u32>() {
-                                    if patch >= 5 {
-                                        // 1.16.5+ recommended Java 16
-                                        return self.major_version >= 16;
-                                    }
-                                }
-                            }
-                        }
-                        // Minecraft 1.0-1.16.4 uses Java 8
-                        self.major_version >= 8 && self.major_version <= 8
-                    }
-                    // Minecraft 1.17 uses Java 16+
-                    17 => self.major_version >= 16,
-                    // Minecraft 1.18+ uses Java 17+
-                    18..=u32::MAX => self.major_version >= 17,
-                }
-            }
-            _ => false,
-        }
-    }
 }
 
 /// Detects Java installations in the launcher's meta/java directory
@@ -544,35 +490,6 @@ pub async fn get_java_info(java_path: &Path) -> Result<JavaInstallation> {
     })
 }
 
-/// Finds the best Java installation for the given Minecraft version
-pub async fn find_best_java_for_minecraft(mc_version: &str) -> Result<Option<JavaInstallation>> {
-    let installations = detect_java_installations().await?;
-
-    if installations.is_empty() {
-        return Ok(None);
-    }
-
-    // First try to find a recommended version
-    let recommended = installations
-        .iter()
-        .filter(|java| java.is_recommended_for_minecraft(mc_version))
-        .max_by_key(|java| (java.major_version, java.is_64bit))
-        .cloned();
-
-    if recommended.is_some() {
-        return Ok(recommended);
-    }
-
-    // If no recommended version, find any suitable version
-    let suitable = installations
-        .iter()
-        .filter(|java| java.is_suitable_for_minecraft())
-        .max_by_key(|java| (java.major_version, java.is_64bit))
-        .cloned();
-
-    Ok(suitable)
-}
-
 /// Parses the major version from a Java version string
 fn parse_java_major_version(version: &str) -> Option<u32> {
     // Handle different version formats:
@@ -905,11 +822,4 @@ async fn detect_java_on_linux() -> Result<Vec<JavaInstallation>> {
     }
 
     Ok(installations)
-}
-
-/// Invalidates the Java installation cache, forcing a fresh scan on the next query
-pub async fn invalidate_java_cache() {
-    info!("Invalidating Java installation cache");
-    let mut cache = JAVA_INSTALLATIONS.write().await;
-    *cache = None;
 }

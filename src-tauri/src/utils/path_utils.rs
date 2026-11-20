@@ -293,65 +293,6 @@ async fn read_children(root_path: &Path, include_hidden: bool, depth: Option<usi
     Ok(children)
 }
 
-/// Flattens a directory structure into a vector of paths with their relative depths.
-/// Useful for UI rendering where a flat list with indentation is preferred.
-///
-/// # Arguments
-/// * `node` - The root node to flatten
-/// * `depth` - The current depth (should be 0 for the initial call)
-/// * `result` - The vector to populate (should be empty for the initial call)
-pub fn flatten_directory_structure(
-    node: &FileNode,
-    depth: usize,
-    result: &mut Vec<(FileNode, usize)>,
-) {
-    result.push((node.clone(), depth));
-
-    for child in &node.children {
-        flatten_directory_structure(child, depth + 1, result);
-    }
-}
-
-/// Filters a directory structure based on a set of excluded paths.
-/// Returns a new tree with only the files and directories that should be included.
-///
-/// # Arguments
-/// * `node` - The root node to filter
-/// * `excluded_paths` - Set of paths (as strings) that should be excluded
-///
-/// # Returns
-/// A new FileNode with excluded paths removed
-pub fn filter_directory_structure(
-    node: &FileNode,
-    excluded_paths: &std::collections::HashSet<String>,
-) -> Option<FileNode> {
-    // If this node's path is excluded, skip the entire subtree
-    if excluded_paths.contains(&node.path.to_string_lossy().to_string()) {
-        return None;
-    }
-
-    // For files, simply return a clone if not excluded
-    if !node.is_dir {
-        return Some(node.clone());
-    }
-
-    // For directories, filter children and keep the directory if it has any children left
-    let filtered_children: Vec<FileNode> = node
-        .children
-        .iter()
-        .filter_map(|child| filter_directory_structure(child, excluded_paths))
-        .collect();
-
-    // Only return the directory if it has children or is the root
-    if !filtered_children.is_empty() || node.path.parent().is_none() {
-        let mut filtered_node = node.clone();
-        filtered_node.children = filtered_children;
-        Some(filtered_node)
-    } else {
-        None
-    }
-}
-
 /// Filters a directory structure based on a set of included paths.
 /// Returns a new tree with only the files and directories that should be included.
 ///

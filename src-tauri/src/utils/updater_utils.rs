@@ -110,7 +110,7 @@ pub fn build_updater(
         .map_err(|e| AppError::Other(format!("Failed to build updater: {}", e)))
 }
 
-/// Checks if an update is available and returns detailed information including the updater instance.
+/// Checks if an update is available and returns detailed information including the pending update.
 /// This version provides all necessary information to proceed with download/installation without redundancy.
 ///
 /// # Arguments
@@ -120,7 +120,7 @@ pub fn build_updater(
 ///
 /// # Returns
 ///
-/// * `Result<Option<UpdateCheckResult>>` - Detailed update information with updater instance, or None if up to date.
+/// * `Result<Option<UpdateCheckResult>>` - Detailed update information with the pending update, or None if up to date.
 pub async fn check_update_available_detailed(
     app_handle: &AppHandle,
     is_beta_channel: bool,
@@ -166,7 +166,6 @@ pub async fn check_update_available_detailed(
 
             let result = UpdateCheckResult {
                 update_info,
-                updater,
                 update,
             };
 
@@ -235,10 +234,9 @@ pub struct UpdateInfo {
     pub download_url: Option<String>,
 }
 
-// Structure to hold update information along with the updater instance
+// Structure to hold update information along with the pending update
 pub struct UpdateCheckResult {
     pub update_info: UpdateInfo,
-    pub updater: tauri_plugin_updater::Updater,
     pub update: tauri_plugin_updater::Update,
 }
 

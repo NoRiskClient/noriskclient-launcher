@@ -10,8 +10,6 @@ pub struct DiskSpaceInfo {
     pub available_bytes: u64,
     /// Total space in bytes
     pub total_bytes: u64,
-    /// Used space in bytes (calculated)
-    pub used_bytes: u64,
 }
 
 impl DiskSpaceInfo {
@@ -95,7 +93,6 @@ impl DiskSpaceUtils {
         Some(DiskSpaceInfo {
             available_bytes: available,
             total_bytes: total,
-            used_bytes: total.saturating_sub(available),
         })
     }
 
@@ -142,8 +139,6 @@ impl DiskSpaceUtils {
 
         let total_bytes = (stat.f_blocks as u64).saturating_mul(block_size);
         let available_bytes = (stat.f_bavail as u64).saturating_mul(block_size);
-        let free_bytes = (stat.f_bfree as u64).saturating_mul(block_size);
-        let used_bytes = total_bytes.saturating_sub(free_bytes);
 
         if total_bytes == 0 {
             debug!("statvfs returned 0 total bytes for {:?}", path);
@@ -153,7 +148,6 @@ impl DiskSpaceUtils {
         Some(DiskSpaceInfo {
             available_bytes,
             total_bytes,
-            used_bytes,
         })
     }
 

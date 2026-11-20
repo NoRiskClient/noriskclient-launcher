@@ -428,15 +428,6 @@ pub async fn list_backups<P: AsRef<Path>>(
     Ok(backups)
 }
 
-/// Statistics about backups
-#[derive(Debug)]
-pub struct BackupStats {
-    pub total_backups: usize,
-    pub total_size: u64,
-    pub oldest_backup: Option<DateTime<Utc>>,
-    pub newest_backup: Option<DateTime<Utc>>,
-}
-
 /// Safe write operation with automatic backup
 pub async fn safe_write_with_backup<P: AsRef<Path>, C: AsRef<[u8]>>(
     file_path: P,
@@ -456,4 +447,3 @@ pub async fn safe_write_with_backup<P: AsRef<Path>, C: AsRef<[u8]>>(
     info!("Successfully wrote file with backup: {}", file_path.display());
     Ok(())
 }
-

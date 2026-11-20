@@ -15,7 +15,6 @@ fn a_reserve_fraction_shrinks_what_a_download_may_use() {
     let disk_info = DiskSpaceInfo {
         available_bytes: 1000,
         total_bytes: 2000,
-        used_bytes: 1000,
     };
 
     assert!(disk_info.has_enough_space(800, 0.0));
