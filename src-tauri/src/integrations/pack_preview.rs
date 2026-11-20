@@ -40,7 +40,7 @@ impl PackFormat {
 }
 
 pub use crate::integrations::provenance::{
-    ExecutableContentReport, ProvenanceReport, UnknownContent, UnknownReason,
+    ExecutableContentReport, ProvenanceReport, UnknownReason,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

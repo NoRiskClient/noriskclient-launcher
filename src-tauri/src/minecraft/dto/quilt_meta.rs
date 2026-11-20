@@ -1,13 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct QuiltVersion {
-    pub version: String,
-    #[serde(default)]
-    pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct QuiltLoaderVersion {
     pub separator: String,
     pub build: i32,
@@ -15,21 +8,6 @@ pub struct QuiltLoaderVersion {
     pub version: String,
     #[serde(default)]
     pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct QuiltInstallerVersion {
-    pub url: String,
-    pub maven: String,
-    pub version: String,
-    #[serde(default)]
-    pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct QuiltVersionManifest {
-    pub loader: QuiltLoaderVersion,
-    pub installer: QuiltInstallerVersion,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

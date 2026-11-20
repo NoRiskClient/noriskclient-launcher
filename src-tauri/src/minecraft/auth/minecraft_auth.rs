@@ -169,12 +169,6 @@ pub enum MinecraftAuthenticationError {
         #[source]
         source: reqwest::Error,
     },
-    #[error("Error creating signed request buffer {step:?}: {source}")]
-    ConstructingSignedRequest {
-        step: MinecraftAuthStep,
-        #[source]
-        source: std::io::Error,
-    },
     #[error("Error reading XBOX Session ID header")]
     NoSessionId,
     #[error("Error reading user hash")]
@@ -547,11 +541,6 @@ impl MinecraftAuthStore {
                 error: Some(error_message),
             }).await;
         });
-    }
-
-    /// Completes the direct OAuth2 flow (for Flatpak/localhost redirect)
-    pub async fn login_finish_direct_oauth(&self, code: &str, flow: DirectOAuthFlow) -> Result<Credentials> {
-        self.login_finish_direct_oauth_with_events(code, flow, Uuid::new_v4()).await
     }
 
     /// Completes the direct OAuth2 flow with event emission (for Flatpak/localhost redirect)

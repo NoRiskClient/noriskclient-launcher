@@ -8,10 +8,6 @@ pub struct NeoForgeMavenMetadata {
 
 #[derive(Debug, Deserialize)]
 pub struct Versioning {
-    #[serde(rename = "latest")]
-    pub latest: String,
-    #[serde(rename = "release")]
-    pub release: String,
     #[serde(rename = "versions")]
     pub versions: Versions,
 }

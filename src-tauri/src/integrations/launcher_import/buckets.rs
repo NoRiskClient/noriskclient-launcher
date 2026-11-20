@@ -72,7 +72,6 @@ pub static BUCKETS: &[Bucket] = &[
 ];
 
 pub const MODS: &str = "mods";
-pub const SAVES: &str = "saves";
 
 pub fn find(key: &str) -> Option<&'static Bucket> {
     BUCKETS.iter().find(|bucket| bucket.key == key)

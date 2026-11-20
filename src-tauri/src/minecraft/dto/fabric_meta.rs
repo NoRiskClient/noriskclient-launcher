@@ -1,32 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct FabricVersion {
-    pub version: String,
-    pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct FabricLoaderVersion {
     pub separator: String,
     pub build: i32,
     pub maven: String,
     pub version: String,
     pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FabricInstallerVersion {
-    pub url: String,
-    pub maven: String,
-    pub version: String,
-    pub stable: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FabricVersionManifest {
-    pub loader: FabricLoaderVersion,
-    pub installer: FabricInstallerVersion,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -15,7 +15,6 @@ use tokio::fs;
 #[derive(Debug, Clone)]
 pub struct TargetMod {
     // Make fields public so mod_downloader can access them
-    pub mod_id: String, // Canonical Key (e.g., "modrinth:AANobbMI")
     pub filename: String,
     pub cache_path: PathBuf,
     pub sha1: Option<String>, // Known SHA1 from Modrinth/CurseForge (None for Maven/URL/local)
@@ -293,9 +292,8 @@ async fn try_add_mod_to_final_list(
     }
     
     final_mods.insert(
-        canonical_key.clone(),
+        canonical_key,
         TargetMod {
-            mod_id: canonical_key,
             filename,
             cache_path,
             sha1,
@@ -649,7 +647,6 @@ pub async fn resolve_target_mods(
 
                 // Custom mods use direct path, not cache path - no exists() check needed
                 let target = TargetMod {
-                    mod_id: canonical_key.clone(),
                     filename: info.filename.clone(),
                     cache_path: info.path.clone(),
                     sha1: None, // Local custom mods don't have known SHA1

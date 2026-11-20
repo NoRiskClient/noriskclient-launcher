@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 
-const DEFAULT_CONCURRENT_MOD_DOWNLOADS: usize = 4;
 const MOD_CACHE_DIR_NAME: &str = "mod_cache"; // Reuse the same cache directory
 const MODRINTH_MAVEN_URL: &str = "https://api.modrinth.com/maven"; // Modrinth Maven repo
 
@@ -21,13 +20,6 @@ pub struct NoriskPackDownloadService {
 }
 
 impl NoriskPackDownloadService {
-    pub fn new() -> Self {
-        Self {
-            concurrent_downloads: DEFAULT_CONCURRENT_MOD_DOWNLOADS,
-            stats: None,
-        }
-    }
-
     pub fn with_concurrency(concurrent_downloads: usize) -> Self {
         Self {
             concurrent_downloads,

@@ -499,56 +499,6 @@ pub enum CurseForgeModLoaderType {
     NeoForge = 6,
 }
 
-impl CurseForgeModLoaderType {
-    pub fn from_u32(value: u32) -> Option<Self> {
-        match value {
-            0 => Some(CurseForgeModLoaderType::Any),
-            1 => Some(CurseForgeModLoaderType::Forge),
-            2 => Some(CurseForgeModLoaderType::Cauldron),
-            3 => Some(CurseForgeModLoaderType::LiteLoader),
-            4 => Some(CurseForgeModLoaderType::Fabric),
-            5 => Some(CurseForgeModLoaderType::Quilt),
-            6 => Some(CurseForgeModLoaderType::NeoForge),
-            _ => None,
-        }
-    }
-}
-
-pub enum CurseForgeFileRelationType {
-    EmbeddedLibrary = 1,
-    OptionalDependency = 2,
-    RequiredDependency = 3,
-    Tool = 4,
-    Incompatible = 5,
-    Include = 6,
-}
-
-impl CurseForgeFileRelationType {
-    pub fn from_u32(value: u32) -> Option<Self> {
-        match value {
-            1 => Some(CurseForgeFileRelationType::EmbeddedLibrary),
-            2 => Some(CurseForgeFileRelationType::OptionalDependency),
-            3 => Some(CurseForgeFileRelationType::RequiredDependency),
-            4 => Some(CurseForgeFileRelationType::Tool),
-            5 => Some(CurseForgeFileRelationType::Incompatible),
-            6 => Some(CurseForgeFileRelationType::Include),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            CurseForgeFileRelationType::EmbeddedLibrary => "EmbeddedLibrary",
-            CurseForgeFileRelationType::OptionalDependency => "OptionalDependency",
-            CurseForgeFileRelationType::RequiredDependency => "RequiredDependency",
-            CurseForgeFileRelationType::Tool => "Tool",
-            CurseForgeFileRelationType::Incompatible => "Incompatible",
-            CurseForgeFileRelationType::Include => "Include",
-        }
-    }
-
-}
-
 // Enum for hash algorithms used in CurseForge file hashes
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum CurseForgeHashAlgo {
@@ -579,11 +529,6 @@ pub struct CurseForgeFilesResponse {
     #[serde(default, deserialize_with = "lenient::vec")]
     pub data: Vec<CurseForgeFile>,
     pub pagination: CurseForgePagination,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CurseForgeModResponse {
-    pub data: CurseForgeMod,
 }
 
 // Structure for Get Mods by IDs request body

@@ -3,23 +3,6 @@ use crate::utils::system_info::{ARCHITECTURE, OS};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq)]
-#[serde(tag = "type", content = "value")]
-pub enum DistributionSelection {
-    #[serde(rename = "automatic")]
-    Automatic(String), // (String) is useless, but required for deserialization
-    #[serde(rename = "custom")]
-    Custom(String),
-    #[serde(rename = "manual")]
-    Manual(JavaDistribution),
-}
-
-impl Default for DistributionSelection {
-    fn default() -> Self {
-        DistributionSelection::Automatic(String::new())
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, PartialEq)]
 pub enum JavaDistribution {
     #[serde(rename = "temurin")]
     Temurin,
