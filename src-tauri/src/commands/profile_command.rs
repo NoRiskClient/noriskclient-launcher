@@ -1,35 +1,28 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, CommandError};
 use crate::integrations::curseforge;
-use crate::integrations::modrinth::ModrinthVersion;
 use crate::integrations::mrpack;
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
-use crate::integrations::norisk_versions::NoriskVersionsConfig;
 use crate::minecraft::auth::minecraft_auth::Credentials;
 use crate::minecraft::installer;
 use crate::minecraft::modloader::{ModloaderFactory, ResolvedLoaderVersion};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{
-    default_profile_path, CustomModInfo, ModLoader, Profile, ProfileBackupInfo, ProfileSettings,
-    ProfileState,
+    default_profile_path, ModLoader, Profile, ProfileBackupInfo, ProfileSettings, ProfileState,
 };
 use crate::state::state_manager::State;
 pub use crate::minecraft::temp_profile::TempLaunchArgs;
 use crate::minecraft::temp_profile::{build_temp_profile, prepare_temp_launch, run_temp_launch};
 use crate::commands::analytics_command::track_event as track_analytics;
-use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
 use crate::utils::path_utils::{find_unique_profile_segment, copy_dir_recursively, count_files_recursively};
 use crate::utils::profile_utils::{
     CheckContentParams, ContentInstallStatus, LoadItemsParams as ProfileUtilLoadItemsParams, LocalContentItem,
     LocalContentLoader as ProfileUtilLocalContentLoader, MigrationInfo, ScreenshotInfo,
 };
-use crate::utils::resourcepack_utils::ResourcePackInfo;
-use crate::utils::shaderpack_utils::ShaderPackInfo;
 use crate::utils::world_utils;
 use crate::utils::{
-    datapack_utils, disk_space_utils::DiskSpaceUtils, path_utils, profile_utils, referral_utils, repair_utils, resourcepack_utils,
-    shaderpack_utils,
+    disk_space_utils::DiskSpaceUtils, path_utils, profile_utils, referral_utils, repair_utils,
 };
 use chrono::Utc;
 use log::{error, info, warn};
@@ -37,7 +30,6 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs as TokioFs;
 use uuid::Uuid;
@@ -612,50 +604,6 @@ pub async fn resolve_loader_version(
 }
 
 #[tauri::command]
-pub async fn add_modrinth_mod_to_profile(
-    profile_id: Uuid,
-    project_id: String,
-    version_id: String,
-    file_name: String,
-    download_url: String,
-    file_hash_sha1: Option<String>,
-    mod_name: Option<String>,
-    version_number: Option<String>,
-    loaders: Option<Vec<String>>,
-    game_versions: Option<Vec<String>>,
-) -> Result<(), CommandError> {
-    info!(
-        "Executing add_mod_to_profile command for profile {}",
-        profile_id
-    );
-
-    Ok(State::get()
-        .await?
-        .profile_manager
-        .add_modrinth_mod(
-            profile_id,
-            project_id,
-            version_id,
-            file_name,
-            download_url,
-            file_hash_sha1,
-            mod_name,
-            version_number,
-            loaders,
-            game_versions,
-            true,
-        )
-        .await?)
-}
-
-#[tauri::command]
-pub async fn list_profiles() -> Result<Vec<Profile>, CommandError> {
-    let state = State::get().await?;
-    let profiles = state.profile_manager.list_profiles().await?;
-    Ok(profiles)
-}
-
-#[tauri::command]
 pub async fn search_profiles(query: String) -> Result<Vec<Profile>, CommandError> {
     let state = State::get().await?;
     let profiles = state.profile_manager.search_profiles(&query).await?;
@@ -712,53 +660,6 @@ pub async fn reimport_profiles_from_legacy_json() -> Result<usize, CommandError>
     Ok(state.profile_manager.reimport_from_legacy_json().await?)
 }
 
-/// Loads and returns the list of standard profiles from the local configuration file.
-#[tauri::command]
-pub async fn get_standard_profiles() -> Result<NoriskVersionsConfig, CommandError> {
-    info!("Executing get_standard_profiles command");
-    let state = State::get().await?;
-    let config = state.norisk_version_manager.get_config().await;
-    Ok(config)
-}
-
-#[tauri::command]
-pub async fn set_profile_mod_enabled(
-    profile_id: Uuid,
-    mod_id: Uuid,
-    enabled: bool,
-) -> Result<(), CommandError> {
-    info!(
-        "Received command set_profile_mod_enabled: profile={}, mod={}, enabled={}",
-        profile_id, mod_id, enabled
-    );
-    let state = State::get().await?;
-    state
-        .profile_manager
-        .set_mod_enabled(profile_id, mod_id, enabled)
-        .await?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn delete_mod_from_profile(profile_id: Uuid, mod_id: Uuid) -> Result<(), CommandError> {
-    info!(
-        "Received command delete_mod_from_profile: profile={}, mod={}",
-        profile_id, mod_id
-    );
-    let state = State::get().await?;
-    state.profile_manager.delete_mod(profile_id, mod_id).await?;
-    Ok(())
-}
-
-// Command to retrieve the list of available Norisk Modpacks
-#[tauri::command]
-pub async fn get_norisk_packs() -> Result<NoriskModpacksConfig, CommandError> {
-    info!("Received command get_norisk_packs");
-    let state = State::get().await?;
-    let config = state.norisk_pack_manager.get_config().await;
-    Ok(config)
-}
-
 /// Retrieves the Norisk packs configuration with fully resolved mod lists for each pack.
 #[tauri::command]
 pub async fn get_norisk_packs_resolved() -> Result<NoriskModpacksConfig, CommandError> {
@@ -799,115 +700,7 @@ pub async fn get_norisk_packs_resolved() -> Result<NoriskModpacksConfig, Command
     Ok(resolved_config)
 }
 
-#[tauri::command]
-pub async fn set_norisk_mod_status(
-    profile_id: Uuid,
-    pack_id: String,
-    mod_id: String,
-    game_version: String,
-    loader_str: String, // Receive loader as string from frontend
-    disabled: bool,
-) -> Result<(), CommandError> {
-    info!(
-        "Received command set_norisk_mod_status: profile={}, pack={}, mod={}, mc={}, loader={}, disabled={}",
-        profile_id, pack_id, mod_id, game_version, loader_str, disabled
-    );
-    let state = State::get().await?;
-
-    // Convert loader string to ModLoader enum
-    let loader = ModLoader::from_str(&loader_str)?;
-
-    state
-        .profile_manager
-        .set_norisk_mod_status(profile_id, pack_id, mod_id, game_version, loader, disabled)
-        .await?;
-    Ok(())
-}
-
-// Command to update the version of a Modrinth mod in a profile
-#[tauri::command]
-pub async fn update_modrinth_mod_version(
-    profile_id: Uuid,
-    mod_instance_id: Uuid, // The unique ID of the Mod instance in the profile's list
-    new_version_details: ModrinthVersion, // Receive the full details of the target version
-) -> Result<(), CommandError> {
-    info!(
-        "Received command update_modrinth_mod_version: profile={}, mod_instance={}, new_version_id={}",
-        profile_id,
-        mod_instance_id,
-        new_version_details.id
-    );
-    let state = State::get().await?;
-    state
-        .profile_manager
-        .update_profile_modrinth_mod_version(profile_id, mod_instance_id, &new_version_details) // Pass details by reference
-        .await?;
-    Ok(())
-}
-
 // --- Custom Mod Commands ---
-
-#[tauri::command]
-#[allow(deprecated)]
-pub async fn get_custom_mods(profile_id: Uuid) -> Result<Vec<CustomModInfo>, CommandError> {
-    log::info!(
-        "Received get_custom_mods command for profile {}",
-        profile_id
-    );
-    let state: std::sync::Arc<State> = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-    Ok(state.profile_manager.list_custom_mods(&profile).await?)
-}
-
-#[tauri::command]
-#[allow(deprecated)]
-pub async fn set_custom_mod_enabled(
-    profile_id: Uuid,
-    filename: String,
-    enabled: bool,
-) -> Result<(), CommandError> {
-    // Return Result<()> as the manager method does
-    log::info!(
-        "Received set_custom_mod_enabled command for profile {}, file '{}', set_enabled={}",
-        profile_id,
-        filename,
-        enabled
-    );
-    let state: std::sync::Arc<State> = State::get().await?;
-    Ok(state
-        .profile_manager
-        .set_custom_mod_enabled(profile_id, filename, enabled)
-        .await?)
-}
-
-#[tauri::command]
-#[allow(deprecated)]
-pub async fn delete_custom_mod(profile_id: Uuid, filename: String) -> Result<(), CommandError> {
-    log::info!(
-        "Received delete_custom_mod command for profile {}, file '{}'",
-        profile_id,
-        filename
-    );
-
-    // Ensure the filename itself doesn't end with .disabled - we expect the base name.
-    if filename.ends_with(".disabled") {
-        log::warn!("delete_custom_mod called with filename ending in .disabled: '{}'. Please provide the base filename.", filename);
-        return Err(CommandError::from(AppError::Other(format!(
-            "Invalid filename provided to delete_custom_mod: {}",
-            filename
-        ))));
-    }
-
-    let state = State::get().await?;
-
-    // Call the ProfileManager method to handle the deletion
-    state
-        .profile_manager
-        .delete_custom_mod_file(profile_id, &filename)
-        .await?;
-
-    Ok(())
-}
 
 // --- New Command to get System RAM ---
 #[tauri::command]
@@ -983,70 +776,6 @@ pub async fn open_profile_folder(
             ))))
         }
     }
-}
-
-#[tauri::command]
-pub async fn import_local_mods(
-    app_handle: tauri::AppHandle,
-    profile_id: Uuid,
-) -> Result<(), CommandError> {
-    log::info!(
-        "Executing import_local_mods command for profile {}",
-        profile_id
-    );
-
-    // Spawn the blocking dialog call onto a blocking thread pool
-    let dialog_result_outer = tokio::task::spawn_blocking(move || {
-        app_handle
-            .dialog()
-            .file()
-            .add_filter("Java Archives", &["jar"])
-            .set_title("Select Mod Jars to Import")
-            .blocking_pick_files() // Use the blocking version inside spawn_blocking
-    })
-        .await
-        .map_err(|e| CommandError::from(AppError::Other(format!("Dialog task failed: {}", e))))?;
-    // The first ? handles JoinError
-
-    if let Some(paths_enums) = dialog_result_outer {
-        // Check if user selected files
-        if paths_enums.is_empty() {
-            log::info!("No files selected by user for import.");
-            return Ok(());
-        }
-        log::info!(
-            "User selected {} files to import for profile {}. Triggering processing...",
-            paths_enums.len(),
-            profile_id
-        );
-
-        // Call the ProfileManager method to handle the processing
-        let state = State::get().await?;
-        state
-            .profile_manager
-            .import_local_mods_to_profile(profile_id, paths_enums)
-            .await?;
-        // Propagate potential critical errors from the processing method
-
-        // Emit event to trigger UI update for this profile
-        if let Err(e) = state.event_state.trigger_profile_update(profile_id).await {
-            // Log the error, but don't fail the whole command just because the event failed
-            log::error!(
-                "Failed to emit TriggerProfileUpdate event for profile {}: {}",
-                profile_id,
-                e
-            );
-        }
-
-        // --- REMOVED processing logic (hashing, bulk lookup, adding/copying) ---
-
-        // TODO: Decide if the frontend update event should be emitted here or within the ProfileManager method
-        // It might be better in ProfileManager after processing is fully complete.
-    } else {
-        log::info!("User cancelled the file import dialog (blocking).");
-    }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -1210,101 +939,6 @@ pub async fn import_profile(
     }
 
     Ok(new_profile_id)
-}
-
-// Command to get all resourcepacks in a profile
-#[tauri::command]
-pub async fn get_local_resourcepacks(
-    profile_id: Uuid,
-    calculate_hashes: bool,
-    fetch_modrinth_data: bool,
-) -> Result<Vec<resourcepack_utils::ResourcePackInfo>, CommandError> {
-    log::info!(
-        "Executing get_local_resourcepacks command for profile {}, fetch_modrinth_data: {}",
-        profile_id,
-        fetch_modrinth_data
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    // Use the utility function to get all resourcepacks
-    let resourcepacks = resourcepack_utils::get_resourcepacks_for_profile(
-        &profile,
-        calculate_hashes,
-        fetch_modrinth_data,
-    )
-        .await
-        .map_err(|e| CommandError::from(e))?;
-
-    Ok(resourcepacks)
-}
-
-// Command to get all shaderpacks in a profile
-#[tauri::command]
-pub async fn get_local_shaderpacks(
-    profile_id: Uuid,
-) -> Result<Vec<shaderpack_utils::ShaderPackInfo>, CommandError> {
-    log::info!(
-        "Executing get_local_shaderpacks command for profile {}",
-        profile_id
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    // Use the utility function to get all shaderpacks
-    let shaderpacks = shaderpack_utils::get_shaderpacks_for_profile(&profile, true, true)
-        .await
-        .map_err(|e| CommandError::from(e))?;
-
-    Ok(shaderpacks)
-}
-
-#[tauri::command]
-pub async fn add_modrinth_content_to_profile(
-    profile_id: Uuid,
-    project_id: String,
-    version_id: String,
-    file_name: String,
-    download_url: String,
-    file_hash_sha1: Option<String>,
-    content_name: Option<String>,
-    version_number: Option<String>,
-    project_type: String,
-) -> Result<(), CommandError> {
-    info!(
-        "Executing add_modrinth_content_to_profile for profile {}",
-        profile_id
-    );
-
-    // Konvertiere den String project_type in ModrinthProjectType
-    let content_type = match project_type.to_lowercase().as_str() {
-        "resourcepack" => profile_utils::ContentType::ResourcePack,
-        "shader" => profile_utils::ContentType::ShaderPack,
-        "datapack" => profile_utils::ContentType::DataPack,
-        _ => {
-            return Err(CommandError::from(AppError::Other(format!(
-                "Unsupported content type: {}",
-                project_type
-            ))));
-        }
-    };
-
-    // Rufe die Implementierung auf
-    profile_utils::add_modrinth_content_to_profile(
-        profile_id,
-        project_id,
-        version_id,
-        file_name,
-        download_url,
-        file_hash_sha1,
-        content_name,
-        version_number,
-        content_type,
-    )
-        .await
-        .map_err(CommandError::from)
 }
 
 async fn profile_directory(profile_id: Uuid) -> Result<PathBuf, CommandError> {
@@ -1696,108 +1330,6 @@ pub async fn refresh_standard_versions() -> Result<Vec<Profile>, CommandError> {
     }
 }
 
-// Command to update a Modrinth resourcepack in a profile
-#[tauri::command]
-pub async fn update_resourcepack_from_modrinth(
-    profile_id: Uuid,
-    resourcepack: ResourcePackInfo,
-    new_version_details: ModrinthVersion,
-) -> Result<(), CommandError> {
-    info!(
-        "Received command update_resourcepack_from_modrinth: profile={}, resourcepack={}, new_version_id={}",
-        profile_id,
-        resourcepack.filename,
-        new_version_details.id
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    crate::utils::resourcepack_utils::update_resourcepack_from_modrinth(
-        &profile,
-        &resourcepack,
-        &new_version_details,
-    )
-        .await?;
-
-    Ok(())
-}
-
-// Command to update a Modrinth shaderpack in a profile
-#[tauri::command]
-pub async fn update_shaderpack_from_modrinth(
-    profile_id: Uuid,
-    shaderpack: ShaderPackInfo,
-    new_version_details: ModrinthVersion,
-) -> Result<(), CommandError> {
-    info!(
-        "Received command update_shaderpack_from_modrinth: profile={}, shaderpack={}, new_version_id={}",
-        profile_id,
-        shaderpack.filename,
-        new_version_details.id
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    crate::utils::shaderpack_utils::update_shaderpack_from_modrinth(
-        &profile,
-        &shaderpack,
-        &new_version_details,
-    )
-        .await?;
-
-    Ok(())
-}
-
-// Command to get all datapacks in a profile
-#[tauri::command]
-pub async fn get_local_datapacks(
-    profile_id: Uuid,
-) -> Result<Vec<datapack_utils::DataPackInfo>, CommandError> {
-    log::info!(
-        "Executing get_local_datapacks command for profile {}",
-        profile_id
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    // Use the utility function to get all datapacks
-    let datapacks = datapack_utils::get_datapacks_for_profile(&profile, true, true)
-        .await
-        .map_err(|e| CommandError::from(e))?;
-
-    Ok(datapacks)
-}
-
-// Command to update a Modrinth datapack in a profile
-#[tauri::command]
-pub async fn update_datapack_from_modrinth(
-    profile_id: Uuid,
-    datapack: DataPackInfo,
-    new_version_details: ModrinthVersion,
-) -> Result<(), CommandError> {
-    info!(
-        "Received command update_datapack_from_modrinth: profile={}, datapack={}, new_version_id={}",
-        profile_id,
-        datapack.filename,
-        new_version_details.id
-    );
-
-    let state = State::get().await?;
-    let profile = state.profile_manager.get_profile(profile_id).await?;
-
-    crate::utils::datapack_utils::update_datapack_from_modrinth(
-        &profile,
-        &datapack,
-        &new_version_details,
-    )
-        .await?;
-
-    Ok(())
-}
-
 /// Checks the installation status of content based on provided parameters.
 #[tauri::command]
 pub async fn is_content_installed(
@@ -1823,21 +1355,6 @@ pub async fn batch_check_content_installed(
     );
     // Call the batch utility function and map the error
     Ok(profile_utils::check_content_installed_batch(params).await?)
-}
-
-/// Opens the latest log file for the specified profile using the system default application.
-#[tauri::command]
-pub async fn open_profile_latest_log<R: tauri::Runtime>(
-    app_handle: tauri::AppHandle<R>,
-    profile_id: Uuid,
-) -> Result<(), CommandError> {
-    info!(
-        "Executing open_profile_latest_log command for profile {}",
-        profile_id
-    );
-
-    // Call the utility function
-    Ok(profile_utils::open_latest_log_for_profile(app_handle, profile_id).await?)
 }
 
 /// Gets a list of all log file paths (.log and .log.gz) for the specified profile.
@@ -2010,63 +1527,6 @@ pub async fn import_world(params: ImportWorldParams) -> Result<String, CommandEr
         generated_folder_name
     );
     Ok(generated_folder_name) // Return the actual folder name created
-}
-
-/// Checks if a specific world's session.lock file can be locked, indicating if it's likely in use.
-#[tauri::command]
-pub async fn check_world_lock_status(
-    profile_id: Uuid,
-    world_folder: String,
-) -> Result<bool, CommandError> {
-    info!(
-        "Executing check_world_lock_status for profile {}, world '{}'",
-        profile_id, world_folder
-    );
-
-    let state = State::get().await?;
-    let profile_manager = &state.profile_manager;
-
-    // Calculate the world path
-    let instance_path = profile_manager
-        .get_profile_instance_path(profile_id)
-        .await?;
-    let world_path = instance_path.join("saves").join(&world_folder);
-
-    if !world_path.is_dir() {
-        return Err(AppError::WorldNotFound {
-            profile_id,
-            world_folder,
-        }
-            .into());
-    }
-
-    // Call the utility function
-    match world_utils::check_world_session_lock(&world_path).await {
-        Ok(()) => {
-            // Lock could be acquired -> world is NOT locked
-            info!(
-                "World '{}' in profile {} is not locked.",
-                world_folder, profile_id
-            );
-            Ok(false)
-        }
-        Err(AppError::WorldLocked { .. }) => {
-            // Lock could NOT be acquired -> world IS locked
-            info!(
-                "World '{}' in profile {} is locked.",
-                world_folder, profile_id
-            );
-            Ok(true)
-        }
-        Err(e) => {
-            // Other error during lock check
-            error!(
-                "Error checking lock status for world '{}' in profile {}: {}",
-                world_folder, profile_id, e
-            );
-            Err(e.into()) // Propagate other errors
-        }
-    }
 }
 
 /// Deletes a specific world directory from a profile after checking the session lock.
@@ -2428,20 +1888,6 @@ pub async fn get_default_profile_path() -> Result<String, CommandError> {
     Ok(path.to_string_lossy().to_string())
 }
 
-#[tauri::command]
-pub async fn get_profile_disk_size(profile_id: Uuid) -> Result<u64, CommandError> {
-    let state = State::get().await?;
-    let path = state
-        .profile_manager
-        .get_profile_instance_path(profile_id)
-        .await?;
-    if !path.exists() {
-        return Ok(0);
-    }
-    let size = path_utils::calculate_dir_size_recursively(&path).await?;
-    Ok(size)
-}
-
 // ---------------------------------------------------------------------------
 // CLI / runtime-override launch
 // ---------------------------------------------------------------------------
@@ -2776,7 +2222,6 @@ pub(crate) async fn resolve_credentials_for_account(
 /// at `<root>/profiles/noriskclient/temp/<uuid>/` and is swept into the trash
 /// on the next launcher start by `utils::trash_utils::reap_temp_profiles`; the
 /// trash's own 30-day retention then deletes it for good.
-#[tauri::command]
 pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandError> {
     let profile = build_temp_profile(&args, "Temporary throwaway instance (CLI)")?;
     let launch = prepare_temp_launch(profile, args).await?;

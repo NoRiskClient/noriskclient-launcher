@@ -7,9 +7,7 @@ use crate::state::state_manager::State;
 use crate::sync::engine::SyncEngine;
 use crate::sync::ingest::{self, DroppedSyncResult};
 use crate::sync::model::{
-    jar_exclusion_key,
-    DetachMode, SyncPack, SyncPackSubscriber, SyncTarget, SyncTargetKind,
-    VersionOverride,
+    jar_exclusion_key, DetachMode, SyncPack, SyncTarget, SyncTargetKind, VersionOverride,
 };
 use crate::sync::report::{SyncConflict, SyncPreviewEntry, SyncReport};
 use crate::sync::profile_mods::{self, ProfileSyncPackMod};
@@ -32,12 +30,6 @@ pub async fn get_sync_packs() -> Result<Vec<SyncPack>, CommandError> {
     let state = State::get().await?;
     let packs = state.sync_pack_manager.list_packs().await?;
     Ok(packs)
-}
-
-#[tauri::command]
-pub async fn get_sync_pack(pack_id: Uuid) -> Result<Option<SyncPack>, CommandError> {
-    let state = State::get().await?;
-    Ok(state.sync_pack_manager.get_pack(pack_id).await?)
 }
 
 #[derive(Debug, Deserialize)]
@@ -439,22 +431,6 @@ pub async fn remove_sync_pack_local_jar(
 }
 
 #[tauri::command]
-pub async fn get_sync_pack_subscribers(
-    pack_id: Uuid,
-) -> Result<Vec<SyncPackSubscriber>, CommandError> {
-    let state = State::get().await?;
-    Ok(subscribers::of_pack(&state, pack_id)
-        .await
-        .into_iter()
-        .map(|s| SyncPackSubscriber {
-            profile_id: s.profile.id,
-            profile_name: s.profile.name,
-            instance_path: s.instance_dir.to_string_lossy().into_owned(),
-        })
-        .collect())
-}
-
-#[tauri::command]
 pub async fn open_sync_pack_folder(
     app_handle: tauri::AppHandle,
     pack_id: Uuid,
@@ -736,18 +712,6 @@ pub async fn resolve_sync_pack_mod(
         &targets,
     )
     .await?)
-}
-
-#[tauri::command]
-pub async fn get_or_create_default_sync_pack() -> Result<SyncPack, CommandError> {
-    let state = State::get().await?;
-    if let Some(pack) = state.sync_pack_manager.list_packs().await?.into_iter().next() {
-        return Ok(pack);
-    }
-    Ok(state
-        .sync_pack_manager
-        .create_pack("Default".to_string(), None, None)
-        .await?)
 }
 
 #[tauri::command]

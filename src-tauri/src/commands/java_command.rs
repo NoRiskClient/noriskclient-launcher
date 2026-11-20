@@ -1,8 +1,5 @@
 use crate::error::CommandError;
-use crate::utils::java_detector::{
-    detect_java_installations, find_best_java_for_minecraft, get_java_info, invalidate_java_cache,
-    JavaInstallation,
-};
+use crate::utils::java_detector::{detect_java_installations, get_java_info, JavaInstallation};
 use log::info;
 use std::path::PathBuf;
 
@@ -19,26 +16,6 @@ pub async fn get_java_info_command(path: String) -> Result<JavaInstallation, Com
     info!("Command: Getting Java info for path: {}", path);
     let java_path = PathBuf::from(path);
     Ok(get_java_info(&java_path).await?)
-}
-
-/// Finds the best Java installation for the given Minecraft version
-#[tauri::command]
-pub async fn find_best_java_for_minecraft_command(
-    minecraft_version: String,
-) -> Result<Option<JavaInstallation>, CommandError> {
-    info!(
-        "Command: Finding best Java for Minecraft version: {}",
-        minecraft_version
-    );
-    Ok(find_best_java_for_minecraft(&minecraft_version).await?)
-}
-
-/// Invalidates the Java installation cache, forcing a fresh scan on the next query
-#[tauri::command]
-pub async fn invalidate_java_cache_command() -> Result<(), CommandError> {
-    info!("Command: Invalidating Java cache");
-    invalidate_java_cache().await;
-    Ok(())
 }
 
 /// Checks if a custom Java path exists and is valid

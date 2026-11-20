@@ -40,8 +40,3 @@ pub async fn set_pack_fallback_config(config: PackFallbackConfig) -> Result<(), 
     *storage().await.write().await = config;
     Ok(())
 }
-
-#[tauri::command]
-pub async fn get_pack_fallback_config() -> Result<PackFallbackConfig, CommandError> {
-    Ok(storage().await.read().await.clone())
-}

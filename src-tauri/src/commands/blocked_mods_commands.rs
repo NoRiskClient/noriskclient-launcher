@@ -130,29 +130,6 @@ pub async fn set_blocked_mods_config(config: BlockedModsConfig) -> Result<(), Co
     Ok(())
 }
 
-/// Get the current blocked mods configuration
-#[tauri::command]
-pub async fn get_blocked_mods_config() -> Result<BlockedModsConfig, CommandError> {
-    debug!("Command called: get_blocked_mods_config");
-
-    let storage = get_blocked_mods_config_storage().await;
-    let config_guard = storage.read().await;
-    let config = config_guard.clone();
-    drop(config_guard);
-    
-    debug!(
-        "Retrieved blocked mods config: {} exact filenames, {} patterns, {} mod IDs, {} modrinth project IDs, {} warning project IDs",
-        config.exact_filenames.len(),
-        config.filename_patterns.len(),
-        config.mod_ids.len(),
-        config.modrinth_project_ids.len(),
-        config.warning_project_ids.len()
-    );
-
-    debug!("Command completed: get_blocked_mods_config");
-    Ok(config)
-}
-
 /// Fast filename blocking check using pre-compiled combined regex
 async fn is_filename_blocked_fast(filename: &str, config: &BlockedModsConfig) -> bool {
     // 1. Fast exact filename check first (no regex needed)
@@ -197,7 +174,6 @@ async fn is_filename_blocked_fast(filename: &str, config: &BlockedModsConfig) ->
 }
 
 /// Check if a specific filename should be blocked
-#[tauri::command]
 pub async fn is_filename_blocked(filename: String) -> Result<bool, CommandError> {
     trace!("Command called: is_filename_blocked for: {}", filename);
 
@@ -216,28 +192,7 @@ pub async fn is_filename_blocked(filename: String) -> Result<bool, CommandError>
     Ok(is_blocked)
 }
 
-/// Check if a specific mod ID should be blocked
-#[tauri::command]
-pub async fn is_mod_id_blocked(mod_id: String) -> Result<bool, CommandError> {
-    trace!("Command called: is_mod_id_blocked for: {}", mod_id);
-
-    let storage = get_blocked_mods_config_storage().await;
-    let config_guard = storage.read().await;
-    
-    let is_blocked = config_guard.mod_ids.contains(&mod_id);
-    
-    if is_blocked {
-        debug!("Mod ID '{}' is blocked", mod_id);
-    } else {
-        trace!("Mod ID '{}' is not blocked", mod_id);
-    }
-
-    trace!("Command completed: is_mod_id_blocked");
-    Ok(is_blocked)
-}
-
 /// Check if a specific Modrinth project ID should be blocked
-#[tauri::command]
 pub async fn is_modrinth_project_id_blocked(project_id: String) -> Result<bool, CommandError> {
     trace!("Command called: is_modrinth_project_id_blocked for: {}", project_id);
 
