@@ -5,13 +5,6 @@ export interface SelectedIcon {
   plus: boolean;
 }
 
-export interface ActiveCreatorCode {
-  code: string;
-  isValid: boolean;
-  hasValidIcon: boolean;
-  iconUrl: string | null;
-}
-
 export async function getSelectedIcon(
   playerIdentifier: string
 ): Promise<SelectedIcon> {
@@ -31,14 +24,6 @@ export async function getSelectedIconCached(
     return await invoke<SelectedIcon | null>("get_selected_player_icon_cached", {
       playerIdentifier,
     });
-  } catch {
-    return null;
-  }
-}
-
-export async function getActiveCreatorCode(): Promise<ActiveCreatorCode | null> {
-  try {
-    return await invoke<ActiveCreatorCode | null>("get_active_creator_code");
   } catch {
     return null;
   }

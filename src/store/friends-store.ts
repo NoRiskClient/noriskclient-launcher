@@ -181,7 +181,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
 
   removeFriend: async (name: string, uuid: string) => {
     try {
-      await invoke('remove_friend', { targetName: name, targetUuid: uuid });
+      await invoke('remove_friend', { targetName: name });
       set((state) => ({
         friends: state.friends.filter((f) => f.uuid !== uuid),
       }));

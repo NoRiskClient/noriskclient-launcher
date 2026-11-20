@@ -21,24 +21,3 @@ export const getOrDownloadAssetModel = async (url: string): Promise<string> => {
   const localPath = await invoke<string>('get_or_download_asset_model', { url });
   return convertFileSrc(localPath);
 };
-
-/**
- * Gets or downloads an asset model file and returns it as a Blob URL.
- * This is more reliable for GLTF files in production builds.
- * 
- * @param url - The CDN URL of the asset model
- * @returns A promise that resolves to a Blob URL for the asset model
- * @throws If the download fails or the URL is invalid
- */
-export const getOrDownloadAssetModelAsBlob = async (url: string): Promise<string> => {
-  const localPath = await invoke<string>('get_or_download_asset_model', { url });
-  const fileBytes = await invoke<number[]>('read_file_bytes', { filePath: localPath });
-  
-  // Convert number array to Uint8Array
-  const uint8Array = new Uint8Array(fileBytes);
-  
-  // Create blob URL
-  const blob = new Blob([uint8Array], { type: 'model/gltf+json' });
-  return URL.createObjectURL(blob);
-};
-

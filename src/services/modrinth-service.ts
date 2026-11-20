@@ -1,20 +1,12 @@
 import type {
-  ModrinthAllVersionsResult,
-  ModrinthBulkUpdateRequestBody,
   ModrinthProject,
-  ModrinthProjectContext,
   ModrinthProjectType,
-  ModrinthSearchHit,
   ModrinthSearchResponse,
   ModrinthSortType,
   ModrinthVersion,
   ModrinthTags,
   ModrinthTeamMember,
 } from "../types/modrinth";
-import type {
-  UnifiedModVersionsParams,
-  UnifiedVersionResponse,
-} from "../types/unified";
 import type { CacheBehaviour } from "../types/profile";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -47,20 +39,6 @@ export class ModrinthService {
     });
   }
 
-  static async searchMods(
-    query: string,
-    gameVersion?: string,
-    loader?: string,
-    limit = 20,
-  ): Promise<ModrinthSearchHit[]> {
-    return invoke<ModrinthSearchHit[]>("search_modrinth_mods", {
-      query,
-      gameVersion,
-      loader,
-      limit,
-    });
-  }
-
   static async getModVersions(
     projectIdOrSlug: string,
     loaders?: string[],
@@ -73,17 +51,6 @@ export class ModrinthService {
       gameVersions,
       cacheBehaviour,
     });
-  }
-
-  static async getAllVersionsForContexts(
-    contexts: ModrinthProjectContext[],
-  ): Promise<ModrinthAllVersionsResult[]> {
-    return invoke<ModrinthAllVersionsResult[]>(
-      "get_all_modrinth_versions_for_contexts",
-      {
-        contexts,
-      },
-    );
   }
 
   static async getProjectDetails(
@@ -103,14 +70,6 @@ export class ModrinthService {
     return invoke<ModrinthTeamMember[]>("get_modrinth_project_members", {
       projectIdOrSlug,
       cacheBehaviour,
-    });
-  }
-
-  static async checkUpdates(
-    request: ModrinthBulkUpdateRequestBody,
-  ): Promise<Record<string, ModrinthVersion>> {
-    return invoke<Record<string, ModrinthVersion>>("check_modrinth_updates", {
-      request,
     });
   }
 
@@ -149,28 +108,5 @@ export class ModrinthService {
       );
     }
     return inFlightTags;
-  }
-
-  static async getVersionsByHashes(
-    hashes: string[],
-    cacheBehaviour?: CacheBehaviour,
-  ): Promise<Record<string, ModrinthVersion>> {
-    // The backend command `get_modrinth_versions_by_hashes` implicitly uses "sha1"
-    return invoke<Record<string, ModrinthVersion>>(
-      "get_modrinth_versions_by_hashes",
-      {
-        hashes,
-        cacheBehaviour,
-        // hashAlgorithm: "sha1", // Not needed as backend command defaults/is specific to sha1
-      },
-    );
-  }
-
-  static async getModVersionsUnified(
-    params: UnifiedModVersionsParams,
-  ): Promise<UnifiedVersionResponse> {
-    return invoke<UnifiedVersionResponse>("get_mod_versions_unified_command", {
-      params,
-    });
   }
 }
