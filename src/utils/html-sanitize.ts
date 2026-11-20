@@ -55,15 +55,20 @@ export function sanitizeMotdHtml(html: string): string {
 const RICH_SANITIZE_CONFIG: Config = {
   ALLOW_UNKNOWN_PROTOCOLS: false,
   ADD_ATTR: ["target", "rel"],
+  FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select"],
 };
+
+const ESCAPING_STYLE = /position\s*:\s*(fixed|absolute|sticky)/i;
 
 /**
  * Sanitize rich HTML content (CurseForge changelogs / mod descriptions) before it is
  * rendered. Keeps DOMPurify's safe default tag set, drops scripts/event handlers/
- * dangerous protocols, and forces external links to open safely.
+ * dangerous protocols, forms, `<style>` and positioning that escapes the content box,
+ * and forces external links to open safely.
  */
 export function sanitizeRichHtml(html: string): string {
   const hook = (node: Element) => {
+    if (ESCAPING_STYLE.test(node.getAttribute("style") ?? "")) node.removeAttribute("style");
     if (node.tagName === "A" && node.hasAttribute("href")) {
       node.setAttribute("target", "_blank");
       node.setAttribute("rel", "noopener noreferrer");
