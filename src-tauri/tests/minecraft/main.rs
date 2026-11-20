@@ -1,3 +1,4 @@
+mod aot_cache;
 mod cape_browse;
 mod cosmetic_pack_api;
 mod jvm_security;

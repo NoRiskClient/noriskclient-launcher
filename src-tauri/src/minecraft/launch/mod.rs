@@ -1,3 +1,4 @@
+pub mod aot_cache;
 pub mod classpath;
 pub mod forge_arguments;
 pub mod forge_patcher;
@@ -10,6 +11,7 @@ pub mod neo_forge_patcher;
 pub mod pack_jvm;
 pub mod rules;
 pub mod version;
+pub use aot_cache::*;
 pub use classpath::*;
 pub use forge_patcher::*;
 pub use game_arguments::*;
