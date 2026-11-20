@@ -11,11 +11,7 @@ const outFile = join(root, "src", "lib", "icon-bundle.ts");
 const attributionFile = join(root, "THIRD_PARTY_ICONS.md");
 
 /** Icon sets we ship. A name with any other prefix is an error. */
-const COLLECTIONS = [
-  "solar", "pixel", "mdi", "simple-icons", "circle-flags", "ph",
-  "material-symbols", "mingcute", "svg-spinners", "lucide",
-  "line-md", "ic", "fluent", "eos-icons", "nrc",
-];
+const COLLECTIONS = ["solar", "pixel", "simple-icons", "circle-flags", "svg-spinners", "nrc"];
 
 const ownIconsDir = join(root, "scripts", "icons");
 
