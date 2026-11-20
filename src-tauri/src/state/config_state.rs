@@ -62,12 +62,6 @@ pub struct QualitySpec {
     pub bitrate_kbps: u32,
 }
 
-pub const CUSTOM_RESOLUTIONS: [(u32, u32); 4] = [(640, 360), (854, 480), (1280, 720), (1920, 1080)];
-pub const CUSTOM_FPS: [u32; 5] = [24, 30, 60, 120, 144];
-pub const CUSTOM_BITRATES_KBPS: [u32; 11] = [
-    3_000, 5_000, 7_000, 10_000, 15_000, 20_000, 25_000, 30_000, 50_000, 70_000, 100_000,
-];
-
 const MIN_WIDTH: u32 = 160;
 const MAX_WIDTH: u32 = 3840;
 const MIN_HEIGHT: u32 = 120;
@@ -292,18 +286,6 @@ impl ClipConfig {
         self.pre_roll_seconds
             .saturating_add(BUFFER_HEADROOM_SECONDS)
             .clamp(MIN_CLIP_SECONDS, MAX_CLIP_SECONDS + BUFFER_HEADROOM_SECONDS)
-    }
-
-    pub fn estimated_buffer_bytes(&self) -> u64 {
-        let quality = self.effective_quality();
-        let seconds = self.effective_buffer_seconds() as u64;
-        let video = quality.bitrate_kbps as u64 * 1000 / 8 * seconds;
-        let audio = if self.capture_audio {
-            160_u64 * 1000 / 8 * seconds
-        } else {
-            0
-        };
-        video + audio
     }
 
     pub fn to_capture_config(&self) -> norisk_ipc::CaptureConfig {
@@ -1016,6 +998,12 @@ fn differs_ignoring_version(current: &LauncherConfig, next: &LauncherConfig) -> 
 mod clip_quality_tests {
     use super::*;
 
+    const CUSTOM_RESOLUTIONS: [(u32, u32); 4] = [(640, 360), (854, 480), (1280, 720), (1920, 1080)];
+    const CUSTOM_FPS: [u32; 5] = [24, 30, 60, 120, 144];
+    const CUSTOM_BITRATES_KBPS: [u32; 11] = [
+        3_000, 5_000, 7_000, 10_000, 15_000, 20_000, 25_000, 30_000, 50_000, 70_000, 100_000,
+    ];
+
     #[test]
     fn presets_resolve_to_the_advertised_numbers() {
         let cases = [
@@ -1240,35 +1228,6 @@ mod clip_quality_tests {
         let bytes = (quality.bitrate_kbps + audio_kbps) as u64 * 1000 / 8 * 30;
 
         assert!(bytes < 10 * 1000 * 1000, "a 30s Low clip is {bytes} bytes");
-    }
-
-    #[test]
-    fn the_memory_estimate_follows_bitrate_and_duration() {
-        let config = ClipConfig {
-            quality: Some(QualityPreset::Custom),
-            bitrate_kbps: 8_000,
-            pre_roll_seconds: 25,
-            capture_audio: false,
-            ..ClipConfig::default()
-        };
-
-        let seconds = 25 + BUFFER_HEADROOM_SECONDS as u64;
-        assert_eq!(config.estimated_buffer_bytes(), 8_000 * 1000 / 8 * seconds);
-
-        let with_audio = ClipConfig {
-            capture_audio: true,
-            ..config.clone()
-        };
-        assert_eq!(
-            with_audio.estimated_buffer_bytes(),
-            (8_000 + 160) * 1000 / 8 * seconds
-        );
-
-        let high = ClipConfig {
-            quality: Some(QualityPreset::High),
-            ..config
-        };
-        assert_eq!(high.estimated_buffer_bytes(), 12_000 * 1000 / 8 * seconds);
     }
 
     #[test]

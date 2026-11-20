@@ -24,7 +24,6 @@ use tokio::task::JoinHandle;
 static LAUNCHER_STATE: OnceCell<Arc<State>> = OnceCell::const_new();
 
 pub struct State {
-    pub initialized: bool,
     pub profile_manager: ProfileManager,
     pub event_state: EventState,
     pub process_manager: ProcessManager,
@@ -78,13 +77,12 @@ impl State {
                 )?;
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
-                log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
+                log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct.");
                 let friends_state = FriendsState::new();
                 let cosmetic_pack_manager = CosmeticPackManager::new();
                 let content_cache = ContentCacheManager::new(db.clone())?;
                 let sync_pack_manager = SyncPackManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
-                    initialized: true,
                     profile_manager,
                     event_state,
                     process_manager,

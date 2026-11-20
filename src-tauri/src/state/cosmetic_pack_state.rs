@@ -26,16 +26,6 @@ impl CosmeticPackManager {
             .insert(pack_id.to_string(), parsed.clone());
         Ok(parsed)
     }
-
-    #[allow(dead_code)]
-    pub async fn invalidate(&self, pack_id: &str) {
-        self.cache.write().await.remove(pack_id);
-    }
-
-    #[allow(dead_code)]
-    pub async fn clear(&self) {
-        self.cache.write().await.clear();
-    }
 }
 
 impl Default for CosmeticPackManager {

@@ -964,15 +964,6 @@ impl ProcessManager {
             .map(|entry| entry.metadata.clone())
     }
 
-    pub async fn get_process_metadata_by_profile(&self, profile_id: Uuid) -> Vec<ProcessMetadata> {
-        let processes_map = self.processes.read().await;
-        processes_map
-            .values()
-            .filter(|entry| entry.metadata.profile_id == profile_id)
-            .map(|entry| entry.metadata.clone())
-            .collect()
-    }
-
     pub async fn list_processes(&self) -> Vec<ProcessMetadata> {
         let processes_map = self.processes.read().await;
         processes_map

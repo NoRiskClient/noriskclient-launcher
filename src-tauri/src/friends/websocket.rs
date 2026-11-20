@@ -14,11 +14,6 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum WsCommand {
-    Connect {
-        uuid: Uuid,
-        username: String,
-        token: String,
-    },
     Disconnect,
     SendTyping {
         chat_id: String,
@@ -133,7 +128,6 @@ impl FriendsWebSocket {
                                         None => {
                                             break;
                                         }
-                                        _ => {}
                                     }
                                 }
                             }

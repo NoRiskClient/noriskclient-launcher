@@ -436,15 +436,6 @@ impl ContentCacheManager {
         Ok(n)
     }
 
-    pub async fn save(&self) -> Result<()> {
-        if let Some(pool) = self.pool().await {
-            let _ = sqlx::query("PRAGMA wal_checkpoint(PASSIVE)")
-                .execute(&pool)
-                .await;
-        }
-        Ok(())
-    }
-
     pub async fn get_file_hash(&self, path: &str, size: u64, mtime_ms: u64) -> Option<String> {
         self.get_file_hashes(&[(path.to_string(), size, mtime_ms)])
             .await

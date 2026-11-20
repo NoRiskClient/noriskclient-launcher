@@ -247,7 +247,6 @@ async fn no_pool_means_miss_not_panic() {
         .await;
     assert!(m.get_entry::<String>(K, "a").await.is_none());
     assert!(m.get_file_hash("/p", 1, 1).await.is_none());
-    assert!(m.save().await.is_ok());
 }
 
 #[tokio::test]
