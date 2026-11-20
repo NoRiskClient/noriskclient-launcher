@@ -163,6 +163,10 @@ deunicode = "1.6.2"
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+test-api = []
+
+[dev-dependencies]
+noriskclient-launcher-v3 = { path = ".", features = ["test-api"] }
 
 [profile.release]
 panic = "abort" # Strip expensive panic clean-up logic
