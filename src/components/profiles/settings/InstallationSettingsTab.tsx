@@ -121,7 +121,6 @@ export function InstallationSettingsTab({
   const gameVersion = editedProfile.game_version;
   const loader = editedProfile.loader || "vanilla";
   const current = loaderOf(loader);
-  const changed = gameVersion !== profile.game_version || loader !== (profile.loader || "vanilla");
   const customLoaderVersion = editedProfile.settings.use_overwrite_loader_version;
   const overwrittenVersion =
     editedProfile.settings.overwrite_loader_versions?.[loader] ?? editedProfile.settings.overwrite_loader_version ?? "";
@@ -241,15 +240,6 @@ export function InstallationSettingsTab({
             <span className="text-white/50">{resolvedLoaderVersion.version}</span>
           )}
         </span>
-        {changed && (
-          <span className="ml-auto flex items-center gap-2 text-xs text-white/60">
-            <Icon icon="solar:pen-bold" className="h-3.5 w-3.5" style={{ color: accent }} />
-            {t("profiles.settings.unsavedFrom", {
-              version: profile.game_version,
-              loader: loaderOf(profile.loader || "vanilla").label,
-            })}
-          </span>
-        )}
       </div>
 
       <Section title={t("profiles.settings.gameVersion")} aside={typeSwitch}>
