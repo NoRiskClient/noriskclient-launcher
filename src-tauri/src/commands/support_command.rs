@@ -34,7 +34,7 @@ pub async fn support_request_prepare(
     window: WebviewWindow,
     app: AppHandle,
     code: String,
-    profile_id: Uuid,
+    profile_id: Option<Uuid>,
     account_id: Uuid,
 ) -> Result<PrepareResult, CommandError> {
     require_main_window(&window)?;

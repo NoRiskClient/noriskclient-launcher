@@ -2,8 +2,10 @@ mod error;
 mod files;
 mod handler;
 mod handlers;
+mod no_profile;
 mod registry;
 mod service;
+mod temp_profile;
 mod types;
 
 use noriskclient_launcher_v3_lib::state::profile_state::Profile;
@@ -20,9 +22,19 @@ pub fn test_ctx(instance: &Path, file_byte_budget: u64) -> SupportContext {
     }))
     .unwrap();
     SupportContext {
-        profile,
-        instance_path: instance.to_path_buf(),
+        profile: Some(profile),
+        instance_path: Some(instance.to_path_buf()),
         file_byte_budget,
+        session: None,
+    }
+}
+
+pub fn test_ctx_without_profile(file_byte_budget: u64) -> SupportContext {
+    SupportContext {
+        profile: None,
+        instance_path: None,
+        file_byte_budget,
+        session: None,
     }
 }
 

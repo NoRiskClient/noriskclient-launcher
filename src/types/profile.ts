@@ -227,6 +227,7 @@ export interface Profile {
   group: string | null;
   use_shared_minecraft_folder: boolean;
   is_standard_version: boolean;
+  is_temporary?: boolean;
   description: string | null;
   banner: ProfileBanner | null;
   background: ProfileBanner | null;

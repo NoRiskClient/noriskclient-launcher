@@ -1,5 +1,5 @@
 use crate::support::handler::SupportContext;
-use crate::support::handlers::logs::{found, FileItemHandler, Located};
+use crate::support::handlers::logs::{found, in_instance, FileItemHandler, Located};
 use crate::utils::security_utils::mask_sensitive_data;
 
 const LAST_SERVER: &str = "lastServer:";
@@ -10,7 +10,7 @@ pub const HANDLER: FileItemHandler = FileItemHandler {
 };
 
 fn locate_options(ctx: &SupportContext) -> Located {
-    found(&ctx.instance_path, "options.txt")
+    in_instance(ctx, |root| found(root, "options.txt"))
 }
 
 fn hide_last_server(line: &str) -> String {

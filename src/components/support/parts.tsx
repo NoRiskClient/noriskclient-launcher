@@ -70,6 +70,15 @@ export function BackButton({ onClick, disabled }: { onClick: () => void; disable
   );
 }
 
+export function NoProfileStep({ flow }: { flow: StepFlow }) {
+  const { t } = useTranslation();
+  return (
+    <SupportFrame onClose={flow.close} stepper={flow.stepper} left={<BackButton onClick={flow.back} />}>
+      <Status icon="solar:question-circle-bold" tone="info" title={t("support_request.profile.none")} />
+    </SupportFrame>
+  );
+}
+
 export function useAccentStyle(): CSSProperties {
   const accent = useThemeStore((s) => s.accentColor.value);
   return { borderColor: `${accent}80`, backgroundColor: `${accent}25` };

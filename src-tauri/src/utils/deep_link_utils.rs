@@ -114,13 +114,10 @@ pub async fn handle_deep_link(app_handle: &AppHandle, urls: Vec<Url>) {
                 }
             }
             Some("twitch") => handle_twitch_deep_link(app_handle, &url).await,
-            Some("support") => {
-                if url.path() == "/request" {
-                    handle_support_request(app_handle, &url);
-                } else {
-                    warn!("[DeepLink] Unknown support path: {}", url.path());
-                }
-            }
+            Some("support") => match url.path() {
+                "/request" => handle_support_request(app_handle, &url),
+                path => warn!("[DeepLink] Unknown support path: {}", path),
+            },
             Some(host) => {
                 warn!("[DeepLink] Unknown deep link host: {}", host);
             }

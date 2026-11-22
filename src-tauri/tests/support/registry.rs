@@ -17,6 +17,7 @@ fn offers_every_contract_type_and_ignores_unknown_ones() {
         "NRC_PROFILE",
         "UPDATE_LOADER",
         "SWITCH_PACK",
+        "START_TEMP_PROFILE",
     ] {
         assert!(caps.iter().any(|c| c == t), "missing {}", t);
     }

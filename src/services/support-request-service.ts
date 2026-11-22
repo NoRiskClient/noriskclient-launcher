@@ -29,7 +29,7 @@ export function parseSupportRequestError(e: unknown): SupportRequestErrorInfo {
 export const SupportRequestService = {
   fetch: (code: string, tryOtherAccounts = false) =>
     invoke<SupportRequestInfo>("support_request_fetch", { code, tryOtherAccounts }),
-  prepare: (code: string, profileId: string, accountId: string) =>
+  prepare: (code: string, profileId: string | null, accountId: string) =>
     invoke<PrepareSupportRequestResult>("support_request_prepare", { code, profileId, accountId }),
   executeAction: (code: string, index: number) =>
     invoke<SupportActionResult>("support_request_execute_action", { code, index }),

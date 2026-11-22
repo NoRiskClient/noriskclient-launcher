@@ -14,6 +14,8 @@ use crate::state::profile_state::{
     ProfileState,
 };
 use crate::state::state_manager::State;
+pub use crate::minecraft::temp_profile::TempLaunchArgs;
+use crate::minecraft::temp_profile::{build_temp_profile, prepare_temp_launch, run_temp_launch};
 use crate::commands::analytics_command::track_event as track_analytics;
 use crate::utils::datapack_utils::DataPackInfo;
 use crate::utils::mc_utils::{self, WorldInfo};
@@ -2434,7 +2436,7 @@ pub struct LaunchOverrides {
 /// entry → that jar; a directory entry → all top-level `*.jar` inside. Missing
 /// paths and non-jar files are warned and skipped. Jars are referenced in place
 /// (never copied) — the absolute path lands in the addMods meta file.
-async fn resolve_local_mod_paths(entries: &[String]) -> Result<Vec<PathBuf>, AppError> {
+pub(crate) async fn resolve_local_mod_paths(entries: &[String]) -> Result<Vec<PathBuf>, AppError> {
     let mut paths: Vec<PathBuf> = Vec::new();
     for entry in entries {
         let p = PathBuf::from(entry);
@@ -2573,7 +2575,7 @@ pub async fn launch_profile_with_overrides(
 /// Resolve a profile reference (UUID-string OR exact profile name) to a Profile.
 /// Errors on unknown profiles and on ambiguous name matches (multiple profiles
 /// share the same name) — in that case the user must supply the UUID instead.
-async fn resolve_profile_ref(state: &State, profile_ref: &str) -> Result<Profile, CommandError> {
+pub(crate) async fn resolve_profile_ref(state: &State, profile_ref: &str) -> Result<Profile, CommandError> {
     if let Ok(uuid) = Uuid::parse_str(profile_ref) {
         return Ok(state.profile_manager.get_profile(uuid).await?);
     }
@@ -2630,7 +2632,7 @@ fn apply_overrides(profile: &mut Profile, ov: LaunchOverrides) -> Result<(), Com
 
 /// Credential resolution for a profile (preferred account → fallback to active).
 /// Extracted from `launch_profile`; both launch paths share this helper.
-async fn resolve_credentials_for_profile(
+pub(crate) async fn resolve_credentials_for_profile(
     state: &State,
     profile: &Profile,
     is_experimental: bool,
@@ -2689,7 +2691,7 @@ async fn resolve_credentials_for_profile(
 /// (case-insensitive) or by UUID. Refreshes tokens via the account manager.
 /// Hard error if no such account exists (the user asked for it explicitly).
 /// Runtime-only: does NOT change the globally active account.
-async fn resolve_credentials_for_account(
+pub(crate) async fn resolve_credentials_for_account(
     state: &State,
     account_ref: &str,
     is_experimental: bool,
@@ -2745,26 +2747,6 @@ async fn resolve_credentials_for_account(
 // CLI / throwaway launch (no profiles.json entry)
 // ---------------------------------------------------------------------------
 
-/// Args for `launch_temp_profile`. Wired by `cli.rs` from the `temp` subcommand
-/// (or callable from the frontend later if needed).
-#[derive(Deserialize, Debug, Clone)]
-pub struct TempLaunchArgs {
-    pub game_version: String,
-    pub loader: String,
-    pub loader_version: Option<String>,
-    pub pack: Option<String>,
-    pub name: Option<String>,
-    pub quick_play_singleplayer: Option<String>,
-    pub quick_play_multiplayer: Option<String>,
-    /// CLI `--mods`: local jar paths to load in-place (not copied).
-    #[serde(default)]
-    pub local_mods: Vec<String>,
-    /// CLI `--account`: launch with this account (username or UUID).
-    pub account: Option<String>,
-    #[serde(default)]
-    pub jvm_args: Vec<String>,
-}
-
 /// Spin up a throwaway MC instance with the given overrides. Builds an
 /// in-memory Profile, never touches profiles.json. Instance directory lives
 /// at `<root>/profiles/noriskclient/temp/<uuid>/` and is swept into the trash
@@ -2772,113 +2754,12 @@ pub struct TempLaunchArgs {
 /// trash's own 30-day retention then deletes it for good.
 #[tauri::command]
 pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandError> {
-    let state = State::get().await?;
-    let id = Uuid::new_v4();
-    let short: String = id.to_string().chars().take(8).collect();
-    let display_name = args
-        .name
-        .clone()
-        .unwrap_or_else(|| format!("temp-{}", short));
-
-    let loader = ModLoader::from_str(&args.loader)
-        .map_err(|_| AppError::Other(format!("Invalid loader: '{}'", args.loader)))?;
-
-    let profile = Profile {
-        id,
-        name: display_name.clone(),
-        // Relative segment. calculate_instance_path_for_profile resolves this to
-        // <root>/profiles/noriskclient/temp/<uuid>/. The `noriskclient/` prefix
-        // is a reserved namespace (also used for grouped profiles) so it can't
-        // collide with a user profile literally named "temp".
-        path: format!("noriskclient/temp/{}", id),
-        game_version: args.game_version.clone(),
-        loader: loader.clone(),
-        loader_version: args.loader_version.clone(),
-        created: Utc::now(),
-        last_played: None,
-        settings: ProfileSettings::default(),
-        state: ProfileState::NotInstalled,
-        mods: Vec::new(),
-        selected_norisk_pack_id: args.pack.clone(),
-        disabled_norisk_mods_detailed: HashSet::new(),
-        source_standard_profile_id: None,
-        use_shared_minecraft_folder: false,
-        group: None,
-        description: Some("Temporary throwaway instance (CLI)".into()),
-        banner: None,
-        background: None,
-        is_standard_version: false,
-        norisk_information: None,
-        modpack_info: None,
-        preferred_account_id: None,
-        playtime_seconds: 0,
-        sync_pack_ids: Vec::new(),
-        extra: Default::default(),
-    };
-
-    let game_dir = state
-        .profile_manager
-        .calculate_instance_path_for_profile(&profile)?;
-
-    log::info!(
-        "[CLI temp] launch id={} name='{}' dir={:?} mc={} loader={} loader_version={:?} pack={:?} quick_play_sp={:?} quick_play_mp={:?} jvm_args={:?}",
-        profile.id,
-        display_name,
-        game_dir,
-        profile.game_version,
-        profile.loader.as_str(),
-        profile.loader_version,
-        profile.selected_norisk_pack_id,
-        args.quick_play_singleplayer,
-        args.quick_play_multiplayer,
-        args.jvm_args,
-    );
-
-    let is_experimental = state.config_manager.is_experimental_mode().await;
-    let credentials = match &args.account {
-        Some(acc) => Some(resolve_credentials_for_account(&state, acc, is_experimental).await?),
-        None => resolve_credentials_for_profile(&state, &profile, is_experimental).await?,
-    };
-
-    // Register in the in-memory profile map so by-id lookups during the install
-    // (custom mods, instance path, ProcessManager) resolve. Never persisted —
-    // save_profiles() filters out `temp/`-path profiles.
-    state
-        .profile_manager
-        .register_transient_profile(profile.clone())
-        .await;
-
-    let local_mod_paths = resolve_local_mod_paths(&args.local_mods).await?;
-
-    let version = profile.game_version.clone();
-    let modloader = profile.loader.clone();
-    let profile_id = profile.id;
-    let profile_clone = profile.clone();
-    let qp_sp = args.quick_play_singleplayer.clone();
-    let qp_mp = args.quick_play_multiplayer.clone();
-    let jvm_args = args.jvm_args.clone();
-
+    let profile = build_temp_profile(&args, "Temporary throwaway instance (CLI)")?;
+    let launch = prepare_temp_launch(profile, args).await?;
     tokio::spawn(async move {
-        match installer::install_minecraft_version(
-            &version,
-            &modloader.as_str(),
-            &profile_clone,
-            credentials,
-            qp_sp,
-            qp_mp,
-            None,
-            local_mod_paths,
-            jvm_args,
-            false,
-        )
-        .await
-        {
-            Ok(_) => log::info!(
-                "[CLI temp] Temp profile {} started ({} {}).",
-                profile_id,
-                version,
-                modloader.as_str()
-            ),
+        let profile_id = launch.profile.id;
+        match run_temp_launch(launch).await {
+            Ok(_) => log::info!("[CLI temp] Temp profile {} started.", profile_id),
             Err(e) => log::error!(
                 "[CLI temp] install_minecraft_version failed for {}: {}",
                 profile_id,
@@ -2886,6 +2767,5 @@ pub async fn launch_temp_profile(args: TempLaunchArgs) -> Result<(), CommandErro
             ),
         }
     });
-
     Ok(())
 }

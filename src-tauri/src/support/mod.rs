@@ -1,6 +1,7 @@
 pub mod api;
 pub mod error;
 pub mod files;
+pub mod follow_up;
 pub mod handler;
 pub mod handlers;
 pub mod registry;

@@ -2,7 +2,9 @@ use crate::state::state_manager::State;
 use crate::support::api::{self, UploadFile};
 use crate::support::error::{SupportError, SupportErrorKind, SupportResult};
 use crate::support::files::truncate_middle;
-use crate::support::handler::{ActionOutcome, PreparedItem, SupportContext, SupportItemHandler};
+use crate::support::handler::{
+    ActionOutcome, PreparedItem, SessionRef, SupportContext, SupportItemHandler, NO_PROFILE,
+};
 use crate::support::registry::{capabilities, REGISTRY};
 use crate::support::types::{
     AccountRef, ItemCategory, ItemParams, ItemStatus, PrepareResult, PrepareStep, PreparedItemView,
@@ -94,7 +96,7 @@ impl SupportSession {
         self.prepared.as_ref().is_some_and(PreparedSet::running)
     }
 
-    fn ensure_can_prepare(&self, account_id: Uuid, profile_id: Uuid) -> SupportResult<()> {
+    fn ensure_can_prepare(&self, account_id: Uuid, profile_id: Option<Uuid>) -> SupportResult<()> {
         if self.account_id != account_id {
             return Err(SupportError::unknown(
                 "account does not match the loaded request",
@@ -106,7 +108,7 @@ impl SupportSession {
         if previous.running() {
             return Err(SupportError::new(SupportErrorKind::Busy));
         }
-        if previous.ctx.profile.id != profile_id && previous.entries.iter().any(|e| e.outcome.is_some())
+        if previous.ctx.profile_id() != profile_id && previous.entries.iter().any(|e| e.outcome.is_some())
         {
             return Err(SupportError::unknown(
                 "an action was already executed for another profile",
@@ -214,7 +216,7 @@ async fn refreshed_token(account_id: Uuid, experimental: bool) -> SupportResult<
         .map_err(|_| SupportError::new(SupportErrorKind::NotLoggedIn))
 }
 
-async fn with_account_token<T, F, Fut>(
+pub async fn with_account_token<T, F, Fut>(
     account_id: Uuid,
     experimental: bool,
     call: F,
@@ -411,7 +413,7 @@ fn view(index: usize, entry: &PreparedEntry) -> PreparedItemView {
 
 pub async fn prepare(
     raw_code: &str,
-    profile_id: Uuid,
+    profile_id: Option<Uuid>,
     account_id: Uuid,
     on_step: impl Fn(PrepareStep),
 ) -> SupportResult<PrepareResult> {
@@ -420,21 +422,32 @@ pub async fn prepare(
     session.ensure_can_prepare(account_id, profile_id)?;
 
     let state = State::get().await?;
-    let profile = state
-        .profile_manager
-        .get_profile(profile_id)
-        .await
-        .map_err(|e| SupportError::unknown(format!("profile: {}", e)))?;
-    let instance_path = state
-        .profile_manager
-        .get_profile_instance_path(profile_id)
-        .await
-        .map_err(|e| SupportError::unknown(format!("profile path: {}", e)))?;
+    let (profile, instance_path) = match profile_id {
+        Some(id) => {
+            let profile = state
+                .profile_manager
+                .get_profile(id)
+                .await
+                .map_err(|e| SupportError::unknown(format!("profile: {}", e)))?;
+            let instance_path = state
+                .profile_manager
+                .get_profile_instance_path(id)
+                .await
+                .map_err(|e| SupportError::unknown(format!("profile path: {}", e)))?;
+            (Some(profile), Some(instance_path))
+        }
+        None => (None, None),
+    };
     let limits = limits(&session.request);
     let ctx = SupportContext {
         profile,
         instance_path,
         file_byte_budget: limits.file,
+        session: Some(SessionRef {
+            code: code.clone(),
+            account_id,
+            is_experimental: session.is_experimental,
+        }),
     };
 
     let mut entries = Vec::with_capacity(session.request.items.len());
@@ -451,7 +464,7 @@ pub async fn prepare(
             ..PreparedEntry::new(item.item_type.clone(), REGISTRY.get(&item.item_type), None)
         };
         if let Some(handler) = entry.handler {
-            let mut prepared = handler.prepare(&ctx, &entry.params).await;
+            let mut prepared = prepare_item(handler, &ctx, &entry.params).await;
             if prepared.file.is_some() {
                 if files_used >= limits.files {
                     prepared = PreparedItem::failed("too_large: file limit of this request reached");
@@ -475,6 +488,17 @@ pub async fn prepare(
     Ok(PrepareResult { items })
 }
 
+pub async fn prepare_item(
+    handler: &dyn SupportItemHandler,
+    ctx: &SupportContext,
+    params: &ItemParams,
+) -> PreparedItem {
+    if handler.needs_profile() && ctx.profile.is_none() {
+        return PreparedItem::missing(NO_PROFILE);
+    }
+    handler.prepare(ctx, params).await
+}
+
 pub async fn store_prepared(
     raw_code: &str,
     account_id: Uuid,
@@ -482,7 +506,7 @@ pub async fn store_prepared(
     mut entries: Vec<PreparedEntry>,
 ) -> SupportResult<()> {
     let code = require_code(raw_code)?;
-    let profile_id = ctx.profile.id;
+    let profile_id = ctx.profile_id();
     let mut map = sessions().await;
     let stored = map.get_mut(&code).ok_or_else(SupportError::not_loaded)?;
     stored.ensure_can_prepare(account_id, profile_id)?;

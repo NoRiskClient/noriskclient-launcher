@@ -1,5 +1,6 @@
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::support::error::{SupportError, SupportResult};
+use crate::support::follow_up::FollowUp;
 use crate::support::types::{RemoteSupportRequest, SubmitResponse, SubmitResults};
 use crate::utils::http_client::{nrc_get, nrc_post, NrcRequest};
 use crate::utils::security_utils::mask_sensitive_data;
@@ -17,10 +18,14 @@ pub struct UploadFile {
     pub gzip_bytes: Vec<u8>,
 }
 
+pub fn support_base(is_experimental: bool) -> String {
+    format!("{}/support", NoRiskApi::get_api_base(is_experimental))
+}
+
 fn endpoint(is_experimental: bool, code: &str, suffix: &str) -> String {
     format!(
-        "{}/support/user/support-requests/{}{}",
-        NoRiskApi::get_api_base(is_experimental),
+        "{}/user/support-requests/{}{}",
+        support_base(is_experimental),
         code,
         suffix
     )
@@ -99,5 +104,16 @@ pub async fn submit(
 pub async fn decline(token: &str, code: &str, is_experimental: bool) -> SupportResult<()> {
     let request = nrc_post(endpoint(is_experimental, code, "/decline"));
     send(request, token, "Support request decline").await?;
+    Ok(())
+}
+
+pub async fn follow_up(
+    token: &str,
+    code: &str,
+    is_experimental: bool,
+    follow_up: &FollowUp,
+) -> SupportResult<()> {
+    let request = nrc_post(endpoint(is_experimental, code, "/follow-up")).json_body(follow_up);
+    send(request, token, "Support follow-up").await?;
     Ok(())
 }

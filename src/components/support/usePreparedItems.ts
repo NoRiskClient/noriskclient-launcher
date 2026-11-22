@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SupportRequestService, parseSupportRequestError } from "../../services/support-request-service";
 import type { PreparedItem } from "../../types/support-request";
-import { getSupportItemDefinition } from "./supportItems";
+import { getSupportItemDefinition, type SupportItemGroup } from "./supportItems";
 import { FATAL_ERRORS, type ShowError } from "./useSupportRequest";
 
 export type ActionPhase = "running" | "done" | "failed" | "declined";
@@ -9,7 +9,7 @@ export type ActionPhase = "running" | "done" | "failed" | "declined";
 const ACTION_BUSY_RETRIES = 10;
 const ACTION_BUSY_DELAY_MS = 1500;
 
-const isUsable = (item: PreparedItem, group: "data" | "action") =>
+const isUsable = (item: PreparedItem, group: SupportItemGroup) =>
   getSupportItemDefinition(item.type)?.group === group && item.supported && item.available;
 
 export const isCollectSelectable = (item: PreparedItem) => item.category === "COLLECT" && isUsable(item, "data");
@@ -18,12 +18,14 @@ export function usePreparedItems({
   code,
   accountId,
   profileId,
+  profileNeeded,
   active,
   showError,
 }: {
   code: string;
   accountId: string | undefined;
   profileId: string | null;
+  profileNeeded: boolean;
   active: boolean;
   showError: ShowError;
 }) {
@@ -44,7 +46,7 @@ export function usePreparedItems({
   }, []);
 
   useEffect(() => {
-    if (!active || !accountId || !profileId) return;
+    if (!active || !accountId || (profileNeeded && !profileId)) return;
     const key = `${profileId}:${attempt}`;
     if (preparedKey.current === key) return;
     preparedKey.current = key;
@@ -61,11 +63,11 @@ export function usePreparedItems({
       })
       .catch((e) => mySeq === seq.current && showError(e, () => setAttempt((n) => n + 1)))
       .finally(() => mySeq === seq.current && setPreparing(false));
-  }, [active, code, accountId, profileId, attempt, showError]);
+  }, [active, code, accountId, profileId, profileNeeded, attempt, showError]);
 
   const groups = useMemo(() => {
     const all = prepared ?? [];
-    const data = all.filter((i) => getSupportItemDefinition(i.type)?.group !== "action");
+    const data = all.filter((i) => getSupportItemDefinition(i.type)?.group === "data");
     return {
       dataItems: data.filter(isCollectSelectable),
       missingItems: data.filter((i) => getSupportItemDefinition(i.type) && i.supported && !i.available),
