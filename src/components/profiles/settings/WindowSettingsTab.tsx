@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 
-import type { Profile } from "../../../types/profile";
+import type { Profile, ProfilePatch } from "../../../types/profile";
+import { TYPING_SAVE_DELAY_MS } from "../../../utils/profile-patch";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { SearchStyleInput } from "../../ui/Input";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
@@ -10,7 +11,7 @@ import { Chip, Section } from "./SettingsSection";
 
 interface WindowSettingsTabProps {
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
 }
 
 const DEFAULT_WIDTH = 854;
@@ -39,8 +40,8 @@ export function WindowSettingsTab({ editedProfile, updateProfile }: WindowSettin
     }
   }, [isBackgroundAnimationEnabled]);
 
-  const setResolution = (nextWidth: number, nextHeight: number) =>
-    updateProfile({ settings: { ...editedProfile.settings, resolution: { width: nextWidth, height: nextHeight } } });
+  const setResolution = (nextWidth: number, nextHeight: number, delayMs = 0) =>
+    updateProfile({ settings: { resolution: { width: nextWidth, height: nextHeight } } }, delayMs);
 
   const sizeInput = (value: number, fallback: number, onValue: (value: number) => void) => (
     <SearchStyleInput
@@ -74,12 +75,12 @@ export function WindowSettingsTab({ editedProfile, updateProfile }: WindowSettin
           <div className="flex items-end gap-2">
             <label className="min-w-0 flex-1 space-y-1.5">
               <span className="block font-minecraft text-xs text-white/50">{t("profiles.settings.width")}</span>
-              {sizeInput(width, DEFAULT_WIDTH, (value) => setResolution(value, height))}
+              {sizeInput(width, DEFAULT_WIDTH, (value) => setResolution(value, height, TYPING_SAVE_DELAY_MS))}
             </label>
             <span className="pb-3 font-minecraft text-white/40">×</span>
             <label className="min-w-0 flex-1 space-y-1.5">
               <span className="block font-minecraft text-xs text-white/50">{t("profiles.settings.height")}</span>
-              {sizeInput(height, DEFAULT_HEIGHT, (value) => setResolution(width, value))}
+              {sizeInput(height, DEFAULT_HEIGHT, (value) => setResolution(width, value, TYPING_SAVE_DELAY_MS))}
             </label>
           </div>
         </div>
@@ -90,7 +91,7 @@ export function WindowSettingsTab({ editedProfile, updateProfile }: WindowSettin
         aside={
           <ToggleSwitch
             checked={editedProfile.settings?.fullscreen || false}
-            onChange={(fullscreen) => updateProfile({ settings: { ...editedProfile.settings, fullscreen } })}
+            onChange={(fullscreen) => updateProfile({ settings: { fullscreen } })}
             size="sm"
           />
         }

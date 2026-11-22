@@ -800,6 +800,7 @@
   "profiles.settings.customJavaArgs": "Argomenti Java personalizzati",
   "profiles.settings.enterJavaArgs": "Inserisci argomenti Java...",
   "profiles.settings.javaArgsHint": "Avanzato: Sovrascrivi argomenti JVM (es. -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Predefiniti del launcher",
   "profiles.settings.reasonNoriskPack": "Impostato dal pack NoRisk",
   "profiles.settings.reasonUserOverwrite": "Impostazione utente personalizzata",
   "profiles.settings.reasonProfileDefault": "Predefinito profilo",

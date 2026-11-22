@@ -802,6 +802,7 @@
   "profiles.settings.customJavaArgs": "Niestandardowe argumenty Java",
   "profiles.settings.enterJavaArgs": "Wpisz argumenty Java...",
   "profiles.settings.javaArgsHint": "Zaawansowane: Nadpisz argumenty JVM (np. -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Domyślne ustawienia launchera",
   "profiles.settings.reasonNoriskPack": "Ustawione przez paczkę NoRisk",
   "profiles.settings.reasonUserOverwrite": "Niestandardowe ustawienie użytkownika",
   "profiles.settings.reasonProfileDefault": "Domyślne profilu",

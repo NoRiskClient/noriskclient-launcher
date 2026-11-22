@@ -190,24 +190,10 @@ export function ProfileWizardV2({
     const creationPromise = async () => {
       const profileId = await createProfile(createParams);
 
-      // Update profile with additional settings
-      const updateData: any = {};
-      
-      if (profileData.group) {
-        updateData.group = profileData.group;
-      }
-
-      // Set memory settings
-      updateData.settings = {
-        memory: {
-          min: 1024, // Default minimum
-          max: profileData.memoryMaxMb
-        }
-      };
-
-      if (Object.keys(updateData).length > 0) {
-        await useProfileStore.getState().updateProfile(profileId, updateData);
-      }
+      await useProfileStore.getState().patchProfile(profileId, {
+        ...(profileData.group ? { group: profileData.group } : {}),
+        settings: { memory: { min: 1024, max: profileData.memoryMaxMb } },
+      });
 
       // Apply the chosen profile icon (best-effort — a download failure must not abort creation)
       try {

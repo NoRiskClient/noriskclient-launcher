@@ -1,5 +1,6 @@
 use noriskclient_launcher_v3_lib::minecraft::{
-    is_allowed_jvm_flag, parse_jvm_rules, plan_jvm_rules, sets_gc, JvmContext, JvmPlan,
+    default_jvm_args, is_allowed_jvm_flag, parse_jvm_rules, plan_jvm_rules, sets_gc, JvmContext,
+    JvmPlan, DEFAULT_GC_ARGS,
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -194,4 +195,51 @@ fn gc_flags_are_recognised_in_any_argument_list() {
     assert!(sets_gc(["-Xss2M", "-XX:+UseZGC"]));
     assert!(sets_gc(["-XX:+UseShenandoahGC"]));
     assert!(!sets_gc(["-Xss2M", "-XX:+UseStringDeduplication"]));
+}
+
+#[test]
+fn defaults_without_pack_rules_are_the_launcher_gc_flags() {
+    assert_eq!(
+        default_jvm_args(&JvmPlan::default()),
+        DEFAULT_GC_ARGS.map(String::from).to_vec()
+    );
+}
+
+#[test]
+fn a_pack_gc_replaces_the_launcher_gc_in_the_defaults() {
+    let plan = plan(
+        json!([{ "id": "zgc", "args": ["-XX:+UseZGC", "-XX:+UseStringDeduplication"] }]),
+        &context(),
+    );
+
+    assert_eq!(
+        default_jvm_args(&plan),
+        vec![
+            "-XX:+UnlockExperimentalVMOptions",
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+UseZGC",
+            "-XX:+UseStringDeduplication",
+        ],
+    );
+}
+
+#[test]
+fn pack_flags_without_a_gc_join_the_launcher_gc_once() {
+    let plan = plan(
+        json!([{ "id": "dedup", "args": ["-XX:+UseStringDeduplication", "-Dnorisk.debug=true"] }]),
+        &context(),
+    );
+    let args = default_jvm_args(&plan);
+
+    assert!(args.contains(&"-XX:+UseG1GC".to_string()));
+    assert!(args.ends_with(&[
+        "-XX:+UseStringDeduplication".to_string(),
+        "-Dnorisk.debug=true".to_string()
+    ]));
+    assert_eq!(
+        args.iter()
+            .filter(|arg| *arg == "-XX:+UnlockExperimentalVMOptions")
+            .count(),
+        1
+    );
 }

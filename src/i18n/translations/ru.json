@@ -802,6 +802,7 @@
   "profiles.settings.customJavaArgs": "Пользовательские аргументы Java",
   "profiles.settings.enterJavaArgs": "Введите аргументы Java...",
   "profiles.settings.javaArgsHint": "Расширенные: Переопределить аргументы JVM (например, -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Стандартные параметры лаунчера",
   "profiles.settings.reasonNoriskPack": "Установлено пакетом NoRisk",
   "profiles.settings.reasonUserOverwrite": "Пользовательская настройка",
   "profiles.settings.reasonProfileDefault": "По умолчанию профиля",

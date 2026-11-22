@@ -1,9 +1,15 @@
+use crate::error::{AppError, Result};
+use crate::minecraft::api::mc_api::MinecraftApiService;
 use crate::minecraft::launch::version::compare_versions;
+use crate::state::profile_state::Profile;
+use crate::state::state_manager::State;
+use crate::utils::{java_detector, system_info};
 use log::warn;
 use serde::Deserialize;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 use std::cmp::Ordering;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 const GC_FLAGS: [&str; 5] = [
@@ -247,6 +253,20 @@ fn parse_range<T>(range: &str, parse: impl Fn(&str) -> Option<T>) -> Option<Vec<
     terms.filter(|terms| !terms.is_empty())
 }
 
+pub fn default_jvm_args(plan: &JvmPlan) -> Vec<String> {
+    let gc = (!sets_gc(plan.args.iter().map(String::as_str)))
+        .then_some(DEFAULT_GC_ARGS)
+        .into_iter()
+        .flatten();
+    let mut args: Vec<String> = Vec::new();
+    for arg in gc.map(str::to_string).chain(plan.jvm_args()) {
+        if !args.contains(&arg) {
+            args.push(arg);
+        }
+    }
+    args
+}
+
 pub fn plan_jvm_rules(rules: &[JvmRule], ctx: &JvmContext) -> JvmPlan {
     let mut plan = JvmPlan::default();
     for rule in rules.iter().filter(|rule| rule.matches(ctx)) {
@@ -258,4 +278,69 @@ pub fn plan_jvm_rules(rules: &[JvmRule], ctx: &JvmContext) -> JvmPlan {
         plan.applied.push(rule.id.clone());
     }
     plan
+}
+
+pub async fn profile_default_jvm_args(profile: &Profile, heap_mb: u32) -> Result<Vec<String>> {
+    let state = State::get().await?;
+    let rules = match profile.effective_norisk_pack_id().await {
+        Some(pack_id) => state
+            .norisk_pack_manager
+            .get_config()
+            .await
+            .get_resolved_pack_definition(&pack_id)
+            .ok()
+            .and_then(|pack| pack.jvm),
+        None => None,
+    };
+    let plan = match rules {
+        Some(rules) => {
+            let context = JvmContext {
+                java_major: java_major(profile).await?,
+                minecraft: profile.game_version.clone(),
+                loader: profile.loader.as_str().to_string(),
+                os: std::env::consts::OS.to_string(),
+                arch: std::env::consts::ARCH.to_string(),
+                ram_mb: system_info::total_ram_mb(),
+                heap_mb,
+                user_gc: false,
+                player: state
+                    .minecraft_account_manager_v2
+                    .get_active_account()
+                    .await?
+                    .map(|account| account.id),
+            };
+            plan_jvm_rules(&parse_jvm_rules(&rules), &context)
+        }
+        None => JvmPlan::default(),
+    };
+    Ok(default_jvm_args(&plan))
+}
+
+async fn java_major(profile: &Profile) -> Result<u32> {
+    let api = MinecraftApiService::new();
+    let manifest = api.get_version_manifest().await?;
+    let version = manifest
+        .versions
+        .iter()
+        .find(|version| version.id == profile.game_version)
+        .ok_or_else(|| AppError::VersionNotFound(profile.game_version.clone()))?;
+    let required = api
+        .get_piston_meta(&version.url)
+        .await?
+        .java_version
+        .major_version as u32;
+    let custom = match profile
+        .settings
+        .java_path
+        .as_ref()
+        .filter(|_| profile.settings.use_custom_java_path)
+    {
+        Some(path) => java_detector::get_java_info(&PathBuf::from(path))
+            .await
+            .ok()
+            .map(|info| info.major_version)
+            .filter(|major| *major >= required),
+        None => None,
+    };
+    Ok(custom.unwrap_or(required))
 }

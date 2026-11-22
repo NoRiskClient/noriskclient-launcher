@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { gsap } from "gsap";
-import type { Profile } from "../../types/profile";
+import type { Profile, ProfilePatch } from "../../types/profile";
 import { GeneralSettingsTab } from "./settings/GeneralSettingsTab";
 import { InstallationSettingsTab } from "./settings/InstallationSettingsTab";
 import { JavaSettingsTab } from "./settings/JavaSettingsTab";
@@ -13,12 +13,12 @@ import { useProfileStore } from "../../store/profile-store";
 import * as ProfileService from "../../services/profile-service";
 import { logError } from "../../utils/logging-utils";
 import { Modal } from "../ui/Modal";
-import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { applyPatch, mergePatches } from "../../utils/profile-patch";
 
 interface ProfileSettingsProps {
   profile: Profile;
@@ -35,11 +35,10 @@ type SettingsTab =
 
 export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
   const { t } = useTranslation();
-  const { updateProfile, deleteProfile } = useProfileStore();
+  const { patchProfile, deleteProfile } = useProfileStore();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [editedProfile, setEditedProfile] = useState<Profile>({ ...profile });
   const [currentProfile, setCurrentProfile] = useState<Profile>({ ...profile });
-  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [systemRam, setSystemRam] = useState<number>(8192);
   const [recommendedRam, setRecommendedRam] = useState<number>(4096);
@@ -95,9 +94,31 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     setTempRamMb(profile.settings?.memory?.max ?? recommendedRam);
   }, [profile]);
 
-  const updateProfileData = (updates: Partial<Profile>) => {
-    setEditedProfile((prev) => ({ ...prev, ...updates }));
-  };
+  const pendingPatch = useRef<ProfilePatch>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const flushPatch = useCallback(async () => {
+    clearTimeout(saveTimer.current);
+    const patch = pendingPatch.current;
+    pendingPatch.current = {};
+    if (Object.keys(patch).length === 0) return;
+    try {
+      await patchProfile(profile.id, patch);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      logError(`Failed to save profile ${profile.id}: ${err}`);
+      toast.error(t("profiles.settings.saveError"));
+    }
+  }, [patchProfile, profile.id, t]);
+
+  const updateProfileData = useCallback((patch: ProfilePatch, delayMs = 0) => {
+    setEditedProfile((prev) => applyPatch(prev, patch));
+    pendingPatch.current = mergePatches(pendingPatch.current, patch);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flushPatch, delayMs);
+  }, [flushPatch]);
+
+  useEffect(() => () => void flushPatch(), [flushPatch]);
 
   const handleRefresh = async () => {
     try {
@@ -112,46 +133,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
     } catch (error) {
       console.error("Failed to refresh profile:", error);
       throw error;
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      await updateProfile(profile.id, {
-        name: editedProfile.name,
-        game_version: editedProfile.game_version,
-        loader: editedProfile.loader,
-        loader_version: editedProfile.loader_version || null || undefined,
-        settings: {
-          ...editedProfile.settings,
-          // Only save memory settings for custom profiles
-          // Standard profiles save memory to global settings directly via JavaSettingsTab
-          ...(profile.is_standard_version ? {} : {
-            memory: {
-              ...editedProfile.settings?.memory,
-              max: tempRamMb,
-            },
-          }),
-        },
-        selected_norisk_pack_id: editedProfile.selected_norisk_pack_id,
-        clear_selected_norisk_pack: !editedProfile.selected_norisk_pack_id,
-        group: editedProfile.group,
-        clear_group: !editedProfile.group,
-        description: editedProfile.description,
-        norisk_information: editedProfile.norisk_information,
-        use_shared_minecraft_folder: editedProfile.use_shared_minecraft_folder,
-        preferred_account_id: editedProfile.preferred_account_id,
-        clear_preferred_account: !editedProfile.preferred_account_id,
-      });
-
-      toast.success(t('profiles.settings.saveSuccess'));
-      setRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      console.error("Failed to save profile:", err);
-      toast.error(t('profiles.settings.saveError'));
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -247,7 +228,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         return (
           <SymlinkSettingsTab
             editedProfile={editedProfile}
-            updateProfile={updateProfileData}
             allProfiles={useProfileStore.getState().profiles}
           />
         );
@@ -255,38 +235,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
         return null;
     }
   };
-
-  const renderFooter = () => (
-    <div className="flex justify-between">
-      <Button
-        variant="secondary"
-        onClick={onClose}
-        size="md"
-        className="text-base"
-      >
-        {t('profiles.settings.cancel')}
-      </Button>
-      <Button
-        variant="default"
-        onClick={handleSave}
-        disabled={isSaving}
-        size="md"
-        className="text-base"
-      >
-        {isSaving ? (
-          <div className="flex items-center gap-3">
-            <Icon
-              icon="svg-spinners:ring-resize"
-              className="w-6 h-6 text-white"
-            />
-            <span>{t('profiles.settings.saving')}</span>
-          </div>
-        ) : (
-          t('profiles.settings.saveChanges')
-        )}
-      </Button>
-    </div>
-  );
 
   const handleTabClick = (tabId: string) => {
     if (activeTab !== tabId) {
@@ -309,7 +257,6 @@ export function ProfileSettings({ profile, onClose }: ProfileSettingsProps) {
       title={t('profiles.settings.title', { name: profile.name })}
       onClose={onClose}
       width="xl"
-      footer={renderFooter()}
       className="!max-w-6xl h-[85vh] min-h-[600px] flex flex-col"
     >
       <div className="flex h-full p-4 gap-2">

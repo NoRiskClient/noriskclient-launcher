@@ -774,6 +774,7 @@
   "profiles.settings.customJavaArgs": "Benutzerdefinierte Java-Argumente",
   "profiles.settings.enterJavaArgs": "Java-Argumente eingeben...",
   "profiles.settings.javaArgsHint": "Erweitert: JVM-Argumente überschreiben (z.B. -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Launcher-Standard",
   "profiles.settings.reasonNoriskPack": "Von NoRisk-Pack gesetzt",
   "profiles.settings.reasonUserOverwrite": "Benutzerdefinierte Einstellung",
   "profiles.settings.reasonProfileDefault": "Profil-Standard",

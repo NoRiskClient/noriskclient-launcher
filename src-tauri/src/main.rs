@@ -58,7 +58,7 @@ use commands::profile_command::{
     get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_structure,
     get_profile_log_files,
     get_servers_for_profile,
-    get_default_memory_max_mb, get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
+    get_default_jvm_args, get_default_memory_max_mb, patch_profile, get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
@@ -66,7 +66,7 @@ use commands::profile_command::{
     get_profile_store_status, reimport_profiles_from_legacy_json,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
-    update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
+    update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
 
 // Use statements for registered commands only
@@ -484,7 +484,6 @@ async fn main() {
             list_system_fonts,
             create_profile,
             get_profile,
-            update_profile,
             delete_profile,
             repair_profile,
             resolve_loader_version,
@@ -553,6 +552,8 @@ async fn main() {
             import_local_mods,
             get_system_ram_mb,
             get_default_memory_max_mb,
+            get_default_jvm_args,
+            patch_profile,
             delete_custom_mod,
             open_profile_folder,
             import_profile,

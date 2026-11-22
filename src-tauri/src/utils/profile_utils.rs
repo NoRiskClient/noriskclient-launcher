@@ -1120,7 +1120,8 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
 
     export_profile.settings.java_path = None;
     export_profile.settings.use_custom_java_path = false;
-    export_profile.settings.custom_jvm_args = None;
+    export_profile.settings.use_custom_jvm_args = false;
+    export_profile.settings.jvm_args = String::new();
     export_profile.settings.extra_game_args = Vec::new();
     export_profile.settings.quick_play_path = None;
     export_profile.preferred_account_id = None;

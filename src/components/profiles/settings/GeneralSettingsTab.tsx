@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "react-hot-toast";
 
-import type { Profile } from "../../../types/profile";
+import type { Profile, ProfilePatch } from "../../../types/profile";
+import { TYPING_SAVE_DELAY_MS } from "../../../utils/profile-patch";
 import type { MinecraftAccount } from "../../../types/minecraft";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
@@ -19,7 +20,7 @@ import { Chip, Section } from "./SettingsSection";
 interface GeneralSettingsTabProps {
   profile: Profile;
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   onRefresh?: () => Promise<Profile>;
   onDelete?: () => void;
   isDeleting?: boolean;
@@ -43,6 +44,7 @@ function AccountAvatar({ account }: { account: MinecraftAccount }) {
 
 export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRefresh }: GeneralSettingsTabProps) {
   const { t } = useTranslation();
+  const [groupDraft, setGroupDraft] = useState(editedProfile.group || "");
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
   const tabRef = useRef<HTMLDivElement>(null);
@@ -87,7 +89,7 @@ export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRe
               <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.profileName")}</p>
               <SearchStyleInput
                 value={editedProfile.name}
-                onChange={(e) => updateProfile({ name: e.target.value })}
+                onChange={(e) => updateProfile({ name: e.target.value }, TYPING_SAVE_DELAY_MS)}
                 placeholder={t("profiles.settings.enterProfileName")}
                 className="text-sm"
                 disabled={locked}
@@ -96,8 +98,9 @@ export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRe
             <div className="min-w-0 space-y-1.5">
               <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.group")}</p>
               <SearchStyleInput
-                value={editedProfile.group || ""}
-                onChange={(e) => updateProfile({ group: e.target.value || null })}
+                value={groupDraft}
+                onChange={(e) => setGroupDraft(e.target.value)}
+                onBlur={() => (groupDraft || null) !== (editedProfile.group || null) && updateProfile({ group: groupDraft || null })}
                 placeholder={t("placeholders.group_name")}
                 className="text-sm"
                 disabled={locked}
@@ -127,9 +130,7 @@ export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRe
         <SearchStyleInput
           value={editedProfile.settings.quick_play_path || ""}
           onChange={(e) =>
-            updateProfile({
-              settings: { ...editedProfile.settings, quick_play_path: e.target.value || null },
-            })
+            updateProfile({ settings: { quick_play_path: e.target.value || null } }, TYPING_SAVE_DELAY_MS)
           }
           placeholder={t("profiles.settings.quickPlayPlaceholder")}
           icon="solar:play-bold"

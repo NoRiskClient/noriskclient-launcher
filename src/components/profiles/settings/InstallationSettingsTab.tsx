@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 
-import type { ModLoader, Profile } from "../../../types/profile";
+import type { ModLoader, Profile, ProfilePatch } from "../../../types/profile";
 import type { MinecraftVersion } from "../../../types/minecraft";
 import { useResolvedLoaderVersion } from "../../../hooks/useResolvedLoaderVersion";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -19,7 +19,7 @@ import { withoutStableTag } from "../../../utils/loader-version";
 interface InstallationSettingsTabProps {
   profile: Profile;
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   refreshTrigger?: number;
 }
 
@@ -194,7 +194,6 @@ export function InstallationSettingsTab({
   ) =>
     updateProfile({
       settings: {
-        ...editedProfile.settings,
         use_overwrite_loader_version: custom,
         overwrite_loader_version: null,
         overwrite_loader_versions: { ...editedProfile.settings.overwrite_loader_versions, [loader]: version },

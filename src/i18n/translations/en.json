@@ -774,6 +774,7 @@
   "profiles.settings.customJavaArgs": "Custom Java Arguments",
   "profiles.settings.enterJavaArgs": "Enter Java arguments...",
   "profiles.settings.javaArgsHint": "Advanced: Override JVM arguments (e.g., -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Launcher defaults",
   "profiles.settings.reasonNoriskPack": "Set by NoRisk pack",
   "profiles.settings.reasonUserOverwrite": "Custom user setting",
   "profiles.settings.reasonProfileDefault": "Profile default",

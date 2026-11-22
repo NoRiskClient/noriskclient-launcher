@@ -809,6 +809,7 @@
   "profiles.settings.customJavaArgs": "कस्टम Java तर्क",
   "profiles.settings.enterJavaArgs": "Java तर्क दर्ज करें...",
   "profiles.settings.javaArgsHint": "उन्नत: JVM तर्क ओवरराइड करें (जैसे -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "लॉन्चर डिफ़ॉल्ट",
   "profiles.settings.reasonNoriskPack": "NoRisk pack द्वारा सेट",
   "profiles.settings.reasonUserOverwrite": "कस्टम उपयोगकर्ता सेटिंग",
   "profiles.settings.reasonProfileDefault": "प्रोफ़ाइल डिफ़ॉल्ट",

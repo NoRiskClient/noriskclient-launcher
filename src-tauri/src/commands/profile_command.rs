@@ -51,23 +51,6 @@ pub struct CreateProfileParams {
     use_shared_minecraft_folder: Option<bool>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct UpdateProfileParams {
-    name: Option<String>,
-    game_version: Option<String>,
-    loader: Option<String>,
-    loader_version: Option<String>,
-    settings: Option<ProfileSettings>,
-    selected_norisk_pack_id: Option<String>,
-    group: Option<String>,
-    clear_group: Option<bool>,
-    use_shared_minecraft_folder: Option<bool>,
-    clear_selected_norisk_pack: Option<bool>,
-    norisk_information: Option<crate::state::profile_state::NoriskInformation>,
-    preferred_account_id: Option<String>,
-    clear_preferred_account: Option<bool>,
-}
-
 // Neue DTO für den copy_profile Command
 #[derive(Deserialize)]
 pub struct CopyProfileParams {
@@ -516,71 +499,6 @@ pub async fn get_profile(id: Uuid) -> Result<Profile, CommandError> {
     Ok(profile)
 }
 
-#[tauri::command]
-pub async fn update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(), CommandError> {
-    info!(
-        "[CMD] update_profile called for ID: {} with params: {:?}",
-        id, params
-    );
-    match try_update_profile(id, params).await {
-        Ok(_) => {
-            info!("[CMD] update_profile successful for ID: {}", id);
-            Ok(())
-        }
-        Err(e) => {
-            error!("[CMD] update_profile failed for ID: {}: {:?}", id, e);
-            Err(e)
-        }
-    }
-}
-
-/// Checks if mods directory migration is needed based on profile changes
-fn needs_mods_migration(
-    original_profile: &Profile,
-    updated_profile: &Profile,
-    params: &UpdateProfileParams
-) -> Result<bool, CommandError> {
-    // Only check for actual path-affecting changes for regular user profiles
-
-    // Check if group actually changed (affects shared path)
-    let group_changed = if params.clear_group == Some(true) {
-        // Clearing group: changed if profile had a group before
-        original_profile.group.is_some()
-    } else if let Some(new_group) = &params.group {
-        // Setting new group: changed if different from current group
-        original_profile.group.as_deref() != Some(new_group)
-    } else {
-        // No group change requested
-        false
-    };
-
-    // Check if use_shared_minecraft_folder setting changed
-    let shared_setting_changed = params.use_shared_minecraft_folder.is_some();
-
-    // Only migrate if we actually changed something that affects the mods path
-    let migration_needed = if group_changed || shared_setting_changed {
-        // Recalculate if shared folder usage would change
-        let original_uses_shared = original_profile.should_use_shared_minecraft_folder();
-        let updated_uses_shared = updated_profile.should_use_shared_minecraft_folder();
-
-        // Migration needed if shared folder usage actually changed
-        original_uses_shared != updated_uses_shared
-    } else {
-        // No path-affecting changes, no migration needed
-        false
-    };
-
-    info!(
-        "Migration check for profile {}: group_changed={}, shared_setting_changed={} -> migration_needed={}",
-        original_profile.id,
-        group_changed,
-        shared_setting_changed,
-        migration_needed
-    );
-
-    Ok(migration_needed)
-}
-
 /// Migrates mods directory from old path to new path
 async fn migrate_mods_directory(old_path: &std::path::Path, new_path: &std::path::Path) -> Result<(), CommandError> {
     use tokio::fs;
@@ -625,171 +543,30 @@ async fn migrate_mods_directory(old_path: &std::path::Path, new_path: &std::path
     Ok(())
 }
 
-// Helper function to contain the actual logic and allow for ? operator
-async fn try_update_profile(id: Uuid, params: UpdateProfileParams) -> Result<(), CommandError> {
-    info!(
-        "[CMD] try_update_profile for ID: {}. Received params: {:?}",
-        id, params
-    );
+#[tauri::command]
+pub async fn patch_profile(
+    id: Uuid,
+    patch: crate::state::profile_patch::ProfilePatch,
+) -> Result<Profile, CommandError> {
     let state = State::get().await?;
-    let mut profile = state.profile_manager.get_profile(id).await?;
+    let before = state.profile_manager.get_profile(id).await?;
+    let mut after = before.clone();
+    patch.clone().apply(&mut after);
 
-    // Get original profile for migration check and clone params for later use
-    let original_profile = state.profile_manager.get_profile(id).await?;
-    let params_for_migration = params.clone();
-
-    if let Some(name) = &params.name {
-        // Borrow params.name
-        info!("Updating profile name to: {}", name);
-        profile.name = name.clone();
-    }
-    if let Some(game_version) = &params.game_version {
-        // Borrow params.game_version
-        info!("Updating game_version to: {}", game_version);
-        profile.game_version = game_version.clone();
-    }
-    if let Some(loader_str) = &params.loader {
-        // Borrow params.loader
-        info!("Updating loader to: {}", loader_str);
-        profile.loader = ModLoader::from_str(loader_str)?;
-    }
-    if let Some(loader_version) = &params.loader_version {
-        // Borrow params.loader_version
-        info!("Updating loader_version to: {}", loader_version);
-        profile.loader_version = Some(loader_version.clone());
-    }
-    if let Some(settings) = params.settings {
-        // settings can be moved if it's Clone or Copy, or borrowed if not
-        info!("Updating settings: {:?}", settings);
-        profile.settings = settings; // Assuming ProfileSettings is Clone or params.settings is not used after this
-
-        // Mirror legacy override into the per-loader map so writes that only
-        // touch `overwrite_loader_version` (e.g. Settings modal) stay in sync
-        // with the new read-path that prefers the map. Keyed by the profile's
-        // current loader because that's the implicit context of any legacy
-        // write. See `overwrite_loader_versions` comment in profile_state.rs.
-        if profile.settings.use_overwrite_loader_version {
-            if let Some(v) = profile.settings.overwrite_loader_version.clone() {
-                if !v.is_empty() {
-                    profile
-                        .settings
-                        .overwrite_loader_versions
-                        .insert(profile.loader.as_str().to_string(), v);
-                }
+    if !before.is_standard_version
+        && before.should_use_shared_minecraft_folder() != after.should_use_shared_minecraft_folder()
+    {
+        let mods_path = |profile: &Profile| {
+            if profile.should_use_shared_minecraft_folder() {
+                state.profile_manager.get_profile_mods_path_shared(profile)
+            } else {
+                state.profile_manager.get_profile_mods_path_single(profile)
             }
-        }
-    }
-
-    // Handle selected_norisk_pack_id based on clear_selected_norisk_pack and new value
-    if params.clear_selected_norisk_pack == Some(true) {
-        info!("Clearing selected_norisk_pack_id for profile {}", id);
-        profile.selected_norisk_pack_id = None;
-    } else if let Some(pack_id) = &params.selected_norisk_pack_id {
-        info!(
-            "Updating selected_norisk_pack_id to: {} for profile {}",
-            pack_id, id
-        );
-        profile.selected_norisk_pack_id = Some(pack_id.clone());
-    } else {
-        info!("selected_norisk_pack_id not explicitly changed or cleared for profile {}. Current: {:?}", id, profile.selected_norisk_pack_id);
-        // No change to selected_norisk_pack_id if neither clear is true nor a new value is provided
-    }
-
-    // Handle group based on clear_group and new value
-    if params.clear_group == Some(true) {
-        info!("Clearing group for profile {}", id);
-        profile.group = None;
-    } else if let Some(new_group) = &params.group {
-        info!("Updating group to: {}", new_group);
-        profile.group = Some(new_group.clone());
-    }
-
-    // Handle use_shared_minecraft_folder
-    if let Some(use_shared) = params.use_shared_minecraft_folder {
-        info!("Updating use_shared_minecraft_folder to: {}", use_shared);
-        profile.use_shared_minecraft_folder = use_shared;
-    }
-
-    // Handle norisk_information
-    if let Some(norisk_info) = params.norisk_information {
-        info!("Updating norisk_information to: {:?}", norisk_info);
-        profile.norisk_information = Some(norisk_info);
-    } else {
-        // This else block handles the case where `norisk_information` is explicitly `null` in JSON,
-        // which Serde maps to `None` for `Option<NoriskInformation>`.
-        // If you want to distinguish between `null` and `undefined` (field not present),
-        // you might need `Option<Option<NoriskInformation>>` or a custom deserializer.
-        // For now, if it's `None` (either not sent or sent as null), we keep the existing value.
-        // If you want `null` to clear it, you would do: `profile.norisk_information = None;`
-        info!(
-            "norisk_information not provided or explicitly null, keeping existing: {:?}",
-            profile.norisk_information
-        );
-    }
-
-    // Handle preferred_account_id based on clear_preferred_account and new value
-    if params.clear_preferred_account == Some(true) {
-        info!("Clearing preferred_account_id for profile {}", id);
-        profile.preferred_account_id = None;
-    } else if let Some(account_id_str) = &params.preferred_account_id {
-        match Uuid::parse_str(account_id_str) {
-            Ok(account_uuid) => {
-                info!(
-                    "Updating preferred_account_id to: {} for profile {}",
-                    account_uuid, id
-                );
-                profile.preferred_account_id = Some(account_uuid);
-            }
-            Err(e) => {
-                return Err(CommandError::from(AppError::Other(format!(
-                    "Invalid UUID format for preferred_account_id: {}",
-                    e
-                ))));
-            }
-        }
-    } else {
-        info!(
-            "preferred_account_id not explicitly changed or cleared for profile {}. Current: {:?}",
-            id, profile.preferred_account_id
-        );
-    }
-
-    // Check if mods directory location needs to change (using the params copy from above)
-    let mods_migration_needed = needs_mods_migration(&original_profile, &profile, &params_for_migration)?;
-
-    if mods_migration_needed {
-        info!("Mods directory migration needed for profile {}", id);
-
-        // Get old and new mods paths
-        let old_mods_path = if original_profile.is_standard_version || !original_profile.should_use_shared_minecraft_folder() {
-            state.profile_manager.get_profile_mods_path_single(&original_profile)?
-        } else {
-            state.profile_manager.get_profile_mods_path_shared(&original_profile)?
         };
-
-        let new_mods_path = if profile.is_standard_version || !profile.should_use_shared_minecraft_folder() {
-            state.profile_manager.get_profile_mods_path_single(&profile)?
-        } else {
-            state.profile_manager.get_profile_mods_path_shared(&profile)?
-        };
-
-        // Only migrate if paths are actually different
-        if old_mods_path != new_mods_path {
-            info!(
-                "Migrating mods from {:?} to {:?} for profile {}",
-                old_mods_path, new_mods_path, id
-            );
-
-            // Perform the migration
-            migrate_mods_directory(&old_mods_path, &new_mods_path).await?;
-        } else {
-            info!("Mods paths are identical, skipping migration for profile {}", id);
-        }
+        migrate_mods_directory(&mods_path(&before)?, &mods_path(&after)?).await?;
     }
 
-    state.profile_manager.update_profile(id, profile).await?;
-    info!("Profile {} updated successfully.", id);
-    Ok(())
+    Ok(state.profile_manager.patch_profile(id, patch).await?)
 }
 
 #[tauri::command]
@@ -1140,6 +917,15 @@ pub async fn get_system_ram_mb() -> Result<u64, CommandError> {
 #[tauri::command]
 pub async fn get_default_memory_max_mb() -> Result<u32, CommandError> {
     Ok(crate::state::profile_state::default_memory_max_mb())
+}
+
+#[tauri::command]
+pub async fn get_default_jvm_args(profile: Profile, heap_mb: u32) -> Result<String, CommandError> {
+    Ok(
+        crate::minecraft::profile_default_jvm_args(&profile, heap_mb)
+            .await?
+            .join(" "),
+    )
 }
 
 // --- New Command to open Profile Folder ---

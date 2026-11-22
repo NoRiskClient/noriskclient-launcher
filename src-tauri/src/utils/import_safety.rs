@@ -140,12 +140,8 @@ pub fn sanitize_settings(
             .clone()
             .or_else(|| Some("<enabled without a path>".to_string()));
     }
-    if let Some(args) = claimed
-        .custom_jvm_args
-        .as_ref()
-        .filter(|a| !a.trim().is_empty())
-    {
-        report.stripped_jvm_args = Some(args.clone());
+    if !claimed.jvm_args.trim().is_empty() {
+        report.stripped_jvm_args = Some(claimed.jvm_args.clone());
     }
     if !claimed.extra_game_args.is_empty() {
         report.stripped_game_args = claimed.extra_game_args.clone();

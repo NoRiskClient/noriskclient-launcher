@@ -4,7 +4,7 @@ import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
 
-import type { Profile } from "../../../types/profile";
+import type { Profile, ProfilePatch } from "../../../types/profile";
 import { useThemeStore } from "../../../store/useThemeStore";
 import * as ProfileService from "../../../services/profile-service";
 import { parseErrorMessage } from "../../../utils/error-utils";
@@ -16,7 +16,7 @@ import { Section, SectionButton } from "./SettingsSection";
 interface NRCTabProps {
   profile: Profile;
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   onRefresh?: () => Promise<Profile>;
 }
 

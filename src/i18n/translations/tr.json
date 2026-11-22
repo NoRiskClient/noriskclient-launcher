@@ -800,6 +800,7 @@
   "profiles.settings.customJavaArgs": "Özel Java Argümanları",
   "profiles.settings.enterJavaArgs": "Java argümanları girin...",
   "profiles.settings.javaArgsHint": "Gelişmiş: JVM argümanlarını geçersiz kıl (ör. -XX:+UseG1GC)",
+  "profiles.settings.javaArgsDefaults": "Başlatıcı varsayılanları",
   "profiles.settings.reasonNoriskPack": "NoRisk paketi tarafından ayarlandı",
   "profiles.settings.reasonUserOverwrite": "Özel kullanıcı ayarı",
   "profiles.settings.reasonProfileDefault": "Profil varsayılanı",

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import type { Profile } from "../../../types/profile";
+import type { Profile, ProfilePatch } from "../../../types/profile";
+import { SLIDER_SAVE_DELAY_MS, TYPING_SAVE_DELAY_MS } from "../../../utils/profile-patch";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { SearchStyleTextArea } from "../../ui/Input";
@@ -10,7 +11,10 @@ import { gsap } from "gsap";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
-import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalCustomJvmArgs, setGlobalCustomJvmArgs } from "../../../services/launcher-config-service";
+import { getGlobalMemorySettings, setGlobalMemorySettings, getGlobalJvmArgs, setGlobalJvmArgs } from "../../../services/launcher-config-service";
+import { getDefaultJvmArgs } from "../../../services/profile-service";
+import { useDebounce } from "../../../hooks/useDebounce";
+import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
 import type { MemorySettings } from "../../../types/launcherConfig";
 import { useTranslation } from "react-i18next";
 import { parseErrorMessage } from "../../../utils/error-utils";
@@ -25,7 +29,7 @@ function formatGb(mb: number): string {
 
 interface JavaSettingsTabProps {
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   systemRam: number;
   recommendedRam: number;
   tempRamMb: number;
@@ -52,9 +56,10 @@ export function JavaSettingsTab({
   const [useCustomJava, setUseCustomJava] = useState(
     editedProfile.settings?.use_custom_java_path ?? false,
   );
-  const [useCustomArgs, setUseCustomArgs] = useState(
-    (editedProfile.settings?.custom_jvm_args?.length || 0) > 0,
-  );
+  const [useCustomArgs, setUseCustomArgs] = useState(editedProfile.settings?.use_custom_jvm_args ?? false);
+  const [argsDraft, setArgsDraft] = useState(editedProfile.settings?.jvm_args ?? "");
+  const [defaultJvmArgs, setDefaultJvmArgs] = useState("");
+  const previewRamMb = useDebounce(tempRamMb, SLIDER_SAVE_DELAY_MS);
   const accentColor = useThemeStore((state) => state.accentColor);
   const isBackgroundAnimationEnabled = useThemeStore(
     (state) => state.isBackgroundAnimationEnabled,
@@ -74,7 +79,6 @@ export function JavaSettingsTab({
   const [isLoadingGlobalMemory, setIsLoadingGlobalMemory] = useState(false);
   const [isSystemRamLoaded, setIsSystemRamLoaded] = useState(false);
 
-  const [globalJvmArgs, setGlobalJvmArgsState] = useState<string | null>(null);
   const [isLoadingGlobalJvmArgs, setIsLoadingGlobalJvmArgs] = useState(false);
   
 
@@ -126,6 +130,23 @@ export function JavaSettingsTab({
   }, []);
 
   useEffect(() => {
+    let current = true;
+    getDefaultJvmArgs(editedProfile, previewRamMb)
+      .then((args) => current && setDefaultJvmArgs(args))
+      .catch((error) => console.error("Failed to load default JVM args:", error));
+    return () => {
+      current = false;
+    };
+  }, [
+    editedProfile.selected_norisk_pack_id,
+    editedProfile.game_version,
+    editedProfile.loader,
+    editedProfile.settings?.use_custom_java_path,
+    editedProfile.settings?.java_path,
+    previewRamMb,
+  ]);
+
+  useEffect(() => {
     if (systemRam !== 8192) {
       setIsSystemRamLoaded(true);
     }
@@ -154,10 +175,10 @@ export function JavaSettingsTab({
   useEffect(() => {
     if (editedProfile.is_standard_version) {
       setIsLoadingGlobalJvmArgs(true);
-      getGlobalCustomJvmArgs()
-        .then((args) => {
-          setGlobalJvmArgsState(args);
-          setUseCustomArgs((args?.length || 0) > 0);
+      getGlobalJvmArgs()
+        .then(({ use_global_jvm_args, global_jvm_args }) => {
+          setArgsDraft(global_jvm_args);
+          setUseCustomArgs(use_global_jvm_args);
         })
         .catch((error) => {
           console.error("Failed to load global JVM args:", error);
@@ -204,13 +225,7 @@ export function JavaSettingsTab({
       });
       if (isValid) {
         toast.success(t('java.path_valid'));
-        updateProfile({
-          settings: {
-            ...editedProfile.settings,
-            java_path: currentPath,
-            use_custom_java_path: true,
-          },
-        });
+        updateProfile({ settings: { java_path: currentPath, use_custom_java_path: true } });
       } else {
         toast.error(t('java.path_invalid'));
       }
@@ -231,33 +246,29 @@ export function JavaSettingsTab({
     ? (globalMemorySettings || { min: 1024, max: recommendedMaxRam })
     : (editedProfile.settings?.memory || { min: 1024, max: recommendedMaxRam });
 
-  const handleMemoryChange = async (value: number) => {
-    if (editedProfile.is_standard_version) {
-      const newGlobalSettings: MemorySettings = {
-        min: memory.min,
-        max: value,
-      };
-      
-      try {
-        await setGlobalMemorySettings(newGlobalSettings);
-        setGlobalMemorySettingsState(newGlobalSettings);
-      } catch (error) {
-        console.error("Failed to save global memory settings:", error);
-        toast.error(t('java.save_ram_failed'));
-      }
-    } else {
-      const newSettings = { ...editedProfile.settings };
-      if (!newSettings.memory) {
-        newSettings.memory = {
-          min: 1024,
-          max: value,
-        };
-      } else {
-        newSettings.memory.max = value;
-      }
-      updateProfile({ settings: newSettings });
+  const saveGlobalMemory = useDebouncedCallback(async (value: number) => {
+    const newGlobalSettings: MemorySettings = { min: memory.min, max: value };
+    try {
+      await setGlobalMemorySettings(newGlobalSettings);
+      setGlobalMemorySettingsState(newGlobalSettings);
+    } catch (error) {
+      console.error("Failed to save global memory settings:", error);
+      toast.error(t('java.save_ram_failed'));
+    }
+  }, SLIDER_SAVE_DELAY_MS);
+
+  const saveGlobalJvmArgs = async (patch: Parameters<typeof setGlobalJvmArgs>[0]) => {
+    try {
+      await setGlobalJvmArgs(patch);
+    } catch (error) {
+      console.error("Failed to save global JVM args:", error);
+      toast.error(t('java.save_jvm_failed'));
     }
   };
+  const saveGlobalJvmArgsText = useDebouncedCallback(
+    (global_jvm_args: string) => saveGlobalJvmArgs({ global_jvm_args }),
+    TYPING_SAVE_DELAY_MS,
+  );
 
   const handleJavaPathInputChange = (newPath: string) => {
     setCustomJavaPathInput(newPath);
@@ -268,19 +279,12 @@ export function JavaSettingsTab({
     testCustomJavaPath(installation.path);
   };
 
-  const handleJavaArgsChange = async (args: string) => {
+  const handleJavaArgsChange = (args: string) => {
+    setArgsDraft(args);
     if (editedProfile.is_standard_version) {
-      try {
-        await setGlobalCustomJvmArgs(args || null);
-        setGlobalJvmArgsState(args || null);
-      } catch (error) {
-        console.error("Failed to save global JVM args:", error);
-        toast.error(t('java.save_jvm_failed'));
-      }
+      saveGlobalJvmArgsText(args);
     } else {
-      const newSettings = { ...editedProfile.settings };
-      newSettings.custom_jvm_args = args;
-      updateProfile({ settings: newSettings });
+      updateProfile({ settings: { jvm_args: args } }, TYPING_SAVE_DELAY_MS);
     }
   };
 
@@ -293,60 +297,29 @@ export function JavaSettingsTab({
           detectedJavaInstallations[0];
         if (defaultOrFirst) setCustomJavaPathInput(defaultOrFirst.path);
       }
-      updateProfile({
-        settings: { ...editedProfile.settings, use_custom_java_path: true },
-      });
-    } else {
-      updateProfile({
-        settings: { ...editedProfile.settings, use_custom_java_path: false },
-      });
     }
+    updateProfile({ settings: { use_custom_java_path: checked } });
   };
 
-  const handleCustomArgsToggle = async (checked: boolean) => {
+  const handleCustomArgsToggle = (checked: boolean) => {
     setUseCustomArgs(checked);
-
-    const defaultArgs = [
-      "-XX:+UseG1GC",
-      "-XX:+ParallelRefProcEnabled",
-      "-XX:MaxGCPauseMillis=200",
-    ].join(" ");
-
     if (editedProfile.is_standard_version) {
-      try {
-        if (checked) {
-          const argsToSet = globalJvmArgs || defaultArgs;
-          await setGlobalCustomJvmArgs(argsToSet);
-          setGlobalJvmArgsState(argsToSet);
-        } else {
-          await setGlobalCustomJvmArgs(null);
-          setGlobalJvmArgsState(null);
-        }
-      } catch (error) {
-        console.error("Failed to save global JVM args:", error);
-        toast.error(t('java.save_jvm_failed'));
-      }
+      saveGlobalJvmArgs({ use_global_jvm_args: checked });
     } else {
-      const newSettings = { ...editedProfile.settings };
-      if (checked) {
-        if (!newSettings.custom_jvm_args) {
-          newSettings.custom_jvm_args = defaultArgs;
-        }
-      } else {
-        newSettings.custom_jvm_args = null;
-      }
-      updateProfile({ settings: newSettings });
+      updateProfile({ settings: { use_custom_jvm_args: checked } });
     }
-
   };
-
 
   const isStandard = editedProfile.is_standard_version;
   const memoryLoading = (isStandard && (isLoadingGlobalMemory || !globalMemorySettings)) || !isSystemRamLoaded;
   const presets = MEMORY_PRESETS_GB.map((gb) => gb * 1024).filter((mb) => mb <= systemRam);
   const selectRam = (value: number) => {
     setTempRamMb(value);
-    if (isStandard) handleMemoryChange(value);
+    if (isStandard) {
+      saveGlobalMemory(value);
+    } else {
+      updateProfile({ settings: { memory: { min: memory.min, max: value } } }, SLIDER_SAVE_DELAY_MS);
+    }
   };
 
   return (
@@ -503,7 +476,14 @@ export function JavaSettingsTab({
         }
       >
         {!useCustomArgs ? (
-          <p className="font-minecraft text-sm text-white/60">{t("profiles.settings.javaArgsHint")}</p>
+          <div className="space-y-1.5">
+            <p className="font-minecraft text-sm text-white/60">{t("profiles.settings.javaArgsHint")}</p>
+            {defaultJvmArgs && (
+              <p className="font-minecraft text-xs normal-case text-white/40">
+                {t("profiles.settings.javaArgsDefaults")}: {defaultJvmArgs}
+              </p>
+            )}
+          </div>
         ) : isStandard && isLoadingGlobalJvmArgs ? (
           <div className="flex items-center gap-2 font-smallcaps text-white/60">
             <Icon icon="svg-spinners:ring-resize" className="h-5 w-5" />
@@ -512,9 +492,9 @@ export function JavaSettingsTab({
         ) : (
           <div className="space-y-2">
             <SearchStyleTextArea
-              value={isStandard ? globalJvmArgs || "" : editedProfile.settings?.custom_jvm_args || ""}
+              value={argsDraft}
               onChange={(e) => handleJavaArgsChange(e.target.value)}
-              placeholder={t("profiles.settings.enterJavaArgs")}
+              placeholder={defaultJvmArgs || t("profiles.settings.enterJavaArgs")}
               minHeight="90px"
             />
             <p className="font-minecraft text-xs text-white/50">

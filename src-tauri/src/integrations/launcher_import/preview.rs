@@ -33,7 +33,8 @@ pub fn security_report_for(instance: &ExternalInstance) -> ImportSecurityReport 
         use_custom_java_path: instance.untrusted_java_path.is_some(),
         java_path: instance.untrusted_java_path.clone(),
         extra_game_args: instance.untrusted_game_args.clone(),
-        custom_jvm_args: instance.untrusted_jvm_args.clone(),
+        use_custom_jvm_args: instance.untrusted_jvm_args.is_some(),
+        jvm_args: instance.untrusted_jvm_args.clone().unwrap_or_default(),
         ..ProfileSettings::default()
     };
 
