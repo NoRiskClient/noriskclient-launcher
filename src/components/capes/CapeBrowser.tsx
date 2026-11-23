@@ -15,7 +15,10 @@ import type {
   GetPlayerCapesPayloadOptions,
   PaginationInfo,
 } from "../../types/noriskCapes";
-import { CapeList } from "./CapeList";
+import { CapeList, type CapeSelection } from "./CapeList";
+import { CapePanel } from "./CapePanel";
+import { useEquippedCosmetics } from "../../hooks/useEquippedCosmetics";
+import { RailPanel } from "../ads/AdRail";
 import { NO_CAPE_ID, createNoCapePlaceholder } from "./noCape";
 import type { CapeFiltersData } from "./CapeFilters";
 import { Icon } from "@iconify/react";
@@ -29,7 +32,7 @@ import { useVanillaCapeStore } from "../../store/useVanillaCapeStore";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { preloadIcons } from "../../lib/icon-utils";
-import { deleteCape, checkIsModerator } from "../../services/cape-service";
+import { deleteCape, checkIsModerator, getCapeImageUrl } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
 import { ConfirmDeletionModal } from "./ConfirmDeletionModal";
@@ -38,7 +41,7 @@ import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const pageOf = (page: number, response: CapesBrowseResponse): PaginationInfo => ({
   currentPage: page,
@@ -65,6 +68,7 @@ export function CapeBrowser(): JSX.Element {
     null,
   );
   const [currentPage, setCurrentPage] = useState(0);
+  const [selectedCape, setSelectedCape] = useState<CapeSelection | null>(null);
   const [filters, setFilters] = useState<CapeFiltersData>({
     sortBy: "",
     timeFrame: "",
@@ -116,13 +120,23 @@ export function CapeBrowser(): JSX.Element {
   }, [filters.showOwnedOnly, filters.showVanillaOnly, isFetchingMoreMy, isFetchingMoreAll, searchQuery]);
 
   // Computed equipped cape ID based on current tab
+  const { activeAccount } = useMinecraftAuthStore();
+  const { customCapeHash } = useEquippedCosmetics(activeAccount?.id);
+  const [equippedNoriskOverride, setEquippedNoriskOverride] = useState<string | null | undefined>(undefined);
+
   const equippedCapeId = useMemo(() => {
     if (filters.showVanillaOnly) {
       return equippedCape?.id || NO_CAPE_ID;
     }
-    // For NoRisk capes, we don't have equipped state yet
-    return null;
-  }, [filters.showVanillaOnly, equippedCape]);
+    const hash = equippedNoriskOverride !== undefined ? equippedNoriskOverride : customCapeHash;
+    return hash || NO_CAPE_ID;
+  }, [filters.showVanillaOnly, equippedCape, equippedNoriskOverride, customCapeHash]);
+
+  const panelSelection = useMemo<CapeSelection | null>(() => {
+    if (selectedCape) return selectedCape;
+    if (filters.showVanillaOnly || equippedCapeId === NO_CAPE_ID) return null;
+    return { capeId: equippedCapeId, capeUrl: getCapeImageUrl(equippedCapeId, isExperimental), uses: null };
+  }, [selectedCape, filters.showVanillaOnly, equippedCapeId, isExperimental]);
 
   const { showModal, hideModal } = useGlobalModal();
 
@@ -212,7 +226,6 @@ export function CapeBrowser(): JSX.Element {
 
   const isLoadingRef = useRef(false);
   const nextCursorRef = useRef<string | null>(null);
-  const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
     if (!activeAccount) return;
@@ -641,6 +654,7 @@ export function CapeBrowser(): JSX.Element {
       loading: t('capes.equippingCape'),
       success: () => {
         setIsEquippingCapeId(null);
+        if (!filters.showVanillaOnly) setEquippedNoriskOverride(capeHash);
         return t('capes.capeEquippedSuccess');
       },
       error: (err: any) => {
@@ -660,6 +674,7 @@ export function CapeBrowser(): JSX.Element {
           ? [useVanillaCapeStore.getState().equipCape(null)]
           : []),
       ]);
+      setEquippedNoriskOverride(null);
       toast.success(t('capes.capeUnequippedSuccess'));
     } catch (err: any) {
       console.error("Error unequipping cape:", err);
@@ -796,6 +811,17 @@ export function CapeBrowser(): JSX.Element {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
+      {activeAccount && (
+        <RailPanel>
+          <CapePanel
+            selection={panelSelection}
+            equippedCapeId={equippedCapeId}
+            busy={isEquippingCapeId !== null}
+            canFavorite={!filters.showVanillaOnly}
+            onEquip={handleEquipCape}
+          />
+        </RailPanel>
+      )}
       <div className={`flex-1 overflow-y-auto no-scrollbar${activeAccount ? "" : " flex flex-col"}`}>
         {/* Group tabs and search. Hidden while signed out: every filter here
             needs an account, so the bar would only offer dead controls above an
@@ -816,7 +842,7 @@ export function CapeBrowser(): JSX.Element {
                       });
                     }
                   }}
-                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`h-[42px] px-3 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     !filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -844,7 +870,7 @@ export function CapeBrowser(): JSX.Element {
                     }
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`h-[42px] px-3 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showOwnedOnly && !filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -865,7 +891,7 @@ export function CapeBrowser(): JSX.Element {
                     setSearchQuery("");
                     setCurrentPage(0);
                   }}
-                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`h-[42px] px-3 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showFavoritesOnly && !filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -887,7 +913,7 @@ export function CapeBrowser(): JSX.Element {
                     setCurrentPage(0);
                   }}
                   disabled={!activeAccount}
-                  className={`px-3 py-1 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
+                  className={`h-[42px] px-3 rounded-lg font-smallcaps text-base transition-all duration-200 flex items-center gap-2 border-2 ${
                     filters.showVanillaOnly
                       ? 'text-white'
                       : 'text-white/70 bg-black/30 hover:bg-black/40 border-white/10 hover:border-white/20'
@@ -908,6 +934,7 @@ export function CapeBrowser(): JSX.Element {
                 <div className="flex-1">
                   {!filters.showVanillaOnly ? (
                     <SearchWithFilters
+                      compact
                       placeholder={t('capes.searchPlayerPlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
@@ -921,6 +948,7 @@ export function CapeBrowser(): JSX.Element {
                     />
                   ) : (
                     <SearchWithFilters
+                      compact
                       placeholder={t('capes.searchVanillaCapePlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
@@ -991,7 +1019,9 @@ export function CapeBrowser(): JSX.Element {
             {/* Cape List */}
             <CapeList
               capes={capesForList}
+              onSelectCape={setSelectedCape}
               onEquipCape={handleEquipCape}
+              selectedCapeId={selectedCape?.capeId ?? null}
               isLoading={isLoading}
               isEquippingCapeId={isEquippingCapeId}
               equippedCapeId={equippedCapeId}

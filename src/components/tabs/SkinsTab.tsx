@@ -20,6 +20,11 @@ import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
 import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { RailPanel } from "../ads/AdRail";
+import { PlayerPreview3D } from "../launcher/PlayerPreview3D";
+import { RailActionButton } from "../ads/RailActionButton";
+import { CardContextMenu, useCardContextMenu } from "../ui/CardContextMenu";
+import type { ContextMenuItem } from "../ui/SettingsContextMenu";
 
 function useDelayedFlag(active: boolean, delayMs: number): boolean {
   const [shown, setShown] = useState(false);
@@ -36,8 +41,33 @@ function useDelayedFlag(active: boolean, delayMs: number): boolean {
   return shown;
 }
 
-const PREVIEW_WIDTH = 176;
-const PREVIEW_HEIGHT = 280;
+const PREVIEW_WIDTH = 120;
+const PREVIEW_HEIGHT = 190;
+
+interface PanelSkin {
+  textureUrl: string;
+  variant: SkinVariant;
+}
+
+interface SkinPanelProps {
+  skin: PanelSkin | null;
+  applied: boolean;
+  busy: boolean;
+  onApply?: () => void;
+}
+
+function SkinPanel({ skin, applied, busy, onApply }: SkinPanelProps) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <PlayerPreview3D skinUrl={skin?.textureUrl ?? null} variant={skin?.variant} />
+      <RailActionButton disabled={!onApply || busy || applied} onClick={() => onApply?.()}>
+        {busy ? t("skins.applying") : applied ? t("skins.applied") : t("skins.applySkin")}
+      </RailActionButton>
+    </>
+  );
+}
 
 const SkinPreview = memo(
   ({
@@ -50,6 +80,7 @@ const SkinPreview = memo(
     onClick,
     onEditSkin,
     onDeleteSkin,
+    onContextMenu,
   }: {
     skin: MinecraftSkin;
     index: number;
@@ -67,6 +98,7 @@ const SkinPreview = memo(
       skinName: string,
       event: React.MouseEvent<HTMLButtonElement>,
     ) => void;
+    onContextMenu?: (skin: MinecraftSkin, event: React.MouseEvent) => void;
   }) => {
     const [isHovered, setIsHovered] = useState(false);
     const accentColor = useThemeStore((state) => state.accentColor);
@@ -75,6 +107,7 @@ const SkinPreview = memo(
     );
     const { t } = useTranslation();
     const isSelected = selectedLocalSkin?.id === skin.id;
+    const highlighted = isHovered || isSelected;
     const isDisabled = loading && isSelected;
 
     const { url: previewUrl, loading: isRenderLoading } = useSkinPreview(true, {
@@ -99,20 +132,24 @@ const SkinPreview = memo(
         key={skin.id}
         style={{
           ...animationStyle,
-          backgroundColor: isHovered ? `${accentColor.value}20` : undefined,
-          borderColor: isHovered ? `${accentColor.value}60` : undefined,
+          backgroundColor: highlighted ? `${accentColor.value}20` : undefined,
+          borderColor: isSelected ? accentColor.value : isHovered ? `${accentColor.value}60` : undefined,
         }}
         className={cn(
-          "relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
+          "group relative flex flex-col gap-3 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
           animationClasses,
           isDisabled ? "opacity-60 pointer-events-none" : ""
         )}
         onClick={() => !isDisabled && onClick(skin)}
+        onContextMenu={(event) => {
+          if (isDisabled) return;
+          onContextMenu?.(skin, event);
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Action buttons - top right */}
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
+        <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {onEditSkin && (
             <button
               onClick={(event) => {
@@ -120,7 +157,7 @@ const SkinPreview = memo(
                 event.stopPropagation();
                 onEditSkin(skin, event);
               }}
-              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              className="w-7 h-7 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
               title={t('skins.editProperties')}
               disabled={isDisabled}
             >
@@ -135,7 +172,7 @@ const SkinPreview = memo(
                 event.stopPropagation();
                 onDeleteSkin(skin.id, skin.name, event);
               }}
-              className="w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
+              className="w-7 h-7 flex items-center justify-center bg-black/30 hover:bg-red-700/80 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded transition-all duration-200"
               title={t('skins.deleteSkin')}
               disabled={isDisabled}
             >
@@ -248,7 +285,7 @@ const AddSkinCard = memo(
         key={`add-skin-${index}`}
         style={animationStyle}
         className={cn(
-          "relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-dashed border-white/10 hover:border-white/30 transition-all duration-200 cursor-pointer",
+          "relative flex flex-col gap-3 p-3 rounded-lg bg-black/20 border border-dashed border-white/10 hover:border-white/30 transition-all duration-200 cursor-pointer",
           animationClasses
         )}
         onClick={onClick}
@@ -329,6 +366,7 @@ export function SkinsTab() {
     useState<MinecraftSkin | null>(null);
   const [search, setSearch] = useState<string>("");
   const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
+  const [currentTexture, setCurrentTexture] = useState<{ url: string; variant: SkinVariant } | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
 
@@ -362,6 +400,10 @@ export function SkinsTab() {
               const urlParts = skinInfo.url.split("/");
               const skinIdFromUrl = urlParts[urlParts.length - 1].split(".")[0];
               setCurrentSkinId(skinIdFromUrl);
+              setCurrentTexture({
+                url: skinInfo.url,
+                variant: skinInfo.metadata?.model === "slim" ? "slim" : "classic",
+              });
             }
           } catch (e) {
             console.error("Error parsing skin textures:", e);
@@ -568,6 +610,35 @@ export function SkinsTab() {
     return skin.id === currentSkinId;
   };
 
+  const skinMenuItems: ContextMenuItem<MinecraftSkin>[] = [
+    {
+      id: "apply",
+      label: t("skins.applySkin"),
+      icon: "solar:check-circle-bold",
+      disabled: loading,
+      onClick: (skin) => void applyLocalSkin(skin),
+    },
+    {
+      id: "edit",
+      label: t("skins.editProperties"),
+      icon: "solar:pen-bold",
+      onClick: (skin) => startEditSkin(skin),
+    },
+    {
+      id: "delete",
+      label: t("skins.deleteSkin"),
+      icon: "solar:trash-bin-trash-bold",
+      destructive: true,
+      separator: true,
+      onClick: (skin) => void handleDeleteSkin(skin.id, skin.name),
+    },
+  ];
+  const { menu: skinMenu, open: openMenu, close: closeSkinMenu } = useCardContextMenu<MinecraftSkin>();
+  const openSkinMenu = useCallback(
+    (skin: MinecraftSkin, event: React.MouseEvent) => openMenu(skin, event, 3),
+    [openMenu],
+  );
+
   // Add skin button
   const addSkinButton = (
     <button
@@ -585,27 +656,45 @@ export function SkinsTab() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
+      <CardContextMenu menu={skinMenu} items={skinMenuItems} onClose={closeSkinMenu} />
+      {activeAccount && (
+        <RailPanel>
+          <SkinPanel
+            skin={
+              selectedLocalSkin
+                ? {
+                    textureUrl: `data:image/png;base64,${selectedLocalSkin.base64_data}`,
+                    variant: selectedLocalSkin.variant,
+                  }
+                : currentTexture && {
+                    textureUrl: currentTexture.url,
+                    variant: currentTexture.variant,
+                  }
+            }
+            applied={
+              !selectedLocalSkin ||
+              (isSkinApplied(selectedLocalSkin) && currentTexture?.variant === selectedLocalSkin.variant)
+            }
+            busy={loading && !!selectedLocalSkin}
+            onApply={selectedLocalSkin ? () => void applyLocalSkin(selectedLocalSkin) : undefined}
+          />
+        </RailPanel>
+      )}
       <div className="flex-1 overflow-y-auto no-scrollbar">
         {/* Search & Filters. Hidden while signed out: with no skins to search
             and the add button already gated, the bar is a row of dead controls
             above an empty page. */}
         {activeAccount && (
-          <div className="mb-6 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <SearchWithFilters
-                  placeholder={t('skins.searchPlaceholder')}
-                  searchValue={search}
-                  onSearchChange={setSearch}
-                  onSearchEnter={() => {}} // Optional: implement instant search
-                />
-              </div>
-
-              {/* Action Button */}
-              <div className="flex items-center gap-3">
-                {addSkinButton}
-              </div>
+          <div className="mb-6 pb-4 border-b border-white/10 flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <SearchWithFilters
+                placeholder={t('skins.searchPlaceholder')}
+                searchValue={search}
+                onSearchChange={setSearch}
+                onSearchEnter={() => {}}
+              />
             </div>
+            {addSkinButton}
           </div>
         )}
 
@@ -663,7 +752,7 @@ export function SkinsTab() {
                   {t('skins.noSkinsMatchSearch')}
                 </p>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(145px,1fr))] gap-3">
                   <AddSkinCard
                     index={0}
                     onClick={() => startEditSkin(null, undefined)}
@@ -677,7 +766,8 @@ export function SkinsTab() {
                       localSkinsLoading={localSkinsLoading}
                       selectedLocalSkin={selectedLocalSkin}
                       isApplied={isSkinApplied(skin)}
-                      onClick={(target) => startEditSkin(target)}
+                      onClick={setSelectedLocalSkin}
+                      onContextMenu={openSkinMenu}
                       onEditSkin={startEditSkin}
                       onDeleteSkin={handleDeleteSkin}
                     />

@@ -241,8 +241,6 @@ interface ThemeState {
   modSource: ModPlatform;
   setModSource: (source: ModPlatform) => void;
   // News section width
-  newsSectionWidth: number;
-  setNewsSectionWidth: (width: number) => void;
   // Featured HugoSMP card on Play tab
   featureMode: boolean;
   setFeatureMode: (enabled: boolean) => void;
@@ -284,7 +282,6 @@ export const useThemeStore = create<ThemeState>()(
       // Mod source selection - defaults
       modSource: ModPlatform.Modrinth,
       // News section width - defaults
-      newsSectionWidth: 375,
       // Featured HugoSMP card - defaults
       featureMode: false,
       // Language - defaults
@@ -458,9 +455,6 @@ export const useThemeStore = create<ThemeState>()(
       },
 
       // News section width
-      setNewsSectionWidth: (width: number) => {
-        set({ newsSectionWidth: width });
-      },
 
       // Featured HugoSMP card
       setFeatureMode: (enabled: boolean) => {

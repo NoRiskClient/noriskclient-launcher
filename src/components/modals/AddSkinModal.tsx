@@ -4,10 +4,7 @@ import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
-import { Input } from "../ui/Input";
-import { Checkbox } from "../ui/Checkbox";
 import { toast } from "react-hot-toast";
 import { open } from "@tauri-apps/plugin-dialog";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
@@ -16,6 +13,7 @@ import { WebGLBoundary } from "../WebGLBoundary";
 import { FlatSkin } from "@noriskclient/nrc-skin-renderer/react";
 import { useIdleEmote } from "../../hooks/useIdleEmote";
 import { SearchStyleInput } from "../ui/Input";
+import { FieldLabel, SegmentedControl } from "../ui/SegmentedControl";
 import { parseErrorMessage } from "../../utils/error-utils";
 
 interface AddSkinModalProps {
@@ -30,6 +28,8 @@ interface AddSkinModalProps {
   ) => Promise<void>;
   isLoading: boolean;
 }
+
+const DEFAULT_SKIN = "/skins/steve.png";
 
 export const AddSkinModal = memo(
   ({ skin, onSave, onSaveAndApply, onAdd, isLoading }: AddSkinModalProps) => {
@@ -60,8 +60,8 @@ export const AddSkinModal = memo(
       setIsSlimVariant(skin?.variant === "slim");
     };
 
-    const handlePreview = async () => {
-      const trimmedInput = skinInput.trim();
+    const handlePreview = async (source: string = skinInput) => {
+      const trimmedInput = source.trim();
       if (!trimmedInput) {
         toast.error(t('skins.skinSourceEmpty'));
         return;
@@ -177,7 +177,6 @@ export const AddSkinModal = memo(
         setPreviewBase64Url(base64Url);
         setPreviewSkinName(targetName);
         setIsPreviewMode(true);
-        toast.success(t('skins.previewLoadedSuccess'));
 
       } catch (error) {
         console.error("Error loading skin preview:", error);
@@ -208,9 +207,7 @@ export const AddSkinModal = memo(
 
         if (typeof selectedFile === "string") {
           setSkinInput(selectedFile);
-          toast.success(t('skins.fileSelected', { name: selectedFile.split(/[\\/]/).pop() }));
-        } else if (selectedFile === null) {
-          console.log("User cancelled file selection.");
+          await handlePreview(selectedFile);
         }
       } catch (error) {
         console.error("Error opening file dialog:", error);
@@ -321,229 +318,157 @@ export const AddSkinModal = memo(
       handleClose();
     };
 
+    const hasPreview = !!previewBase64Url && isPreviewMode;
+
+    const busy = isLoading || isPreviewLoading;
+
     return (
       <Modal
-        title={skin ? t('skins.editSkinProperties') : (isPreviewMode ? t('skins.addSkinPreview') : t('skins.addSkin'))}
+        title={skin ? t('skins.editSkinProperties') : t('skins.addSkin')}
         onClose={handleClose}
         variant="flat"
+        width="lg"
         footer={
-          <div className="flex gap-3 justify-center">
-            {isPreviewMode ? (
-              <>
-                <Button
-                  variant="flat"
-                  onClick={handleSave}
-                  disabled={isLoading}
-                  size="sm"
-                >
-                  {isLoading ? t('skins.saving') : (skin ? t('skins.saveChanges') : t('skins.saveSkin'))}
-                </Button>
-                {skin && onSaveAndApply && (
-                  <Button
-                    variant="flat"
-                    onClick={handleSaveAndApply}
-                    disabled={isLoading}
-                    size="sm"
-                  >
-                    {t('skins.saveAndApply')}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                {!skin && (
-                  <Button
-                    variant="flat-secondary"
-                    onClick={handlePreview}
-                    disabled={isPreviewLoading}
-                    size="sm"
-                  >
-                    {isPreviewLoading ? t('skins.loading') : t('skins.previewSkin')}
-                  </Button>
-                )}
-                {skin && (
-                  <Button
-                    variant="flat"
-                    onClick={handleSave}
-                    disabled={isLoading}
-                    size="sm"
-                  >
-                    {isLoading ? t('skins.saving') : t('skins.saveChanges')}
-                  </Button>
-                )}
-                <Button
-                  variant="flat-secondary"
-                  onClick={handleClose}
-                  disabled={isLoading || isPreviewLoading}
-                  size="sm"
-                >
-                  {t('common.cancel')}
-                </Button>
-              </>
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" onClick={handleClose} disabled={busy} size="sm">
+              {t('common.cancel')}
+            </Button>
+            {skin && onSaveAndApply && (
+              <Button variant="flat-secondary" onClick={handleSaveAndApply} disabled={busy} size="sm">
+                {t('skins.saveAndApply')}
+              </Button>
             )}
+            <Button variant="flat" onClick={handleSave} disabled={busy || !hasPreview} size="sm">
+              {isLoading ? t('skins.saving') : skin ? t('skins.saveChanges') : t('skins.saveSkin')}
+            </Button>
           </div>
         }
       >
-        {isPreviewMode ? (
-          <div className="p-4">
-            {/* Skin Name Input - Above Preview */}
-            <div className="flex justify-center mb-4">
-              <div className="w-full max-w-md">
-                <SearchStyleInput
+        <div className="p-6 flex gap-7">
+          <div className="relative w-64 min-h-[22rem] self-stretch shrink-0 rounded-lg overflow-hidden bg-black/30 border border-white/10">
+            <WebGLBoundary
+              label="add-skin preview"
+              fallback={<FlatSkin textureUrl={hasPreview ? previewBase64Url : DEFAULT_SKIN} variant={variant} />}
+            >
+              <SkinRenderer
+                textureUrl={hasPreview ? previewBase64Url : DEFAULT_SKIN}
+                variant={hasPreview ? variant : "classic"}
+                emote={idleEmote.urls}
+                emoteLoop={idleEmote.loop}
+                zoom={1.75}
+                draggable
+                dragAxis="yaw"
+                fps={30}
+                style={{ width: "100%", height: "100%", opacity: hasPreview ? 1 : 0.35 }}
+              />
+            </WebGLBoundary>
+            {!hasPreview && (
+              <p className="absolute inset-x-0 bottom-3 text-center font-minecraft text-xs text-white/50">
+                {t('skins.previewPlaceholder')}
+              </p>
+            )}
+            {isPreviewLoading && (
+              <Icon icon="svg-spinners:ring-resize" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-white/70" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0 min-h-[22rem] flex flex-col">
+            {!hasPreview ? (
+              <div className="flex-1 flex flex-col gap-3">
+                <FieldLabel htmlFor="skinInputField">{t('skins.skin')}</FieldLabel>
+                <div className="flex items-stretch gap-2">
+                  <div className="flex-1 min-w-0">
+                    <SearchStyleInput
+                      id="skinInputField"
+                      icon="solar:link-bold"
+                      className="text-sm"
+                      value={skinInput}
+                      onChange={(e) => setSkinInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handlePreview();
+                      }}
+                      placeholder={t('skins.sourcePlaceholder')}
+                      disabled={busy}
+                    />
+                  </div>
+                  <Button
+                    variant="flat-secondary"
+                    size="sm"
+                    heightClassName="h-auto"
+                    onClick={() => void handlePreview()}
+                    disabled={busy || !skinInput.trim()}
+                  >
+                    {isPreviewLoading ? t('skins.loading') : t('skins.load')}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3 text-white/30 font-minecraft text-xs uppercase tracking-wider">
+                  <span className="h-px flex-1 bg-white/10" />
+                  {t('skins.or')}
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenFileUpload()}
+                  disabled={busy}
+                  className="group flex-1 flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-white/15 hover:border-white/35 bg-black/20 hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  <span className="w-12 h-12 rounded-full bg-white/5 group-hover:bg-white/10 flex items-center justify-center transition-colors">
+                    <Icon icon="solar:upload-bold" className="w-5 h-5 text-white/60 group-hover:text-white" />
+                  </span>
+                  <span className="flex flex-col items-center gap-1">
+                    <span className="font-minecraft text-sm text-white/75 group-hover:text-white">{t('skins.uploadSkinFromFile')}</span>
+                    <span className="font-minecraft text-xs text-white/35">{t('skins.fileHint')}</span>
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col gap-6">
+              <label className="group flex items-center gap-3 pb-2 border-b-2 border-white/10 focus-within:border-white/40 transition-colors cursor-text">
+                <input
                   value={previewSkinName}
                   onChange={(e) => setPreviewSkinName(e.target.value)}
                   placeholder={t('skins.enterSkinName')}
                   disabled={isLoading}
+                  aria-label={t('skins.skinName')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="flex-1 min-w-0 bg-transparent outline-none font-minecraft text-3xl text-white placeholder-white/25 normal-case"
                 />
-              </div>
-            </div>
+                <Icon icon="solar:pen-bold" className="w-5 h-5 shrink-0 text-white/30 group-hover:text-white/60 group-focus-within:text-white/80 transition-colors" />
+              </label>
 
-            <div className="flex justify-center">
-              <div className="w-72 h-[min(24rem,40vh)]">
-                <WebGLBoundary
-                  label="add-skin preview"
-                  fallback={
-                    <FlatSkin textureUrl={previewBase64Url} variant={variant} />
-                  }
-                >
-                  <SkinRenderer
-                  textureUrl={previewBase64Url}
-                  variant={variant}
-                  emote={idleEmote.urls}
-                  emoteLoop={idleEmote.loop}
-                  zoom={1.75}
-                  draggable
-                  dragAxis="yaw"
-                  fps={30}
-                  style={{ width: "100%", height: "100%" }}
-                />
-                </WebGLBoundary>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="flex justify-center gap-6">
-                <Checkbox
-                  checked={!isSlimVariant}
-                  onChange={(e) => setIsSlimVariant(false)}
+              <div className="flex flex-col gap-2">
+                <FieldLabel>{t('skins.skinVariant')}</FieldLabel>
+                <SegmentedControl
+                  stretch
+                  value={variant}
+                  onChange={(next) => setIsSlimVariant(next === "slim")}
                   disabled={isLoading}
-                  label={t('skins.classicSteve')}
-                  size="md"
-                />
-                <Checkbox
-                  checked={isSlimVariant}
-                  onChange={(e) => setIsSlimVariant(true)}
-                  disabled={isLoading}
-                  label={t('skins.slimAlex')}
-                  size="md"
+                  options={[
+                    { value: "classic", label: t('skins.classicSteve') },
+                    { value: "slim", label: t('skins.slimAlex') },
+                  ]}
                 />
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 space-y-4">
-            {skin && (
-              <div className="space-y-4">
-                {/* 3D Skin Preview for editing */}
-                <div className="flex justify-center">
-                  <div className="w-64 h-[min(20rem,34vh)]">
-                    <WebGLBoundary
-                      label="edit-skin preview"
-                      fallback={
-                        <FlatSkin textureUrl={previewBase64Url} variant={variant} />
-                      }
-                    >
-                      <SkinRenderer
-                      textureUrl={previewBase64Url}
-                      variant={variant}
-                      emote={idleEmote.urls}
-                      emoteLoop={idleEmote.loop}
-                      zoom={1.75}
-                      draggable
-                      dragAxis="yaw"
-                      fps={30}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                    </WebGLBoundary>
-                  </div>
-                </div>
 
-                {/* Skin Name Input */}
-                <div>
-                  <label className="block font-smallcaps text-lg text-white/80 mb-2">
-                    {t('skins.skinName')}
-                  </label>
-                  <SearchStyleInput
-                    value={previewSkinName}
-                    onChange={(e) => setPreviewSkinName(e.target.value)}
-                    placeholder={t('skins.enterSkinName')}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                {/* Skin Variant Selection */}
-                <div>
-                  <p className="font-smallcaps text-lg text-white/80 mb-4">
-                    {t('skins.skinVariant')}
-                  </p>
-                  <div className="flex justify-center gap-6">
-                    <Checkbox
-                      checked={!isSlimVariant}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setIsSlimVariant(false);
-                        }
-                      }}
-                      disabled={isLoading}
-                      label={t('skins.classicSteve')}
-                      size="md"
-                    />
-                    <Checkbox
-                      checked={isSlimVariant}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setIsSlimVariant(true);
-                        }
-                      }}
-                      disabled={isLoading}
-                      label={t('skins.slimAlex')}
-                      size="md"
-                    />
-                  </div>
-                </div>
+                {!skin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPreviewMode(false);
+                      setPreviewBase64Url(null);
+                    }}
+                    disabled={busy}
+                    className="mt-auto self-start flex items-center gap-2 font-minecraft text-sm text-white/50 hover:text-white transition-colors"
+                  >
+                    <Icon icon="solar:refresh-bold" className="w-4 h-4" />
+                    {t('skins.chooseOther')}
+                  </button>
+                )}
               </div>
             )}
-
-            {!skin && (
-              <div className="space-y-2">
-                <label className="block font-smallcaps text-lg text-white/80">
-                  {t('skins.skin')}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="skinInputField"
-                    value={skinInput}
-                    onChange={(e) => setSkinInput(e.target.value)}
-                    placeholder={t('skins.skinInputPlaceholder')}
-                    disabled={isLoading}
-                    size="md"
-                    variant="flat"
-                    className="flex-grow"
-                  />
-                  <IconButton
-                    onClick={handleOpenFileUpload}
-                    title={t('skins.uploadSkinFromFile')}
-                    disabled={isLoading}
-                    size="md"
-                    variant="flat-secondary"
-                    icon={<Icon icon="solar:folder-bold" className="w-5 h-5" />}
-                  />
-                </div>
-              </div>
-            )}
-
           </div>
-        )}
+        </div>
       </Modal>
     );
   },

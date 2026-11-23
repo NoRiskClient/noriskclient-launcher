@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CapesBrowseResponse, BrowseCapesOptions, GetPlayerCapesPayloadOptions, CosmeticCape, OwnedCapesResponse } from '../types/noriskCapes';
-import type { MinecraftProfile } from '../types/minecraft';
 import { invalidateEquippedCosmetics } from './cosmetic-cache';
 
 export const getCapeImageUrl = (hash: string, isExperimental: boolean): string => {
@@ -145,18 +144,6 @@ export const downloadTemplateAndOpenExplorer = (withElytra: boolean): Promise<vo
   console.log('[cape-service] Downloading cape template and opening explorer (elytra:', withElytra, ')');
   return invoke('download_template_and_open_explorer', { withElytra });
 };
-
-/**
- * Fetches a Minecraft profile by player name or UUID.
- * Corresponds to the Rust `get_profile_by_name_or_uuid` command.
- *
- * @param nameOrUuidQuery - The player's name or UUID to query.
- * @returns A promise that resolves to a `MinecraftProfile` object.
- * @throws If the backend command fails.
- */
-export const getPlayerProfileByUuidOrName = (nameOrUuidQuery: string): Promise<MinecraftProfile> => {
-  return invoke('get_profile_by_name_or_uuid', { nameOrUuidQuery });
-}; 
 
 /**
  * Add a cape to the user's favorites (server-backed)

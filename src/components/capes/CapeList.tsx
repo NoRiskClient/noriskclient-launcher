@@ -1,38 +1,30 @@
 import React, {
+  memo,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useInView } from "react-intersection-observer";
 import type { CosmeticCape } from "../../types/noriskCapes";
 import type { VanillaCape } from "../../types/vanillaCapes";
-import type { SkinVariant } from "../../types/localSkin";
 import { EmptyState } from "../ui/EmptyState";
 import { SignedOutState } from "../account/SignedOutState";
 import { Icon } from "@iconify/react";
 import { CapeImage } from "./CapeImage";
 import { VanillaCapeImage } from "./VanillaCapeImage";
 import { Tooltip } from "../ui/Tooltip";
-import { getPlayerProfileByUuidOrName, getCapesByHashes, getCapeImageUrl, getCapeReviewImageUrl } from "../../services/cape-service";
-import { MinecraftSkinService } from "../../services/minecraft-skin-service";
+import { getCapesByHashes, getCapeImageUrl, getCapeReviewImageUrl } from "../../services/cape-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { cn } from "../../lib/utils";
-import { Button } from "../ui/buttons/Button";
-import { Modal } from "../ui/Modal";
-import { SkinRenderer } from "@noriskclient/nrc-skin-renderer/react";
-import { WebGLBoundary } from "../WebGLBoundary";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
-import gsap from "gsap";
-import { IconButton } from "../ui/buttons/IconButton";
 import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
-import { useGlobalModal } from "../../hooks/useGlobalModal";
 import type { CapeReviewState } from "../../types/noriskCapes";
-import { ConfirmUnequipModal } from "./ConfirmUnequipModal";
 import { NO_CAPE_ID } from "./noCape";
+import { CardContextMenu, useCardContextMenu } from "../ui/CardContextMenu";
+import type { ContextMenuItem } from "../ui/SettingsContextMenu";
 
 function getCapeReviewState(cape: CosmeticCape): CapeReviewState {
   if (cape.accepted) return 'ACCEPTED';
@@ -45,14 +37,11 @@ interface CapeItemDisplayProps {
   imageUrl: string;
   isCurrentlyEquipping: boolean;
   isEquipped?: boolean;
-  onEquipCape: (capeId: string) => void | Promise<void>;
+  isSelected?: boolean;
+  onSelect: (selection: CapeSelection) => void;
+  onOpenMenu?: (cape: CosmeticCape | VanillaCape, event: React.MouseEvent) => void;
   canDelete?: boolean;
   onDeleteCapeClick?: (cape: CosmeticCape | VanillaCape, e: React.MouseEvent) => void;
-  creatorNameCache: Map<string, string>;
-  onContextMenu?: (e: React.MouseEvent) => void;
-  activeAccount?: any;
-  showModal?: (id: string, component: ReactNode) => void;
-  hideModal?: (id: string) => void;
   isVanilla?: boolean;
   showReviewState?: boolean;
   isExperimental?: boolean;
@@ -60,19 +49,16 @@ interface CapeItemDisplayProps {
   onModeratorDeleteClick?: (cape: CosmeticCape, e: React.MouseEvent) => void;
 }
 
-function CapeItemDisplay({
+const CapeItemDisplay = memo(function CapeItemDisplay({
   cape,
   imageUrl,
   isCurrentlyEquipping,
   isEquipped = false,
-  onEquipCape,
+  isSelected = false,
+  onSelect,
+  onOpenMenu,
   canDelete,
   onDeleteCapeClick,
-  creatorNameCache,
-  onContextMenu,
-  activeAccount,
-  showModal,
-  hideModal,
   isVanilla = false,
   showReviewState = false,
   isExperimental = false,
@@ -80,8 +66,6 @@ function CapeItemDisplay({
   onModeratorDeleteClick,
 }: CapeItemDisplayProps) {
   const { t } = useTranslation();
-  const [creatorName, setCreatorName] = useState<string | null>(null);
-  const [creatorLoading, setCreatorLoading] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState(false);
   const accentColor = useThemeStore((state) => state.accentColor);
   const capeState = !isVanilla ? getCapeReviewState(cape as CosmeticCape) : 'ACCEPTED';
@@ -90,111 +74,28 @@ function CapeItemDisplay({
   const capeId = isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id;
   const isNoCape = capeId === NO_CAPE_ID;
 
-  const handleCapeClick = useCallback(async () => {
-    if (isCurrentlyEquipping || !showModal || isDenied) return;
-
-    if (isNoCape) {
-      showModal(`unequip-cape`, (
-        <ConfirmUnequipModal
-          onConfirmUnequip={async () => {
-            await onEquipCape(NO_CAPE_ID);
-            hideModal && hideModal(`unequip-cape`);
-          }}
-          onCancelUnequip={() => hideModal && hideModal(`unequip-cape`)}
-        />
-      ));
-      return;
-    }
-
-    let userSkinUrl: string | undefined;
-    let userSkinVariant: SkinVariant | undefined;
-    if (activeAccount?.id) {
-      try {
-        const active = await MinecraftSkinService.getActiveSkin();
-        if (active?.base64_data) {
-          userSkinUrl = `data:image/png;base64,${active.base64_data}`;
-          userSkinVariant = active.variant;
-        }
-      } catch (e) {
-        console.error("[CapeList] Failed to load active skin for preview:", e);
-      }
-    }
-
-    const capeUrl = isVanilla
-      ? (cape as VanillaCape).url
-      : isInReview
-        ? getCapeReviewImageUrl(capeId, isExperimental)
-        : getCapeImageUrl(capeId, isExperimental);
-
-    showModal(`cape-preview-${capeId}`, (
-      <Modal
-        title={t('capes.capePreview')}
-        onClose={() => hideModal && hideModal(`cape-preview-${capeId}`)}
-        width="md"
-        variant="flat"
-      >
-        <Cape3DPreviewWithToggle
-          skinUrl={userSkinUrl}
-          skinVariant={userSkinVariant}
-          capeUrl={capeUrl}
-          capeId={capeId}
-          isEquipped={false}
-          isExperimental={isExperimental}
-          onEquipCape={() => {
-            onEquipCape(capeId);
-            hideModal && hideModal(`cape-preview-${capeId}`);
-          }}
-        />
-      </Modal>
-    ));
-  }, [cape, capeId, isNoCape, isCurrentlyEquipping, activeAccount, showModal, hideModal, onEquipCape, isVanilla, isDenied, isInReview, isExperimental]);
+  const handleCapeClick = () => {
+    if (isCurrentlyEquipping || isDenied) return;
+    onSelect({
+      capeId,
+      capeUrl: isNoCape
+        ? null
+        : isVanilla
+          ? (cape as VanillaCape).url
+          : isInReview
+            ? getCapeReviewImageUrl(capeId, isExperimental)
+            : getCapeImageUrl(capeId, isExperimental),
+      uses: isNoCape || isVanilla ? null : (cape as CosmeticCape).uses,
+    });
+  };
 
   const isFavorite = useCapeFavoritesStore((s) =>
     isVanilla ? false : s.isFavorite((cape as CosmeticCape)._id)
   );
   const toggleFavoriteOptimistic = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
 
-  useEffect(() => {
-    if (isVanilla) return;
 
-    let isMounted = true;
-    const cosmeticCape = cape as CosmeticCape;
-    if (cosmeticCape.firstSeen) {
-      if (creatorNameCache.has(cosmeticCape.firstSeen)) {
-        setCreatorName(creatorNameCache.get(cosmeticCape.firstSeen)!);
-        setCreatorLoading(false);
-        return;
-      }
-
-      setCreatorLoading(true);
-      getPlayerProfileByUuidOrName(cosmeticCape.firstSeen)
-        .then((profile) => {
-          if (isMounted) {
-            const nameToCache =
-              profile && profile.name ? profile.name : "Unknown";
-            setCreatorName(nameToCache);
-            creatorNameCache.set(cosmeticCape.firstSeen, nameToCache);
-          }
-        })
-        .catch(() => {
-          if (isMounted) {
-            const errorNameToCache = "Error";
-            setCreatorName(errorNameToCache);
-            creatorNameCache.set(cosmeticCape.firstSeen, errorNameToCache);
-          }
-        })
-        .finally(() => {
-          if (isMounted) {
-            setCreatorLoading(false);
-          }
-        });
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [cape, creatorNameCache, isVanilla]);
-
-  const displayWidth = 140;
+  const displayWidth = 96;
   const displayHeight = Math.round(displayWidth * (16 / 10));
 
   return (
@@ -203,10 +104,15 @@ function CapeItemDisplay({
         "group relative flex flex-col gap-3 p-4 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200",
         isDenied ? "cursor-default opacity-60" : "cursor-pointer"
       )}
+      style={isSelected ? { borderColor: accentColor.value, backgroundColor: `${accentColor.value}20` } : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={(e) => { e.preventDefault(); handleCapeClick(); }}
-      onContextMenu={(e) => { e.preventDefault(); handleCapeClick(); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (isDenied || isNoCape) return;
+        onOpenMenu?.(cape, e);
+      }}
     >
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-1">
         {!isVanilla && !isNoCape && (
@@ -344,28 +250,17 @@ function CapeItemDisplay({
         </div>
 
         <div className="flex-grow min-w-0 w-full text-center">
-          <h3
-            className={cn(
-              "font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case",
-              isNoCape && !isVanilla ? "mt-2.5" : "mb-1"
-            )}
-            title={
-              isVanilla
-                ? (cape as VanillaCape).name
-                : isNoCape
-                  ? t('capes.noCape')
-                  : creatorName || (cape as CosmeticCape).firstSeen
-            }
-          >
-            {isVanilla
-              ? (cape as VanillaCape).name
-              : isNoCape
-                ? t('capes.noCape')
-                : creatorLoading
-                  ? t('common.loading')
-                  : creatorName || t('common.unknown')
-            }
-          </h3>
+          {(isVanilla || isNoCape) && (
+            <h3
+              className={cn(
+                "font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case",
+                isNoCape && !isVanilla ? "mt-2.5" : "mb-1"
+              )}
+              title={isVanilla ? (cape as VanillaCape).name : t('capes.noCape')}
+            >
+              {isVanilla ? (cape as VanillaCape).name : t('capes.noCape')}
+            </h3>
+          )}
 
           {!isVanilla && !isNoCape && (
             <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
@@ -374,7 +269,9 @@ function CapeItemDisplay({
                   icon="solar:download-minimalistic-outline"
                   className="w-3 h-3 text-white/50"
                 />
-                <span>{t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}</span>
+                <span title={t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}>
+                  {(cape as CosmeticCape).uses.toLocaleString()}
+                </span>
               </div>
             </div>
           )}
@@ -382,12 +279,20 @@ function CapeItemDisplay({
       </div>
     </div>
   );
-}
+});
 
+
+export interface CapeSelection {
+  capeId: string;
+  capeUrl: string | null;
+  uses: number | null;
+}
 
 export interface CapeListProps {
   capes: CosmeticCape[] | VanillaCape[];
-  onEquipCape: (capeHash: string) => void | Promise<void>;
+  onSelectCape: (selection: CapeSelection) => void;
+  onEquipCape: (capeId: string) => void;
+  selectedCapeId?: string | null;
   isLoading?: boolean;
   isEquippingCapeId?: string | null;
   equippedCapeId?: string | null;
@@ -410,7 +315,9 @@ export interface CapeListProps {
 
 export function CapeList({
   capes,
+  onSelectCape,
   onEquipCape,
+  selectedCapeId = null,
   isLoading = false,
   isEquippingCapeId = null,
   equippedCapeId = null,
@@ -431,20 +338,11 @@ export function CapeList({
   onModeratorDeleteCape,
 }: CapeListProps) {
   const accentColor = useThemeStore((state) => state.accentColor);
-  const creatorNameCacheRef = useRef<Map<string, string>>(new Map());
-  const { showModal, hideModal } = useGlobalModal();
   const { t } = useTranslation();
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    cape: CosmeticCape | null;
-  } | null>(null);
   const authStore = useMinecraftAuthStore();
   const activeAccount = authStore.activeAccount;
 
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const favoriteCapeIds = useCapeFavoritesStore((s) => s.favoriteCapeIds);
   const [favoriteCapesFetched, setFavoriteCapesFetched] = useState<Map<string, CosmeticCape>>(new Map());
@@ -563,76 +461,68 @@ export function CapeList({
 
 // Removed virtuosoComponents - using native scrolling grid instead 
 
-  function calculateMenuPosition(x: number, y: number, menuWidth: number, menuHeight: number) {
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const padding = 16;
-    let adjustedX = x;
-    let adjustedY = y;
-    if (x + menuWidth + padding > viewport.width) {
-      adjustedX = x - menuWidth;
-      if (adjustedX < padding) adjustedX = viewport.width - menuWidth - padding;
-    }
-    if (y + menuHeight + padding > viewport.height) {
-      adjustedY = y - menuHeight;
-      if (adjustedY < padding) adjustedY = viewport.height - menuHeight - padding;
-    }
-    adjustedX = Math.max(padding, Math.min(adjustedX, viewport.width - menuWidth - padding));
-    adjustedY = Math.max(padding, Math.min(adjustedY, viewport.height - menuHeight - padding));
-    return { x: adjustedX, y: adjustedY };
-  }
+  const latestHandlers = useRef({ onDeleteCape, onModeratorDeleteCape, isVanilla });
+  latestHandlers.current = { onDeleteCape, onModeratorDeleteCape, isVanilla };
 
-  useEffect(() => {
-    if (contextMenu) {
-      const menuWidth = 200;
-      const menuHeight = 56;
-      setMenuPosition(calculateMenuPosition(contextMenu.x, contextMenu.y, menuWidth, menuHeight));
-      window.addEventListener("click", () => setContextMenu(null));
-      return () => window.removeEventListener("click", () => setContextMenu(null));
-    }
-  }, [contextMenu]);
-
-  useEffect(() => {
-    if (contextMenu && menuRef.current) {
-      gsap.fromTo(
-        menuRef.current,
-        { opacity: 0, scale: 0.95, y: -10 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.18, ease: "power2.out" }
-      );
-    }
-  }, [contextMenu]);
-
-  const handleCapeContextMenu = useCallback(
-    (cape: CosmeticCape, e: React.MouseEvent) => {
-      e.preventDefault();
-      setContextMenu({ x: e.clientX, y: e.clientY, cape });
+  const toggleFavorite = useCapeFavoritesStore((s) => s.toggleFavoriteOptimistic);
+  const { menu: capeMenu, open: openMenu, close: closeCapeMenu } = useCardContextMenu<CosmeticCape | VanillaCape>();
+  const capeIdOf = (cape: CosmeticCape | VanillaCape) => (isVanilla ? (cape as VanillaCape).id : (cape as CosmeticCape)._id);
+  const capeMenuItems: ContextMenuItem<CosmeticCape | VanillaCape>[] = [
+    {
+      id: "equip",
+      label: t("capes.equipCape"),
+      icon: "solar:check-circle-bold",
+      disabled: !!capeMenu && capeIdOf(capeMenu.target) === equippedCapeId,
+      onClick: (cape) => onEquipCape(capeIdOf(cape)),
     },
-    []
+    ...(isVanilla
+      ? []
+      : [
+          {
+            id: "favorite",
+            label: capeMenu && favoriteCapeIds.includes(capeIdOf(capeMenu.target)) ? t("capes.unfavorite") : t("capes.favorite"),
+            icon: "solar:heart-bold",
+            onClick: (cape: CosmeticCape | VanillaCape) => void toggleFavorite(capeIdOf(cape)),
+          },
+        ]),
+    ...(canDelete && onDeleteCape
+      ? [
+          {
+            id: "delete",
+            label: t("capes.deleteCape"),
+            icon: "solar:trash-bin-trash-bold",
+            destructive: true,
+            separator: true,
+            onClick: (cape: CosmeticCape | VanillaCape) => latestHandlers.current.onDeleteCape?.(cape as CosmeticCape),
+          },
+        ]
+      : []),
+  ];
+  const latestCount = useRef(capeMenuItems.length);
+  latestCount.current = capeMenuItems.length;
+  const openCapeMenu = useCallback(
+    (cape: CosmeticCape | VanillaCape, event: React.MouseEvent) => openMenu(cape, event, latestCount.current),
+    [openMenu],
   );
 
   const handleDeleteClickInternal = useCallback(
     (cape: CosmeticCape | VanillaCape, e: React.MouseEvent) => {
       e.stopPropagation();
+      const { onDeleteCape, isVanilla } = latestHandlers.current;
       if (onDeleteCape && !isVanilla) {
         onDeleteCape(cape as CosmeticCape);
       }
     },
-    [onDeleteCape, isVanilla],
+    [],
   );
 
   const handleModeratorDeleteClickInternal = useCallback(
     (cape: CosmeticCape, e: React.MouseEvent) => {
       e.stopPropagation();
-      if (onModeratorDeleteCape) {
-        onModeratorDeleteCape(cape);
-      }
+      latestHandlers.current.onModeratorDeleteCape?.(cape);
     },
-    [onModeratorDeleteCape],
+    [],
   );
-
-  const handlePreview3D = useCallback(() => {
-    // Preview is now handled by direct click, this function is kept for potential future use
-    setContextMenu(null);
-  }, []);
 
   // No loading spinner - capes appear immediately when available
 
@@ -722,7 +612,7 @@ export function CapeList({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
               gap: "16px",
               padding: "16px",
             }}
@@ -736,14 +626,11 @@ export function CapeList({
                   imageUrl={imageUrl}
                   isCurrentlyEquipping={isEquippingCapeId === cape._id}
                   isEquipped={false}
-                  onEquipCape={onEquipCape}
+                  isSelected={selectedCapeId === cape._id}
+                  onSelect={onSelectCape}
+                  onOpenMenu={openCapeMenu}
                   canDelete={canDelete}
                   onDeleteCapeClick={handleDeleteClickInternal}
-                  creatorNameCache={creatorNameCacheRef.current}
-                  onContextMenu={(e) => handleCapeContextMenu(cape, e)}
-                  activeAccount={activeAccount}
-                  showModal={(id, component) => showModal(id, component)}
-                  hideModal={(id) => hideModal(id)}
                   isVanilla={isVanilla}
                   isExperimental={isExperimental}
                   isModerator={isModerator}
@@ -759,7 +646,7 @@ export function CapeList({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
               gap: "16px",
               padding: "16px",
           }}
@@ -777,14 +664,11 @@ export function CapeList({
                 imageUrl={imageUrl}
                 isCurrentlyEquipping={isEquippingCapeId === capeId}
                 isEquipped={isEquipped}
-                onEquipCape={onEquipCape}
+                isSelected={selectedCapeId === capeId}
+                onSelect={onSelectCape}
+                onOpenMenu={openCapeMenu}
                 canDelete={canDelete && !isVanilla}
                 onDeleteCapeClick={handleDeleteClickInternal}
-                creatorNameCache={creatorNameCacheRef.current}
-                onContextMenu={(e) => handleCapeContextMenu(cape, e)}
-                activeAccount={activeAccount}
-                showModal={(id, component) => showModal(id, component)}
-                hideModal={(id) => hideModal(id)}
                 isVanilla={isVanilla}
                 showReviewState={showReviewState}
                 isExperimental={isExperimental}
@@ -800,110 +684,9 @@ export function CapeList({
         </div>
       </div>
 
-      {contextMenu && contextMenu.cape && (
-        <div
-          ref={menuRef}
-          className="glass-panel fixed z-[9999] rounded-md shadow-xl border-2 border-b-4 overflow-hidden"
-          style={{
-            top: menuPosition.y,
-            left: menuPosition.x,
-            backgroundColor: accentColor.value + "20",
-            borderColor: accentColor.value + "90",
-            borderBottomColor: accentColor.value,
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            boxShadow: "0 8px 16px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          <span
-            className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
-            style={{ backgroundColor: `${accentColor.value}80` }}
-          />
-          <ul className="py-1">
-            <li
-              className="px-4 py-2.5 flex items-center gap-3 hover:bg-white/10 cursor-pointer transition-colors duration-150"
-              onClick={handlePreview3D}
-            >
-              <Icon icon="ph:eye-bold" className="w-5 h-5 text-white" />
-              <span className="font-minecraft text-base text-white/80">
-                {t('capes.preview')}
-              </span>
-            </li>
-          </ul>
-        </div>
-      )}
+      <CardContextMenu menu={capeMenu} items={capeMenuItems} onClose={closeCapeMenu} />
     </div>
   );
 }
 
-function Cape3DPreviewWithToggle({
-  skinUrl,
-  skinVariant,
-  capeUrl,
-  capeId,
-  onEquipCape,
-  isEquipped = false,
-  isExperimental = false,
-}: {
-  skinUrl?: string;
-  skinVariant?: SkinVariant;
-  capeUrl?: string;
-  capeId: string;
-  onEquipCape: () => void;
-  isEquipped?: boolean;
-  isExperimental?: boolean;
-}) {
-  const { t } = useTranslation();
-  const [showElytra, setShowElytra] = useState(false);
-
-  const finalCapeUrl = capeUrl || getCapeImageUrl(capeId, isExperimental);
-
-  return (
-    <div className="p-4">
-      <div style={{ width: 300, height: 380, margin: "0 auto", position: "relative" }}>
-        <IconButton
-          onClick={() => setShowElytra((v) => !v)}
-          variant="ghost"
-          size="sm"
-          className="absolute top-2 right-2 z-10"
-          icon={
-            <Icon
-              icon={showElytra ? "ph:airplane-tilt-fill" : "ph:airplane-tilt-duotone"}
-              className="w-5 h-5"
-            />
-          }
-          title={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
-          aria-label={showElytra ? t('capes.showAsCape') : t('capes.showAsElytra')}
-        />
-        <WebGLBoundary
-          label="cape preview"
-          fallback={<CapeImage imageUrl={finalCapeUrl} part="back" width={200} />}
-        >
-          <SkinRenderer
-            textureUrl={skinUrl ?? null}
-            variant={skinVariant ?? "auto"}
-            cape={{ texture: finalCapeUrl, elytra: showElytra }}
-            rotation={Math.PI}
-            draggable
-            zoom={1.6}
-            fps={30}
-            style={{ width: 300, height: 380 }}
-          />
-        </WebGLBoundary>
-      </div>
-
-      <div className="flex justify-center mt-4">
-        <Button
-          onClick={onEquipCape}
-          variant="flat"
-          size="lg"
-          className="px-8"
-        >
-          {isEquipped ? t('capes.unequipCape') : t('capes.selectCape')}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
