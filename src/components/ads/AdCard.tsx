@@ -3,29 +3,29 @@ import { useLauncherAdsStore } from "../../store/launcher-ads-store";
 import { useFriendsStore } from "../../store/friends-store";
 import type { AdSize } from "../../services/ads-service";
 import { AdSlot } from "./AdSlot";
-import { openExternalUrl } from "../../services/tauri-service";
-
-const NORISK_PLUS_URL = "https://norisk.gg/shop";
+import { useOpenAdPause } from "./AdPauseDialog";
 
 export const MAIN_AD_SLOT = "play-news";
 
 export function useAdSize(slot: string): AdSize | null {
   const active = useLauncherAdsStore((state) => state.active);
   const size = useLauncherAdsStore((state) => state.slots[slot]);
-  return active && size ? size : null;
+  const paused = useLauncherAdsStore((state) => state.pausedUntil !== null);
+  return active && size && !paused ? size : null;
 }
 
 export function AdCaption() {
   const { t } = useTranslation();
+  const openPause = useOpenAdPause();
   return (
     <div className="flex items-center justify-between gap-2 px-0.5 font-minecraft text-[10px] uppercase tracking-wider text-white/35">
       <span>{t("ads.label")}</span>
       <button
         type="button"
-        onClick={() => void openExternalUrl(NORISK_PLUS_URL).catch(() => {})}
+        onClick={openPause}
         className="truncate uppercase tracking-wider text-white/50 hover:text-white transition-colors"
       >
-        {t("ads.ad_free_plus")}
+        {t("ads.disable")}
       </button>
     </div>
   );

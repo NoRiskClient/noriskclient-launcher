@@ -6,6 +6,7 @@ import { SettingRow } from "../../ui/settings/SettingRow";
 import { getAdStatus, onAdConsentMode, onAdStatusChanged } from "../../../services/ads-service";
 import { useLauncherAdsStore } from "../../../store/launcher-ads-store";
 import { useSettingsKeywords } from "./settings-context";
+import { useOpenAdPause } from "../../ads/AdPauseDialog";
 
 const BUTTON_CLASS = "px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors";
 
@@ -37,6 +38,9 @@ export function AdsTab() {
   const kw = useSettingsKeywords();
   const { launcherAds, available } = useAdSettings();
   const openConsent = useLauncherAdsStore((state) => state.openConsent);
+  const pausedUntil = useLauncherAdsStore((state) => state.pausedUntil);
+  const resume = useLauncherAdsStore((state) => state.resume);
+  const openPause = useOpenAdPause();
   const personalized = usePersonalizedAds(launcherAds);
   const personalizedLabel =
     personalized === null
@@ -55,6 +59,21 @@ export function AdsTab() {
         icon="solar:play-circle-bold"
         keywords={kw("settings.sections.ads", "ads", "werbung", "consent", "privacy", "gdpr", "dsgvo")}
       >
+        {launcherAds && (
+          <SettingRow
+            label={t("settings.ads.pause")}
+            description={
+              pausedUntil
+                ? t("settings.ads.pause.until", { date: new Date(pausedUntil).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) })
+                : t("settings.ads.pause.off")
+            }
+            searchKeywords={kw("settings.ads.pause", "pause", "pausieren", "werbung", "ads", "timer")}
+          >
+            <Button variant="ghost" className={BUTTON_CLASS} onClick={pausedUntil ? resume : openPause}>
+              {pausedUntil ? t("settings.ads.pause.resume") : t("settings.ads.pause.button")}
+            </Button>
+          </SettingRow>
+        )}
         {launcherAds && (
           <SettingRow
             label={t("settings.ads.privacy")}
