@@ -302,8 +302,9 @@ const AddSkinCard = memo(
           >
             <SkinViewer
               skinUrl="/skins/default_skin_full.png"
-              width={140}
-              height={280}
+              width={PREVIEW_WIDTH}
+              height={PREVIEW_HEIGHT}
+              fill
               className="rounded-sm block opacity-70 hover:opacity-100 transition-opacity"
             />
 

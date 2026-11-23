@@ -58,7 +58,7 @@ export function PlayerPreview3D({ skinUrl, variant, capeUrl = null, height = "fi
             emote={idleEmote.urls}
             emoteLoop={idleEmote.loop}
             onEmoteEnd={idleEmote.onEnd}
-            zoom={1.6}
+            zoom={1.9}
             fps={30}
             style={FILL_STYLE}
           />
