@@ -14,7 +14,8 @@ import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
 import { errorKey, getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
 import type { CaptureMethod, CaptureStatus, ClipEncoder } from "../../types/launcherConfig";
-import { BetaNotice } from "../ui/BetaNotice";
+import { RailPanel } from "../ads/AdRail";
+import { RailIntro } from "../ads/RailIntro";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
 import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../store/capture-permissions-store";
@@ -24,6 +25,7 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { trackEvent } from "../../services/analytics-service";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
+import { RailActionButton } from "../ads/RailActionButton";
 
 const STATUS_POLL_MS = 2000;
 const DROP_SHARE = 0.05;
@@ -283,6 +285,29 @@ export function ClipsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
+      <RailPanel>
+        <div className="flex flex-col gap-4 px-1 pt-1 font-minecraft normal-case select-none">
+          <RailIntro
+            title={t("nav.clips")}
+            tag={t("clips.page.beta_tag")}
+            description={t("clips.page.beta_hint")}
+            feedbackUrl={FEEDBACK_URL}
+            feedbackLabel={t("clips.page.feedback")}
+          />
+          <CaptureStatusCard state={state} hotkey={state.tone === "live" ? hotkey : null} t={t} />
+          <div className="grid grid-cols-2 gap-2">
+            <RailActionButton
+              icon="solar:folder-open-bold"
+              onClick={() => void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))}
+            >
+              {t("clips.page.folder")}
+            </RailActionButton>
+            <RailActionButton icon="solar:settings-bold" onClick={toClipSettings}>
+              {t("clips.page.settings")}
+            </RailActionButton>
+          </div>
+        </div>
+      </RailPanel>
       <div className="mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-4">
           <div className="flex-1">
@@ -300,28 +325,13 @@ export function ClipsPage() {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <CaptureStatusPill state={state} hotkey={state.tone === "live" ? hotkey : null} t={t} />
-
-            <Tooltip content={t("clips.page.favourites_only")} position="bottom">
-              <ActionButton
-                icon={favouritesOnly ? "solar:star-bold" : "solar:star-linear"}
-                variant={favouritesOnly ? "primary" : "icon-only"}
-                onClick={() => setFavouritesOnly((current) => !current)}
-              />
-            </Tooltip>
-            <Tooltip content={t("clips.page.folder")} position="bottom">
-              <ActionButton
-                icon="solar:folder-open-bold"
-                onClick={() =>
-                  void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
-                }
-              />
-            </Tooltip>
-            <Tooltip content={t("clips.page.settings")} position="bottom">
-              <ActionButton icon="solar:settings-bold" onClick={toClipSettings} />
-            </Tooltip>
-          </div>
+          <Tooltip content={t("clips.page.favourites_only")} position="bottom">
+            <ActionButton
+              icon={favouritesOnly ? "solar:star-bold" : "solar:star-linear"}
+              variant={favouritesOnly ? "primary" : "icon-only"}
+              onClick={() => setFavouritesOnly((current) => !current)}
+            />
+          </Tooltip>
         </div>
       </div>
 
@@ -344,14 +354,6 @@ export function ClipsPage() {
           </div>
         ))}
 
-      <BetaNotice
-        className="mb-4"
-        tag={t("clips.page.beta_tag")}
-        hint={t("clips.page.beta_hint")}
-        feedbackLabel={t("clips.page.feedback")}
-        feedbackUrl={FEEDBACK_URL}
-      />
-
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <ClipGallery
           search={search}
@@ -365,7 +367,7 @@ export function ClipsPage() {
   );
 }
 
-function CaptureStatusPill({
+function CaptureStatusCard({
   state,
   hotkey,
   t,
@@ -375,32 +377,24 @@ function CaptureStatusPill({
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const focused = useWindowFocus();
-
-  const pill = (
-    <div className="flex items-center gap-2.5 h-10 px-3 bg-black/30 border border-white/10 rounded-lg">
-      <span className="relative flex h-2.5 w-2.5 shrink-0">
-        {state.tone === "live" && focused && (
-          <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60 animate-ping" />
-        )}
-        <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", TONE_DOT[state.tone])} />
-      </span>
-      <span className="font-smallcaps text-base text-white/70 whitespace-nowrap">{state.label}</span>
+  return (
+    <div className="space-y-2 border-y border-white/10 py-3">
+      <div className="flex items-center gap-2.5">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          {state.tone === "live" && focused && (
+            <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60 animate-ping" />
+          )}
+          <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", TONE_DOT[state.tone])} />
+        </span>
+        <span className="text-sm text-white">{state.label}</span>
+      </div>
+      {state.detail && <p className="text-xs text-white/55 leading-relaxed">{state.detail}</p>}
       {hotkey && (
-        <>
-          <span className="w-px h-3 bg-white/30" />
-          <span className="font-minecraft text-xs text-white/60 whitespace-nowrap">
-            {t("clips.page.status.hotkey_hint")} {formatShortcut(hotkey)}
-          </span>
-        </>
+        <div className="flex items-center justify-between gap-2 text-xs text-white/55">
+          <span>{t("clips.page.status.hotkey_hint")}</span>
+          <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-white/80">{formatShortcut(hotkey)}</kbd>
+        </div>
       )}
     </div>
-  );
-
-  if (!state.detail) return pill;
-
-  return (
-    <Tooltip content={state.detail} position="bottom">
-      {pill}
-    </Tooltip>
   );
 }
