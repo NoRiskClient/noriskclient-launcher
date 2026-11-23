@@ -49,7 +49,7 @@ export function AdRailLayout({ children }: { children: ReactNode }) {
                 background: `linear-gradient(180deg, ${accentColor.value}1f, ${accentColor.value}0a), rgba(0, 0, 0, 0.3)`,
               }}
             >
-              <div ref={setTarget} className="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
+              <div ref={setTarget} className="flex-1 min-h-0 flex flex-col gap-2 p-2.5 overflow-y-auto custom-scrollbar">
                 {panels === 0 && <NewsSection />}
               </div>
               {railAd && (
