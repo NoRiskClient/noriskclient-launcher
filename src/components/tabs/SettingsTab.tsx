@@ -231,7 +231,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         setConfig(updatedConfig);
         toast.success(t("settings.toast.auto_saved"), {
           duration: 2000,
-          position: "bottom-right",
+          position: "top-right",
         });
       } catch (err) {
         console.error("Failed to auto-save configuration:", err);

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { AccountAvatar } from "../../account/AccountAvatar";
 import type React from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
@@ -32,7 +33,7 @@ preloadIcons([
 
 import type { Profile } from "../../../types/profile";
 import { setDiscordState } from "../../../utils/discordRpc";
-import { formatRelativeTime, formatPlaytime, formatBytes } from "../../../utils/format-relative-time";
+import { formatRelativeTime, formatPlaytime } from "../../../utils/format-relative-time";
 import { parseMotdToHtml } from "../../../utils/motd-utils";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useProfileStore } from "../../../store/profile-store";
@@ -56,6 +57,7 @@ import { SettingsContextMenu, type ContextMenuItem } from "../../ui/SettingsCont
 import { Tooltip } from "../../ui/Tooltip";
 
 import { ProfileLeftRailV3, type NavKey, contentTabOf } from "./ProfileLeftRailV3";
+import { RailHeader, RailPanel } from "../../ads/AdRail";
 import { EditableChipV3 } from "./chips/EditableChipV3";
 import { GameVersionPickerV3 } from "./chips/GameVersionPickerV3";
 import { LoaderBadgeV3 } from "./chips/LoaderBadgeV3";
@@ -80,14 +82,13 @@ interface ProfileDetailViewV3Props {
 }
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
-const Stat: React.FC<{ icon: string; label: string; value: string; muted?: boolean }> = ({ icon, label, value, muted }) => (
-  <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-black/30 border border-white/10 hover:border-white/20 transition-colors min-w-[160px] max-w-[240px]">
-    <Icon icon={icon} className={`w-5 h-5 flex-shrink-0 ${muted ? "text-white/25" : "text-white/60"}`} />
-    <div className="flex flex-col leading-tight min-w-0">
-      <span className="text-xs uppercase tracking-wider text-white/50 font-minecraft">{label}</span>
-      <span className={`text-sm font-minecraft truncate ${muted ? "text-white/40" : "text-white/95"}`} title={value}>{value}</span>
-    </div>
-  </div>
+const Stat: React.FC<{ icon: string; label: string; value: string }> = ({ icon, label, value }) => (
+  <Tooltip content={label}>
+    <span className="inline-flex items-center gap-1.5">
+      <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />
+      {value}
+    </span>
+  </Tooltip>
 );
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -134,10 +135,6 @@ export function ProfileDetailViewV3({
   const preferredAccount = currentProfile.preferred_account_id
     ? accounts.find(acc => acc.id === currentProfile.preferred_account_id)
     : null;
-  const preferredAccountAvatarUrl = usePlayerAvatar({
-    uuid: preferredAccount?.id,
-    overlay: true,
-  });
 
   const { isLaunching, statusMessage, handleLaunch, handleQuickPlayLaunch } = useProfileLaunch({
     profileId: profile.id,
@@ -342,23 +339,6 @@ export function ProfileDetailViewV3({
     }
   }, [openContextMenuId, contextMenuId, isContextMenuOpen]);
 
-  // Disk usage: fetch once per profile, also refetch when a session ends
-  // (Playtime-Wert hat sich dann geändert, plausibel dass sich auch Dateien änderten).
-  const [diskSize, setDiskSize] = useState<number | null>(
-    () => useContentCacheStore.getState().getDiskSize(profile.id) ?? null,
-  );
-  useEffect(() => {
-    let cancelled = false;
-    ProfileService.getProfileDiskSize(currentProfile.id)
-      .then((size) => {
-        useContentCacheStore.getState().setDiskSize(currentProfile.id, size);
-        if (!cancelled) setDiskSize(size);
-      })
-      .catch((err) => {
-        console.warn("[V3] Failed to fetch disk size:", err);
-      });
-    return () => { cancelled = true; };
-  }, [currentProfile.id, currentProfile.playtime_seconds]);
 
   const resolvedLoaderVersion = useResolvedLoaderVersion(currentProfile);
 
@@ -372,6 +352,8 @@ export function ProfileDetailViewV3({
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
+      <RailHeader>
+        <div className="border-b border-white/5">
       {/* ── Top Bar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-5 h-11 border-b border-white/5 flex-shrink-0">
         <button
@@ -445,11 +427,11 @@ export function ProfileDetailViewV3({
       </div>
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <div className="px-5 pt-5 pb-4 flex-shrink-0">
-        <div className="flex items-start gap-5">
+      <div className="px-5 py-2.5 flex-shrink-0">
+        <div className="flex items-center gap-4">
           {/* Icon + loader overlay */}
           <div className="relative flex-shrink-0">
-            <ProfileIconV2 profile={currentProfile} size="lg" className="w-24 h-24 rounded-lg ring-1 ring-white/10" />
+            <ProfileIconV2 profile={currentProfile} size="lg" className="w-16 h-16 rounded-lg ring-1 ring-white/10" />
             <LoaderBadgeV3
               loader={currentProfile.loader}
               disabled={chipEditors.isLocked}
@@ -459,12 +441,27 @@ export function ProfileDetailViewV3({
           </div>
 
           {/* Identity + chips */}
-          <div className="flex-1 min-w-0 pt-1">
-            <h1
-              className="font-minecraft text-3xl text-white normal-case truncate"
-              dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
-            />
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-3 min-w-0">
+              <h1
+                className="font-minecraft text-2xl text-white normal-case truncate"
+                dangerouslySetInnerHTML={{ __html: parseMotdToHtml(currentProfile.name || currentProfile.id) }}
+              />
+              {isLaunching && statusMessage ? (
+                <span className="flex items-center gap-1.5 min-w-0 text-sm font-minecraft text-emerald-300/90 animate-in fade-in duration-200">
+                  <Icon icon="svg-spinners:ring-resize" className="w-3.5 h-3.5 flex-shrink-0 self-center" />
+                  <span className="truncate" title={statusMessage}>{statusMessage}</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-3 shrink-0 text-sm font-minecraft text-white/45 whitespace-nowrap">
+                  <Stat icon="solar:clock-circle-bold" label={t('profiles.sort.lastPlayed')} value={formatRelativeTime(currentProfile.last_played)} />
+                  {!!currentProfile.playtime_seconds && (
+                    <Stat icon="solar:hourglass-bold" label={t("profiles.v3.stats.playtime")} value={formatPlaytime(currentProfile.playtime_seconds)} />
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
               <EditableChipV3
                 icon="solar:gamepad-bold"
                 withSaveCancel={false}
@@ -590,21 +587,53 @@ export function ProfileDetailViewV3({
                 );
               })()}
               {preferredAccount && (
-                <Tooltip content={t('profiles.launchWith', { account: preferredAccount.username })}>
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white/75 font-minecraft">
-                    {preferredAccountAvatarUrl ? (
-                      <img
-                        src={preferredAccountAvatarUrl}
-                        alt={preferredAccount.username}
-                        className="w-4 h-4 rounded-sm flex-shrink-0"
-                        style={{ imageRendering: 'pixelated' }}
-                      />
-                    ) : (
-                      <Icon icon="solar:user-bold" className="w-4 h-4 flex-shrink-0" />
-                    )}
+                <EditableChipV3
+                  withSaveCancel={false}
+                  width="w-64"
+                  renderEditor={({ close }) => (
+                    <div className="py-1">
+                      {[null, ...accounts].map((account) => {
+                        const selected = (account?.id ?? null) === (currentProfile.preferred_account_id ?? null);
+                        return (
+                          <button
+                            key={account?.id ?? "active"}
+                            type="button"
+                            onClick={() => {
+                              void chipEditors.savePreferredAccount(account?.id ?? null);
+                              close();
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left font-minecraft text-sm transition-colors ${
+                              selected ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            <span className="w-6 h-6 shrink-0 rounded overflow-hidden bg-black/40 flex items-center justify-center">
+                              {account ? (
+                                <AccountAvatar uuid={account.id} name={account.username} />
+                              ) : (
+                                <Icon icon="solar:user-rounded-bold" className="w-4 h-4 text-white/50" />
+                              )}
+                            </span>
+                            <span className="flex-1 truncate normal-case">
+                              {account ? account.username : t("profiles.v3.chips.account.active")}
+                            </span>
+                            {selected && <Icon icon="solar:check-circle-bold" className="w-4 h-4 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                >
+                  <span className="inline-flex items-center gap-2 normal-case">
+                    <span className="w-4 h-4 shrink-0 rounded-sm overflow-hidden bg-black/40 flex items-center justify-center">
+                      {preferredAccount ? (
+                        <AccountAvatar uuid={preferredAccount.id} name={preferredAccount.username} />
+                      ) : (
+                        <Icon icon="solar:user-rounded-bold" className="w-3 h-3 text-white/50" />
+                      )}
+                    </span>
                     {preferredAccount.username}
                   </span>
-                </Tooltip>
+                </EditableChipV3>
               )}
             </div>
           </div>
@@ -615,8 +644,8 @@ export function ProfileDetailViewV3({
               onClick={handleLaunch}
               variant={isLaunching ? "destructive" : "3d"}
               size="lg"
-              heightClassName="h-14"
-              widthClassName="w-[200px]"
+              heightClassName="h-12"
+              widthClassName="w-[150px]"
               icon={<Icon icon={isLaunching ? "solar:stop-bold" : "solar:play-bold"} width="24" height="24" />}
             >
               {isLaunching ? t('profiles.stop') : t('profiles.play')}
@@ -624,7 +653,7 @@ export function ProfileDetailViewV3({
             <Tooltip content={t('profiles.editProfile')}>
               <button
                 onClick={onEdit}
-                className="h-14 w-12 rounded-lg bg-white/[0.03] hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+                className="h-12 w-12 rounded-lg bg-white/[0.03] hover:bg-white/10 border border-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
               >
                 <Icon icon="solar:settings-bold" className="w-5 h-5" />
               </button>
@@ -632,50 +661,12 @@ export function ProfileDetailViewV3({
           </div>
         </div>
 
-        {/* Stats-Strip — waehrend Launch durch Status-Card ersetzt. IDENTISCHER
-            Wrapper (flex + gap-2 + flex-wrap) damit die Row-Hoehe stabil bleibt
-            auch wenn die Stats auf schmalen Viewports wrappen. Launch-Card
-            nutzt EXAKT das Stat-Padding/-Struktur (px-3 py-2 + gap-2.5 +
-            leading-tight) damit 1:1 gleiche Pixel. */}
-        <div className="flex items-center gap-2 flex-wrap mt-5">
-          {isLaunching && statusMessage ? (
-            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-400/25 min-w-[160px] animate-in fade-in duration-200">
-              <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-emerald-300 flex-shrink-0" />
-              <div className="flex flex-col leading-tight min-w-0">
-                <span className="text-xs uppercase tracking-wider text-emerald-300/70 font-minecraft">
-                  {t("profiles.card.starting")}
-                </span>
-                <span className="text-sm text-emerald-100/95 font-minecraft truncate" title={statusMessage}>
-                  {statusMessage}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <>
-              <Stat
-                icon="solar:clock-circle-bold"
-                label={t('profiles.sort.lastPlayed')}
-                value={formatRelativeTime(currentProfile.last_played)}
-              />
-              <Stat
-                icon="solar:hourglass-bold"
-                label={t("profiles.v3.stats.playtime")}
-                value={formatPlaytime(currentProfile.playtime_seconds)}
-                muted={!currentProfile.playtime_seconds}
-              />
-              <Stat
-                icon="solar:ssd-round-bold"
-                label={t("profiles.v3.stats.disk")}
-                value={diskSize == null ? "…" : formatBytes(diskSize)}
-                muted={diskSize == null || diskSize === 0}
-              />
-            </>
-          )}
-        </div>
       </div>
+        </div>
+      </RailHeader>
 
       {/* ── Body: Main + Right-Rail ─────────────────────────────────────── */}
-      <div className={`flex-1 min-h-0 flex border-t border-white/5 ${activeNavItem === "logs" ? "" : "overflow-hidden"}`}>
+      <div className={`flex-1 min-h-0 flex ${activeNavItem === "logs" ? "" : "overflow-hidden"}`}>
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {contentTab && (
             <LocalContentTabV3<LocalContentItem>
@@ -710,11 +701,13 @@ export function ProfileDetailViewV3({
           )}
         </main>
 
-        <ProfileLeftRailV3
-          profile={currentProfile}
-          activeNavItem={activeNavItem}
-          onNavChange={setActiveNavItem}
-        />
+        <RailPanel>
+          <ProfileLeftRailV3
+            profile={currentProfile}
+            activeNavItem={activeNavItem}
+            onNavChange={setActiveNavItem}
+          />
+        </RailPanel>
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}

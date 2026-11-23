@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AccountAvatar } from "../../account/AccountAvatar";
 import { Icon } from "@iconify/react";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
@@ -24,22 +25,6 @@ interface GeneralSettingsTabProps {
   onRefresh?: () => Promise<Profile>;
   onDelete?: () => void;
   isDeleting?: boolean;
-}
-
-function AccountAvatar({ account }: { account: MinecraftAccount }) {
-  const avatarUrl = usePlayerAvatar({ uuid: account.id, overlay: true });
-  if (!avatarUrl) return null;
-  return (
-    <img
-      src={avatarUrl}
-      alt={account.username}
-      className="h-full w-full object-cover"
-      style={{ imageRendering: "pixelated" }}
-      onError={(e) => {
-        e.currentTarget.style.display = "none";
-      }}
-    />
-  );
 }
 
 export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRefresh }: GeneralSettingsTabProps) {
@@ -153,7 +138,7 @@ export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRe
                   className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-3"
                 >
                   <span className="h-8 w-8 shrink-0 overflow-hidden rounded bg-black/40">
-                    <AccountAvatar account={account} />
+                    <AccountAvatar uuid={account.id} name={account.username} />
                   </span>
                   <span className="max-w-[140px] truncate text-sm normal-case">{account.username}</span>
                   {selected && (

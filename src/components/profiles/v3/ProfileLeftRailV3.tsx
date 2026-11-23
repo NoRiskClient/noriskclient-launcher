@@ -81,13 +81,13 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 border-l border-white/10 overflow-y-auto no-scrollbar py-4 flex flex-col">
+    <nav className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col">
       {groups.map((group, gi) => (
-        <div key={gi} className="mb-5">
-          <div className="px-4 mb-2 text-xs uppercase tracking-wider text-white/60 font-minecraft">
+        <div key={gi} className="mb-2">
+          <div className="px-4 mb-1 text-xs uppercase tracking-wider text-white/60 font-minecraft">
             {t(group.labelKey)}
           </div>
-          <div className="px-2 space-y-1">
+          <div className="px-2">
             {group.items.map((item) => {
               const active = item.key === activeNavItem;
               return (
@@ -104,7 +104,7 @@ export function ProfileLeftRailV3({ profile, activeNavItem, onNavChange }: Profi
           </div>
         </div>
       ))}
-    </aside>
+    </nav>
   );
 }
 
@@ -119,13 +119,13 @@ interface NavButtonProps {
 const NavButton: React.FC<NavButtonProps> = ({ icon, label, count, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left transition-colors border ${
+    className={`w-full flex items-center gap-3 px-3 py-[2px] rounded text-left transition-colors border ${
       active
         ? "bg-white/10 text-white border-white/20"
         : "text-white/60 hover:text-white hover:bg-white/5 border-transparent"
     }`}
   >
-    <Icon icon={icon} className="w-5 h-5 flex-shrink-0" />
+    <Icon icon={icon} className="w-4 h-4 flex-shrink-0" />
     <span className="flex-1 font-minecraft text-sm uppercase tracking-wide truncate">{label}</span>
     {typeof count === "number" && count > 0 && (
       <span className="text-xs font-minecraft text-white/45 tabular-nums">{count}</span>

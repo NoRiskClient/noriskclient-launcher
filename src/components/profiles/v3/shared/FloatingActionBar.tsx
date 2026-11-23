@@ -1,5 +1,6 @@
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +25,8 @@ interface FloatingActionBarProps {
   batchProgress?: { current: number; total: number } | null;
 }
 
+const EDGE_GAP = 16;
+
 export function FloatingActionBar(props: FloatingActionBarProps) {
   const lastVisible = useRef(props);
   if (props.visible) lastVisible.current = props;
@@ -32,16 +35,48 @@ export function FloatingActionBar(props: FloatingActionBarProps) {
   } = lastVisible.current;
   const { visible, accent } = props;
   const { t } = useTranslation();
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [center, setCenter] = useState<{ x: number; bottom: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const list = anchorRef.current?.parentElement;
+    const page = list?.closest<HTMLElement>("[data-page-area]") ?? list;
+    if (!list || !page) return;
+    const place = () => {
+      const listRect = list.getBoundingClientRect();
+      const pageRect = page.getBoundingClientRect();
+      const half = (barRef.current?.offsetWidth ?? 0) / 2;
+      const listCenter = listRect.left + listRect.width / 2;
+      setCenter({
+        x: Math.max(listCenter, pageRect.left + EDGE_GAP + half),
+        bottom: window.innerHeight - listRect.bottom,
+      });
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(list);
+    if (barRef.current) observer.observe(barRef.current);
+    window.addEventListener("resize", place);
+    place();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, []);
+
   const toggle = !allSelected
     ? { onClick: onSelectAll, icon: "solar:check-square-linear", label: t("profiles.v3.fab.selectAll") }
     : onRestore
       ? { onClick: onRestore, icon: "solar:undo-left-linear", label: t("profiles.v3.fab.selectPrevious") }
       : { onClick: onClear, icon: "solar:close-square-linear", label: t("profiles.v3.fab.selectNone") };
-  return (
+  const bar = (
     <div
-      className={`absolute left-1/2 -translate-x-1/2 z-30 transition-[bottom] duration-200 ease-out ${
-        visible ? "bottom-5 pointer-events-auto" : "bottom-1 pointer-events-none"
+      ref={barRef}
+      data-ad-passthrough
+      className={`fixed -translate-x-1/2 z-40 transition-[bottom] duration-200 ease-out ${
+        visible ? "pointer-events-auto" : "pointer-events-none"
       }`}
+      style={center ? { left: center.x, bottom: center.bottom + (visible ? 20 : 4) } : { display: "none" }}
     >
       <div
         style={{
@@ -98,6 +133,13 @@ export function FloatingActionBar(props: FloatingActionBarProps) {
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      <div ref={anchorRef} className="hidden" />
+      {createPortal(bar, document.body)}
+    </>
   );
 }
 

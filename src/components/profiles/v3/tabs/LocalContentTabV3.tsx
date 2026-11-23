@@ -583,7 +583,8 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           filterValue={filter}
           onFilterChange={(v) => setFilter(v as FilterKey)}
           dropdownSize="sm"
-          className="flex-1"
+          compact
+          className="flex-1 min-w-0"
         />
 
         {isNrc && (

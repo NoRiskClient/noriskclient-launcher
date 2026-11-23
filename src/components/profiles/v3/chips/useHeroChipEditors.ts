@@ -64,6 +64,7 @@ interface UseHeroChipEditorsResult {
   saveGameVersion: (version: string) => Promise<void>;
   saveLoader: (loader: LoaderKey) => Promise<void>;
   saveLoaderVersion: (version: string) => Promise<void>;
+  savePreferredAccount: (accountId: string | null) => Promise<void>;
 }
 
 export function useHeroChipEditors(
@@ -274,6 +275,14 @@ export function useHeroChipEditors(
     [profile.loader, profile.settings, save],
   );
 
+  const savePreferredAccount = useCallback(
+    async (accountId: string | null) => {
+      if (accountId === (profile.preferred_account_id ?? null)) return;
+      await save({ preferred_account_id: accountId });
+    },
+    [profile.preferred_account_id, save],
+  );
+
   return {
     isLocked,
     lockReason,
@@ -287,5 +296,6 @@ export function useHeroChipEditors(
     saveGameVersion,
     saveLoader,
     saveLoaderVersion,
+    savePreferredAccount,
   };
 }

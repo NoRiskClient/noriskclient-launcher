@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { RailPanel } from "../ads/AdRail";
 import { Virtuoso } from "react-virtuoso";
 import type { Profile } from "../../types/profile";
 import { useProfileStore } from "../../store/profile-store";
@@ -144,10 +145,10 @@ export function ProfilesTabV2() {
   // Create groups array with default groups + dynamic groups
   const createGroups = (): GroupTab[] => {
     const defaultGroups: GroupTab[] = [
-      { id: "all", name: "All", count: getFilteredCountForGroup("all") },
-      { id: "nrc", name: "NRC", count: getFilteredCountForGroup("nrc") },
-      { id: "server", name: "SERVER", count: getFilteredCountForGroup("server") },
-      { id: "modpacks", name: "MODPACKS", count: getFilteredCountForGroup("modpacks") },
+      { id: "all", name: "All", icon: "solar:widget-bold", count: getFilteredCountForGroup("all") },
+      { id: "nrc", name: "NRC", icon: "solar:bolt-bold", count: getFilteredCountForGroup("nrc") },
+      { id: "server", name: "SERVER", icon: "solar:server-bold", count: getFilteredCountForGroup("server") },
+      { id: "modpacks", name: "MODPACKS", icon: "solar:box-bold", count: getFilteredCountForGroup("modpacks") },
     ];
 
     // Get unique profile groups and convert to GroupTab format
@@ -208,7 +209,7 @@ export function ProfilesTabV2() {
   };
 
   // Columns per layout mode (also used by the virtual grid).
-  const columnCount = layoutMode === "grid" ? 2 : layoutMode === "compact" ? 3 : 1;
+  const columnCount = layoutMode === "grid" ? 2 : layoutMode === "compact" ? 5 : 1;
 
   // Filter -> sort (memoized; avoids re-running on unrelated re-renders like hover).
   const filteredProfiles = useMemo(
@@ -289,7 +290,7 @@ export function ProfilesTabV2() {
     return out;
   }, [sortedProfiles, selectedVersions, columnCount]);
 
-  const gridColsClass = columnCount === 3 ? "grid-cols-3" : columnCount === 2 ? "grid-cols-2" : "grid-cols-1";
+  const gridColsClass = columnCount === 5 ? "grid-cols-5" : columnCount === 2 ? "grid-cols-2" : "grid-cols-1";
 
   if (loading) {
     return <LoadingState message={t('profiles.loadingProfiles')} />;
@@ -325,13 +326,17 @@ export function ProfilesTabV2() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden p-4 relative">
-      {/* Group Tabs */}
-      <GroupTabs
-        groups={groups}
-        activeGroup={activeGroup}
-        onGroupChange={setProfilesTabActiveGroup}
-        showAddButton={false}
-      />
+      <RailPanel>
+        <h2 className="font-smallcaps text-base text-white/70 mb-2">{t('profiles.groups_title')}</h2>
+        <GroupTabs
+          vertical
+          className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
+          groups={groups}
+          activeGroup={activeGroup}
+          onGroupChange={setProfilesTabActiveGroup}
+          showAddButton={false}
+        />
+      </RailPanel>
 
       {/* Search & Filter Header */}
       <div className="mb-6 pb-4 border-b border-white/10">
