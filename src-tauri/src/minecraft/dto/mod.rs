@@ -1,4 +1,3 @@
-pub mod afkpoints;
 pub mod cosmetic_icon;
 pub mod cosmetic_outfit;
 pub mod norisk_user;

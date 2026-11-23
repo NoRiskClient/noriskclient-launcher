@@ -167,20 +167,6 @@ export const getLauncherNotices = async (): Promise<LauncherNotice[]> => {
   return launcherNoticesFetchPromise;
 };
 
-let cachedApplixirEnabled: boolean | null = null;
-
-export const isApplixirEnabled = async (): Promise<boolean> => {
-  if (cachedApplixirEnabled !== null) return cachedApplixirEnabled;
-  try {
-    cachedApplixirEnabled = isFlagOn(await getFeatureFlags(), "launcher.applixir");
-    log("info", `AppLixir rewarded video enabled: ${cachedApplixirEnabled}`);
-  } catch (error) {
-    log("error", `Failed to fetch launcher.applixir flag: ${error}`);
-    cachedApplixirEnabled = false;
-  }
-  return cachedApplixirEnabled;
-};
-
 let cachedBlockedModsConfig: BlockedModsConfig | null = null;
 let configFetchPromise: Promise<BlockedModsConfig> | null = null;
 

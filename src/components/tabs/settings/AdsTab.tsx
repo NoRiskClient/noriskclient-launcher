@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
-import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../ui/buttons/Button";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
-import { isApplixirEnabled } from "../../../services/feature-flags-service";
-import { showApplixirAd } from "../../../services/nrc-service";
 import { getAdStatus, onAdConsentMode, onAdStatusChanged } from "../../../services/ads-service";
 import { useLauncherAdsStore } from "../../../store/launcher-ads-store";
 import { useSettingsKeywords } from "./settings-context";
@@ -13,14 +10,8 @@ import { useSettingsKeywords } from "./settings-context";
 const BUTTON_CLASS = "px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors";
 
 export function useAdSettings() {
-  const [applixir, setApplixir] = useState(false);
   const launcherAds = useLauncherAdsStore((state) => state.active);
-
-  useEffect(() => {
-    isApplixirEnabled().then(setApplixir).catch(() => setApplixir(false));
-  }, []);
-
-  return { applixir, launcherAds, available: applixir || launcherAds };
+  return { launcherAds, available: launcherAds };
 }
 
 function usePersonalizedAds(enabled: boolean) {
@@ -44,7 +35,7 @@ function usePersonalizedAds(enabled: boolean) {
 export function AdsTab() {
   const { t } = useTranslation();
   const kw = useSettingsKeywords();
-  const { applixir, launcherAds, available } = useAdSettings();
+  const { launcherAds, available } = useAdSettings();
   const openConsent = useLauncherAdsStore((state) => state.openConsent);
   const personalized = usePersonalizedAds(launcherAds);
   const personalizedLabel =
@@ -64,23 +55,6 @@ export function AdsTab() {
         icon="solar:play-circle-bold"
         keywords={kw("settings.sections.ads", "ads", "werbung", "consent", "privacy", "gdpr", "dsgvo")}
       >
-        {applixir && (
-          <SettingRow
-            label={t("settings.ads.reset_consent")}
-            description={t("settings.ads.reset_consent.tooltip")}
-            searchKeywords={kw("settings.ads.reset_consent", "consent", "werbung", "privacy", "reset", "widerruf")}
-          >
-            <Button
-              variant="ghost"
-              className={BUTTON_CLASS}
-              onClick={() => {
-                showApplixirAd(true).catch(() => toast.error(t("applixir.failed")));
-              }}
-            >
-              {t("settings.ads.reset_consent.button")}
-            </Button>
-          </SettingRow>
-        )}
         {launcherAds && (
           <SettingRow
             label={t("settings.ads.privacy")}

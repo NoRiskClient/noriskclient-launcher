@@ -28,7 +28,6 @@ fn the_main_window_can_call_launcher_commands() {
 fn other_launcher_windows_keep_their_access() {
     for label in [
         "updater",
-        "applixir_window",
         "clip_editor",
         "minecraft-log-window",
         "some-new-window",

@@ -63,7 +63,6 @@ export default defineConfig(async ({ command }) => ({
         updater: resolve(__dirname, 'updater.html'),
         minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
         singleLogWindow: resolve(__dirname, 'single-log-window.html'),
-        applixirWindow: resolve(__dirname, 'applixir-window.html'),
         clipOverlay: resolve(__dirname, 'clip-overlay.html'),
         clipEditorWindow: resolve(__dirname, 'clip-editor-window.html')
       }
