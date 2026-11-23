@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload } from '../types/content';
+import type { ContentInstallTarget, UninstallContentPayload, ToggleContentPayload, InstallContentPayload, InstallLocalContentPayload, SwitchContentVersionPayload, ToggleModUpdatesPayload, BulkToggleModUpdatesPayload, CopyContentsRequest, CopyContentsResult } from '../types/content';
 import { addContentToSyncPack, removeContentFromSyncPack } from './sync-pack-service';
 
 /**
@@ -233,3 +233,7 @@ export async function bulkToggleModUpdates(
     throw error;
   }
 } 
+
+export function copyContentsToProfile(request: CopyContentsRequest): Promise<CopyContentsResult> {
+  return invoke<CopyContentsResult>('copy_contents_to_profile', { request });
+}

@@ -1060,6 +1060,13 @@ pub async fn uninstall_content_from_profile(
 }
 
 #[tauri::command]
+pub async fn copy_contents_to_profile(
+    request: crate::utils::content_copy::CopyContentsRequest,
+) -> Result<crate::utils::content_copy::CopyContentsResult, CommandError> {
+    Ok(crate::utils::content_copy::copy_contents(request).await?)
+}
+
+#[tauri::command]
 pub async fn install_content_to_profile(
     payload: InstallContentPayload,
 ) -> Result<(), CommandError> {

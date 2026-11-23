@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
@@ -13,9 +13,9 @@ import { Tooltip } from "../ui/Tooltip";
 import { formatShortcut } from "../ui/HotkeyInput";
 import { useWindowFocus } from "../../hooks/useWindowFocus";
 import { ClipGallery, type ClipSort } from "../clips/ClipGallery";
-import { getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../services/clip-service";
+import { errorKey, getCaptureStatus, openClipFolder, runtimeDownloadPercent } from "../../services/clip-service";
 import { getLauncherConfig } from "../../services/launcher-config-service";
-import type { CaptureStatus } from "../../types/launcherConfig";
+import type { CaptureMethod, CaptureStatus, ClipEncoder } from "../../types/launcherConfig";
 import { BetaNotice } from "../ui/BetaNotice";
 import { StatusMessage } from "../ui/StatusMessage";
 import { useSettingsModalStore } from "../../store/settings-modal-store";
@@ -28,6 +28,11 @@ import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
 
 const STATUS_POLL_MS = 2000;
+const DROP_SHARE = 0.05;
+const HOOK: CaptureMethod = "graphics hook";
+const WINDOW: CaptureMethod = "window capture";
+const SCREEN: CaptureMethod = "screen capture";
+
 const ALL_GAMES = "__all__";
 const FEEDBACK_URL = "https://discord.norisk.gg";
 
@@ -65,7 +70,7 @@ function health(
 
   switch (status.state) {
     case "buffering":
-      return { tone: "live", label: t("clips.page.status.ready"), detail: null };
+      return { tone: "live", label: t("clips.page.status.ready"), detail: liveDetail(status, t) };
     case "attaching":
       return { tone: "waiting", label: t("clips.page.status.attaching"), detail: null };
     case "blocked_fullscreen_exclusive":
@@ -78,13 +83,71 @@ function health(
       return {
         tone: "warn",
         label: t("clips.page.status.failed"),
-        detail: t("clips.page.status.failed_hint"),
+        detail: failedDetail(status, t),
       };
     case "paused":
       return { tone: "waiting", label: t("clips.page.status.paused"), detail: null };
     default:
       return { tone: "waiting", label: t("clips.page.status.idle"), detail: null };
   }
+}
+
+function liveDetail(
+  status: CaptureStatus,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string | null {
+  const method =
+    status.capture_method === HOOK
+      ? t("clips.page.status.via_hook")
+      : status.capture_method === WINDOW
+        ? t("clips.page.status.via_window")
+        : status.capture_method === SCREEN
+          ? t("clips.page.status.via_screen")
+          : null;
+  const encoder = status.active_encoder
+    ? status.active_encoder === "software"
+      ? t("clips.page.status.by_cpu")
+      : t("clips.page.status.by_gpu")
+    : null;
+  const parts = [method, encoder].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function failedDetail(
+  status: CaptureStatus,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const reason = status.last_error
+    ? t(`overlay.clip.error.${errorKey(status.last_error.code)}`, {
+        defaultValue: t("overlay.clip.error.generic"),
+      })
+    : null;
+  const retry =
+    status.retry_in_seconds !== null
+      ? t("clips.page.status.retry_in", { seconds: status.retry_in_seconds })
+      : null;
+  return [reason && `${reason}.`, retry, t("clips.page.status.failed_hint")].filter(Boolean).join(" ");
+}
+
+function warningsFor(
+  status: CaptureStatus | null,
+  chosenEncoder: ClipEncoder | null,
+  dropping: boolean,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string[] {
+  if (status?.state === "failed") return [failedDetail(status, t)];
+  if (status?.state !== "buffering") return [];
+  const warnings: string[] = [];
+  if (status.capture_method === WINDOW) warnings.push(t("clips.page.warn.window_capture"));
+  if (status.active_encoder === "software" && chosenEncoder !== "software") {
+    warnings.push(
+      status.capabilities.some((capability) => capability.driver_too_old)
+        ? t("settings.clips.quality.encoder.driver_too_old")
+        : t("clips.page.warn.cpu_encoder"),
+    );
+  }
+  if (dropping) warnings.push(t("clips.page.warn.dropping"));
+  return warnings;
 }
 
 const TONE_DOT: Record<Tone, string> = {
@@ -104,6 +167,9 @@ export function ClipsPage() {
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [hotkey, setHotkey] = useState<string | null>(null);
+  const [chosenEncoder, setChosenEncoder] = useState<ClipEncoder | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const drops = useRef({ seen: 0, streak: 0 });
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<ClipSort>("newest");
   const [favouritesOnly, setFavouritesOnly] = useState(false);
@@ -128,7 +194,15 @@ export function ClipsPage() {
     const read = async () => {
       try {
         const next = await getCaptureStatus();
-        if (!cancelled) setStatus(next);
+        if (cancelled) return;
+        setStatus(next);
+
+        const lost = next.dropped_frames - drops.current.seen;
+        drops.current.seen = next.dropped_frames;
+        const expected = next.capture_fps * (STATUS_POLL_MS / 1000);
+        const bad = next.state === "buffering" && lost > Math.max(5, expected * DROP_SHARE);
+        drops.current.streak = bad ? drops.current.streak + 1 : 0;
+        setDropping(drops.current.streak >= 2);
       } catch {
         if (!cancelled) setStatus(null);
       }
@@ -145,7 +219,9 @@ export function ClipsPage() {
     let cancelled = false;
     getLauncherConfig()
       .then((config) => {
-        if (!cancelled) setHotkey(config.clips?.hotkey_save ?? null);
+        if (cancelled) return;
+        setHotkey(config.clips?.hotkey_save ?? null);
+        setChosenEncoder(config.clips?.encoder ?? null);
       })
       .catch(() => {});
     return () => {
@@ -259,6 +335,16 @@ export function ClipsPage() {
           </Button>
         </div>
       )}
+
+      {!permissionsBlocked &&
+        warningsFor(status, chosenEncoder, dropping, t).map((warning) => (
+          <div key={warning} className="mb-4 flex flex-wrap items-center gap-3">
+            <StatusMessage type="warning" message={warning} className="mb-0 min-w-[16rem] flex-1" />
+            <Button size="sm" variant="secondary" onClick={toClipSettings}>
+              {t("clips.page.settings")}
+            </Button>
+          </div>
+        ))}
 
       <BetaNotice
         className="mb-4"

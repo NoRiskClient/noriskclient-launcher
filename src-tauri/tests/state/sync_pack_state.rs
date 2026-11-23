@@ -45,6 +45,7 @@ fn linked(path: &str) -> SyncTarget {
     }
 }
 
+#[allow(deprecated)]
 fn a_mod(file_name: &str) -> Mod {
     Mod {
         id: Uuid::new_v4(),
@@ -61,6 +62,7 @@ fn a_mod(file_name: &str) -> Mod {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),

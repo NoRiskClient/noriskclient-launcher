@@ -15,6 +15,7 @@ import { ActionButton } from '../../ui/ActionButton';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { loaderIconSrc } from "../../../lib/loader-icons";
+import { compareByLastPlayed } from "../../../utils/profile-sort";
 
 /**
  * Universal Profiles Modal for Modrinth Installation
@@ -213,11 +214,7 @@ export function ModrinthQuickInstallProfilesModal({
     // Sort profiles
     switch (sortValue) {
       case 'last_played':
-        return filtered.sort((a, b) => {
-          const aTime = a.last_played ? new Date(a.last_played).getTime() : 0;
-          const bTime = b.last_played ? new Date(b.last_played).getTime() : 0;
-          return bTime - aTime; // Most recent first
-        });
+        return filtered.sort(compareByLastPlayed);
 
       case 'name':
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -249,11 +246,7 @@ export function ModrinthQuickInstallProfilesModal({
 
       default:
         // Default to last_played if unknown sort option
-        return filtered.sort((a, b) => {
-          const aTime = a.last_played ? new Date(a.last_played).getTime() : 0;
-          const bTime = b.last_played ? new Date(b.last_played).getTime() : 0;
-          return bTime - aTime;
-        });
+        return filtered.sort(compareByLastPlayed);
     }
   }, [profiles, searchValue, sortValue]);
 

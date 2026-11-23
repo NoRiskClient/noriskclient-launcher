@@ -72,7 +72,7 @@ export function TrackLevelControl({ track, name, volume, onChange, disabled, t }
   const muteLabel = muted ? t("clips.trim.unmute") : t("clips.trim.mute");
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-2">
       <ClipIconButton
         icon={
           muted
@@ -86,10 +86,10 @@ export function TrackLevelControl({ track, name, volume, onChange, disabled, t }
         aria-pressed={muted}
         disabled={disabled}
         onClick={() => onChange(muted ? 100 : 0)}
-        className={cn("shrink-0", muted && "text-white/40 hover:text-white/70")}
+        className={cn("shrink-0", muted && "text-white/40 enabled:hover:text-white/70")}
       />
 
-      <span className="w-28 shrink-0 truncate font-minecraft text-sm text-white/80">{name}</span>
+      <span className="w-16 shrink-0 truncate font-minecraft text-xs text-white/80">{name}</span>
 
       <div className="flex-1 min-w-0">
         <RangeSlider
@@ -108,7 +108,7 @@ export function TrackLevelControl({ track, name, volume, onChange, disabled, t }
 
       <span
         className={cn(
-          "w-12 shrink-0 text-right font-minecraft text-sm",
+          "w-10 shrink-0 text-right font-minecraft text-xs tabular-nums",
           volume === 100 ? "text-white/50" : "text-white",
         )}
       >

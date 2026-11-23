@@ -1,4 +1,5 @@
 import type { Mod } from "./profile";
+import { ModPlatform } from "./unified";
 
 export type AdoptStrategy =
   | "backup_local"
@@ -252,3 +253,54 @@ export const SYNC_TARGET_PRESETS: SyncTargetPreset[] = [
   { path: "command_history.txt", kindType: "file_copy", icon: "solar:command-bold", hint: "syncPacks.presets.commandHistory" },
   { path: "mods", kindType: "mods", icon: "solar:box-bold", hint: "syncPacks.presets.mods" },
 ];
+
+export type ProfileSyncModStatus =
+  | "active"
+  | "pending"
+  | "disabled"
+  | "disabled_for_version"
+  | "excluded_here"
+  | "shadowed";
+
+export interface ProfileSyncPackMod {
+  pack_id: string;
+  pack_name: string;
+  pack_icon: string | null;
+  mod_id: string | null;
+  mod_key: string;
+  display_name: string;
+  platform: "modrinth" | "curseforge" | null;
+  project_id: string | null;
+  version_id: string | null;
+  version_name: string | null;
+  filename: string | null;
+  pinned: boolean;
+  status: ProfileSyncModStatus;
+  shadowed_by_pack: string | null;
+}
+
+export function syncModKey(entry: ProfileSyncPackMod): string {
+  return `sync:${entry.pack_id}:${entry.mod_key}`;
+}
+
+export function isSyncModLive(entry: ProfileSyncPackMod): boolean {
+  return entry.status === "active" || entry.status === "pending";
+}
+
+export function isSyncModLockedByPack(entry: ProfileSyncPackMod): boolean {
+  return entry.status === "disabled" || entry.status === "disabled_for_version";
+}
+
+export function isSyncModOnHere(entry: ProfileSyncPackMod): boolean {
+  return !isSyncModLockedByPack(entry) && entry.status !== "excluded_here";
+}
+
+export function overridesProfileMod(entry: ProfileSyncPackMod): boolean {
+  return entry.status === "shadowed" && !entry.shadowed_by_pack;
+}
+
+export function syncModPlatform(entry: ProfileSyncPackMod): ModPlatform | null {
+  if (entry.platform === "modrinth") return ModPlatform.Modrinth;
+  if (entry.platform === "curseforge") return ModPlatform.CurseForge;
+  return null;
+}

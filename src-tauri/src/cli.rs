@@ -46,6 +46,7 @@ struct LaunchArgs {
     quick_play: QuickPlay,
     local_mods: Vec<String>,
     account: Option<String>,
+    jvm_args: Vec<String>,
 }
 
 impl LaunchArgs {
@@ -63,6 +64,7 @@ impl LaunchArgs {
             quick_play: QuickPlay::from_matches(sub)?,
             local_mods: arg_list(sub, "mods"),
             account: arg_str(sub, "account"),
+            jvm_args: arg_words(sub, "jvm-args"),
         })
     }
 }
@@ -100,6 +102,7 @@ impl TempLaunchArgs {
             quick_play_multiplayer: qp.server,
             local_mods: arg_list(sub, "mods"),
             account: arg_str(sub, "account"),
+            jvm_args: arg_words(sub, "jvm-args"),
         })
     }
 }
@@ -118,6 +121,12 @@ fn arg_flag(sub: &SubcommandMatches, name: &str) -> bool {
         Some(a) => a.value.as_bool().unwrap_or(true),
         None => false,
     }
+}
+
+fn arg_words(sub: &SubcommandMatches, name: &str) -> Vec<String> {
+    arg_str(sub, name)
+        .map(|s| s.split_whitespace().map(String::from).collect())
+        .unwrap_or_default()
 }
 
 /// Comma-separated multi-value arg → trimmed, non-empty parts.
@@ -196,6 +205,9 @@ pub fn dispatch_cold_start(app: &AppHandle) -> bool {
 /// `true` if argv was consumed by a CLI subcommand — caller should then skip
 /// the default window-focus behavior.
 pub fn dispatch_hot_start(app: &AppHandle, argv: Vec<String>) -> bool {
+    if crate::utils::deep_link_utils::is_deep_link_launch(&argv) {
+        return false;
+    }
     // Log the parse failure instead of swallowing it: an unknown flag or a
     // subcommand this build predates is otherwise indistinguishable from "no
     // subcommand given", and the caller just silently focuses the window.
@@ -262,6 +274,7 @@ async fn run_action(action: DispatchAction, tag: &'static str) {
                 a.quick_play.server,
                 a.local_mods,
                 a.account,
+                Some(a.jvm_args),
             )
             .await
             {

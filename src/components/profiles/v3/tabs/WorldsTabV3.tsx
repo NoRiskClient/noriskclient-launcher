@@ -33,7 +33,7 @@ import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
 import { CopyWorldDialog } from "../../../modals/CopyWorldDialog";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
-import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface WorldsTabV3Props {
@@ -384,6 +384,14 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     },
   ];
 
+  const allSelected = selectedIds.size === visibleWorlds.length && visibleWorlds.length > 0;
+  const selectAllUndo = useSelectAllUndo(
+    allSelected,
+    () => new Set(selectedIds),
+    setSelectedIds,
+    () => setSelectedIds(new Set(visibleWorlds.map(w => w.folder_name))),
+  );
+
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
@@ -518,8 +526,9 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         count={selectedIds.size}
         totalCount={visibleWorlds.length}
         accent={accentColor.value}
-        allSelected={selectedIds.size === visibleWorlds.length && visibleWorlds.length > 0}
-        onSelectAll={() => setSelectedIds(new Set(visibleWorlds.map(w => w.folder_name)))}
+        allSelected={allSelected}
+        onSelectAll={selectAllUndo.onSelectAll}
+        onRestore={selectAllUndo.onRestore}
         onClear={() => setSelectedIds(new Set())}
         actions={fabActions}
         batchProgress={null}

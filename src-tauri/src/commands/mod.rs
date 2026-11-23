@@ -1,11 +1,15 @@
 pub mod applixir_command;
 pub mod assets_command;
+#[cfg(desktop)]
 pub mod deep_link_handler;
+#[cfg(desktop)]
+pub mod support_command;
 pub mod cape_command;
 pub mod cosmetic_command;
 pub mod icon_command;
 #[cfg(desktop)]
 pub mod launcher_import_command;
+pub mod legal_commands;
 pub mod request_context;
 #[cfg(desktop)]
 pub mod clip_commands;
@@ -45,7 +49,7 @@ pub mod profile_command;
 pub mod skin_render_command;
 #[cfg(desktop)]
 pub mod sync_pack_command;
-pub mod tester_command;
+pub mod twitch_command;
 pub mod vanilla_cape_command;
 pub mod analytics_command;
 pub mod font_command;

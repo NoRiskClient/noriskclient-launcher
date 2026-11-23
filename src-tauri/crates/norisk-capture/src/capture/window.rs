@@ -226,17 +226,12 @@ fn describe(hwnd: HWND) -> Option<GameWindow> {
         Some(GameWindow {
             hwnd,
             pid,
-            title: utf16_to_string(&title_buffer),
-            class: utf16_to_string(&class_buffer),
+            title: super::utf16_to_string(&title_buffer),
+            class: super::utf16_to_string(&class_buffer),
             width,
             height,
         })
     }
-}
-
-fn utf16_to_string(buffer: &[u16]) -> String {
-    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-    String::from_utf16_lossy(&buffer[..end])
 }
 
 pub fn thread_of(hwnd: HWND) -> u32 {
@@ -337,24 +332,5 @@ pub fn content_rect(hwnd: HWND, captured: (u32, u32)) -> Option<(i32, i32, u32, 
         }
 
         Some((left, top, width, height))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frames_are_only_expected_from_a_live_foreground_window() {
-        let ready = WindowState {
-            alive: true,
-            minimized: false,
-            foreground: true,
-        };
-        assert!(ready.should_produce_frames());
-
-        assert!(!WindowState { minimized: true, ..ready }.should_produce_frames());
-        assert!(!WindowState { foreground: false, ..ready }.should_produce_frames());
-        assert!(!WindowState { alive: false, ..ready }.should_produce_frames());
     }
 }

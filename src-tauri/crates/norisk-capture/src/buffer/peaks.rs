@@ -148,6 +148,14 @@ fn quantise(peak: f32) -> u8 {
     (peak.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
+pub fn peaks_of(samples: &[f32], sample_rate: u32, channels: usize) -> Vec<u8> {
+    let step = (sample_rate as i64 * POINT_MS / 1_000).max(1) as usize * channels.max(1);
+    samples
+        .chunks(step)
+        .map(|window| quantise(window.iter().fold(0.0f32, |acc, s| acc.max(s.abs()))))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,5 +339,27 @@ mod tests {
         let mut mono = PeakRing::new(30.0, TB, RATE, 1);
         mono.push(&vec![0.42f32; per_point()], 0);
         assert_eq!(mono.extract(i64::MIN, i64::MAX)[0].value, quantise(0.42));
+    }
+
+    #[test]
+    fn a_decoded_track_gets_one_point_per_step_like_a_recording() {
+        let tenth_of_a_second = vec![0.0f32; RATE as usize / 10 * 2];
+
+        assert_eq!(peaks_of(&tenth_of_a_second, RATE, 2), vec![0; 5]);
+    }
+
+    #[test]
+    fn the_loudest_sample_of_any_channel_sets_the_point() {
+        let mut samples = vec![0.1f32; per_point() * 2 * 2];
+        samples[3] = -0.9;
+
+        assert_eq!(peaks_of(&samples, RATE, 2), vec![quantise(0.9), quantise(0.1)]);
+    }
+
+    #[test]
+    fn a_short_tail_still_shows_up() {
+        let samples = vec![0.5f32; (per_point() + 10) * 2];
+
+        assert_eq!(peaks_of(&samples, RATE, 2), vec![quantise(0.5), quantise(0.5)]);
     }
 }

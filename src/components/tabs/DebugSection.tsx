@@ -19,14 +19,13 @@ import {
   type PermissionCacheState,
 } from "../../services/permission-service";
 import {
-  fetchTesterQueueCount,
-  openTesterWindow,
-} from "../../services/tester-service";
-import {
   listProfileBackups,
+  listRemovedStandardProfiles,
   restoreProfileBackup,
+  restoreStandardProfile,
   type ProfileBackupInfo,
 } from "../../services/profile-service";
+import type { Profile } from "../../types/profile";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { useProfileStore } from "../../store/profile-store";
 import { useContentCacheStore } from "../../store/content-cache-store";
@@ -37,7 +36,7 @@ import { useSettingsConfig } from "./settings/settings-context";
 import { LOG_LEVELS, type LogLevel } from "../../types/launcherConfig";
 import { logError } from '../../utils/logging-utils';
 
-export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "testing";
+export type DebugTab = "launcher" | "minecraft" | "process" | "crashes" | "permissions" | "removed-profiles" | "testing";
 
 export function getDebugTabs(t: (key: string) => string): { id: DebugTab; label: string }[] {
   return [
@@ -46,6 +45,7 @@ export function getDebugTabs(t: (key: string) => string): { id: DebugTab; label:
     { id: "process", label: t("debug.tabs.process") },
     { id: "crashes", label: t("debug.tabs.crashes") },
     { id: "permissions", label: t("debug.permissions.tab") },
+    { id: "removed-profiles", label: t("debug.removed_profiles.title") },
     { id: "testing", label: t("debug.tabs.testing") },
   ];
 }
@@ -242,11 +242,99 @@ export function DebugSection() {
         </div>
       </SettingsSection>
 
+      <SettingsSection id="settings-section-removed-profiles" title={t("debug.removed_profiles.title")} icon="solar:restart-bold">
+        <div className="py-2">
+          <RemovedNoRiskProfiles />
+        </div>
+      </SettingsSection>
+
       <SettingsSection id="settings-section-testing" title={t("debug.tabs.testing")} icon="solar:test-tube-bold">
         <div className="py-2">
           <TestingPanel />
         </div>
       </SettingsSection>
+    </div>
+  );
+}
+
+function RemovedNoRiskProfiles() {
+  const { t } = useTranslation();
+  const [removed, setRemoved] = useState<Profile[] | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const fetchProfiles = useProfileStore((s) => s.fetchProfiles);
+
+  async function load() {
+    try {
+      setRemoved(await listRemovedStandardProfiles());
+    } catch (e) {
+      logError(`Failed to list removed NoRisk profiles: ${e}`);
+      toast.error(t("debug.removed_profiles.load_failed", { error: getErrorMessage(e) }));
+      setRemoved([]);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleRestore(profile: Profile) {
+    setRestoringId(profile.id);
+    try {
+      await restoreStandardProfile(profile.id);
+      await fetchProfiles();
+      await load();
+      toast.success(t("debug.removed_profiles.restored", { name: profile.name }));
+    } catch (e) {
+      logError(`Failed to restore NoRisk profile ${profile.id}: ${e}`);
+      toast.error(t("debug.removed_profiles.restore_failed", { error: getErrorMessage(e) }));
+    }
+    setRestoringId(null);
+  }
+
+  if (removed === null) {
+    return (
+      <div className="p-8 flex justify-center">
+        <Icon icon="svg-spinners:ring-resize" className="w-5 h-5 text-white/50" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+      <div className="px-4 py-2 text-xs text-white/50 font-sans border-b border-white/10">
+        {t("debug.removed_profiles.description")}
+      </div>
+      {removed.length === 0 ? (
+        <div className="p-8 text-center text-white/50 font-minecraft">
+          {t("debug.removed_profiles.empty")}
+        </div>
+      ) : (
+        <div className="divide-y divide-white/10 max-h-96 overflow-y-auto">
+          {removed.map((profile) => (
+            <div key={profile.id} className="p-3 px-4 hover:bg-white/5 flex items-center gap-4">
+              <Icon icon="solar:gamepad-bold" className="w-5 h-5 text-white/50 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-minecraft truncate">{profile.name}</div>
+                <div className="text-xs text-white/40 font-sans truncate">
+                  {profile.game_version} · {profile.loader}
+                </div>
+              </div>
+              <button
+                onClick={() => handleRestore(profile)}
+                disabled={restoringId !== null}
+                className="px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {restoringId === profile.id ? (
+                  <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
+                ) : (
+                  <Icon icon="solar:restart-bold" className="w-4 h-4" />
+                )}
+                {t("debug.removed_profiles.restore")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -581,32 +669,6 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
     ? new Date(permissions.last_fetched).toLocaleString()
     : null;
 
-  const canTest = nodes.includes("norisk.tester");
-  const [queueCount, setQueueCount] = useState<number | null>(null);
-  const [opening, setOpening] = useState(false);
-
-  useEffect(() => {
-    if (!canTest) {
-      setQueueCount(null);
-      return;
-    }
-    fetchTesterQueueCount()
-      .then(({ count }) => setQueueCount(count))
-      .catch(() => setQueueCount(null));
-  }, [canTest, permissions]);
-
-  const handleOpenTester = async () => {
-    setOpening(true);
-    try {
-      await openTesterWindow();
-    } catch (e) {
-      logError(`Failed to open tester window: ${e}`);
-      toast.error(t("debug.testing.tester_open_failed", { error: String(e) }));
-    } finally {
-      setOpening(false);
-    }
-  };
-
   return (
     <div className="space-y-3">
       <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
@@ -633,35 +695,6 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
           />
         </button>
       </div>
-
-      {canTest && (
-        <div className="bg-black/20 rounded-lg border border-white/10 px-4 py-3 flex items-center gap-3">
-          <Icon icon="solar:test-tube-bold" className="w-5 h-5 text-amber-300 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-minecraft">{t("debug.testing.tester_queue")}</div>
-            <div className="text-xs text-white/40 font-sans truncate">
-              {queueCount === null
-                ? t("debug.testing.tester_open_hint")
-                : queueCount === 0
-                  ? t("debug.testing.tester_caught_up")
-                  : t("debug.testing.tester_waiting", { count: queueCount })}
-            </div>
-          </div>
-          <button
-            onClick={handleOpenTester}
-            disabled={opening}
-            className="px-3 py-2 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-minecraft text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-            title={t("debug.testing.tester_open_title")}
-          >
-            {opening ? (
-              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
-            ) : (
-              <Icon icon="solar:test-tube-bold" className="w-4 h-4" />
-            )}
-            {t("debug.testing.tester_open")}
-          </button>
-        </div>
-      )}
 
       <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
         {nodes.length === 0 ? (

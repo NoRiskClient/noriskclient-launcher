@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useProfileStore } from "../../store/profile-store";
 import { LoadingState } from "../ui/LoadingState";
 import { EmptyState } from "../ui/EmptyState";
 import { ProfileDetailViewV3 } from "./v3/ProfileDetailViewV3";
+import type { NavKey } from "./v3/ProfileLeftRailV3";
 import type { Profile } from "../../types/profile";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
 
@@ -14,6 +15,8 @@ export function ProfileDetailViewV2Wrapper() {
   const { t } = useTranslation();
   const { profileId } = useParams<{ profileId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialNav = (location.state as { nav?: NavKey } | null)?.nav;
   const { profiles, loading, fetchProfiles } = useProfileStore();
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -67,7 +70,9 @@ export function ProfileDetailViewV2Wrapper() {
 
   return (
     <ProfileDetailViewV3
+      key={profile.id}
       profile={profile}
+      initialNav={initialNav}
       onClose={handleClose}
       onEdit={handleEdit}
     />

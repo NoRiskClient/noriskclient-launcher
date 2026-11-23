@@ -9,11 +9,12 @@ use crate::minecraft::downloads::mc_assets_download::MinecraftAssetsDownloadServ
 use crate::minecraft::downloads::mc_client_download::MinecraftClientDownloadService;
 use crate::minecraft::downloads::mc_libraries_download::MinecraftLibrariesDownloadService;
 use crate::minecraft::downloads::mc_natives_download::MinecraftNativesDownloadService;
+use crate::minecraft::downloads::norisk_natives_download::{NoriskNativesDownloadService, FFMPEG};
 use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
 use crate::minecraft::launch::launch_summary::LaunchSummary;
-use crate::minecraft::{MinecraftLaunchParameters, MinecraftLauncher};
+use crate::minecraft::{base64_intrinsics_mitigation, MinecraftLaunchParameters, MinecraftLauncher};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
@@ -96,6 +97,7 @@ pub async fn install_minecraft_version(
     quick_play_multiplayer: Option<String>,
     migration_info: Option<crate::utils::profile_utils::MigrationInfo>,
     extra_local_mods: Vec<std::path::PathBuf>,
+    extra_jvm_args: Vec<String>,
     // Use the passed-in profile as-is instead of reloading by id (override launches).
     skip_profile_reload: bool,
 ) -> Result<()> {
@@ -240,6 +242,7 @@ pub async fn install_minecraft_version(
     // Check if profile uses a custom Java path
     let step_start = Instant::now();
     let mut custom_java_valid = false;
+    let mut java_major = java_version;
     let java_path = if profile.settings.use_custom_java_path && profile.settings.java_path.is_some()
     {
         // Try to use the custom Java path
@@ -278,6 +281,7 @@ pub async fn install_minecraft_version(
                             java_info.major_version, java_version
                         );
                         custom_java_valid = true;
+                        java_major = java_info.major_version;
                         path
                     } else {
                         info!(
@@ -458,6 +462,8 @@ pub async fn install_minecraft_version(
             .await?
     });
 
+    NoriskNativesDownloadService::install_in_background(&FFMPEG);
+
     // Download Minecraft client
     let client_service = MinecraftClientDownloadService::new().with_stats(summary.client.clone());
     timed_step(&state, &summary, EventType::DownloadingClient, profile.id, "client", || async {
@@ -586,6 +592,13 @@ pub async fn install_minecraft_version(
             current_jvm_args.extend(custom_args);
             launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
         }
+    }
+
+    if !extra_jvm_args.is_empty() {
+        info!("Adding runtime JVM arguments for this launch: {:?}", extra_jvm_args);
+        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
+        current_jvm_args.extend(extra_jvm_args);
+        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
     }
 
     // Combine Game arguments from modloader (if any) and profile settings (extra_game_args)
@@ -824,6 +837,22 @@ pub async fn install_minecraft_version(
         .await?
     });
 
+    let jar_loaders = mod_resolution.jar_loaders();
+    if !jar_loaders.is_empty() {
+        if let Err(e) = state
+            .profile_manager
+            .store_jar_loaders(profile.id, &jar_loaders)
+            .await
+        {
+            warn!(
+                "Could not store jar loaders for {} mod(s) in profile '{}': {}",
+                jar_loaders.len(),
+                profile.name,
+                e
+            );
+        }
+    }
+
     emit_progress_event(
         &state,
         EventType::SyncingMods,
@@ -867,7 +896,7 @@ pub async fn install_minecraft_version(
     } else if modloader_enum == ModLoader::Forge || modloader_enum == ModLoader::NeoForge {
         let loader_str = if modloader_enum == ModLoader::NeoForge { "neoforge" } else { "forge" };
         let is_legacy_forge = modloader_enum == ModLoader::Forge
-            && ["1.7.10", "1.8.9", "1.12.2"].contains(&version_id);
+            && mc_utils::is_legacy_minecraft_version(version_id);
 
         // Early services go through the meta file like everything else: the loader registers an
         // ITransformerDiscoveryService, and ModLauncher puts what it reports into Layer.SERVICE.
@@ -942,6 +971,22 @@ pub async fn install_minecraft_version(
         info!("Adding log4j configuration: {}", log4j_argument);
         let mut jvm_args = launch_params.additional_jvm_args.clone();
         jvm_args.push(log4j_argument);
+        launch_params = launch_params.with_additional_jvm_args(jvm_args);
+    }
+
+    let mitigation_args = base64_intrinsics_mitigation(
+        java_major,
+        piston_meta
+            .arguments
+            .iter()
+            .flat_map(|arguments| arguments.simple_jvm())
+            .chain(launch_params.additional_jvm_args.iter().map(String::as_str)),
+    );
+    if !mitigation_args.is_empty() {
+        let jvm_args = mitigation_args
+            .into_iter()
+            .chain(launch_params.additional_jvm_args.clone())
+            .collect();
         launch_params = launch_params.with_additional_jvm_args(jvm_args);
     }
 

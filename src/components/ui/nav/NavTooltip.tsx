@@ -45,6 +45,7 @@ export const NavTooltip = forwardRef<HTMLDivElement, NavTooltipProps>(
       <div
         ref={ref}
         className={cn(
+          variant !== "ghost" && "glass-panel",
           "font-smallcaps relative overflow-hidden backdrop-blur-md",
           "px-4 py-2 rounded-md text-white whitespace-nowrap",
           "text-shadow-sm text-base",

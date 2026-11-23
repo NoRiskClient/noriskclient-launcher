@@ -225,7 +225,6 @@ interface ThemeState {
   toggleStaticBackground: () => void;
   toggleBackgroundAnimation: () => void;
   hasAcceptedTermsOfService: boolean;
-  acceptTermsOfService: () => void;
   hasAcceptedCapeGuidelines: boolean;
   acceptCapeGuidelines: () => void;
   borderRadius: number;
@@ -401,8 +400,6 @@ export const useThemeStore = create<ThemeState>()(
 
       toggleStaticBackground: () => {
         set((state) => ({ staticBackground: !state.staticBackground }));
-      },      acceptTermsOfService: () => {
-        set({ hasAcceptedTermsOfService: true });
       },
       acceptCapeGuidelines: () => {
         set({ hasAcceptedCapeGuidelines: true });

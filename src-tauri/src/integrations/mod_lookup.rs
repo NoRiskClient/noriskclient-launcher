@@ -1,5 +1,5 @@
 use crate::integrations::{curseforge, modrinth, unified_mod};
-use crate::state::profile_state::{Mod, ModLoader, ModSource};
+use crate::state::profile_state::{mod_project_key, Mod, ModSource};
 use crate::utils::hash_utils;
 use dashmap::DashMap;
 use log::{debug, info, warn};
@@ -23,6 +23,7 @@ fn fresh_copy(entry: &Mod) -> Mod {
     copy
 }
 
+#[allow(deprecated)]
 pub fn mod_from_modrinth_version(
     version: &modrinth::ModrinthVersion,
     sha1: Option<String>,
@@ -33,7 +34,7 @@ pub fn mod_from_modrinth_version(
         .find(|entry| entry.primary)
         .or_else(|| version.files.first())?;
 
-    Some(Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source: ModSource::Modrinth {
             project_id: version.project_id.clone(),
@@ -47,19 +48,20 @@ pub fn mod_from_modrinth_version(
         version: Some(version.version_number.clone()),
         game_versions: Some(version.game_versions.clone()),
         file_name_override: None,
-        associated_loader: version
-            .loaders
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    })
+    };
+    entry.set_loader_names(&version.loaders);
+    Some(entry)
 }
 
+#[allow(deprecated)]
 pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
-    Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source: ModSource::CurseForge {
             project_id: file.mod_id.to_string(),
@@ -78,14 +80,17 @@ pub fn mod_from_curseforge_file(file: &curseforge::CurseForgeFile) -> Mod {
         version: None,
         game_versions: Some(file.game_versions.clone()),
         file_name_override: None,
-        associated_loader: unified_mod::extract_loaders_from_game_versions(&file.game_versions)
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    }
+    };
+    entry.set_loader_names(&unified_mod::extract_loaders_from_game_versions(
+        &file.game_versions,
+    ));
+    entry
 }
 
 #[derive(Debug, Clone)]
@@ -289,22 +294,10 @@ async fn resolve_with_curseforge(items: &mut [JarIdentity]) -> bool {
     complete
 }
 
-async fn apply_display_names(items: &mut [JarIdentity]) {
-    let mut modrinth_ids = Vec::new();
-    let mut curseforge_ids = Vec::new();
-
-    for item in items.iter() {
-        match item.resolved.as_ref().map(|entry| &entry.source) {
-            Some(ModSource::Modrinth { project_id, .. }) => modrinth_ids.push(project_id.clone()),
-            Some(ModSource::CurseForge { project_id, .. }) => {
-                if let Ok(id) = project_id.parse::<u32>() {
-                    curseforge_ids.push(id);
-                }
-            }
-            _ => {}
-        }
-    }
-
+pub async fn project_titles(
+    modrinth_ids: Vec<String>,
+    curseforge_ids: Vec<u32>,
+) -> HashMap<String, String> {
     let mut titles: HashMap<String, String> = HashMap::new();
 
     for chunk in chunk_unique(modrinth_ids, MODRINTH_HASH_BATCH) {
@@ -330,17 +323,39 @@ async fn apply_display_names(items: &mut [JarIdentity]) {
         }
     }
 
-    for item in items.iter_mut() {
-        let Some(entry) = item.resolved.as_mut() else {
-            continue;
-        };
-        let project_id = match &entry.source {
-            ModSource::Modrinth { project_id, .. } | ModSource::CurseForge { project_id, .. } => {
-                project_id.clone()
+    titles
+}
+
+pub async fn project_titles_for<'a>(
+    sources: impl IntoIterator<Item = &'a ModSource>,
+) -> HashMap<String, String> {
+    let mut modrinth_ids = Vec::new();
+    let mut curseforge_ids = Vec::new();
+    for source in sources {
+        match mod_project_key(source) {
+            Some(("modrinth", id)) => modrinth_ids.push(id.to_string()),
+            Some(("curseforge", id)) => {
+                if let Ok(id) = id.parse::<u32>() {
+                    curseforge_ids.push(id);
+                }
             }
-            _ => continue,
-        };
-        if let Some(title) = titles.get(&project_id) {
+            _ => {}
+        }
+    }
+    project_titles(modrinth_ids, curseforge_ids).await
+}
+
+pub fn title_for<'a>(titles: &'a HashMap<String, String>, source: &ModSource) -> Option<&'a String> {
+    mod_project_key(source).and_then(|(_, id)| titles.get(id))
+}
+
+async fn apply_display_names(items: &mut [JarIdentity]) {
+    let titles =
+        project_titles_for(items.iter().filter_map(|item| item.resolved.as_ref().map(|entry| &entry.source)))
+            .await;
+
+    for entry in items.iter_mut().filter_map(|item| item.resolved.as_mut()) {
+        if let Some(title) = title_for(&titles, &entry.source) {
             entry.display_name = Some(title.clone());
         }
     }
@@ -413,7 +428,11 @@ pub async fn identify_jar(path: &Path) -> Option<Mod> {
         .and_then(|item| item.resolved)
 }
 
-pub fn mod_from_unified_version(version: &unified_mod::UnifiedVersion) -> Option<Mod> {
+#[allow(deprecated)]
+pub fn mod_from_unified_version(
+    version: &unified_mod::UnifiedVersion,
+    display_name: String,
+) -> Option<Mod> {
     let file = version
         .files
         .iter()
@@ -439,21 +458,21 @@ pub fn mod_from_unified_version(version: &unified_mod::UnifiedVersion) -> Option
         },
     };
 
-    Some(Mod {
+    let mut entry = Mod {
         id: Uuid::new_v4(),
         source,
         enabled: true,
-        display_name: Some(version.name.clone()),
+        display_name: Some(display_name),
         version: Some(version.version_number.clone()),
         game_versions: Some(version.game_versions.clone()),
         file_name_override: None,
-        associated_loader: version
-            .loaders
-            .iter()
-            .find_map(|loader| ModLoader::from_str(loader).ok()),
+        associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),
         force_include_versions: Vec::new(),
-    })
+    };
+    entry.set_loader_names(&version.loaders);
+    Some(entry)
 }

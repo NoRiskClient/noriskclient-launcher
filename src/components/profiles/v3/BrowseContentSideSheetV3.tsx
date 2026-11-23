@@ -127,7 +127,7 @@ export function BrowseContentSideSheetV3({
       <div
         onClick={onClose}
         aria-hidden="true"
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
+        className="glass-scrim fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
       />
 
       {/* Sheet: docked to the right edge. Frosted-glass treatment — lower
@@ -139,7 +139,7 @@ export function BrowseContentSideSheetV3({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="fixed right-0 top-0 h-full w-[82vw] min-w-[640px] max-w-[1300px] z-[1001] flex flex-col shadow-[0_0_64px_-8px_rgba(0,0,0,0.7)] animate-in slide-in-from-right duration-200 overflow-hidden"
+        className="glass-panel fixed right-0 top-0 h-full w-[82vw] min-w-[640px] max-w-[1300px] z-[1001] flex flex-col shadow-[0_0_64px_-8px_rgba(0,0,0,0.7)] animate-in slide-in-from-right duration-200 overflow-hidden"
         style={{
           // Light see-through base — a soft dark veil (~0.42 alpha) takes
           // the edge off what's behind without hiding it, with accent

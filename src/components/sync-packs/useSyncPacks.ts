@@ -66,8 +66,10 @@ export function useSyncPacks() {
     (state) => state.setSyncPacksDropActive,
   );
 
-  const fromProfileId = (location.state as { fromProfileId?: string } | null)
-    ?.fromProfileId;
+  const navState = location.state as
+    | { fromProfileId?: string; expandPackId?: string }
+    | null;
+  const fromProfileId = navState?.fromProfileId;
   const profiles = useProfileStore((state) => state.profiles);
   const fetchProfiles = useProfileStore((state) => state.fetchProfiles);
   const selectedProfile = useProfileStore((state) => state.selectedProfile);
@@ -78,7 +80,9 @@ export function useSyncPacks() {
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [localJars, setLocalJars] = useState<Record<string, string[]>>({});
   const [matrix, setMatrix] = useState<Record<string, SyncPackModMatrix[]>>({});
-  const [expandedPack, setExpandedPack] = useState<string | null>(null);
+  const [expandedPack, setExpandedPack] = useState<string | null>(
+    navState?.expandPackId ?? null,
+  );
   const [isBusy, setIsBusy] = useState(false);
   const showBusy = useDelayedTrue(isBusy, 200, 400);
   const [isDragOver, setIsDragOver] = useState(false);

@@ -50,6 +50,14 @@ export async function restoreProfileBackup(backupPath: string): Promise<void> {
   return invoke<void>("restore_profile_backup", { backupPath });
 }
 
+export async function listRemovedStandardProfiles(): Promise<Profile[]> {
+  return invoke<Profile[]>("list_removed_standard_profiles");
+}
+
+export async function restoreStandardProfile(id: string): Promise<void> {
+  return invoke<void>("restore_standard_profile", { id });
+}
+
 export async function getProfile(id: string): Promise<Profile> {
   return invoke<Profile>("get_profile", { id });
 }

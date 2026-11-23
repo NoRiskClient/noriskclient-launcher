@@ -143,7 +143,7 @@ impl HookSession {
         if info.map_id == 0 || info.cx == 0 || info.cy == 0 {
             return Ok(None);
         }
-        if info.map_id == known_map_id {
+        if info.map_id == known_map_id || info.capture_type() != Some(CaptureType::Texture) {
             return Ok(None);
         }
 
@@ -201,23 +201,28 @@ impl HookSession {
     }
 
     fn try_ready(&mut self) -> Result<Option<HookTexture>> {
+        let info = self
+            .info_map
+            .as_ref()
+            .context("ready check without an info block")?
+            .read();
+
         if !self.ready_seen {
             let events = self
                 .events
                 .as_ref()
                 .context("ready check without events, which cannot happen")?;
 
-            if !events.hook_ready.is_signalled() {
+            let already_live = info.map_id != 0
+                && info.capture_type() == Some(CaptureType::Texture)
+                && SharedTextureData::open(self.hwnd, info.map_id)?
+                    .is_some_and(|data| data.tex_handle != 0);
+
+            if !already_live && !events.hook_ready.is_signalled() {
                 return Ok(None);
             }
             self.ready_seen = true;
         }
-
-        let info = self
-            .info_map
-            .as_ref()
-            .context("ready check without an info block")?
-            .read();
 
         if info.map_id == 0 {
             if let Some(events) = self.events.as_ref() {

@@ -38,6 +38,7 @@ import { FriendsSidebar } from "../friends/FriendsSidebar";
 // import { useFriendsWebSocket } from "../../hooks/useFriendsWebSocket";
 import { useFriendsStore } from "../../store/friends-store";
 import { useClipsStore } from "../../store/clips-store";
+import { closeClipEditorThen } from "../../services/clip-service";
 import { useChatStore } from "../../store/chat-store";
 import { useNotificationStore } from "../../store/notification-store";
 import { checkUpdateAvailable, downloadAndInstallUpdate } from "../../services/nrc-service";
@@ -209,6 +210,8 @@ export function AppLayout({
       }
     });
 
+    let stopListeningForQuit: (() => void) | undefined;
+
     const setupWindowControls = async () => {
       try {
         const tauriModule = await import("@tauri-apps/api/window").catch(
@@ -231,10 +234,13 @@ export function AppLayout({
             );
           }
 
+          const { listen } = await import("@tauri-apps/api/event");
+          stopListeningForQuit = await listen("quit_requested", () => {
+            closeClipEditorThen(() => exit(0)).catch(() => exit(0));
+          });
+
           if (closeRef.current) {
-            closeRef.current.addEventListener("click", () =>
-              exit(0),
-            );
+            closeRef.current.addEventListener("click", () => currentWindow.close());
           }
         } else {
           console.log(
@@ -248,7 +254,10 @@ export function AppLayout({
 
     setupWindowControls();
 
-    return () => ctx.revert();
+    return () => {
+      stopListeningForQuit?.();
+      ctx.revert();
+    };
   }, []);
 
   const renderBackgroundEffect = () => {

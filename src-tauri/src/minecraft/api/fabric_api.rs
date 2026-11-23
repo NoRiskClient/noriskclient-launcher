@@ -69,6 +69,14 @@ impl FabricApi {
         Ok(versions)
     }
 
+    pub async fn refresh_loader_versions(
+        &self,
+        minecraft_version: &str,
+    ) -> Result<Vec<FabricVersionInfo>> {
+        let cache_path = self.cache_dir.join(format!("fabric_versions_{}.json", minecraft_version));
+        Self::fetch_and_cache_versions(&self.base_url, minecraft_version, &cache_path).await
+    }
+
     async fn background_update(
         base_url: String,
         minecraft_version: String,

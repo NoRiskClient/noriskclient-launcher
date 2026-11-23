@@ -2,6 +2,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::minecraft::auth::minecraft_auth::{
     mc_token_expiry, AuthFlow, Credentials, MinecraftAuthStore, NoRiskCredentials,
 };
+use crate::minecraft::auth::twitch_auth::TwitchToken;
 use log::{info, warn};
 use serde::Deserialize;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,6 +34,7 @@ struct HandbackEntry {
 /// single writer of `accounts.json`. Mirrors `discord_state.rs::read_active_client_state`.
 pub async fn consume_pending(store: &MinecraftAuthStore) {
     let dir = LAUNCHER_DIRECTORY.meta_dir().join("auth");
+    consume_twitch_pending(store, &dir).await;
     let read_dir = match std::fs::read_dir(&dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -114,6 +116,7 @@ pub async fn consume_pending(store: &MinecraftAuthStore) {
                     ignore_child_protection_warning: false,
                     auth_flow: handback.auth_flow,
                     mc_access_token_expires: Some(mc_token_expiry(MC_TOKEN_LIFETIME_SECS)),
+                    twitch_token: None,
                 };
                 (creds, true, username)
             }
@@ -136,6 +139,43 @@ pub async fn consume_pending(store: &MinecraftAuthStore) {
             }
         }
 
+        std::fs::remove_file(&path).ok();
+    }
+}
+
+#[derive(Deserialize)]
+struct TwitchHandbackEntry {
+    account_id: Uuid,
+    #[serde(flatten)]
+    token: TwitchToken,
+}
+
+async fn consume_twitch_pending(store: &MinecraftAuthStore, dir: &std::path::Path) {
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for path in read_dir.flatten().map(|entry| entry.path()) {
+        let is_handback = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with("twitch.") && n.ends_with(".json"));
+        if !is_handback {
+            continue;
+        }
+        let Some(handback) = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|c| serde_json::from_str::<TwitchHandbackEntry>(&c).ok())
+        else {
+            continue;
+        };
+        match store.adopt_rotated_twitch_token(handback.account_id, handback.token).await {
+            Ok(true) => info!("[Auth Handback] Applied rotated Twitch token for {}", handback.account_id),
+            Ok(false) => {}
+            Err(e) => {
+                warn!("[Auth Handback] Failed to persist Twitch handback: {:?}", e);
+                continue;
+            }
+        }
         std::fs::remove_file(&path).ok();
     }
 }

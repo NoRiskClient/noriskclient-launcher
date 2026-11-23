@@ -135,6 +135,11 @@ fn mod_source_kind(source: &crate::state::profile_state::ModSource) -> &'static 
     }
 }
 
+fn jar_stem(file: &str) -> Option<String> {
+    let stem = file.trim_end_matches(".disabled").trim_end_matches(".jar");
+    (!stem.is_empty()).then(|| stem.to_string())
+}
+
 fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
     use crate::state::profile_state::ModSource;
     let file = m.file_name_override.clone().or_else(|| match &m.source {
@@ -145,13 +150,13 @@ fn custom_mod_id(m: &crate::state::profile_state::Mod) -> String {
         ModSource::Maven { coordinates, .. } => Some(coordinates.clone()),
         ModSource::Embedded { name } => Some(name.clone()),
     });
-    file.map(|f| f.trim_end_matches(".disabled").trim_end_matches(".jar").to_string())
-        .filter(|s| !s.is_empty())
+    file.as_deref()
+        .and_then(jar_stem)
         .or_else(|| m.display_name.clone())
         .unwrap_or_else(|| m.id.to_string())
 }
 
-/// Snapshot custom + NoRisk-pack mods (incl. disabled) for the crash payload.
+/// Snapshot custom, NoRisk-pack and sync-pack mods (incl. disabled) for the crash payload.
 pub async fn build_crash_mod_manifest(
     profile: &crate::state::profile_state::Profile,
     state: &State,
@@ -232,6 +237,32 @@ pub async fn build_crash_mod_manifest(
                 e
             ),
         }
+    }
+
+    match crate::sync::profile_mods::load_for_profile(state, profile).await {
+        Ok(sync_mods) => {
+            for entry in sync_mods {
+                let mut info = CrashModInfo {
+                    id: entry
+                        .filename
+                        .as_deref()
+                        .and_then(jar_stem)
+                        .unwrap_or_else(|| entry.display_name.clone()),
+                    name: Some(entry.display_name.clone()),
+                    version: entry.version_name.clone(),
+                    source: Some("sync_pack".to_string()),
+                    enabled: entry.is_switched_on(),
+                    norisk: false,
+                    ..Default::default()
+                };
+                apply(
+                    &mut info,
+                    entry.mod_id.and_then(|id| report.and_then(|r| r.profile_mod(&id))),
+                );
+                out.push(info);
+            }
+        }
+        Err(e) => log::warn!("[CrashManifest] Could not list sync pack mods: {}", e),
     }
 
     out
@@ -1170,19 +1201,7 @@ impl ProcessManager {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
                     log::info!("Showing main window after process exit (hide_on_process_start = true)");
-                    if let Some(main_window) = app_handle_clone_for_monitor.get_webview_window("main") {
-                        if let Err(e) = main_window.show() {
-                            log::error!("Failed to show main window after process exit: {}", e);
-                        }
-                        if let Err(e) = main_window.unminimize() {
-                            log::error!("Failed to unminimize main window after process exit: {}", e);
-                        }
-                        if let Err(e) = main_window.set_focus() {
-                            log::error!("Failed to focus main window after process exit: {}", e);
-                        }
-                    } else {
-                        log::warn!("Main window not found, could not show it after process exit");
-                    }
+                    crate::utils::main_window::show(&app_handle_clone_for_monitor);
                 }
             }
 

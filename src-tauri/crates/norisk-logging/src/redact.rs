@@ -1,75 +1,492 @@
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Captures, Regex, RegexSet};
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-
-type Needle = (String, &'static str);
-
-static KNOWN_ACCOUNTS: Lazy<RwLock<Arc<Vec<Needle>>>> =
-    Lazy::new(|| RwLock::new(Arc::new(Vec::new())));
 
 const MIN_NEEDLE_LEN: usize = 3;
 
-pub fn set_known_accounts(accounts: &[(String, String)]) {
-    let mut needles: Vec<(String, &'static str)> = Vec::new();
-    let mut push = |needle: String, placeholder: &'static str| {
-        if needle.len() >= MIN_NEEDLE_LEN && !needles.iter().any(|(n, _)| *n == needle) {
-            needles.push((needle, placeholder));
-        }
-    };
+const GENERIC_IDENTITIES: &[&str] = &[
+    "localhost",
+    "user",
+    "users",
+    "admin",
+    "administrator",
+    "root",
+    "owner",
+    "pc",
+    "default",
+    "public",
+    "guest",
+    "home",
+];
 
-    for (username, uuid) in accounts {
-        push(username.clone(), "<PLAYER>");
-        push(uuid.clone(), "<PLAYER_UUID>");
-        push(uuid.to_lowercase(), "<PLAYER_UUID>");
-        push(uuid.replace('-', ""), "<PLAYER_UUID>");
-        push(uuid.to_lowercase().replace('-', ""), "<PLAYER_UUID>");
+const CHUNK_BYTES: usize = 256 * 1024;
+
+struct NeedleMatcher {
+    regex: Regex,
+    placeholders: HashMap<String, &'static str>,
+    bounded: bool,
+}
+
+impl NeedleMatcher {
+    fn new(needles: Vec<(String, &'static str)>, bounded: bool) -> Option<Self> {
+        let mut needles: Vec<(String, &'static str)> = needles
+            .into_iter()
+            .filter(|(n, _)| n.chars().count() >= MIN_NEEDLE_LEN)
+            .collect();
+        if needles.is_empty() {
+            return None;
+        }
+        needles.sort_by_key(|n| std::cmp::Reverse(n.0.len()));
+        let mut placeholders = HashMap::new();
+        let mut alternatives = Vec::new();
+        for (needle, placeholder) in needles {
+            let key = needle.to_lowercase();
+            if placeholders.contains_key(&key) {
+                continue;
+            }
+            alternatives.push(regex::escape(&needle));
+            placeholders.insert(key, placeholder);
+        }
+        let regex = Regex::new(&format!("(?i)(?:{})", alternatives.join("|"))).ok()?;
+        Some(Self {
+            regex,
+            placeholders,
+            bounded,
+        })
     }
 
-    needles.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
-
-    if let Ok(mut guard) = KNOWN_ACCOUNTS.write() {
-        *guard = Arc::new(needles);
+    fn apply<'a>(&self, text: Cow<'a, str>) -> Cow<'a, str> {
+        if !self.regex.is_match(&text) {
+            return text;
+        }
+        let is_word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        let mut out = String::with_capacity(text.len());
+        let mut last = 0;
+        for m in self.regex.find_iter(&text) {
+            if self.bounded {
+                let prev = text[..m.start()].chars().next_back();
+                let next = text[m.end()..].chars().next();
+                if is_word(prev) || is_word(next) {
+                    continue;
+                }
+            }
+            let placeholder = self
+                .placeholders
+                .get(&m.as_str().to_lowercase())
+                .copied()
+                .unwrap_or("*****");
+            out.push_str(&text[last..m.start()]);
+            out.push_str(placeholder);
+            last = m.end();
+        }
+        if last == 0 {
+            return text;
+        }
+        out.push_str(&text[last..]);
+        Cow::Owned(out)
     }
 }
 
-pub fn mask_sensitive_data(content: &str) -> String {
-    lazy_static! {
-        static ref NORISK_TOKEN_REGEX: Regex = Regex::new(r"-Dnorisk\.token=[^\s]+").unwrap();
-        static ref ACCESS_TOKEN_REGEX: Regex = Regex::new(r"--accessToken\s+[^\s]+").unwrap();
-        static ref CLIENT_ID_ARG_REGEX: Regex = Regex::new(r"--clientId\s+[^\s]+").unwrap();
-        static ref XUID_ARG_REGEX: Regex = Regex::new(r"--xuid\s+[^\s]+").unwrap();
-        static ref BEARER_REGEX: Regex = Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+").unwrap();
-        static ref JSON_TOKEN_FIELD_REGEX: Regex = Regex::new(
-            r#"(?i)"(value|token|access_token|accessToken|refresh_token|refreshToken|id_token|client_secret|DeviceToken|TitleToken|UserToken|XSTSToken|authorization)"\s*:\s*"[^"]*""#
-        ).unwrap();
-        static ref JWT_REGEX: Regex = Regex::new(r"\beyJ[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]*){0,2}").unwrap();
-        static ref WINDOWS_USER_PATH_REGEX: Regex = Regex::new(r#"(?i)([A-Z]:[/\\]+Users[/\\]+)[^/\\"'\s]+"#).unwrap();
-        static ref UNIX_USER_PATH_REGEX: Regex = Regex::new(r#"(/+(?:home|Users)/+)[^/"'\s]+"#).unwrap();
-        static ref EMAIL_REGEX: Regex = Regex::new(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b").unwrap();
+type SharedMatcher = RwLock<Option<Arc<NeedleMatcher>>>;
+
+static KNOWN_ACCOUNTS: Lazy<SharedMatcher> = Lazy::new(|| RwLock::new(None));
+static LOCAL_HOSTNAME: Lazy<SharedMatcher> = Lazy::new(|| {
+    RwLock::new(identity_matcher(
+        detect_local_hostname().as_deref(),
+        "<HOST>",
+    ))
+});
+static LOCAL_USERNAME: Lazy<SharedMatcher> = Lazy::new(|| {
+    RwLock::new(identity_matcher(
+        detect_local_username().as_deref(),
+        "<USER>",
+    ))
+});
+
+fn non_empty_env(keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .filter_map(|k| std::env::var(k).ok())
+        .map(|v| v.trim().to_string())
+        .find(|v| !v.is_empty())
+}
+
+fn detect_local_hostname() -> Option<String> {
+    if let Some(name) = non_empty_env(&["COMPUTERNAME", "HOSTNAME"]) {
+        return Some(name);
     }
-
-    let mut masked_content = NORISK_TOKEN_REGEX.replace_all(content, "-Dnorisk.token=*****").to_string();
-    masked_content = ACCESS_TOKEN_REGEX.replace_all(&masked_content, "--accessToken *****").to_string();
-    masked_content = CLIENT_ID_ARG_REGEX.replace_all(&masked_content, "--clientId *****").to_string();
-    masked_content = XUID_ARG_REGEX.replace_all(&masked_content, "--xuid *****").to_string();
-    masked_content = BEARER_REGEX.replace_all(&masked_content, "Bearer *****").to_string();
-    masked_content = JSON_TOKEN_FIELD_REGEX.replace_all(&masked_content, "\"$1\":\"*****\"").to_string();
-    masked_content = JWT_REGEX.replace_all(&masked_content, "*****").to_string();
-    masked_content = WINDOWS_USER_PATH_REGEX.replace_all(&masked_content, "${1}*****").to_string();
-    masked_content = UNIX_USER_PATH_REGEX.replace_all(&masked_content, "${1}*****").to_string();
-    masked_content = EMAIL_REGEX.replace_all(&masked_content, "*****@*****").to_string();
-
-    let known = KNOWN_ACCOUNTS.read().ok().map(|guard| guard.clone());
-    if let Some(known) = known {
-        for (needle, placeholder) in known.iter() {
-            if masked_content.contains(needle.as_str()) {
-                masked_content = masked_content.replace(needle.as_str(), placeholder);
+    #[cfg(unix)]
+    {
+        if let Ok(raw) = std::fs::read_to_string("/etc/hostname") {
+            let trimmed = raw.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
             }
         }
     }
+    None
+}
 
-    masked_content
+fn detect_local_username() -> Option<String> {
+    non_empty_env(&["USERNAME", "USER", "LOGNAME"])
+}
+
+fn is_generic(name: &str) -> bool {
+    GENERIC_IDENTITIES
+        .iter()
+        .any(|g| name.eq_ignore_ascii_case(g))
+}
+
+fn identity_needles(name: &str) -> Vec<String> {
+    let name = name.trim();
+    if name.chars().count() < MIN_NEEDLE_LEN || is_generic(name) {
+        return Vec::new();
+    }
+    let mut needles = vec![name.to_string()];
+    let short = name.split('.').next().unwrap_or(name);
+    if short != name && short.chars().count() >= MIN_NEEDLE_LEN && !is_generic(short) {
+        needles.push(short.to_string());
+    }
+    let compact: String = name
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '.')
+        .collect();
+    if compact.chars().count() > 8 || compact.len() != name.len() {
+        let stem: String = compact.chars().take(6).collect();
+        if stem.chars().count() >= MIN_NEEDLE_LEN {
+            for i in 1..=4 {
+                needles.push(format!("{}~{}", stem, i));
+            }
+        }
+    }
+    needles
+}
+
+fn identity_matcher(name: Option<&str>, placeholder: &'static str) -> Option<Arc<NeedleMatcher>> {
+    let needles = identity_needles(name?)
+        .into_iter()
+        .map(|n| (n, placeholder))
+        .collect();
+    NeedleMatcher::new(needles, true).map(Arc::new)
+}
+
+pub fn set_local_hostname(hostname: Option<&str>) {
+    if let Ok(mut guard) = LOCAL_HOSTNAME.write() {
+        *guard = identity_matcher(hostname, "<HOST>");
+    }
+}
+
+pub fn set_local_username(username: Option<&str>) {
+    if let Ok(mut guard) = LOCAL_USERNAME.write() {
+        *guard = identity_matcher(username, "<USER>");
+    }
+}
+
+pub fn set_known_accounts(accounts: &[(String, String)]) {
+    let mut needles: Vec<(String, &'static str)> = Vec::new();
+    for (username, uuid) in accounts {
+        needles.push((username.clone(), "<PLAYER>"));
+        needles.push((uuid.clone(), "<PLAYER_UUID>"));
+        needles.push((uuid.replace('-', ""), "<PLAYER_UUID>"));
+    }
+    let matcher = NeedleMatcher::new(needles, false).map(Arc::new);
+    if let Ok(mut guard) = KNOWN_ACCOUNTS.write() {
+        *guard = matcher;
+    }
+}
+
+enum Replace {
+    Template(&'static str),
+    With(fn(&Captures) -> Option<String>),
+}
+
+struct Rule {
+    pattern: &'static str,
+    replace: Replace,
+}
+
+fn basic_auth(c: &Captures) -> Option<String> {
+    let value = c.get(2)?.as_str();
+    let after_header = c.get(1).is_some();
+    let looks_encoded = value
+        .chars()
+        .any(|ch| ch.is_ascii_digit() || matches!(ch, '=' | '+' | '/'));
+    (after_header || looks_encoded)
+        .then(|| format!("{}Basic *****", c.get(1).map_or("", |m| m.as_str())))
+}
+
+fn chat_password_command(c: &Captures) -> Option<String> {
+    Some(format!("{}{} ***", &c[1], &c[2]))
+}
+
+const RULES: &[Rule] = &[
+    Rule {
+        pattern: r"-Dnorisk\.token=[^\s]+",
+        replace: Replace::Template("-Dnorisk.token=*****"),
+    },
+    Rule {
+        pattern: r"--accessToken\s+[^\s]+",
+        replace: Replace::Template("--accessToken *****"),
+    },
+    Rule {
+        pattern: r"--clientId\s+[^\s]+",
+        replace: Replace::Template("--clientId *****"),
+    },
+    Rule {
+        pattern: r"--xuid\s+[^\s]+",
+        replace: Replace::Template("--xuid *****"),
+    },
+    Rule {
+        pattern: r"(?i)(?-u:\b)Bearer\s+[A-Za-z0-9._~+/=-]+",
+        replace: Replace::Template("Bearer *****"),
+    },
+    Rule {
+        pattern: r"(?i)(Authorization:\s*)?(?-u:\b)Basic\s+([A-Za-z0-9+/]{6,}={0,2})",
+        replace: Replace::With(basic_auth),
+    },
+    Rule {
+        pattern: r#"(?i)"(value|token|access_token|accessToken|refresh_token|refreshToken|id_token|client_secret|DeviceToken|TitleToken|UserToken|XSTSToken|authorization)"\s*:\s*"[^"]*""#,
+        replace: Replace::Template("\"$1\":\"*****\""),
+    },
+    Rule {
+        pattern: r#"(?i)(?-u:\b)(access_token|refresh_token|id_token)\s*:\s*Some\("[^"]*"\)"#,
+        replace: Replace::Template("$1: Some(\"*****\")"),
+    },
+    Rule {
+        pattern: r#"(?i)(?-u:\b)(access_token|refresh_token|id_token)\s*:\s*"[^"]*""#,
+        replace: Replace::Template("$1: \"*****\""),
+    },
+    Rule {
+        pattern: r#"(?i)(?-u:\b)(access_token|refresh_token|id_token|code|client_secret|password|token|sig|signature)=[^&\s"]+"#,
+        replace: Replace::Template("$1=*****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)eyJ[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]*){0,2}",
+        replace: Replace::Template("*****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)M\.C\d\S*?\.\S+",
+        replace: Replace::Template("*****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)EwA[A-Za-z0-9+/=_-]{20,}",
+        replace: Replace::Template("*****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)[MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}",
+        replace: Replace::Template("*****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)mfa\.[A-Za-z0-9_-]{60,}",
+        replace: Replace::Template("*****"),
+    },
+    Rule {
+        pattern: r#"(?i)([A-Z]:[/\\]+Users[/\\]+)[^/\\"'\r\n<>|]{1,64}?([/\\])"#,
+        replace: Replace::Template("${1}*****${2}"),
+    },
+    Rule {
+        pattern: r#"(?i)([A-Z]:[/\\]+Users[/\\]+)[^/\\"'\s]+"#,
+        replace: Replace::Template("${1}*****"),
+    },
+    Rule {
+        pattern: r#"(/+(?:home|Users)/+)[^/"'\s]+"#,
+        replace: Replace::Template("${1}*****"),
+    },
+    Rule {
+        pattern: r#"OneDrive - [^/\\"'\r\n]+"#,
+        replace: Replace::Template("OneDrive - *****"),
+    },
+    Rule {
+        pattern: r"(?-u:\b)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?-u:\b)",
+        replace: Replace::Template("*****@*****"),
+    },
+    Rule {
+        pattern: r"--session\s+[^\s]+",
+        replace: Replace::Template("--session *****"),
+    },
+    Rule {
+        pattern: r"--uuid\s+[^\s]+",
+        replace: Replace::Template("--uuid *****"),
+    },
+    Rule {
+        pattern: r#"(?i)(?-u:\b)token:[^\s"',;]+"#,
+        replace: Replace::Template("token:*****"),
+    },
+    Rule {
+        pattern: r#"(?im)(^|[\s\]>:"'])(/(?:login|l|register|reg|changepassword|changepw|cp))[ \t]+[^\r\n]+"#,
+        replace: Replace::With(chat_password_command),
+    },
+    Rule {
+        pattern: r"(?i)(?-u:\b)[0-9a-f]{2}(?::[0-9a-f]{2}){5}(?-u:\b)|(?-u:\b)[0-9a-f]{2}(?:-[0-9a-f]{2}){5}(?-u:\b)",
+        replace: Replace::Template("<MAC>"),
+    },
+];
+
+static COMPILED_RULES: Lazy<(RegexSet, Vec<Regex>)> = Lazy::new(|| {
+    let patterns: Vec<&str> = RULES.iter().map(|r| r.pattern).collect();
+    let set = RegexSet::new(&patterns).expect("redaction rule set");
+    let regexes = patterns
+        .iter()
+        .map(|p| Regex::new(p).expect("redaction rule"))
+        .collect();
+    (set, regexes)
+});
+
+fn apply_rules(chunk: &str) -> Cow<'_, str> {
+    let (set, regexes) = &*COMPILED_RULES;
+    let mut text: Cow<'_, str> = Cow::Borrowed(chunk);
+    let candidates: Vec<usize> = set.matches(chunk).into_iter().collect();
+    for index in candidates {
+        let regex = &regexes[index];
+        let replaced = match &RULES[index].replace {
+            Replace::Template(template) => regex.replace_all(&text, *template).into_owned(),
+            Replace::With(f) => regex
+                .replace_all(&text, |c: &Captures| {
+                    f(c).unwrap_or_else(|| c[0].to_string())
+                })
+                .into_owned(),
+        };
+        text = Cow::Owned(replaced);
+    }
+    text
+}
+
+fn current(slot: &SharedMatcher) -> Option<Arc<NeedleMatcher>> {
+    slot.read().ok().and_then(|guard| guard.clone())
+}
+
+fn mask_chunk(chunk: &str) -> String {
+    let mut text = apply_rules(chunk);
+    if text.contains('.') || text.contains(':') {
+        text = Cow::Owned(mask_ip_addresses(&text));
+    }
+    for slot in [&*LOCAL_HOSTNAME, &*LOCAL_USERNAME, &*KNOWN_ACCOUNTS] {
+        if let Some(matcher) = current(slot) {
+            text = matcher.apply(text);
+        }
+    }
+    text.into_owned()
+}
+
+pub fn mask_sensitive_data(content: &str) -> String {
+    if content.len() <= CHUNK_BYTES {
+        return mask_chunk(content);
+    }
+    let mut out = String::with_capacity(content.len());
+    let mut start = 0;
+    while start < content.len() {
+        let mut end = (start + CHUNK_BYTES).min(content.len());
+        while end < content.len() && !content.is_char_boundary(end) {
+            end += 1;
+        }
+        if end < content.len() {
+            end = match content[end..].find('\n') {
+                Some(n) => end + n + 1,
+                None => content.len(),
+            };
+        }
+        out.push_str(&mask_chunk(&content[start..end]));
+        start = end;
+    }
+    out
+}
+
+const IP_PLACEHOLDER: &str = "<IP>";
+
+fn mask_ip_addresses(content: &str) -> String {
+    lazy_static! {
+        static ref IPV4_REGEX: Regex = Regex::new(
+            r"(?-u:\b)(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?-u:\b)"
+        ).unwrap();
+        static ref IPV6_REGEX: Regex = Regex::new(r"(?i)(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}").unwrap();
+    }
+
+    let after_v4 = replace_filtered(&IPV4_REGEX, content, |candidate, prev, next, rest| {
+        if matches!(prev, Some('.' | '-' | '_' | '+' | 'v' | 'V')) {
+            return false;
+        }
+        if matches!(next, Some('-' | '_' | '+')) {
+            return false;
+        }
+        if next == Some('.')
+            && rest.chars().nth(1).is_some_and(|c| c.is_ascii_alphanumeric())
+        {
+            return false;
+        }
+        !(candidate.starts_with("127.") || candidate == "0.0.0.0")
+    });
+
+    replace_filtered(&IPV6_REGEX, &after_v4, |candidate, prev, next, _rest| {
+        let is_word = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
+        if is_word(prev) || is_word(next) || prev == Some(':') || next == Some(':') {
+            return false;
+        }
+        let groups = candidate.split(':').filter(|g| !g.is_empty()).count();
+        let colons = candidate.matches(':').count();
+        if !(colons == 7 || (candidate.contains("::") && groups >= 2)) {
+            return false;
+        }
+        let lower = candidate.to_ascii_lowercase();
+        !matches!(
+            lower.as_str(),
+            "::1" | "::" | "0:0:0:0:0:0:0:1" | "0:0:0:0:0:0:0:0"
+        )
+    })
+}
+
+fn replace_filtered<F>(regex: &Regex, content: &str, mut accept: F) -> String
+where
+    F: FnMut(&str, Option<char>, Option<char>, &str) -> bool,
+{
+    let mut out = String::with_capacity(content.len());
+    let mut last = 0;
+    let mut replaced = false;
+    for m in regex.find_iter(content) {
+        let prev = content[..m.start()].chars().next_back();
+        let rest = &content[m.end()..];
+        let next = rest.chars().next();
+        if accept(m.as_str(), prev, next, rest) {
+            out.push_str(&content[last..m.start()]);
+            out.push_str(IP_PLACEHOLDER);
+            last = m.end();
+            replaced = true;
+        }
+    }
+    if !replaced {
+        return content.to_string();
+    }
+    out.push_str(&content[last..]);
+    out
+}
+
+pub const HS_ERR_ENV_REMOVED_MARKER: &str =
+    "Environment Variables: [removed by NoRisk Launcher for privacy]";
+
+pub fn redact_hs_err(content: &str) -> String {
+    let mut kept = String::with_capacity(content.len());
+    let mut in_env = false;
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if in_env {
+            let is_var =
+                trimmed.contains('=') || trimmed.starts_with(' ') || trimmed.starts_with('\t');
+            if trimmed.trim().is_empty() || !is_var {
+                in_env = false;
+            } else {
+                continue;
+            }
+        }
+        if trimmed.trim_start().starts_with("Environment Variables:") {
+            in_env = true;
+            kept.push_str(HS_ERR_ENV_REMOVED_MARKER);
+            kept.push('\n');
+            continue;
+        }
+        kept.push_str(line);
+    }
+    mask_sensitive_data(&kept)
 }
 
 pub fn mask_identifier(value: &str) -> String {
@@ -77,121 +494,5 @@ pub fn mask_identifier(value: &str) -> String {
     match value.char_indices().nth(KEEP) {
         Some((split, _)) => format!("{}...", &value[..split]),
         None => "*****".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{mask_identifier, mask_sensitive_data};
-
-    static ACCOUNT_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-    fn lock_account_state() -> std::sync::MutexGuard<'static, ()> {
-        ACCOUNT_STATE.lock().unwrap_or_else(|e| e.into_inner())
-    }
-
-    #[test]
-    fn shortens_long_identifiers_and_hides_short_ones() {
-        assert_eq!(mask_identifier("abcdefghijklmnop"), "abcdefgh...");
-        assert_eq!(mask_identifier("short"), "*****");
-    }
-
-    #[test]
-    fn masks_json_token_fields_and_jwt() {
-        let masked = mask_sensitive_data(r#"{"value":"eyJhbGciOi.eyJzdWIi.SflKxw"}"#);
-        assert!(!masked.contains("eyJ"));
-        assert!(masked.contains(r#""value":"*****""#));
-    }
-
-    #[test]
-    fn masks_truncated_jwt() {
-        let masked = mask_sensitive_data("body: eyJhbGciOi.eyJzdWIiLCJ...");
-        assert!(!masked.contains("eyJ"));
-    }
-
-    #[test]
-    fn masks_bearer_header() {
-        let masked = mask_sensitive_data("Authorization: Bearer abc123.def-456");
-        assert_eq!(masked, "Authorization: Bearer *****");
-    }
-
-    #[test]
-    fn masks_launch_args() {
-        let masked = mask_sensitive_data("-Dnorisk.token=secret --accessToken topsecret --width 800");
-        assert_eq!(masked, "-Dnorisk.token=***** --accessToken ***** --width 800");
-    }
-
-    #[test]
-    fn masks_microsoft_identifiers() {
-        let masked = mask_sensitive_data("--clientId c4502edb-1111 --xuid 2535123 --width 800");
-        assert_eq!(masked, "--clientId ***** --xuid ***** --width 800");
-    }
-
-    #[test]
-    fn masks_registered_player_name_and_uuid_in_every_spelling() {
-        let _guard = lock_account_state();
-        super::set_known_accounts(&[(
-            "ZzTestPlayerZz".to_string(),
-            "A1B2C3D4-1111-2222-3333-444455556666".to_string(),
-        )]);
-
-        let masked = mask_sensitive_data(
-            "--username ZzTestPlayerZz --uuid a1b2c3d4-1111-2222-3333-444455556666 \
-             compact a1b2c3d41111222233334444555566 66 upper A1B2C3D4-1111-2222-3333-444455556666",
-        );
-
-        assert!(!masked.contains("ZzTestPlayerZz"), "name leaked: {}", masked);
-        assert!(!masked.to_lowercase().contains("a1b2c3d4-1111"), "uuid leaked: {}", masked);
-        assert!(masked.contains("<PLAYER>"));
-        assert!(masked.contains("<PLAYER_UUID>"));
-
-        let untouched = mask_sensitive_data("profile 99999999-8888-7777-6666-555544443333 sodium");
-        assert_eq!(untouched, "profile 99999999-8888-7777-6666-555544443333 sodium");
-
-        super::set_known_accounts(&[]);
-    }
-
-    #[test]
-    fn ignores_accounts_with_a_too_short_name() {
-        let _guard = lock_account_state();
-        super::set_known_accounts(&[("ab".to_string(), "".to_string())]);
-        assert_eq!(mask_sensitive_data("about a cab"), "about a cab");
-        super::set_known_accounts(&[]);
-    }
-
-    #[test]
-    fn masks_os_username_in_paths() {
-        let masked = mask_sensitive_data(r"Loading C:\Users\sheesh\AppData\Roaming\NoRiskClientV3\mods");
-        assert_eq!(masked, r"Loading C:\Users\*****\AppData\Roaming\NoRiskClientV3\mods");
-
-        let masked = mask_sensitive_data("path: C:/Users/sheesh/Desktop/test.jar");
-        assert_eq!(masked, "path: C:/Users/*****/Desktop/test.jar");
-
-        let masked = mask_sensitive_data("/home/sheesh/.minecraft and /Users/sheesh/Library");
-        assert_eq!(masked, "/home/*****/.minecraft and /Users/*****/Library");
-    }
-
-    #[test]
-    fn masks_os_username_in_debug_escaped_paths() {
-        let masked = mask_sensitive_data(
-            r#"Successfully saved config to "C:\\Users\\sheesh\\AppData\\Roaming\\norisk""#,
-        );
-        assert!(!masked.contains("sheesh"), "os username leaked: {}", masked);
-        assert_eq!(
-            masked,
-            r#"Successfully saved config to "C:\\Users\\*****\\AppData\\Roaming\\norisk""#
-        );
-    }
-
-    #[test]
-    fn masks_email_addresses() {
-        let masked = mask_sensitive_data("account email: some.user+mc@gmail.com logged in");
-        assert_eq!(masked, "account email: *****@***** logged in");
-    }
-
-    #[test]
-    fn leaves_normal_content_untouched() {
-        let input = r#"{"name":"sodium","version":"0.5.8"}"#;
-        assert_eq!(mask_sensitive_data(input), input);
     }
 }

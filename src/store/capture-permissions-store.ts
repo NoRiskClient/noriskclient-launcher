@@ -6,6 +6,7 @@ import {
   type CapturePermissions,
 } from "../services/clip-service";
 import { parseErrorMessage } from "../utils/error-utils";
+import { isMacOS } from "../utils/platform";
 import { useClipsStore } from "./clips-store";
 
 export const capturePermissionKeys: CapturePermission[] = [
@@ -24,6 +25,9 @@ export const allCapturePermissionsGranted = (
 ) =>
   permissions !== null &&
   requiredCapturePermissions(permissions).every((key) => permissions[key]);
+
+export const useCapturePermissionsReady = () =>
+  useCapturePermissionsStore((state) => !isMacOS() || allCapturePermissionsGranted(state.permissions));
 
 type Notice = {
   reason: "denied" | "revoked" | "missing";

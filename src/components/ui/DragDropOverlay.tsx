@@ -31,7 +31,7 @@ export function DragDropOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center p-8 pointer-events-none animate-in fade-in duration-150"
+      className="glass-scrim fixed inset-0 z-[2000] flex items-center justify-center p-8 pointer-events-none animate-in fade-in duration-150"
       style={{ backgroundColor: `${rejected ? "#000000" : color}26`, backdropFilter: "blur(6px)" }}
     >
       <div

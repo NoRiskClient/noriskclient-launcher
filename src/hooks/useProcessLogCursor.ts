@@ -20,7 +20,7 @@ export function useProcessLogCursor(
       const store = useProcessStore.getState();
       const cursor = store.cursors.get(processId) ?? 0;
       try {
-        const res = await getProcessLogCursor(sessionId, cursor);
+        const res = await getProcessLogCursor(sessionId, cursor, true);
         if (cancelled) return;
         if (res.new_file) {
           store.clearLogs(processId);

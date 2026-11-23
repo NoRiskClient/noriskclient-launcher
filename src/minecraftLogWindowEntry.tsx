@@ -2,11 +2,11 @@ import "./polyfills";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MinecraftLogWindow } from "./components/log/MinecraftLogWindow";
 import { GlobalToaster } from "./components/ui/GlobalToaster";
 import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import i18n from "./i18n/i18n";
+import { revealAfterFirstPaint } from "./utils/reveal-window";
 import "./styles/globals.css";
 import type { ProcessMetadata } from "./types/processState";
 
@@ -34,9 +34,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 
-// Reveal the window only after the first paint to avoid the white flash.
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    getCurrentWindow().show().catch(() => {});
-  });
-});
+revealAfterFirstPaint();

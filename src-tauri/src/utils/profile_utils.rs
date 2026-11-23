@@ -159,7 +159,7 @@ async fn download_content(
 }
 
 /// Helper function to get the correct directory for a specific content type
-async fn get_content_directory(profile: &Profile, content_type: &ContentType) -> Result<PathBuf> {
+pub async fn get_content_directory(profile: &Profile, content_type: &ContentType) -> Result<PathBuf> {
     match content_type {
         ContentType::ResourcePack => resourcepack_utils::get_resourcepacks_dir(profile).await,
         ContentType::ShaderPack => shaderpack_utils::get_shaderpacks_dir(profile).await,
@@ -192,6 +192,13 @@ fn content_type_to_string(content_type: &ContentType) -> &'static str {
         ContentType::Mod => "Mod",
         ContentType::NoRiskMod => "NoRisk Mod",
     }
+}
+
+fn supports_target_loader(installed_mod: &crate::state::profile_state::Mod, target_loader: &str) -> bool {
+    crate::state::profile_state::ModLoader::from_str(target_loader)
+        .ok()
+        .and_then(|loader| installed_mod.supports_loader(loader))
+        .unwrap_or(true)
 }
 
 /// Helper function to install a Modrinth content pack from a ModrinthVersion
@@ -469,10 +476,7 @@ pub async fn check_content_installed(params: CheckContentParams) -> Result<Conte
                     match_game_version =
                         installed_versions.contains(&target_game_version.to_string());
                 }
-                let mut match_loader = true;
-                if let Some(installed_loader_enum) = &installed_mod.associated_loader {
-                    match_loader = installed_loader_enum.as_str() == target_loader_str;
-                }
+                let match_loader = supports_target_loader(installed_mod, target_loader_str);
 
                 if match_project
                     && match_version
@@ -1605,10 +1609,7 @@ async fn process_mod_requests(
             if let Some(installed_versions) = &installed_mod.game_versions {
                 match_game_version = installed_versions.contains(&target_game_version.to_string());
             }
-            let mut match_loader = true;
-            if let Some(installed_loader_enum) = &installed_mod.associated_loader {
-                match_loader = installed_loader_enum.as_str() == target_loader_str;
-            }
+            let match_loader = supports_target_loader(installed_mod, target_loader_str);
 
             if match_project
                 && match_version
@@ -2304,7 +2305,7 @@ impl LocalContentLoader {
                     norisk_info: None,
                     fallback_version: mod_item.version.clone(),
                     id: Some(mod_item.id.to_string()), // Set the ID from ModProfileEntry
-                    associated_loader: mod_item.associated_loader.clone(), // Populate associated_loader
+                    associated_loader: mod_item.primary_loader(),
                     modpack_origin: mod_item.modpack_origin.clone(), // Übernimm ModPack-Origin
                     updates_enabled: Some(mod_item.updates_enabled), // Übernimm Update-Einstellung
                 });
@@ -2726,7 +2727,7 @@ impl LocalContentLoader {
         }
 
         if params.fetch_modrinth_data {
-            Self::attach_icon_urls(&state, &mut final_items).await;
+            Self::attach_project_details(&state, &mut final_items).await;
         }
 
         info!(
@@ -2738,7 +2739,7 @@ impl LocalContentLoader {
         Ok(final_items)
     }
 
-    async fn attach_icon_urls(state: &Arc<State>, items: &mut [LocalContentItem]) {
+    async fn attach_project_details(state: &Arc<State>, items: &mut [LocalContentItem]) {
         let modrinth_ids: Vec<String> = items
             .iter()
             .filter_map(|i| i.modrinth_info.as_ref().map(|m| m.project_id.clone()))
@@ -2747,11 +2748,22 @@ impl LocalContentLoader {
             .collect();
 
         if !modrinth_ids.is_empty() {
-            let projects = state.content_cache.peek_modrinth_projects(modrinth_ids).await;
+            let projects: HashMap<String, _> = state
+                .content_cache
+                .get_modrinth_projects(modrinth_ids, CacheBehaviour::StaleWhileRevalidate)
+                .await
+                .unwrap_or_else(|e| {
+                    debug!("Could not load Modrinth project details: {}", e);
+                    Vec::new()
+                })
+                .into_iter()
+                .map(|project| (project.id.clone(), project))
+                .collect();
             for item in items.iter_mut() {
                 if let Some(info) = item.modrinth_info.as_mut() {
                     if let Some(project) = projects.get(&info.project_id) {
                         info.icon_url = project.icon_url.clone();
+                        info.name = project.title.clone();
                     }
                 }
             }
@@ -2769,12 +2781,24 @@ impl LocalContentLoader {
             .collect();
 
         if !curseforge_ids.is_empty() {
-            let mods = state.content_cache.peek_curseforge_mods(curseforge_ids).await;
+            let mods: HashMap<u32, _> = state
+                .content_cache
+                .get_curseforge_mods(curseforge_ids, None, CacheBehaviour::StaleWhileRevalidate)
+                .await
+                .map(|response| response.data)
+                .unwrap_or_else(|e| {
+                    debug!("Could not load CurseForge project details: {}", e);
+                    Vec::new()
+                })
+                .into_iter()
+                .map(|cf_mod| (cf_mod.id, cf_mod))
+                .collect();
             for item in items.iter_mut() {
                 if let Some(info) = item.curseforge_info.as_mut() {
                     if let Ok(id) = info.project_id.parse::<u32>() {
                         if let Some(cf_mod) = mods.get(&id) {
                             info.icon_url = cf_mod.logo.as_ref().map(|l| l.url.clone());
+                            info.name = cf_mod.name.clone();
                         }
                     }
                 }

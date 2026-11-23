@@ -15,6 +15,8 @@ pub mod minecraft;
 pub mod state;
 #[cfg(desktop)]
 pub mod sync;
+#[cfg(desktop)]
+pub mod support;
 
 use log::{error, info, trace};
 use std::sync::Arc;
@@ -29,11 +31,16 @@ use crate::commands::analytics_command::track_analytics_event;
 use crate::commands::font_command::list_system_fonts;
 #[cfg(desktop)]
 use crate::commands::process_command::{
-    fetch_crash_report, get_process, get_process_log_cursor,
-    get_processes, get_processes_by_profile, stop_process,
+    fetch_crash_report, focus_main_window, get_process, get_process_log_cursor,
+    get_processes, get_processes_by_profile, open_minecraft_log_window, open_single_log_window,
+    set_discord_state, stop_process,
 };
 use commands::minecraft_auth_command::{
     begin_login, cancel_login, get_accounts, get_active_account, is_flatpak, remove_account, set_active_account
+};
+use commands::twitch_command::{
+    twitch_available_scopes, twitch_begin_device_login, twitch_cancel_login, twitch_is_linked,
+    twitch_unlink,
 };
 use commands::minecraft_command::{
     add_skin,
@@ -104,6 +111,7 @@ use commands::file_command::{
 
 // Import config commands
 use commands::config_commands::{get_app_version, get_launcher_config, set_launcher_config};
+use commands::legal_commands::{acknowledge_legal_documents, acknowledge_legal_notice, get_legal_status};
 #[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
@@ -140,11 +148,13 @@ use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
 use commands::nrc_commands::get_news_and_changelogs_command;
+#[cfg(desktop)]
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command};
 
 // Import Content commands
 #[cfg(desktop)]
 use commands::content_command::{
-    bulk_toggle_mod_updates, install_content_to_profile, install_local_content_to_profile,
+    bulk_toggle_mod_updates, copy_contents_to_profile, install_content_to_profile, install_local_content_to_profile,
     switch_content_version, toggle_content_from_profile, toggle_contents_from_profile,
     update_contents_from_profile,
     uninstall_contents_from_profile,
@@ -169,9 +179,11 @@ use commands::friends_command::{
     remove_message_reaction,
 };
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+
     #[cfg(target_os = "android")]
     {
         let base = "/data/data/gg.norisk.NoRiskClientLauncherV3";
@@ -193,15 +205,20 @@ pub fn run() {
 
     info!("Starting NoRiskClient Launcher...");
 
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_fs::init());
+    let builder = tauri::Builder::default();
     #[cfg(desktop)]
     let builder = builder
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            info!("SingleInstance plugin: Second instance triggered with args: {:?}", argv);
+            let logged_args: Vec<String> = argv
+                .iter()
+                .map(|a| match url::Url::parse(a) {
+                    Ok(u) if u.scheme() == "norisk" => {
+                        format!("norisk://{}{} (query hidden)", u.host_str().unwrap_or_default(), u.path())
+                    }
+                    _ => a.clone(),
+                })
+                .collect();
+            info!("SingleInstance plugin: Second instance triggered with args: {:?}", logged_args);
 
             // If the second invocation carried a CLI subcommand we recognize,
             // service it instead of bringing the window to the front.
@@ -209,24 +226,20 @@ pub fn run() {
                 return;
             }
 
-            match app.get_webview_window("main") {
-                Some(window) => {
-                    if let Err(e) = window.show() {
-                        error!("SingleInstance: Failed to show main window: {}", e);
-                    }
-                    if let Err(e) = window.unminimize() {
-                        error!("SingleInstance: Failed to unminimize main window: {}", e);
-                    }
-                    if let Err(e) = window.set_focus() {
-                        error!("SingleInstance: Failed to focus main window: {}", e);
-                    }
-                    info!("SingleInstance: Brought existing window to front.");
-                }
-                None => {
-                    info!("SingleInstance: Main window not yet available, still starting up. Ignoring.");
-                }
-            }
+            utils::main_window::show(app);
         }));
+    let builder = builder
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_fs::init());
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_cli::init())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                utils::main_window::close_requested(window, api);
+            }
+        });
     let builder = builder.plugin(tauri_plugin_dialog::init());
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_haptics::init());
@@ -257,27 +270,8 @@ pub fn run() {
                 .tooltip("NoRisk Client Launcher")
                 .icon(app.default_window_icon().unwrap().clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        match app.get_webview_window("main") {
-                            Some(window) => {
-                                if let Err(e) = window.show() {
-                                    error!("Tray menu: Failed to show window: {}", e);
-                                }
-                                if let Err(e) = window.unminimize() {
-                                    error!("Tray menu: Failed to unminimize window: {}", e);
-                                }
-                                if let Err(e) = window.set_focus() {
-                                    error!("Tray menu: Failed to focus window: {}", e);
-                                }
-                            }
-                            None => {
-                                error!("Tray menu: Main window not found - application in inconsistent state");
-                            }
-                        }
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
+                    "show" => utils::main_window::show(app),
+                    "quit" => utils::main_window::quit(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| match event {
@@ -285,56 +279,11 @@ pub fn run() {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
-                    } => {
-                        let app = tray.app_handle();
-                        match app.get_webview_window("main") {
-                            Some(window) => {
-                                let is_visible = window.is_visible().unwrap_or(false);
-                                let is_minimized = window.is_minimized().unwrap_or(false);
-
-                                if is_visible && !is_minimized {
-                                    if let Err(e) = window.hide() {
-                                        error!("Tray click: Failed to hide window: {}", e);
-                                    }
-                                } else {
-                                    if let Err(e) = window.show() {
-                                        error!("Tray click: Failed to show window: {}", e);
-                                    }
-                                    if let Err(e) = window.unminimize() {
-                                        error!("Tray click: Failed to unminimize window: {}", e);
-                                    }
-                                    if let Err(e) = window.set_focus() {
-                                        error!("Tray click: Failed to focus window: {}", e);
-                                    }
-                                }
-                            }
-                            None => {
-                                error!("Tray click: Main window not found - application in inconsistent state");
-                            }
-                        }
-                    }
+                    } => utils::main_window::toggle(tray.app_handle()),
                     TrayIconEvent::DoubleClick {
                         button: MouseButton::Left,
                         ..
-                    } => {
-                        let app = tray.app_handle();
-                        match app.get_webview_window("main") {
-                            Some(window) => {
-                                if let Err(e) = window.show() {
-                                    error!("Tray double-click: Failed to show window: {}", e);
-                                }
-                                if let Err(e) = window.unminimize() {
-                                    error!("Tray double-click: Failed to unminimize window: {}", e);
-                                }
-                                if let Err(e) = window.set_focus() {
-                                    error!("Tray double-click: Failed to focus window: {}", e);
-                                }
-                            }
-                            None => {
-                                error!("Tray double-click: Main window not found - application in inconsistent state");
-                            }
-                        }
-                    }
+                    } => utils::main_window::show(tray.app_handle()),
                     _ => {}
                 })
                 .build(app)?;
@@ -347,24 +296,22 @@ pub fn run() {
                 info!("Deep link schemes registered successfully.");
             }
 
-            // Handle deep links received while app is running
+            app.manage(utils::deep_link_utils::PendingDeepLinks::default());
+
             let deep_link_app_handle = app_handle.clone();
             app.deep_link().on_open_url(move |event| {
                 let handle = deep_link_app_handle.clone();
                 let urls = event.urls();
-                info!("Deep link received: {:?}", urls);
+                info!("Deep link received ({} URL(s))", urls.len());
                 tauri::async_runtime::spawn(async move {
                     utils::deep_link_utils::handle_deep_link(&handle, urls).await;
                 });
             });
 
-            // Handle cold-start deep links (app was launched via deep link)
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                info!("Cold-start deep link detected: {:?}", urls);
+                info!("Cold-start deep link detected ({} URL(s))", urls.len());
                 let cold_start_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    // Small delay to ensure state initialization has started
-                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                     utils::deep_link_utils::handle_deep_link(&cold_start_handle, urls).await;
                 });
             }
@@ -496,7 +443,7 @@ pub fn run() {
                     utils::mod_cache_cleanup::run_startup_cleanup().await;
                 });
 
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 commands::clip_commands::start_on_launch(state_init_app_handle.clone());
 
                 #[cfg(desktop)]
@@ -597,6 +544,8 @@ pub fn run() {
                 //debug_utils::debug_unified_mod_versions().await;
             });
 
+            utils::screen_time::spawn(app_handle.clone());
+
             // --- Register Focus Event Listener for Discord RPC ---
             #[cfg(desktop)]
             if let Some(main_window) = app.get_webview_window("main") {
@@ -616,12 +565,6 @@ pub fn run() {
                             }
                         }
                     });
-                });
-
-                // --- Handle window close request (from taskbar, etc.) ---
-                main_window.listen("tauri://close-requested", move |_event| {
-                    info!("Window close requested via system (taskbar, etc.). Exiting application.");
-                    std::process::exit(0);
                 });
             } else {
                 error!("Could not get main window handle to attach focus listener!");
@@ -654,6 +597,10 @@ pub fn run() {
             #[cfg(desktop)]
             restore_profile_backup,
             #[cfg(desktop)]
+            commands::profile_command::list_removed_standard_profiles,
+            #[cfg(desktop)]
+            commands::profile_command::restore_standard_profile,
+            #[cfg(desktop)]
             get_profile_store_status,
             #[cfg(desktop)]
             reimport_profiles_from_legacy_json,
@@ -675,11 +622,11 @@ pub fn run() {
             #[cfg(desktop)]
             stop_process,
             #[cfg(desktop)]
-            commands::process_command::open_minecraft_log_window,
+            open_minecraft_log_window,
             #[cfg(desktop)]
-            commands::process_command::open_single_log_window,
+            open_single_log_window,
             #[cfg(desktop)]
-            commands::process_command::focus_main_window,
+            focus_main_window,
             begin_login,
             cancel_login,
             is_flatpak,
@@ -687,6 +634,11 @@ pub fn run() {
             get_active_account,
             set_active_account,
             get_accounts,
+            twitch_available_scopes,
+            twitch_begin_device_login,
+            twitch_cancel_login,
+            twitch_unlink,
+            twitch_is_linked,
             #[cfg(desktop)]
             search_modrinth_mods,
             #[cfg(desktop)]
@@ -784,6 +736,9 @@ pub fn run() {
             #[cfg(desktop)]
             export_profile,
             get_launcher_config,
+            get_legal_status,
+            acknowledge_legal_documents,
+            acknowledge_legal_notice,
             set_launcher_config,
             get_launcher_directory,
             #[cfg(desktop)]
@@ -807,7 +762,7 @@ pub fn run() {
             remove_skin,
             update_skin_properties,
             #[cfg(desktop)]
-            commands::process_command::set_discord_state,
+            set_discord_state,
             browse_capes,
             get_player_capes,
             get_active_creator_code,
@@ -877,9 +832,9 @@ pub fn run() {
             get_app_version,
             get_news_and_changelogs_command,
             #[cfg(desktop)]
-            commands::nrc_commands::check_update_available_command,
+            check_update_available_command,
             #[cfg(desktop)]
-            commands::nrc_commands::download_and_install_update_command,
+            download_and_install_update_command,
             #[cfg(desktop)]
             get_modrinth_tags_command,
             #[cfg(desktop)]
@@ -915,6 +870,8 @@ pub fn run() {
             get_local_content,
             #[cfg(desktop)]
             install_local_content_to_profile,
+            #[cfg(desktop)]
+            copy_contents_to_profile,
             #[cfg(desktop)]
             switch_content_version,
             commands::minecraft_command::get_face_avatar,
@@ -974,11 +931,7 @@ pub fn run() {
             commands::permission_commands::refresh_permissions,
             commands::permission_commands::get_cached_permissions,
             commands::permission_commands::has_permission,
-            commands::tester_command::fetch_tester_queue_count,
-            commands::tester_command::fetch_tester_queue,
-            commands::tester_command::submit_tester_vote,
-            #[cfg(desktop)]
-            commands::tester_command::open_tester_window,
+            commands::permission_commands::get_granted_permissions,
             commands::nrc_commands::get_mobile_app_token,
             commands::nrc_commands::reset_mobile_app_token,
             commands::nrc_commands::get_advent_calendar_command,
@@ -996,6 +949,7 @@ pub fn run() {
             refresh_vanilla_cape_data,
             track_analytics_event,
             commands::analytics_command::get_system_os_info,
+            commands::analytics_command::set_screen_time_tab,
             #[cfg(desktop)]
             commands::profile_command::launch_profile_with_overrides,
             #[cfg(desktop)]
@@ -1050,6 +1004,10 @@ pub fn run() {
             commands::sync_pack_command::set_profile_sync_packs,
             #[cfg(desktop)]
             commands::sync_pack_command::get_profile_sync_conflicts,
+            #[cfg(desktop)]
+            commands::sync_pack_command::get_profile_sync_pack_mods,
+            #[cfg(desktop)]
+            commands::sync_pack_command::set_profile_sync_mods_excluded,
             #[cfg(desktop)]
             commands::sync_pack_command::sync_profile_now,
             #[cfg(desktop)]
@@ -1122,7 +1080,22 @@ pub fn run() {
             commands::mcreal_commands::follow_mcreal_user,
             commands::mcreal_commands::unfollow_mcreal_user,
             commands::mcreal_commands::upload_mcreal_post,
+            #[cfg(desktop)]
             commands::deep_link_handler::confirm_auth_bridge,
+            #[cfg(desktop)]
+            commands::deep_link_handler::take_pending_deep_links,
+            #[cfg(desktop)]
+            commands::support_command::support_request_fetch,
+            #[cfg(desktop)]
+            commands::support_command::support_request_prepare,
+            #[cfg(desktop)]
+            commands::support_command::support_request_execute_action,
+            #[cfg(desktop)]
+            commands::support_command::support_request_submit,
+            #[cfg(desktop)]
+            commands::support_command::support_request_decline,
+            #[cfg(desktop)]
+            commands::support_command::support_request_close,
             #[cfg(desktop)]
             commands::clip_commands::capture_apply_settings,
             #[cfg(desktop)]
@@ -1135,6 +1108,8 @@ pub fn run() {
             commands::capture_permissions::capture_permissions,
             #[cfg(desktop)]
             commands::capture_permissions::capture_open_permission_settings,
+            #[cfg(desktop)]
+            commands::capture_permissions::capture_reset_permissions,
             #[cfg(desktop)]
             commands::clip_commands::capture_encoder_capabilities,
             #[cfg(desktop)]
@@ -1158,21 +1133,40 @@ pub fn run() {
             #[cfg(desktop)]
             commands::clip_commands::clip_open_apps,
             #[cfg(desktop)]
+            commands::clip_commands::clip_list_screens,
+            #[cfg(desktop)]
             commands::clip_commands::clip_save_thumbnail,
             #[cfg(desktop)]
             commands::clip_commands::clip_export_vertical,
+            #[cfg(desktop)]
+            commands::clip_commands::clip_export_gif,
             #[cfg(desktop)]
             commands::clip_commands::clip_prepare_preview,
             #[cfg(desktop)]
             commands::clip_commands::clip_rename,
             #[cfg(desktop)]
             commands::clip_commands::clip_open_folder,
+            #[cfg(desktop)]
+            commands::clip_commands::clip_open_editor,
+            #[cfg(desktop)]
+            commands::clip_commands::clip_editor_current,
+            #[cfg(desktop)]
+            commands::clip_commands::clip_editor_close,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(
             #[allow(unused_variables)]
             |app_handle, event| {
+                if matches!(event, tauri::RunEvent::Exit) {
+                    utils::screen_time::report_before_exit();
+                }
+
+                #[cfg(target_os = "macos")]
+                if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
+                    utils::main_window::show(app_handle);
+                }
+
                 #[cfg(target_os = "macos")]
                 if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                     use std::sync::atomic::{AtomicBool, Ordering};

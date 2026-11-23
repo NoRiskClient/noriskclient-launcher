@@ -86,6 +86,24 @@ pub async fn read_permissions(
 }
 
 #[tauri::command]
+pub fn capture_reset_permissions(app: tauri::AppHandle) -> std::result::Result<(), CommandError> {
+    let identifier = app.config().identifier.clone();
+    #[cfg(target_os = "macos")]
+    for service in ["ScreenCapture", "ListenEvent"] {
+        let status = std::process::Command::new("/usr/bin/tccutil")
+            .args(["reset", service, identifier.as_str()])
+            .status()
+            .map_err(|e| AppError::Other(format!("Could not run tccutil: {e}")))?;
+        if !status.success() {
+            return Err(AppError::Other(format!("tccutil could not reset {service}.")).into());
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = identifier;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn capture_open_permission_settings(
     permission: CapturePermission,
 ) -> std::result::Result<(), CommandError> {

@@ -11,6 +11,8 @@ macro_rules! measure_time {
 }
 
 #[cfg(desktop)]
+pub mod content_copy;
+#[cfg(desktop)]
 pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von DataPacks
 #[cfg(desktop)]
 pub mod debug_utils;
@@ -33,9 +35,16 @@ pub mod hotkey_hook;
 #[cfg(desktop)]
 pub mod window_finder;
 #[cfg(desktop)]
+pub mod main_window;
+#[cfg(desktop)]
+pub mod window_focus;
+#[cfg(desktop)]
+pub mod screens;
+#[cfg(desktop)]
 pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-only
 #[cfg(desktop)]
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it
+pub mod screen_time;
 #[cfg(windows)]
 pub mod hotkey_manager;
 #[cfg(target_os = "macos")]
@@ -84,6 +93,7 @@ pub mod http_client; // NrcRequest: fluent request builder over HTTP_CLIENT
 // Füge hier ggf. andere Util-Module hinzu
 // pub mod network_utils;
 pub mod string_utils;
+#[cfg(desktop)]
 pub mod deep_link_utils;
 
 // Mache server_ping verfügbar

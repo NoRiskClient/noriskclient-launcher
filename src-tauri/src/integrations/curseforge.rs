@@ -1598,6 +1598,11 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
     }
 
     let mut mods_to_add = Vec::new();
+    let pack_loader = determine_loader_from_curseforge_loaders(
+        &manifest.minecraft.mod_loaders,
+        Some(&manifest.minecraft.version),
+    )
+    .0;
 
     // For each mod, get the specific file details from the bulk response
     for curseforge_mod in mods_response.data {
@@ -1635,7 +1640,8 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 file_fingerprint: Some(file_details.file_fingerprint),
             };
 
-            let new_mod = Mod {
+            #[allow(deprecated)]
+            let mut new_mod = Mod {
                 id: Uuid::new_v4(),
                 source: mod_source,
                 enabled: true,
@@ -1643,24 +1649,20 @@ pub async fn resolve_curseforge_manifest_files(manifest: &CurseForgeManifest) ->
                 version: Some(file_details.display_name.clone()),
                 game_versions: Some(vec![game_version.clone()]),
                 file_name_override: None,
-                associated_loader: Some(
-                    determine_loader_from_curseforge_loaders(
-                        &manifest.minecraft.mod_loaders,
-                        Some(&manifest.minecraft.version),
-                    )
-                    .0,
-                ),
+                associated_loader: None,
+                mod_loaders: Vec::new(),
                 modpack_origin: Some(format!("curseforge:{}:{}", project_id, file_id)), // From modpack
                 updates_enabled: false, // Disable updates for modpack mods (updated with pack)
                 force_include_versions: Vec::new(),
                 extra: Default::default(),
             };
+            new_mod.set_mod_loaders(vec![pack_loader]);
 
             info!(
-                "Prepared Mod struct for: {} (Enabled: {}, Loader: {:?})",
+                "Prepared Mod struct for: {} (Enabled: {}, Loaders: {:?})",
                 new_mod.display_name.as_deref().unwrap_or("Unknown"),
                 new_mod.enabled,
-                new_mod.associated_loader
+                new_mod.mod_loaders
             );
             mods_to_add.push(new_mod);
         }

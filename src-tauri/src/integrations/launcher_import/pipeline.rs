@@ -13,8 +13,8 @@ use crate::state::profile_state::{
 use crate::state::State;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use crate::utils::import_safety::{safe_file_component, strip_profile_flags, ImportSecurityReport};
+use crate::utils::world_utils::session_lock_is_held;
 use chrono::Utc;
-use fs4::tokio::AsyncFileExt;
 use log::{info, warn};
 use sanitize_filename::sanitize;
 use std::collections::HashSet;
@@ -106,21 +106,14 @@ fn ensure_not_cancelled(cancel: &AtomicBool) -> Result<()> {
 }
 
 async fn world_is_open(world_dir: &Path) -> bool {
-    let lock_path = world_dir.join("session.lock");
-    if !tokio::fs::try_exists(&lock_path).await.unwrap_or(false) {
-        return false;
-    }
-
-    let Ok(file) = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create(false)
-        .open(&lock_path)
-        .await
-    else {
-        return true;
-    };
-
-    file.try_lock_exclusive().is_err()
+    session_lock_is_held(world_dir).await.unwrap_or_else(|err| {
+        warn!(
+            "Could not check the world lock in {}, assuming it is not in use: {}",
+            world_dir.display(),
+            err
+        );
+        false
+    })
 }
 
 async fn ensure_not_running(game_dir: &Path) -> Result<()> {

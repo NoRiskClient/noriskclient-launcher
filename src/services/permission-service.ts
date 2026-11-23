@@ -14,3 +14,6 @@ export const getCachedPermissions = (): Promise<PermissionCacheState> =>
 
 export const hasPermission = (node: string): Promise<boolean> =>
   invoke("has_permission", { node });
+
+export const getGrantedPermissions = (nodes: readonly string[]): Promise<string[]> =>
+  invoke("get_granted_permissions", { nodes });

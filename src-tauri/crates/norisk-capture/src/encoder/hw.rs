@@ -29,27 +29,34 @@ impl HwFramePool {
 
         let device_ctx = unsafe { create_device_context(device)? };
 
-        let candidates: [(u32, &str); 3] = [
+        let candidates: [(u32, &str); 2] = [
             (
                 (D3D11_BIND_VIDEO_ENCODER.0 | D3D11_BIND_RENDER_TARGET.0) as u32,
                 "VIDEO_ENCODER | RENDER_TARGET",
             ),
             (D3D11_BIND_RENDER_TARGET.0 as u32, "RENDER_TARGET"),
-            (0, "none"),
         ];
 
         let mut frames_ctx = None;
         let mut last_error = None;
 
         for (flags, label) in candidates {
-            match unsafe { create_frames_context(device_ctx, width, height, flags) } {
+            let made = unsafe { create_frames_context(device_ctx, width, height, flags) }
+                .and_then(|ctx| match unsafe { hand_out_one(ctx) } {
+                    Ok(()) => Ok(ctx),
+                    Err(e) => {
+                        unsafe { ff::av_buffer_unref(&mut { ctx } as *mut _) };
+                        Err(e)
+                    }
+                });
+            match made {
                 Ok(ctx) => {
                     log::info!("Hardware frame pool bind flags: {label}");
                     frames_ctx = Some(ctx);
                     break;
                 }
                 Err(e) => {
-                    log::debug!("Bind flags '{label}' rejected: {e:#}");
+                    log::info!("This graphics driver refused frames with bind flags '{label}': {e:#}");
                     last_error = Some(e);
                 }
             }
@@ -211,6 +218,19 @@ unsafe fn create_frames_context(
     }
 
     Ok(buffer)
+}
+
+unsafe fn hand_out_one(frames_ctx: *mut ff::AVBufferRef) -> Result<()> {
+    let mut frame = ff::av_frame_alloc();
+    if frame.is_null() {
+        bail!("av_frame_alloc failed");
+    }
+    let rc = ff::av_hwframe_get_buffer(frames_ctx, frame, 0);
+    ff::av_frame_free(&mut frame);
+    if rc < 0 {
+        bail!("the driver would not create a single frame: {}", av_error(rc));
+    }
+    Ok(())
 }
 
 pub fn av_error(code: i32) -> String {

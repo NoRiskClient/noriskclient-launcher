@@ -42,6 +42,69 @@
   </content_rating>
 
   <releases>  
+    <release version="0.6.31" date="2026-11-19">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.31</url>
+    </release>
+    <release version="0.6.30" date="2026-11-15">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30</url>
+    </release>
+    <release version="0.6.30~beta.11" date="2026-11-13">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.11</url>
+    </release>
+    <release version="0.6.30~beta.10" date="2026-11-13">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.10</url>
+    </release>
+    <release version="0.6.30~beta.9" date="2026-11-11">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.9</url>
+    </release>
+    <release version="0.6.30~beta.8" date="2026-11-10">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.8</url>
+    </release>
+    <release version="0.6.30~beta.7" date="2026-11-09">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.7</url>
+    </release>
+    <release version="0.6.30~beta.6" date="2026-11-08">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.6</url>
+    </release>
+    <release version="0.6.30~beta.5" date="2026-11-06">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.5</url>
+    </release>
+    <release version="0.6.30~beta.4" date="2026-11-03">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.4</url>
+    </release>
+    <release version="0.6.30~beta.3" date="2026-11-01">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.3</url>
+    </release>
+    <release version="0.6.30~beta.2" date="2026-10-30">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.2</url>
+    </release>
+    <release version="0.6.30~beta.1" date="2026-10-23">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.30-beta.1</url>
+    </release>
+    <release version="0.6.29" date="2026-10-20">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29</url>
+    </release>
+    <release version="0.6.29~beta.7" date="2026-10-19">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.7</url>
+    </release>
+    <release version="0.6.29~beta.6" date="2026-10-09">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.6</url>
+    </release>
+    <release version="0.6.29~beta.5" date="2026-10-05">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.5</url>
+    </release>
+    <release version="0.6.29~beta.4" date="2026-09-30">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.4</url>
+    </release>
+    <release version="0.6.29~beta.3" date="2026-09-27">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.3</url>
+    </release>
+    <release version="0.6.29~beta.2" date="2026-09-21">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.2</url>
+    </release>
+    <release version="0.6.29~beta.1" date="2026-09-19">
+      <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.29-beta.1</url>
+    </release>
     <release version="0.6.28" date="2026-09-16">
       <url type="details">https://github.com/NoRiskClient/noriskclient-launcher/releases/tag/v0.6.28</url>
     </release>

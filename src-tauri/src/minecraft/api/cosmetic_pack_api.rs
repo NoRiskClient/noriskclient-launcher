@@ -15,6 +15,14 @@ fn cdn_url(pack: &str, object_path: &str) -> String {
     format!("{}{}", cdn_base(pack), object_path)
 }
 
+/// CDN URL with `?v=<hash>` when the hash is known, so Cloudflare can cache each version.
+fn versioned_cdn_url(pack: &str, parsed: &ParsedPack, object_path: &str) -> String {
+    match parsed.hash_by_path.get(object_path) {
+        Some(hash) => format!("{}?v={}", cdn_url(pack, object_path), hash),
+        None => cdn_url(pack, object_path),
+    }
+}
+
 fn noriskclient_dir() -> PathBuf {
     LAUNCHER_DIRECTORY
         .meta_dir()
@@ -95,7 +103,7 @@ fn asset_ref(pack: &str, parsed: &ParsedPack, path: &str) -> String {
             }
         }
     }
-    cdn_url(pack, path)
+    versioned_cdn_url(pack, parsed, path)
 }
 
 async fn read_object_or_cdn(pack: &str, parsed: &ParsedPack, path: &str) -> Option<Value> {
@@ -110,7 +118,7 @@ async fn read_object_or_cdn(pack: &str, parsed: &ParsedPack, path: &str) -> Opti
             }
         }
     }
-    let res = HTTP_CLIENT.get(cdn_url(pack, path)).send().await.ok()?;
+    let res = HTTP_CLIENT.get(versioned_cdn_url(pack, parsed, path)).send().await.ok()?;
     if !res.status().is_success() {
         return None;
     }
@@ -195,7 +203,8 @@ pub fn merge_settings(mut meta: Value, settings: Option<&CosmeticSettings>) -> V
     meta
 }
 
-fn particle_entries_for(pack: &str, dir: &str, paths: &HashSet<String>) -> Vec<ParticleAssetDataDto> {
+fn particle_entries_for(pack: &str, dir: &str, parsed: &ParsedPack) -> Vec<ParticleAssetDataDto> {
+    let paths = &parsed.paths;
     let particle_prefix = format!("{}particle/", dir);
     let mut entries = Vec::new();
     for p in paths {
@@ -207,7 +216,8 @@ fn particle_entries_for(pack: &str, dir: &str, paths: &HashSet<String>) -> Vec<P
                 .map(|name| name.to_string())
                 .collect();
             entries.push(ParticleAssetDataDto {
-                json_url: cdn_url(pack, p),
+                json_url: versioned_cdn_url(pack, parsed, p),
+                // Stays unversioned: the frontend appends file names to it
                 dir: cdn_url(pack, dir),
                 particle_files,
             });
@@ -255,7 +265,7 @@ pub async fn resolve_pack_cosmetic(
         .filter(|p| parsed.paths.contains(p))
         .unwrap_or_else(|| tex_path.clone());
 
-    let particles = particle_entries_for(pack, dir, &parsed.paths);
+    let particles = particle_entries_for(pack, dir, parsed);
     let name = metadata_json
         .get("name")
         .and_then(|n| n.as_str())

@@ -1430,3 +1430,101 @@ async fn a_profiles_file_from_before_sync_packs_upgrades_without_losing_anything
     assert_eq!(profile.playtime_seconds, 0);
     assert!(profile.preferred_account_id.is_none());
 }
+
+#[tokio::test]
+async fn a_removed_standard_profile_is_remembered() {
+    let store = store().await;
+    let removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    assert_eq!(
+        store.removed_standard_profiles().await.unwrap(),
+        HashSet::from([removed])
+    );
+}
+
+#[tokio::test]
+async fn removing_the_same_standard_profile_twice_keeps_one_entry() {
+    let store = store().await;
+    let removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    store.remember_removed_standard_profile(removed).await.unwrap();
+    assert_eq!(store.removed_standard_profiles().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn restoring_one_standard_profile_keeps_the_others_removed() {
+    let store = store().await;
+    let restored = Uuid::new_v4();
+    let still_removed = Uuid::new_v4();
+    store.remember_removed_standard_profile(restored).await.unwrap();
+    store.remember_removed_standard_profile(still_removed).await.unwrap();
+    store.forget_removed_standard_profile(restored).await.unwrap();
+    assert_eq!(
+        store.removed_standard_profiles().await.unwrap(),
+        HashSet::from([still_removed])
+    );
+}
+
+#[tokio::test]
+async fn a_fresh_store_has_no_removed_standard_profiles() {
+    let store = store().await;
+    assert!(store.removed_standard_profiles().await.unwrap().is_empty());
+}
+
+fn modrinth_mod(file: &str, extra: serde_json::Value) -> serde_json::Value {
+    let mut entry = serde_json::json!({
+        "id": Uuid::new_v4(),
+        "source": {
+            "type": "modrinth",
+            "project_id": file,
+            "version_id": file,
+            "file_name": file,
+            "download_url": "",
+            "file_hash_sha1": null
+        },
+        "enabled": true,
+        "display_name": file,
+        "version": null,
+        "game_versions": ["1.21.1"],
+        "file_name_override": null
+    });
+    entry
+        .as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    entry
+}
+
+#[tokio::test]
+async fn mod_loaders_survive_migration_import_and_reload() {
+    let store = store().await;
+
+    let profile_id = Uuid::new_v4();
+    let raw = serde_json::json!([{
+        "id": profile_id,
+        "name": "ATM10",
+        "path": "atm10",
+        "game_version": "1.21.1",
+        "loader": "neoforge",
+        "mods": [
+            modrinth_mod("dh.jar", serde_json::json!({
+                "associated_loader": "fabric",
+                "mod_loaders": ["fabric", "neoforge"]
+            })),
+            modrinth_mod("legacy.jar", serde_json::json!({
+                "associated_loader": "neoforge"
+            }))
+        ]
+    }])
+    .to_string();
+
+    let outcome = store.import_from_json(&raw).await.unwrap();
+    assert_eq!(outcome.imported, 1);
+
+    let profiles = store.load_all().await.unwrap();
+    let mods = &profiles[&profile_id].mods;
+    assert_eq!(mods[0].mod_loaders, vec![ModLoader::Fabric, ModLoader::NeoForge]);
+    assert_eq!(mods[0].supports_loader(ModLoader::NeoForge), Some(true));
+    assert!(mods[1].mod_loaders.is_empty());
+    assert_eq!(mods[1].supports_loader(ModLoader::NeoForge), Some(true));
+}

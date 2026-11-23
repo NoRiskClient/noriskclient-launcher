@@ -118,7 +118,8 @@ pub async fn discover_jars(game_dir: &Path) -> (Vec<DiscoveredJar>, bool) {
 }
 
 pub fn pin_to_profile(entry: &mut Mod, loader: ModLoader, game_version: &str) {
-    entry.associated_loader = Some(loader);
+    let known = entry.known_mod_loaders().unwrap_or_default().to_vec();
+    entry.set_mod_loaders_with_primary(known, loader);
 
     let mismatched = entry
         .game_versions
@@ -135,6 +136,7 @@ fn trusted_url(url: Option<&String>, hosts: &[&str], platform: &str) -> Option<S
     require_host(url, hosts, platform).ok().map(|_| url.clone())
 }
 
+#[allow(deprecated)]
 fn mod_from_declared(declared: &DeclaredMod) -> Option<Mod> {
     let file_name = declared.file_name.clone();
 
@@ -176,6 +178,7 @@ fn mod_from_declared(declared: &DeclaredMod) -> Option<Mod> {
         game_versions: declared.game_versions.clone(),
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         extra: Default::default(),

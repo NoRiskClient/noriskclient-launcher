@@ -113,12 +113,7 @@ export function GlobalCrashReportModal() {
 
         // Also focus main window
         try {
-          const mainWindowInstance = await Window.getByLabel('main');
-          if (mainWindowInstance) {
-            await mainWindowInstance.show();
-            await mainWindowInstance.unminimize();
-            await mainWindowInstance.setFocus();
-          }
+          await invoke("focus_main_window");
         } catch (e) {
           logError(`Error getting or focusing main window: ${e}`);
         }

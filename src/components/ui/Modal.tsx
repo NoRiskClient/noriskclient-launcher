@@ -18,6 +18,7 @@ interface ModalProps {
   footer?: React.ReactNode;
   width?: "sm" | "md" | "lg" | "xl" | "full";
   closeOnClickOutside?: boolean;
+  hideCloseButton?: boolean;
   headerActions?: React.ReactNode;
   variant?: "default" | "flat" | "3d";
   className?: string;
@@ -33,6 +34,7 @@ export function Modal({
   footer,
   width = "md",
   closeOnClickOutside = true,
+  hideCloseButton = false,
   headerActions,
   variant = "default",
   className,
@@ -123,7 +125,7 @@ export function Modal({
     <div
       ref={modalRef}
       className={cn(
-        "fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 backdrop-blur-md-anyos",
+        "fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 backdrop-blur-md glass-scrim",
         isSheet
           ? "p-0"
           : isMobile ? "p-3" : "p-4",
@@ -132,7 +134,7 @@ export function Modal({
     >
       <div
         className={cn(
-          "relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
+          "glass-panel relative flex flex-col w-full rounded-lg overflow-hidden max-h-[90vh]",
           getBorderClasses(),
           variant === "3d" ? "shadow-2xl" : "",
           widthClasses[width],
@@ -182,17 +184,19 @@ export function Modal({
           </div>
           <div className="flex items-center space-x-2">
             {headerActions}
-            <IconButton
-              ref={closeButtonRef}
-              icon={<Icon icon="solar:close-circle-bold" />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              variant="ghost"
-              size="sm"
-              aria-label={t('common.close_modal')}
-            />
+            {!hideCloseButton && (
+              <IconButton
+                ref={closeButtonRef}
+                icon={<Icon icon="solar:close-circle-bold" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                variant="ghost"
+                size="sm"
+                aria-label={t('common.close_modal')}
+              />
+            )}
           </div>
         </div>
 

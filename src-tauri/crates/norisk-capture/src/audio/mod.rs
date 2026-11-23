@@ -2,6 +2,8 @@ pub mod mix;
 
 #[cfg(windows)]
 pub mod decoder;
+#[cfg(any(windows, target_os = "macos"))]
+pub mod denoise;
 #[cfg(windows)]
 pub mod encoder;
 #[cfg(windows)]

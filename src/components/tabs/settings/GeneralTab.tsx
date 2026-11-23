@@ -12,13 +12,15 @@ import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
+import { useConfirmDialog } from "../../../hooks/useConfirmDialog";
 import { useLauncherTheme } from "../../../hooks/useLauncherTheme";
 import { usePermission } from "../../../hooks/usePermission";
 import { PERMISSION } from "../../../constants/permissions";
 import { invalidateAnalyticsCache } from "../../../services/analytics-service";
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
-import { isWindows } from "../../../utils/platform";
+import { supportsClips } from "../../../utils/platform";
+import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 import { isMobile } from "../../../lib/platform";
 
 export function GeneralTab() {
@@ -28,6 +30,8 @@ export function GeneralTab() {
   const { language, setLanguage, accentColor, borderRadius, setBorderRadius, setAnalyticsConsent } =
     useThemeStore();
   const { showModal, hideModal } = useGlobalModal();
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const clipPermissionsReady = useCapturePermissionsReady();
   const { isThemeActive } = useLauncherTheme();
   const isAccentColorDisabled = isThemeActive;
 
@@ -35,6 +39,24 @@ export function GeneralTab() {
     usePermission(PERMISSION.EXPERIMENTAL_MODE) ||
     !!tempConfig?.is_experimental ||
     !!config?.is_experimental;
+
+  const handleAutoUpdatesChange = async (checked: boolean) => {
+    if (!tempConfig) return;
+    if (!checked) {
+      const phrase = t("settings.auto_updates.disable_phrase");
+      const confirmed = await confirm({
+        title: t("settings.auto_updates.disable_title"),
+        message: t("settings.auto_updates.disable_message"),
+        inputLabel: t("settings.auto_updates.disable_type", { phrase }),
+        inputPlaceholder: phrase,
+        requireTypedText: phrase,
+        confirmText: t("settings.auto_updates.disable_confirm"),
+        type: "warning",
+      });
+      if (!confirmed) return;
+    }
+    setTempConfig({ ...tempConfig, auto_check_updates: checked });
+  };
 
   const handleConcurrentDownloadsChange = (value: number) => {
     if (tempConfig) setTempConfig({ ...tempConfig, concurrent_downloads: value });
@@ -59,6 +81,7 @@ export function GeneralTab() {
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <SettingsSection
         id="settings-section-language"
         title={t("settings.language")}
@@ -142,15 +165,15 @@ export function GeneralTab() {
         >
           <ToggleSwitch
             checked={tempConfig?.auto_check_updates || false}
-            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, auto_check_updates: checked })}
+            onChange={handleAutoUpdatesChange}
             disabled={saving}
             size="md"
           />
         </SettingRow>
-        {isWindows() && (
+        {supportsClips() && (
           <SettingRow
             label={t("settings.clips.enabled")}
-            description={t("settings.clips.enabled.short")}
+            description={t(clipPermissionsReady ? "settings.clips.enabled.short" : "settings.clips.permissions.blocked")}
             searchKeywords={kw(
               "settings.clips.enabled",
               "clips",
@@ -163,7 +186,7 @@ export function GeneralTab() {
             disabled={saving}
           >
             <ToggleSwitch
-              checked={tempConfig?.clips?.enabled || false}
+              checked={Boolean(tempConfig?.clips?.enabled) && clipPermissionsReady}
               onChange={(checked) =>
                 tempConfig &&
                 setTempConfig({
@@ -171,7 +194,7 @@ export function GeneralTab() {
                   clips: { ...tempConfig.clips, enabled: checked },
                 })
               }
-              disabled={saving}
+              disabled={saving || !clipPermissionsReady}
               size="md"
             />
           </SettingRow>
@@ -239,6 +262,19 @@ export function GeneralTab() {
           <ToggleSwitch
             checked={tempConfig?.hide_on_process_start || false}
             onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, hide_on_process_start: checked })}
+            disabled={saving}
+            size="md"
+          />
+        </SettingRow>
+        <SettingRow
+          label={t("settings.close_to_tray")}
+          description={t("settings.close_to_tray.tooltip")}
+          searchKeywords={kw("settings.close_to_tray", "tray", "close", "schliessen", "hintergrund", "background")}
+          disabled={saving}
+        >
+          <ToggleSwitch
+            checked={tempConfig?.close_to_tray || false}
+            onChange={(checked) => tempConfig && setTempConfig({ ...tempConfig, close_to_tray: checked })}
             disabled={saving}
             size="md"
           />

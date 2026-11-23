@@ -1,5 +1,5 @@
 import "./polyfills";
-import { initializeClipSupport } from "./utils/platform";
+import { disableBackdropBlurOnLinux, initializeClipSupport } from "./utils/platform";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";
@@ -11,6 +11,8 @@ import "./styles/globals.css";
 import { isMobile } from "./lib/platform";
 
 if (isMobile) document.addEventListener("touchstart", () => {}, { passive: true });
+
+disableBackdropBlurOnLinux();
 
 const isOverlay = (() => {
   try {

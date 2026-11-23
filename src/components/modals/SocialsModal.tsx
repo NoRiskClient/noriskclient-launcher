@@ -23,71 +23,8 @@ import {
 } from "../../services/nrc-service";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
-
-interface AccountLinkRowProps {
-  icon: string;
-  name: string;
-  isLoading: boolean;
-  isLinked: boolean;
-  isProcessing: boolean;
-  onLink: () => void;
-  onUnlink: () => void;
-  visitUrl?: string;
-}
-
-function AccountLinkRow({
-  icon,
-  name,
-  isLoading,
-  isLinked,
-  isProcessing,
-  onLink,
-  onUnlink,
-  visitUrl,
-}: AccountLinkRowProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center justify-between px-3 bg-black/20 rounded-md h-[58px]">
-      <div className="flex items-center">
-        <Icon icon={icon} className="w-6 h-6 mr-3 text-white/80" />
-        <span className="text-white/90 font-minecraft text-xs">{name}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        {isLinked ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onUnlink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-off"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.unlink')}
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onLink}
-            disabled={isProcessing || isLoading}
-            icon={<Icon icon={isLoading ? "mdi:loading" : "mdi:link-variant"} className={isLoading ? "animate-spin" : ""} />}
-            widthClassName="w-[140px]"
-          >
-            {t('socials.button.link')}
-          </Button>
-        )}
-        <IconButton
-          variant="ghost"
-          size="sm"
-          onClick={() => visitUrl && openExternalUrl(visitUrl)}
-          icon={<Icon icon="mdi:open-in-new" className="w-5 h-5" />}
-          disabled={!visitUrl}
-          className={!visitUrl ? "invisible" : ""}
-        />
-      </div>
-    </div>
-  );
-}
+import { AccountLinkRow } from "../account/AccountLinkRow";
+import { TwitchLinkCard } from "../account/TwitchLinkCard";
 
 export function SocialsModal() {
   const { t } = useTranslation();
@@ -410,14 +347,14 @@ export function SocialsModal() {
 
           <AccountLinkRow
             icon="ic:baseline-discord"
-              name="Discord"
-              isLoading={isLoadingDiscord}
-              isLinked={isDiscordLinked}
-              isProcessing={isProcessingDiscord}
-              onLink={handleDiscordLink}
-              onUnlink={handleDiscordUnlink}
-              visitUrl="https://discord.norisk.gg"
-            />
+            name="Discord"
+            isLoading={isLoadingDiscord}
+            isLinked={isDiscordLinked}
+            isProcessing={isProcessingDiscord}
+            onLink={handleDiscordLink}
+            onUnlink={handleDiscordUnlink}
+            visitUrl="https://discord.norisk.gg"
+          />
 
           <AccountLinkRow
             icon="mdi:github"
@@ -429,6 +366,8 @@ export function SocialsModal() {
             onUnlink={handleGithubUnlink}
             visitUrl="https://github.com/NoRiskClient"
           />
+
+          <TwitchLinkCard />
         </div>
       </div>
     </Modal>

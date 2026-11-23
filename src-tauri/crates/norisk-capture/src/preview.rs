@@ -7,13 +7,16 @@ fn preview_dir() -> PathBuf {
     std::env::temp_dir().join("nrc-clip-preview")
 }
 
-pub fn prepare(source: &Path) -> Result<Vec<norisk_ipc::PreviewTrack>> {
-    let clip = crate::trim::read(source)?;
-
+fn fresh_preview_dir() -> Result<PathBuf> {
     let dir = preview_dir();
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("could not create {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("could not create {}", dir.display()))?;
+    Ok(dir)
+}
+
+pub fn prepare(source: &Path, waveform_only: bool) -> Result<Vec<norisk_ipc::PreviewTrack>> {
+    let clip = crate::trim::read(source)?;
+    let dir = if waveform_only { None } else { Some(fresh_preview_dir()?) };
 
     let stem = source
         .file_stem()
@@ -30,19 +33,35 @@ pub fn prepare(source: &Path) -> Result<Vec<norisk_ipc::PreviewTrack>> {
         )
         .with_context(|| format!("could not decode audio track {index}"))?;
 
-        let path = dir.join(format!("{stem}-{index}.wav"));
-        write_wav(
-            &path,
-            &samples,
-            crate::audio::encoder::OUTPUT_SAMPLE_RATE as u32,
-            crate::audio::encoder::OUTPUT_CHANNELS as u16,
-        )
-        .with_context(|| format!("could not write {}", path.display()))?;
+        let path = match &dir {
+            Some(dir) => {
+                let path = dir.join(format!("{stem}-{index}.wav"));
+                write_wav(
+                    &path,
+                    &samples,
+                    crate::audio::encoder::OUTPUT_SAMPLE_RATE as u32,
+                    crate::audio::encoder::OUTPUT_CHANNELS as u16,
+                )
+                .with_context(|| format!("could not write {}", path.display()))?;
+                path
+            }
+            None => PathBuf::new(),
+        };
 
+        let label = match track.format.label.as_str() {
+            "" => crate::audio::MIX_LABEL.to_string(),
+            named => named.to_string(),
+        };
         out.push(norisk_ipc::PreviewTrack {
             stream: index as u32,
-            label: track.format.label.clone(),
+            adjustable: label != crate::audio::MIX_LABEL,
+            label,
             path,
+            peaks: crate::buffer::peaks::peaks_of(
+                &samples,
+                crate::audio::encoder::OUTPUT_SAMPLE_RATE as u32,
+                crate::audio::encoder::OUTPUT_CHANNELS as usize,
+            ),
         });
     }
 

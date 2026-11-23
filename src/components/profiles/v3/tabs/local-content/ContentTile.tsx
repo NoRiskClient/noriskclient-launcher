@@ -27,20 +27,16 @@ export interface ContentTileProps {
   onNameClick?: () => void;
   menuOpen: boolean;
   onMenuToggle: (open: boolean) => void;
-  // Selection
   selectMode: boolean;
   isSelected: boolean;
   onToggleSelection: () => void;
-  // Update-Checks pausieren
   onToggleUpdateChecks?: () => void;
-  // Quick-Update: immer sichtbar wenn Update da, evtl. disabled
   onQuickUpdate?: () => void;
   quickUpdateDisabled?: boolean;
   quickUpdateTooltip?: React.ReactNode;
   isQuickUpdating?: boolean;
-  // NoRisk Compatibility-Status (null wenn Config nicht geladen oder ok)
   noRiskStatus?: "blocked" | "warning" | null;
-  // Version switching
+  overridesPack?: string;
   versionDropdownOpen: boolean;
   availableVersions: UnifiedVersion[] | null;
   isLoadingVersions: boolean;
@@ -79,6 +75,7 @@ export function ContentTile({
   quickUpdateTooltip,
   isQuickUpdating,
   noRiskStatus,
+  overridesPack,
 }: ContentTileProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((s) => s.accentColor);
@@ -98,11 +95,6 @@ export function ContentTile({
     (item.curseforge_info as any)?.file_id ||
     null;
 
-  // Portal-mode triggers: the tile wrapper carries `opacity-55` when the
-  // content is disabled. CSS opacity cascades to children, so without a
-  // portal the dropdown panels would also fade and become unreadable.
-  // Passing these refs into ThemedDropdown renders the panels in
-  // `document.body`, outside the faded subtree.
   const versionButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -115,7 +107,6 @@ export function ContentTile({
           : `bg-black/20 border-white/10 hover:border-white/20 hover:bg-black/30 ${!enabled ? "opacity-55" : ""}`
       }`}
     >
-      {/* Selection checkbox (on-hover, or permanent when selectMode aktiv) */}
       <div className={`flex-shrink-0 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         <CheckboxV2
           size="sm"
@@ -125,7 +116,6 @@ export function ContentTile({
         />
       </div>
 
-      {/* Icon + optionales NoRisk-Warn-Icon */}
       <div className="relative w-14 h-14 flex-shrink-0">
         <div className="w-full h-full rounded-lg bg-white/5 ring-1 ring-white/10 flex items-center justify-center overflow-hidden">
           {iconUrl ? (
@@ -150,7 +140,6 @@ export function ContentTile({
         )}
       </div>
 
-      {/* Identity */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           {onNameClick ? (
@@ -176,6 +165,11 @@ export function ContentTile({
               <Icon icon="solar:volume-cross-bold" className="w-3 h-3 text-white/30 flex-shrink-0" />
             </Tooltip>
           )}
+          {overridesPack && (
+            <Tooltip content={<span className="block max-w-[260px]">{t("profiles.v3.syncMods.replacesHint", { pack: overridesPack })}</span>}>
+              <Icon icon="solar:layers-minimalistic-bold" className="w-3 h-3 text-amber-300/70 flex-shrink-0" />
+            </Tooltip>
+          )}
           {item.modpack_origin && (
             <Tooltip content={t("profiles.v3.tile.fromModpackTooltip", { source: item.modpack_origin.split(":")[0] })}>
               <Icon
@@ -191,9 +185,6 @@ export function ContentTile({
               ref={versionButtonRef}
               onClick={(e) => { e.stopPropagation(); if (isSwitchable && !isSwitchingVersion) onVersionClick(); }}
               disabled={!isSwitchable || isSwitchingVersion}
-              /* Fixed h-5 verhindert dass die Chip 1-2px hoeher wird sobald ein
-                 Update-Dot/Switch-Spinner reinkommt (inline-block Baseline-Quirk
-                 vom Tooltip-Wrapper). Sonst shifted Identity vertikal. */
               className={`inline-flex items-center gap-1 h-5 max-w-full truncate px-1.5 rounded transition-colors ${
                 isSwitchingVersion
                   ? "text-amber-200 bg-amber-400/10 cursor-wait"
@@ -210,10 +201,6 @@ export function ContentTile({
                 const active = isFromModPack
                   ? item.updates_enabled === true
                   : item.updates_enabled !== false;
-                // Kein Tooltip-Wrapper hier: der Quick-Update-Button rechts
-                // zeigt ohnehin die ModUpdateText-Tooltip beim Hovern. Der Dot
-                // bleibt rein visueller Indicator — vermeidet den inline-block
-                // Baseline-Jitter der sonst die Chip 1px verschiebt.
                 return (
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -244,7 +231,6 @@ export function ContentTile({
         </div>
       </div>
 
-      {/* Quick-Update */}
       {onQuickUpdate && (
         <Tooltip content={isQuickUpdating ? t("profiles.v3.tile.updating") : (quickUpdateTooltip ?? t("profiles.v3.tile.updateToLatest"))}>
           <button
@@ -266,7 +252,6 @@ export function ContentTile({
         </Tooltip>
       )}
 
-      {/* Enable/Disable — V2 ToggleSwitch (accent-getönt, Minecraft-Border) */}
       <div
         className="flex-shrink-0"
         title={enabled ? t("profiles.v3.tile.disable") : t("profiles.v3.tile.enable")}
@@ -279,7 +264,6 @@ export function ContentTile({
         />
       </div>
 
-      {/* Menu */}
       <div className="relative flex-shrink-0">
         <button
           ref={menuButtonRef}

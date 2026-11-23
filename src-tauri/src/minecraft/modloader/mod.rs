@@ -171,64 +171,55 @@ impl ModloaderFactory {
 
     /// Calls the live loader metadata API for `loader` + `mc_version` and
     /// returns the top (newest) entry formatted like the rest of the launcher
-    /// stores it. For Fabric/Quilt that means appending " (stable)" when the
-    /// loader flags it — matches the wizard's `"{ver} (stable)"` encoding
-    /// (see `ModLoaderStep.tsx:194`) so saved + resolved values compare
-    /// cleanly. Errors are swallowed with a warn-level log so the UI stays
+    /// stores it. Errors are swallowed with a warn-level log so the UI stays
     /// responsive.
     async fn fetch_latest_from_api(
         loader: &ModLoader,
         mc_version: &str,
     ) -> Option<String> {
-        match loader {
-            ModLoader::Fabric => match FabricApi::new().get_loader_versions(mc_version).await {
-                Ok(list) => list.first().map(|v| {
-                    if v.loader.stable {
-                        format!("{} (stable)", v.loader.version)
-                    } else {
-                        v.loader.version.clone()
-                    }
-                }),
-                Err(e) => {
-                    warn!("Auto-resolve fabric: {}", e);
-                    None
-                }
-            },
-            ModLoader::Quilt => match QuiltApi::new().get_loader_versions(mc_version).await {
-                Ok(list) => list.first().map(|v| {
-                    if v.loader.stable {
-                        format!("{} (stable)", v.loader.version)
-                    } else {
-                        v.loader.version.clone()
-                    }
-                }),
-                Err(e) => {
-                    warn!("Auto-resolve quilt: {}", e);
-                    None
-                }
-            },
-            ModLoader::Forge => match ForgeApi::new().get_all_versions().await {
-                Ok(meta) => meta
-                    .get_versions_for_minecraft(mc_version)
-                    .first()
-                    .cloned(),
-                Err(e) => {
-                    warn!("Auto-resolve forge: {}", e);
-                    None
-                }
-            },
-            ModLoader::NeoForge => match NeoForgeApi::new().get_all_versions().await {
-                Ok(meta) => meta
-                    .get_versions_for_minecraft(mc_version)
-                    .first()
-                    .cloned(),
-                Err(e) => {
-                    warn!("Auto-resolve neoforge: {}", e);
-                    None
-                }
-            },
-            ModLoader::Vanilla => None,
+        match Self::list_loader_versions(loader, mc_version).await {
+            Ok(list) => list.into_iter().next(),
+            Err(e) => {
+                warn!("Auto-resolve {}: {}", loader.as_str(), e);
+                None
+            }
         }
+    }
+
+    pub async fn list_loader_versions(
+        loader: &ModLoader,
+        mc_version: &str,
+    ) -> Result<Vec<String>> {
+        let tagged = |version: &str, stable: bool| {
+            if stable {
+                format!("{} (stable)", version)
+            } else {
+                version.to_string()
+            }
+        };
+        Ok(match loader {
+            ModLoader::Fabric => FabricApi::new()
+                .get_loader_versions(mc_version)
+                .await?
+                .iter()
+                .map(|v| tagged(&v.loader.version, v.loader.stable))
+                .collect(),
+            ModLoader::Quilt => QuiltApi::new()
+                .get_loader_versions(mc_version)
+                .await?
+                .iter()
+                .map(|v| tagged(&v.loader.version, v.loader.stable))
+                .collect(),
+            ModLoader::Forge => ForgeApi::new()
+                .get_all_versions()
+                .await?
+                .get_versions_for_minecraft(mc_version),
+            ModLoader::NeoForge => NeoForgeApi::new()
+                .get_all_versions()
+                .await?
+                .get_versions_for_minecraft(mc_version),
+            ModLoader::Vanilla => Vec::new(),
+        })
     }
 
     pub fn create_installer(

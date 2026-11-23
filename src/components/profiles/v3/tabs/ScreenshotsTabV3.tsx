@@ -24,7 +24,7 @@ import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
-import { FloatingActionBar, type FABActionConfig } from "../shared/FloatingActionBar";
+import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface ScreenshotsTabV3Props {
@@ -139,7 +139,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       try {
         for (const p of paths) {
           try {
-            await invoke("delete_file", { path: p });
+            await invoke("delete_file", { filePath: p });
             successCount++;
           } catch (err) {
             console.error("[V3 Screenshots] Delete failed for", p, err);
@@ -185,6 +185,14 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       disabled: isBatchDeleting,
     },
   ];
+
+  const allSelected = selectedPaths.size === visibleScreenshots.length && visibleScreenshots.length > 0;
+  const selectAllUndo = useSelectAllUndo(
+    allSelected,
+    () => new Set(selectedPaths),
+    setSelectedPaths,
+    () => setSelectedPaths(new Set(visibleScreenshots.map(s => s.path))),
+  );
 
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
@@ -281,8 +289,9 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         count={selectedPaths.size}
         totalCount={visibleScreenshots.length}
         accent={accentColor.value}
-        allSelected={selectedPaths.size === visibleScreenshots.length && visibleScreenshots.length > 0}
-        onSelectAll={() => setSelectedPaths(new Set(visibleScreenshots.map(s => s.path)))}
+        allSelected={allSelected}
+        onSelectAll={selectAllUndo.onSelectAll}
+        onRestore={selectAllUndo.onRestore}
         onClear={() => setSelectedPaths(new Set())}
         actions={fabActions}
         batchProgress={null}

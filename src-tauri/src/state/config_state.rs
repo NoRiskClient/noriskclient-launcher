@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
@@ -137,6 +138,10 @@ pub struct ClipConfig {
     #[serde(default = "default_volume")]
     pub microphone_volume: u32,
     #[serde(default)]
+    pub microphone_denoise: bool,
+    #[serde(default)]
+    pub excluded_audio_executable: Option<String>,
+    #[serde(default)]
     pub output_dir: Option<PathBuf>,
     #[serde(default = "default_clip_max_storage_gb")]
     pub max_storage_gb: u32,
@@ -150,11 +155,19 @@ pub struct ClipConfig {
     pub hotkey_toggle: String,
     #[serde(default)]
     pub other_game: Option<OtherGame>,
+    #[serde(default)]
+    pub other_screen: Option<OtherScreen>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct OtherGame {
     pub executable: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct OtherScreen {
+    pub device: String,
     pub name: String,
 }
 
@@ -177,6 +190,8 @@ impl Default for ClipConfig {
             capture_microphone: false,
             microphone_device_id: None,
             microphone_volume: default_volume(),
+            microphone_denoise: false,
+            excluded_audio_executable: None,
             output_dir: None,
             max_storage_gb: default_clip_max_storage_gb(),
             pre_roll_seconds: default_clip_pre_roll(),
@@ -184,6 +199,7 @@ impl Default for ClipConfig {
             hotkey_save: default_clip_hotkey_save(),
             hotkey_toggle: default_clip_hotkey_toggle(),
             other_game: None,
+            other_screen: None,
         }
     }
 }
@@ -318,6 +334,8 @@ impl ClipConfig {
             capture_microphone: self.capture_microphone,
             microphone_device_id: self.microphone_device_id.clone(),
             microphone_volume: self.microphone_volume,
+            microphone_denoise: self.microphone_denoise,
+            excluded_audio_executable: self.excluded_audio_executable.clone(),
             output_dir: self.resolved_output_dir(),
         }
     }
@@ -390,6 +408,8 @@ pub struct LauncherConfig {
     pub hooks: Hooks,
     #[serde(default = "default_hide_on_process_start")]
     pub hide_on_process_start: bool,
+    #[serde(default)]
+    pub close_to_tray: bool,
     #[cfg(desktop)]
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
@@ -506,6 +526,7 @@ impl Default for LauncherConfig {
             last_played_profile: None,
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
+            close_to_tray: false,
             #[cfg(desktop)]
             global_memory_settings: default_global_memory_settings(),
             global_custom_jvm_args: None,
@@ -566,6 +587,7 @@ impl ConfigManager {
                 // Update the stored config
                 let mut config = self.config.write().await;
                 *config = loaded_config.clone();
+                CLOSE_TO_TRAY.store(loaded_config.close_to_tray, Ordering::Relaxed);
 
                 // Update cache
                 update_custom_game_dir(loaded_config.custom_game_directory);
@@ -610,6 +632,9 @@ impl ConfigManager {
                             }
                             if let Some(hide) = obj.get("hide_on_process_start").and_then(|v| v.as_bool()) {
                                 migrated_config.hide_on_process_start = hide;
+                            }
+                            if let Some(tray) = obj.get("close_to_tray").and_then(|v| v.as_bool()) {
+                                migrated_config.close_to_tray = tray;
                             }
                             if let Some(analytics) = obj.get("enable_analytics").and_then(|v| v.as_bool()) {
                                 migrated_config.enable_analytics = analytics;
@@ -666,6 +691,7 @@ impl ConfigManager {
                         info!("Migration completed, saving migrated configuration");
                         let mut config = self.config.write().await;
                         *config = migrated_config.clone();
+                        CLOSE_TO_TRAY.store(migrated_config.close_to_tray, Ordering::Relaxed);
                         drop(config); // Release lock before save
 
                         // Save the migrated config
@@ -817,6 +843,12 @@ impl ConfigManager {
                         current.hide_on_process_start, new_config.hide_on_process_start
                     );
                 }
+                if current.close_to_tray != new_config.close_to_tray {
+                    info!(
+                        "Changing close to tray: {} -> {}",
+                        current.close_to_tray, new_config.close_to_tray
+                    );
+                }
                 #[cfg(desktop)]
                 if current.global_memory_settings.min != new_config.global_memory_settings.min
                     || current.global_memory_settings.max != new_config.global_memory_settings.max {
@@ -851,6 +883,7 @@ impl ConfigManager {
                     );
                 }
 
+                CLOSE_TO_TRAY.store(new_config.close_to_tray, Ordering::Relaxed);
                 // Update config while preserving version
                 *config = LauncherConfig {
                     version,
@@ -865,6 +898,7 @@ impl ConfigManager {
                     last_played_profile: new_config.last_played_profile,
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
+                    close_to_tray: new_config.close_to_tray,
                     #[cfg(desktop)]
                     global_memory_settings: new_config.global_memory_settings,
                     global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
@@ -934,6 +968,12 @@ fn apply_log_level(level: LogLevel) {
         return;
     }
     crate::logging::set_log_level(level.into());
+}
+
+static CLOSE_TO_TRAY: AtomicBool = AtomicBool::new(false);
+
+pub fn closes_to_tray() -> bool {
+    CLOSE_TO_TRAY.load(Ordering::Relaxed)
 }
 
 pub fn default_config_path() -> PathBuf {

@@ -13,6 +13,8 @@ import { cn } from "../../lib/utils";
 interface ColorPickerModalProps {
   onClose: () => void;
   onColorSelected?: (color: string) => void;
+  initialColor?: string;
+  applyToTheme?: boolean;
 }
 
 // HSV to RGB conversion
@@ -84,21 +86,28 @@ function hexToRgb(hex: string) {
   } : { r: 0, g: 0, b: 0 };
 }
 
-export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalProps) {
+export function ColorPickerModal({
+  onClose,
+  onColorSelected,
+  initialColor,
+  applyToTheme = true,
+}: ColorPickerModalProps) {
   const { t } = useTranslation();
   const { accentColor, setCustomAccentColor } = useThemeStore();
+  const seed = initialColor ?? accentColor.value;
   const [hsv, setHsv] = useState(() => {
-    const rgb = hexToRgb(accentColor.value);
+    const rgb = hexToRgb(seed);
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
   });
-  const [hex, setHex] = useState(accentColor.value);
+  const [hex, setHex] = useState(seed);
 
   // Update HSV when accent color changes
   useEffect(() => {
+    if (initialColor !== undefined) return;
     const rgb = hexToRgb(accentColor.value);
     setHsv(rgbToHsv(rgb.r, rgb.g, rgb.b));
     setHex(accentColor.value);
-  }, [accentColor.value]);
+  }, [accentColor.value, initialColor]);
 
   // Update hex when HSV changes
   useEffect(() => {
@@ -140,9 +149,11 @@ export function ColorPickerModal({ onClose, onColorSelected }: ColorPickerModalP
 
   const handleApply = () => {
     if (/^#[0-9A-F]{6}$/i.test(hex)) {
-      setCustomAccentColor(hex);
       onColorSelected?.(hex);
-      toast.success(t('color_picker.toast.applied'));
+      if (applyToTheme) {
+        setCustomAccentColor(hex);
+        toast.success(t('color_picker.toast.applied'));
+      }
       onClose();
     } else {
       toast.error(t('color_picker.toast.invalid_hex'));

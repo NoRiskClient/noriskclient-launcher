@@ -366,7 +366,7 @@ function CheckoutOverlay({
 
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="glass-scrim absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={() => !locked && onClose()}
     >
       <div

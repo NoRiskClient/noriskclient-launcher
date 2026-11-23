@@ -444,7 +444,8 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
                     file_hash_sha1: Some(hash.clone()),
                 };
 
-                let new_mod = Mod {
+                #[allow(deprecated)]
+                let mut new_mod = Mod {
                     id: Uuid::new_v4(),
                     source: mod_source,
                     enabled: !original_file_info.path.ends_with(".disabled"),
@@ -452,18 +453,20 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
                     version: Some(version_info.version_number.clone()),
                     game_versions: Some(vec![game_version.clone()]),
                     file_name_override: None,
-                    associated_loader: Some(pack_loader),
+                    associated_loader: None,
+                    mod_loaders: Vec::new(),
                     modpack_origin: Some(format!("modrinth:{}", version_info.project_id)), // From modpack
                     updates_enabled: false, // Disable updates for modpack mods (updated with pack)
                     force_include_versions: Vec::new(),
                     extra: Default::default(),
                 };
+                new_mod.set_mod_loaders(vec![pack_loader]);
 
                 info!(
-                    "Prepared Mod struct for: {} (Enabled: {}, Loader: {:?})",
+                    "Prepared Mod struct for: {} (Enabled: {}, Loaders: {:?})",
                     new_mod.display_name.as_deref().unwrap_or("Unknown"),
                     new_mod.enabled,
-                    new_mod.associated_loader
+                    new_mod.mod_loaders
                 );
                 mods_to_add.push(new_mod);
             } else {
@@ -524,7 +527,8 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             },
         };
 
-        mods_to_add.push(Mod {
+        #[allow(deprecated)]
+        let mut manifest_mod = Mod {
             id: Uuid::new_v4(),
             source,
             enabled: !file_info.path.ends_with(".disabled"),
@@ -532,12 +536,15 @@ pub async fn resolve_manifest_files(manifest: &ModrinthIndex) -> Result<Vec<Mod>
             version: None,
             game_versions: Some(vec![game_version.clone()]),
             file_name_override: None,
-            associated_loader: Some(pack_loader),
+            associated_loader: None,
+            mod_loaders: Vec::new(),
             modpack_origin: Some("modrinth:manifest".to_string()),
             updates_enabled: false,
             force_include_versions: Vec::new(),
             extra: Default::default(),
-        });
+        };
+        manifest_mod.set_mod_loaders(vec![pack_loader]);
+        mods_to_add.push(manifest_mod);
         from_manifest += 1;
     }
 

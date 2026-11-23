@@ -3,6 +3,8 @@ use crate::integrations::modrinth::{self, ModrinthVersion};
 use crate::integrations::unified_mod::{self, ModPlatform, UnifiedModVersionsParams, UnifiedVersion};
 use crate::state::profile_state::{mod_platform_ids, Mod, ModLoader, ModSource, NoriskModIdentifier, Profile};
 use crate::state::state_manager::State;
+use crate::sync::model::VersionOverride;
+use crate::sync::profile_mods::{self, ProfileSyncModStatus, ProfileSyncPackMod};
 use log::info;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -29,6 +31,24 @@ pub struct ConflictRevert {
     pub prev: UnifiedVersion,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SyncPinRevert {
+    pub pack_id: Uuid,
+    pub mod_id: Uuid,
+    pub mc_version: String,
+    pub prev: Option<VersionOverride>,
+}
+
+impl SyncPinRevert {
+    async fn set(&self, state: &State, value: Option<VersionOverride>) -> Result<(), CommandError> {
+        state
+            .sync_pack_manager
+            .set_mod_version_override(self.pack_id, self.mod_id, &self.mc_version, value)
+            .await?;
+        Ok(())
+    }
+}
+
 /// Revert token — opaque to the UI; passed straight back to `revert_crash_fix`.
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -52,7 +72,13 @@ pub enum AppliedFix {
         prev_map: Option<String>,
     },
     Modver { profile_id: Uuid, mod_id: Uuid, prev: UnifiedVersion },
-    Conflict { profile_id: Uuid, mods: Vec<ConflictRevert> },
+    Conflict {
+        profile_id: Uuid,
+        mods: Vec<ConflictRevert>,
+        #[serde(default)]
+        sync_pins: Vec<SyncPinRevert>,
+    },
+    SyncExclusion { profile_id: Uuid, pack_id: Uuid, mod_key: String, excluded: bool },
     Pack { profile_id: Uuid, prev_pack_id: Option<String> },
     Repair { profile_id: Uuid },
 }
@@ -89,17 +115,89 @@ fn mod_id_from_file(fname: &str) -> String {
     base.split(|c| c == '-' || c == '_').next().unwrap_or(&base).to_string()
 }
 
+fn matches_target(target: &str, name: Option<&str>, file: Option<&str>, project_id: Option<&str>) -> bool {
+    let t = norm(target);
+    name.map_or(false, |d| norm(d) == t)
+        || file.map_or(false, |f| mod_id_from_file(f) == target.to_lowercase())
+        || project_id.map_or(false, |p| norm(p) == t)
+}
+
 /// find the installed mod for a mod-id, preferring the enabled instance (a disabled one isn't the
 /// active culprit). None when unsure.
 fn find_installed_mod<'a>(profile: &'a Profile, target: &str) -> Option<&'a Mod> {
-    let t = norm(target);
-    let tl = target.to_lowercase();
     let matches = |m: &&Mod| {
-        m.display_name.as_deref().map_or(false, |d| norm(d) == t)
-            || source_file_name(m).map_or(false, |f| mod_id_from_file(f) == tl)
-            || matches!(&m.source, ModSource::Modrinth { project_id, .. } if norm(project_id) == t)
+        let project_id = match &m.source {
+            ModSource::Modrinth { project_id, .. } => Some(project_id.as_str()),
+            _ => None,
+        };
+        matches_target(target, m.display_name.as_deref(), source_file_name(m), project_id)
     };
     profile.mods.iter().find(|m| m.enabled && matches(m)).or_else(|| profile.mods.iter().find(matches))
+}
+
+enum Installed<'a> {
+    Profile(&'a Mod),
+    Sync(ProfileSyncPackMod),
+}
+
+async fn find_target<'a>(state: &State, profile: &'a Profile, target: &str) -> Result<Option<Installed<'a>>, CommandError> {
+    let profile_mod = find_installed_mod(profile, target);
+    if let Some(m) = profile_mod.filter(|m| m.enabled) {
+        return Ok(Some(Installed::Profile(m)));
+    }
+    let sync_mod = profile_mods::load_for_profile(state, profile)
+        .await?
+        .into_iter()
+        .filter(|entry| {
+            matches_target(target, Some(&entry.display_name), entry.filename.as_deref(), entry.project_id.as_deref())
+        })
+        .max_by_key(|entry| entry.is_switched_on());
+    Ok(match (profile_mod, sync_mod) {
+        (_, Some(entry)) if entry.is_switched_on() => Some(Installed::Sync(entry)),
+        (Some(m), _) => Some(Installed::Profile(m)),
+        (None, entry) => entry.map(Installed::Sync),
+    })
+}
+
+async fn sync_mod_versions(entry: &ProfileSyncPackMod, loader: &str) -> Result<Option<(Uuid, Vec<UnifiedVersion>)>, CommandError> {
+    let platform = match entry.platform.as_deref() {
+        Some("modrinth") => ModPlatform::Modrinth,
+        Some("curseforge") => ModPlatform::CurseForge,
+        _ => return Ok(None),
+    };
+    let (Some(mod_id), Some(project_id)) = (entry.mod_id, entry.project_id.as_deref()) else {
+        return Ok(None);
+    };
+    Ok(Some((mod_id, unified_versions(platform, project_id, loader).await?)))
+}
+
+async fn set_sync_exclusion(state: &State, profile_id: Uuid, entry: &ProfileSyncPackMod, excluded: bool) -> Result<AppliedFix, CommandError> {
+    state
+        .sync_pack_manager
+        .set_profile_exclusions(profile_id, &[(entry.pack_id, entry.mod_key.clone())], excluded)
+        .await?;
+    Ok(AppliedFix::SyncExclusion { profile_id, pack_id: entry.pack_id, mod_key: entry.mod_key.clone(), excluded })
+}
+
+async fn pin_sync_version(state: &State, profile: &Profile, entry: &ProfileSyncPackMod, mod_id: Uuid, version_id: &str) -> Result<SyncPinRevert, CommandError> {
+    let pin = SyncPinRevert {
+        pack_id: entry.pack_id,
+        mod_id,
+        mc_version: profile.game_version.clone(),
+        prev: entry
+            .version_id
+            .clone()
+            .filter(|_| entry.pinned)
+            .map(|version_id| VersionOverride::Pin { version_id }),
+    };
+    pin.set(state, Some(VersionOverride::Pin { version_id: version_id.to_string() })).await?;
+    Ok(pin)
+}
+
+fn pick_update_target<'a>(versions: &'a [UnifiedVersion], want: Option<&str>, mc: &str) -> Option<&'a UnifiedVersion> {
+    want.and_then(|w| versions.iter().find(|v| v.version_number == w || v.version_number.starts_with(w)))
+        .or_else(|| versions.iter().filter(|v| v.game_versions.iter().any(|g| g == mc)).max_by(|a, b| a.date_published.cmp(&b.date_published)))
+        .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)))
 }
 
 /// resolve a Modrinth version for slug+mc+loader, preferring an exact version_number, else newest.
@@ -162,20 +260,26 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
     info!("[CrashFix] apply {}:{} on profile {}", action.action_type, action.target, profile_id);
 
     match action.action_type.as_str() {
-        "disable_mod" => match find_installed_mod(&profile, &action.target) {
-            Some(m) => {
+        "disable_mod" => match find_target(&state, &profile, &action.target).await? {
+            Some(Installed::Profile(m)) => {
                 let mod_id = m.id;
                 pm.set_mod_enabled(profile_id, mod_id, false).await?;
                 Ok(ApplyOutcome::Applied { fix: AppliedFix::Disable { profile_id, mod_id } })
             }
-            None => Ok(skip(&action.target)),
+            Some(Installed::Sync(entry)) if entry.is_switched_on() => {
+                Ok(ApplyOutcome::Applied { fix: set_sync_exclusion(&state, profile_id, &entry, true).await? })
+            }
+            _ => Ok(skip(&action.target)),
         },
 
-        "enable_mod" => match find_installed_mod(&profile, &action.target) {
-            Some(m) if !m.enabled => {
+        "enable_mod" => match find_target(&state, &profile, &action.target).await? {
+            Some(Installed::Profile(m)) if !m.enabled => {
                 let mod_id = m.id;
                 pm.set_mod_enabled(profile_id, mod_id, true).await?;
                 Ok(ApplyOutcome::Applied { fix: AppliedFix::Enable { profile_id, mod_id } })
+            }
+            Some(Installed::Sync(entry)) if entry.status == ProfileSyncModStatus::ExcludedHere => {
+                Ok(ApplyOutcome::Applied { fix: set_sync_exclusion(&state, profile_id, &entry, false).await? })
             }
             _ => Ok(skip(&action.target)),
         },
@@ -204,8 +308,21 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
         }
 
         "update_mod" => {
-            let m = match find_installed_mod(&profile, &action.target) {
-                Some(m) => m,
+            let m = match find_target(&state, &profile, &action.target).await? {
+                Some(Installed::Profile(m)) => m,
+                Some(Installed::Sync(entry)) => {
+                    let Some((mod_id, versions)) = sync_mod_versions(&entry, &loader).await? else {
+                        return Ok(skip(&action.target));
+                    };
+                    let target = match pick_update_target(&versions, action.target_version.as_deref(), &mc) {
+                        Some(v) if entry.version_id.as_deref() != Some(v.id.as_str()) => v,
+                        _ => return Ok(skip(&action.target)),
+                    };
+                    let pin = pin_sync_version(&state, &profile, &entry, mod_id, &target.id).await?;
+                    return Ok(ApplyOutcome::Applied {
+                        fix: AppliedFix::Conflict { profile_id, mods: Vec::new(), sync_pins: vec![pin] },
+                    });
+                }
                 None => return Ok(skip(&action.target)),
             };
             // platform from the installed mod's source (Modrinth or CurseForge); skip local/url mods
@@ -220,13 +337,7 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                 Some(v) => v.clone(),
                 None => return Ok(skip(&action.target)),
             };
-            // target: an explicit version_number wins, else the newest version compatible with this MC
-            let want = action.target_version.as_deref();
-            let target = want
-                .and_then(|w| versions.iter().find(|v| v.version_number == w || v.version_number.starts_with(w)))
-                .or_else(|| versions.iter().filter(|v| v.game_versions.contains(&mc)).max_by(|a, b| a.date_published.cmp(&b.date_published)))
-                .or_else(|| versions.iter().max_by(|a, b| a.date_published.cmp(&b.date_published)));
-            let target = match target {
+            let target = match pick_update_target(&versions, action.target_version.as_deref(), &mc) {
                 Some(v) => v.clone(),
                 None => return Ok(skip(&action.target)),
             };
@@ -236,13 +347,20 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
 
         "install_mod" => {
             // a "missing" dep may actually be present but disabled -> re-enable instead of duplicating
-            if let Some(existing) = find_installed_mod(&profile, &action.target) {
-                let mod_id = existing.id;
-                if existing.enabled {
-                    return Ok(skip(&action.target)); // already installed & active
+            match find_target(&state, &profile, &action.target).await? {
+                Some(Installed::Profile(existing)) => {
+                    let mod_id = existing.id;
+                    if existing.enabled {
+                        return Ok(skip(&action.target)); // already installed & active
+                    }
+                    pm.set_mod_enabled(profile_id, mod_id, true).await?;
+                    return Ok(ApplyOutcome::Applied { fix: AppliedFix::Enable { profile_id, mod_id } });
                 }
-                pm.set_mod_enabled(profile_id, mod_id, true).await?;
-                return Ok(ApplyOutcome::Applied { fix: AppliedFix::Enable { profile_id, mod_id } });
+                Some(Installed::Sync(entry)) if entry.is_switched_on() => return Ok(skip(&action.target)),
+                Some(Installed::Sync(entry)) if entry.status == ProfileSyncModStatus::ExcludedHere => {
+                    return Ok(ApplyOutcome::Applied { fix: set_sync_exclusion(&state, profile_id, &entry, false).await? });
+                }
+                _ => {}
             }
             let v = match resolve_version(&action.target, &mc, &loader, action.target_version.as_deref()).await? {
                 Some(v) => v,
@@ -275,9 +393,22 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
             let targets = action.targets.clone().unwrap_or_default();
             let downgrade = action.direction.as_deref() == Some("downgrade");
             let mut reverts: Vec<ConflictRevert> = Vec::new();
+            let mut sync_pins: Vec<SyncPinRevert> = Vec::new();
             for tname in &targets {
-                let m = match find_installed_mod(&profile, tname) {
-                    Some(m) => m,
+                let m = match find_target(&state, &profile, tname).await? {
+                    Some(Installed::Profile(m)) => m,
+                    Some(Installed::Sync(entry)) => {
+                        let Some(current_id) = entry.version_id.clone() else { continue };
+                        let Some((mod_id, versions)) = sync_mod_versions(&entry, &loader).await? else { continue };
+                        let mc_versions: Vec<UnifiedVersion> =
+                            versions.into_iter().filter(|v| v.game_versions.contains(&mc)).collect();
+                        let target_v = match pick_directional(&mc_versions, &current_id, downgrade) {
+                            Some(v) if v.id != current_id => v,
+                            _ => continue,
+                        };
+                        sync_pins.push(pin_sync_version(&state, &profile, &entry, mod_id, &target_v.id).await?);
+                        continue;
+                    }
                     None => continue,
                 };
                 // platform from the installed mod's source; only managed Modrinth/CurseForge mods can be re-versioned
@@ -301,10 +432,10 @@ pub async fn apply_crash_fix(profile_id: Uuid, action: CrashActionDto) -> Result
                 pm.update_mod_to_unified_version(profile_id, mod_id, &target_v).await?;
                 reverts.push(ConflictRevert { mod_id, prev });
             }
-            if reverts.is_empty() {
+            if reverts.is_empty() && sync_pins.is_empty() {
                 return Ok(skip(&action.target));
             }
-            Ok(ApplyOutcome::Applied { fix: AppliedFix::Conflict { profile_id, mods: reverts } })
+            Ok(ApplyOutcome::Applied { fix: AppliedFix::Conflict { profile_id, mods: reverts, sync_pins } })
         }
 
         "enable_norisk_mod" | "disable_norisk_mod" => {
@@ -386,10 +517,16 @@ pub async fn revert_crash_fix(applied: AppliedFix) -> Result<(), CommandError> {
         AppliedFix::Modver { profile_id, mod_id, prev } => {
             pm.update_mod_to_unified_version(profile_id, mod_id, &prev).await?;
         }
-        AppliedFix::Conflict { profile_id, mods } => {
+        AppliedFix::Conflict { profile_id, mods, sync_pins } => {
             for r in mods {
                 pm.update_mod_to_unified_version(profile_id, r.mod_id, &r.prev).await?;
             }
+            for pin in sync_pins {
+                pin.set(&state, pin.prev.clone()).await?;
+            }
+        }
+        AppliedFix::SyncExclusion { profile_id, pack_id, mod_key, excluded } => {
+            state.sync_pack_manager.set_profile_exclusions(profile_id, &[(pack_id, mod_key)], !excluded).await?;
         }
         AppliedFix::Pack { profile_id, prev_pack_id } => {
             let mut p = pm.get_profile(profile_id).await?;

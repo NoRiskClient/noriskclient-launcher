@@ -130,7 +130,8 @@ export function LogViewerCore({
 }: LogViewerCoreProps) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const { showThreadPrefix, toggleShowThreadPrefix } = useLogSettingsStore();
+  const showThreadPrefix = useLogSettingsStore((state) => state.showThreadPrefix);
+  const toggleShowThreadPrefix = useLogSettingsStore((state) => state.toggleShowThreadPrefix);
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [levelFilters, setLevelFilters] = useState<Record<LogLevel, boolean>>({
@@ -281,7 +282,10 @@ export function LogViewerCore({
   useEffect(() => {
     selectionAnchorIndexRef.current = null;
     setSelectionRange(null);
-    window.getSelection()?.removeAllRanges();
+    const selection = window.getSelection();
+    if (selection?.anchorNode && logContainerRef.current?.contains(selection.anchorNode)) {
+      selection.removeAllRanges();
+    }
   }, [searchTerm, levelFilters, selectedLogPath]);
 
   useEffect(() => {

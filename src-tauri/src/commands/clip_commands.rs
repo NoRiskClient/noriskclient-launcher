@@ -26,6 +26,11 @@ pub struct CaptureStatus {
     pub capabilities: Vec<EncoderCapability>,
     pub active_codec: Option<ClipCodec>,
     pub active_encoder: Option<EncoderPreference>,
+    pub capture_method: Option<norisk_ipc::CaptureMethod>,
+    pub capture_fps: f32,
+    pub dropped_frames: u64,
+    pub retry_in_seconds: Option<u32>,
+    pub last_error: Option<norisk_ipc::CaptureError>,
     pub audio_devices: Vec<AudioDeviceInfo>,
     pub microphones: Vec<AudioDeviceInfo>,
     pub supports_game_only_audio: bool,
@@ -159,6 +164,7 @@ pub async fn capture_status() -> Result<CaptureStatus, CommandError> {
     let current = supervisor.state().await;
     let ready = supervisor.ready_info().await;
     let active = supervisor.active_encoder().await;
+    let live = supervisor.last_status().await;
     let audio = ready
         .as_ref()
         .map(|r| {
@@ -183,6 +189,11 @@ pub async fn capture_status() -> Result<CaptureStatus, CommandError> {
         capabilities: ready.map(|r| r.capabilities).unwrap_or_default(),
         active_codec: active.map(|(codec, _)| codec),
         active_encoder: active.map(|(_, encoder)| encoder),
+        capture_method: live.as_ref().and_then(|s| s.capture_method),
+        capture_fps: live.as_ref().map_or(0.0, |s| s.capture_fps),
+        dropped_frames: live.as_ref().map_or(0, |s| s.dropped_frames),
+        retry_in_seconds: live.as_ref().and_then(|s| s.retry_in_seconds),
+        last_error: supervisor.last_error().await,
         audio_devices: audio.0,
         microphones: audio.1,
         supports_game_only_audio: audio.2,
@@ -214,7 +225,7 @@ pub async fn capture_encoder_capabilities() -> Result<Vec<EncoderCapability>, Co
 
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     let mut capabilities = Vec::new();
-    while std::time::Instant::now() < deadline {
+    while std::time::Instant::now() < deadline && supervisor.is_running().await {
         if let Some(ready) = supervisor.ready_info().await {
             if !ready.capabilities.is_empty() {
                 capabilities = ready.capabilities;
@@ -264,7 +275,8 @@ pub async fn clip_storage_usage() -> Result<crate::utils::clip_library::StorageU
 }
 
 #[tauri::command]
-pub async fn clip_delete(path: std::path::PathBuf) -> Result<(), CommandError> {
+pub async fn clip_delete(app: tauri::AppHandle, path: std::path::PathBuf) -> Result<(), CommandError> {
+    refuse_while_editing(&app, &path)?;
     let dir = clip_dir().await?;
     crate::utils::clip_library::delete(&dir, &path)?;
     log::info!("Deleted clip {}", path.display());
@@ -297,15 +309,22 @@ pub async fn clip_reveal(app: tauri::AppHandle, path: std::path::PathBuf) -> Res
 }
 
 #[tauri::command]
-pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), CommandError> {
+pub async fn clip_prepare_preview(
+    path: std::path::PathBuf,
+    waveform_only: Option<bool>,
+) -> Result<(), CommandError> {
     let dir = clip_dir().await?;
-    crate::utils::clip_library::guard_inside(&dir, &path)?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
 
     let state = State::get().await?;
+    engine_running(&state).await?;
     state
         .capture_supervisor
         .send(LauncherToCapture::PrepareAudioPreview(
-            norisk_ipc::AudioPreviewRequest { source: path },
+            norisk_ipc::AudioPreviewRequest {
+                source,
+                waveform_only: waveform_only.unwrap_or(false),
+            },
         ))?;
     Ok(())
 }
@@ -313,17 +332,155 @@ pub async fn clip_prepare_preview(path: std::path::PathBuf) -> Result<(), Comman
 #[tauri::command]
 pub async fn clip_export_vertical(
     path: std::path::PathBuf,
+    shape: Option<norisk_ipc::ClipShape>,
+    overlays: Option<Vec<norisk_ipc::ClipOverlay>>,
+    start_seconds: Option<f64>,
+    end_seconds: Option<f64>,
+    video_start_seconds: Option<f64>,
+    video_end_seconds: Option<f64>,
+    levels: Option<Vec<norisk_ipc::TrackLevel>>,
+    removed: Option<Vec<norisk_ipc::Span>>,
+    blanked: Option<Vec<norisk_ipc::Span>>,
+    muted: Option<Vec<norisk_ipc::TrackCut>>,
 ) -> Result<std::path::PathBuf, CommandError> {
     let dir = clip_dir().await?;
-    let destination = crate::utils::clip_library::vertical_destination(&dir, &path)?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
+    let shape = shape.unwrap_or_default();
+    let duration = clip_duration(&source).await;
+    let within = |seconds: Option<f64>| seconds.map(|s| within_clip(s, duration));
 
     let state = State::get().await?;
-    state.capture_supervisor.send(LauncherToCapture::ExportVertical(
+    let destination = crate::utils::clip_library::shaped_destination(&dir, &source, shape)?;
+    dispatch(&state, &destination, LauncherToCapture::ExportVertical(
         norisk_ipc::ExportVerticalRequest {
-            source: path,
+            source,
             destination: destination.clone(),
+            shape,
+            overlays: overlays
+                .unwrap_or_default()
+                .into_iter()
+                .map(|overlay| tidy_overlay(overlay, duration))
+                .collect(),
+            start_seconds: within(start_seconds),
+            end_seconds: within(end_seconds),
+            video_start_seconds: within(video_start_seconds),
+            video_end_seconds: within(video_end_seconds),
+            levels: levels.unwrap_or_default(),
+            removed: removed.unwrap_or_default(),
+            blanked: blanked.unwrap_or_default(),
+            muted: muted.unwrap_or_default(),
         },
-    ))?;
+    )).await?;
+
+    Ok(destination)
+}
+
+async fn engine_running(state: &State) -> crate::error::Result<()> {
+    if state.capture_supervisor.is_running().await {
+        return Ok(());
+    }
+    Err(crate::error::AppError::ClipEngineOff)
+}
+
+async fn dispatch(
+    state: &State,
+    destination: &std::path::Path,
+    command: LauncherToCapture,
+) -> crate::error::Result<()> {
+    engine_running(state)
+        .await
+        .and_then(|()| state.capture_supervisor.send(command))
+        .inspect_err(|_| {
+            crate::utils::clip_library::release_destination(destination);
+        })
+}
+
+async fn clip_duration(source: &std::path::Path) -> Option<f64> {
+    let source = source.to_path_buf();
+    tokio::task::spawn_blocking(move || crate::utils::clip_library::read_details(&source))
+        .await
+        .ok()
+        .flatten()
+        .map(|details| details.duration_seconds as f64)
+        .filter(|seconds| seconds.is_finite() && *seconds > 0.0)
+}
+
+fn within_clip(seconds: f64, duration: Option<f64>) -> f64 {
+    if !seconds.is_finite() {
+        return seconds;
+    }
+    let seconds = seconds.max(0.0);
+    duration.map_or(seconds, |duration| seconds.min(duration))
+}
+
+fn unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+const BLUR_STRENGTH: (u32, u32) = (1, 64);
+const ARROW_THICKNESS: (u32, u32) = (1, 32);
+const TEXT_SIZE: (u32, u32) = (8, 240);
+
+fn tidy_overlay(
+    overlay: norisk_ipc::ClipOverlay,
+    duration: Option<f64>,
+) -> norisk_ipc::ClipOverlay {
+    use norisk_ipc::OverlayKind;
+
+    let left = unit(overlay.left);
+    let top = unit(overlay.top);
+    let kind = match overlay.kind {
+        OverlayKind::Blur { strength } => OverlayKind::Blur {
+            strength: strength.clamp(BLUR_STRENGTH.0, BLUR_STRENGTH.1),
+        },
+        OverlayKind::Arrow { colour, thickness, towards } => OverlayKind::Arrow {
+            colour,
+            thickness: thickness.clamp(ARROW_THICKNESS.0, ARROW_THICKNESS.1),
+            towards,
+        },
+        OverlayKind::Text { content, size, colour, align, vertical } => OverlayKind::Text {
+            content,
+            size: size.clamp(TEXT_SIZE.0, TEXT_SIZE.1),
+            colour,
+            align,
+            vertical,
+        },
+        other => other,
+    };
+
+    norisk_ipc::ClipOverlay {
+        kind,
+        left,
+        top,
+        width: unit(overlay.width).min(1.0 - left),
+        height: unit(overlay.height).min(1.0 - top),
+        start_seconds: within_clip(overlay.start_seconds, duration),
+        end_seconds: within_clip(overlay.end_seconds, duration),
+    }
+}
+
+#[tauri::command]
+pub async fn clip_export_gif(
+    path: std::path::PathBuf,
+) -> Result<std::path::PathBuf, CommandError> {
+    let dir = clip_dir().await?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
+
+    let state = State::get().await?;
+    let destination = crate::utils::clip_library::gif_destination(&dir, &source)?;
+    dispatch(
+        &state,
+        &destination,
+        LauncherToCapture::ExportGif(norisk_ipc::ExportGifRequest {
+            source,
+            destination: destination.clone(),
+        }),
+    )
+    .await?;
 
     Ok(destination)
 }
@@ -333,6 +490,8 @@ pub async fn clip_trim(
     path: std::path::PathBuf,
     start_seconds: f64,
     end_seconds: f64,
+    video_start_seconds: Option<f64>,
+    video_end_seconds: Option<f64>,
     levels: Option<Vec<norisk_ipc::TrackLevel>>,
 ) -> Result<std::path::PathBuf, CommandError> {
     if !start_seconds.is_finite() || !end_seconds.is_finite() || end_seconds <= start_seconds {
@@ -343,18 +502,24 @@ pub async fn clip_trim(
     }
 
     let dir = clip_dir().await?;
-    let destination = crate::utils::clip_library::trimmed_destination(&dir, &path)?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
 
     let state = State::get().await?;
-    state
-        .capture_supervisor
-        .send(LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
-            source: path,
+    let destination = crate::utils::clip_library::trimmed_destination(&dir, &source)?;
+    dispatch(
+        &state,
+        &destination,
+        LauncherToCapture::TrimClip(norisk_ipc::TrimClipRequest {
+            source,
             destination: destination.clone(),
             start_seconds,
             end_seconds,
+            video_start_seconds,
+            video_end_seconds,
             levels: levels.unwrap_or_default(),
-        }))?;
+        }),
+    )
+    .await?;
 
     Ok(destination)
 }
@@ -370,9 +535,9 @@ pub async fn clip_details(
     path: std::path::PathBuf,
 ) -> Result<Option<crate::utils::clip_library::ClipDetails>, CommandError> {
     let dir = clip_dir().await?;
-    crate::utils::clip_library::guard_inside(&dir, &path)?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
     Ok(tokio::task::spawn_blocking(move || {
-        crate::utils::clip_library::read_details(&path)
+        crate::utils::clip_library::read_details(&source)
     })
     .await
     .map_err(|e| crate::error::AppError::Other(format!("reading the clip's details failed: {e}")))?)
@@ -389,6 +554,11 @@ pub async fn clip_save_thumbnail(
     })
     .await
     .map_err(|e| crate::error::AppError::Other(format!("writing the still failed: {e}")))??)
+}
+
+#[tauri::command]
+pub fn clip_list_screens() -> Vec<crate::utils::screens::ScreenInfo> {
+    crate::utils::screens::list()
 }
 
 #[tauri::command]
@@ -414,9 +584,11 @@ pub async fn clip_set_favourite(
 
 #[tauri::command]
 pub async fn clip_rename(
+    app: tauri::AppHandle,
     path: std::path::PathBuf,
     name: String,
 ) -> Result<std::path::PathBuf, CommandError> {
+    refuse_while_editing(&app, &path)?;
     let dir = clip_dir().await?;
     let renamed = crate::utils::clip_library::rename(&dir, &path, &name)?;
     log::info!("Renamed {} to {}", path.display(), renamed.display());
@@ -441,5 +613,96 @@ pub async fn clip_open_folder(app: tauri::AppHandle) -> Result<(), CommandError>
     app.opener()
         .open_path(dir.to_string_lossy(), None::<&str>)
         .map_err(|e| crate::error::AppError::Other(format!("could not open the clip folder: {e}")))?;
+    Ok(())
+}
+
+pub const EDITOR_LABEL: &str = "clip_editor";
+
+#[derive(Serialize, Clone)]
+pub struct EditorClip {
+    path: String,
+    name: String,
+}
+
+static EDITOR_CLIP: std::sync::Mutex<Option<EditorClip>> = std::sync::Mutex::new(None);
+
+static EDITOR_OPENING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+fn open_in_editor(app: &tauri::AppHandle) -> Option<EditorClip> {
+    use tauri::Manager;
+
+    app.get_webview_window(EDITOR_LABEL)?;
+    EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+pub fn editing_clip(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    open_in_editor(app).map(|clip| std::path::PathBuf::from(clip.path))
+}
+
+fn refuse_while_editing(app: &tauri::AppHandle, path: &std::path::Path) -> Result<(), CommandError> {
+    let same = |a: &std::path::Path, b: &std::path::Path| match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    };
+    if editing_clip(app).is_some_and(|open| same(&open, path)) {
+        return Err(crate::error::AppError::Other(
+            "This clip is open in the editor. Close the editor first.".into(),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn clip_editor_current(app: tauri::AppHandle) -> Option<EditorClip> {
+    open_in_editor(&app)
+}
+
+#[tauri::command]
+pub fn clip_editor_close(window: tauri::WebviewWindow) -> Result<(), CommandError> {
+    if window.label() != EDITOR_LABEL {
+        return Err(crate::error::AppError::Other("only the clip editor can close itself here".into()).into());
+    }
+    window
+        .destroy()
+        .map_err(|e| crate::error::AppError::Other(format!("could not close the clip editor: {e}")))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clip_open_editor(
+    app: tauri::AppHandle,
+    path: std::path::PathBuf,
+    name: String,
+) -> Result<(), CommandError> {
+    use tauri::{Emitter, Manager};
+
+    let dir = clip_dir().await?;
+    let source = crate::utils::clip_library::resolve_clip(&dir, &path)?;
+    let clip = EditorClip {
+        path: source.to_string_lossy().into_owned(),
+        name,
+    };
+    let _opening = EDITOR_OPENING.lock().await;
+    *EDITOR_CLIP.lock().unwrap_or_else(|e| e.into_inner()) = Some(clip.clone());
+
+    if let Some(window) = app.get_webview_window(EDITOR_LABEL) {
+        app.emit_to(EDITOR_LABEL, "clip_editor_open", &clip).map_err(|e| {
+            crate::error::AppError::Other(format!("could not hand the clip to the editor: {e}"))
+        })?;
+        let _ = crate::utils::window_focus::bring_to_front(&window);
+        return Ok(());
+    }
+
+    let url = "clip-editor-window.html";
+    tauri::WebviewWindowBuilder::new(&app, EDITOR_LABEL, tauri::WebviewUrl::App(url.into()))
+        .title("Clip Editor")
+        .inner_size(1400.0, 860.0)
+        .min_inner_size(1024.0, 640.0)
+        .decorations(false)
+        .center()
+        .visible(false)
+        .build()
+        .map_err(|e| crate::error::AppError::Other(format!("could not open the clip editor: {e}")))?;
     Ok(())
 }

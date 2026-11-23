@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as ProfileService from "../services/profile-service";
-import type { Packs } from "../utils/pack-listing";
+import { PERMISSION } from "../constants/permissions";
+import { usePermissions } from "./usePermission";
+import { devPackPermission, isDevPack, visiblePacks, type Packs } from "../utils/pack-listing";
 import { logError } from "../utils/logging-utils";
 
 let cache: Packs | null = null;
@@ -40,5 +42,16 @@ export function usePacks(): { packs: Packs; loading: boolean } {
     return () => { active = false; };
   }, []);
 
-  return { packs, loading };
+  const nodes = useMemo(
+    () => [PERMISSION.STAFF, ...Object.keys(packs).filter(isDevPack).map(devPackPermission)],
+    [packs],
+  );
+  const granted = usePermissions(nodes);
+
+  const allowed = useMemo(
+    () => visiblePacks(packs, (id) => granted.has(PERMISSION.STAFF) || granted.has(devPackPermission(id))),
+    [packs, granted],
+  );
+
+  return { packs: allowed, loading };
 }

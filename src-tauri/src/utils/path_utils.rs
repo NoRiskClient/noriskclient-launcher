@@ -193,6 +193,10 @@ pub struct FileNode {
 /// # Returns
 /// A Result containing the root FileNode with all its children
 pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> Result<FileNode> {
+    walk_directory(root_path, include_hidden, &mut Vec::new()).await
+}
+
+async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<FileNode> {
     // Get metadata for the root path
     let metadata = fs::metadata(root_path).await.map_err(|e| AppError::Io(e))?;
 
@@ -220,6 +224,39 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         });
     }
 
+    let canonical = fs::canonicalize(root_path).await.unwrap_or_else(|_| root_path.to_path_buf());
+    if ancestors.contains(&canonical) {
+        return Ok(FileNode {
+            name,
+            path: root_path.to_path_buf(),
+            is_dir: true,
+            children: Vec::new(),
+            size: 0,
+            last_modified,
+        });
+    }
+    ancestors.push(canonical);
+    let listed = read_children(root_path, include_hidden, ancestors).await;
+    ancestors.pop();
+    let mut children = listed?;
+
+    children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    Ok(FileNode {
+        name,
+        path: root_path.to_path_buf(),
+        is_dir: true,
+        children,
+        size: 0,
+        last_modified,
+    })
+}
+
+async fn read_children(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<Vec<FileNode>> {
     // If it's a directory, read its entries and process each one
     let mut children = Vec::new();
     let mut entries = fs::read_dir(root_path).await.map_err(|e| AppError::Io(e))?;
@@ -237,7 +274,7 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         }
 
         // Recursively process this entry - using Box::pin to handle recursion
-        match Box::pin(get_directory_structure(&path, include_hidden)).await {
+        match Box::pin(walk_directory(&path, include_hidden, ancestors)).await {
             Ok(node) => children.push(node),
             Err(e) => {
                 // Log the error but continue with other entries
@@ -246,21 +283,7 @@ pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> 
         }
     }
 
-    // Sort children: directories first, then files, both alphabetically
-    children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
-
-    Ok(FileNode {
-        name,
-        path: root_path.to_path_buf(),
-        is_dir: true,
-        children,
-        size: 0, // Directories themselves have no size
-        last_modified,
-    })
+    Ok(children)
 }
 
 /// Flattens a directory structure into a vector of paths with their relative depths.
@@ -697,6 +720,7 @@ async fn collect_copy_operations(
     src: &Path,
     dst: &Path,
     ops: &mut Vec<(PathBuf, PathBuf)>,
+    ancestors: &mut Vec<PathBuf>,
 ) -> Result<()> {
     if !src.exists() {
         return Ok(());
@@ -704,17 +728,34 @@ async fn collect_copy_operations(
 
     if src.is_dir() {
         fs::create_dir_all(dst).await.map_err(AppError::Io)?;
-        let mut entries = fs::read_dir(src).await.map_err(AppError::Io)?;
-        while let Some(entry) = entries.next_entry().await.map_err(AppError::Io)? {
-            let entry_path = entry.path();
-            let dst_path = dst.join(entry.file_name());
-            Box::pin(collect_copy_operations(&entry_path, &dst_path, ops)).await?;
+        let canonical = fs::canonicalize(src).await.unwrap_or_else(|_| src.to_path_buf());
+        if ancestors.contains(&canonical) {
+            return Ok(());
         }
+        ancestors.push(canonical);
+        let collected = collect_dir_copy_operations(src, dst, ops, ancestors).await;
+        ancestors.pop();
+        collected?;
     } else if src.is_file() {
         if let Some(parent) = dst.parent() {
             fs::create_dir_all(parent).await.map_err(AppError::Io)?;
         }
         ops.push((src.to_path_buf(), dst.to_path_buf()));
+    }
+    Ok(())
+}
+
+async fn collect_dir_copy_operations(
+    src: &Path,
+    dst: &Path,
+    ops: &mut Vec<(PathBuf, PathBuf)>,
+    ancestors: &mut Vec<PathBuf>,
+) -> Result<()> {
+    let mut entries = fs::read_dir(src).await.map_err(AppError::Io)?;
+    while let Some(entry) = entries.next_entry().await.map_err(AppError::Io)? {
+        let entry_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        Box::pin(collect_copy_operations(&entry_path, &dst_path, ops, ancestors)).await?;
     }
     Ok(())
 }
@@ -739,7 +780,7 @@ pub async fn copy_dir_recursively(src: &Path, dst: &Path, semaphore: Arc<Semapho
     );
 
     let mut ops = Vec::new();
-    collect_copy_operations(src, dst, &mut ops).await?;
+    collect_copy_operations(src, dst, &mut ops, &mut Vec::new()).await?;
 
     info!(
         "Collected {} file copy operations. Starting parallel copy.",

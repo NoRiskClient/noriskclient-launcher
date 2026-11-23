@@ -12,6 +12,7 @@ import {
 } from "../../services/cape-service";
 import type {
   BrowseCapesOptions,
+  CapesBrowseResponse,
   CosmeticCape,
   GetPlayerCapesPayloadOptions,
   PaginationInfo,
@@ -45,6 +46,15 @@ import { isMobile } from "../../lib/platform";
 import { isNetworkError } from "../../lib/network";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { OfflineState } from "../ui/OfflineState";
+
+const PAGE_SIZE = 20;
+
+const pageOf = (page: number, response: CapesBrowseResponse): PaginationInfo => ({
+  currentPage: page,
+  pageSize: PAGE_SIZE,
+  totalItems: page * PAGE_SIZE + response.capes.length,
+  totalPages: response.nextCursor ? page + 2 : page + 1,
+});
 
 
 
@@ -220,6 +230,7 @@ export function CapeBrowser(): JSX.Element {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
+  const nextCursorRef = useRef<string | null>(null);
   const { activeAccount } = useMinecraftAuthStore();
 
   useEffect(() => {
@@ -239,14 +250,14 @@ export function CapeBrowser(): JSX.Element {
       try {
         setIsLoadingAll(true);
         const browseOptions: BrowseCapesOptions = {
-          page: 0,
-          page_size: 20,
+          limit: PAGE_SIZE,
           sort_by: undefined,
           time_frame: undefined,
         };
         const response = await browseCapes(browseOptions);
+        nextCursorRef.current = response.nextCursor;
         setAllCapes(response.capes);
-        setAllPagination(response.pagination);
+        setAllPagination(pageOf(0, response));
         setOffline(false);
       } catch (error) {
         console.error("Failed to load ALL capes:", error);
@@ -397,8 +408,8 @@ export function CapeBrowser(): JSX.Element {
         } else {
           // Browse all capes
           const browseOptions: BrowseCapesOptions = {
-            page: pageToFetch,
-            page_size: 20,
+            cursor: append ? nextCursorRef.current ?? undefined : undefined,
+            limit: PAGE_SIZE,
             sort_by:
               currentFilters.sortBy === "" ? undefined : currentFilters.sortBy,
             time_frame:
@@ -407,6 +418,7 @@ export function CapeBrowser(): JSX.Element {
                 : currentFilters.timeFrame,
           };
           response = await browseCapes(browseOptions);
+          nextCursorRef.current = response.nextCursor;
 
           // Get the correct setters based on current filter
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
@@ -422,7 +434,7 @@ export function CapeBrowser(): JSX.Element {
             }
             return newCapes;
           });
-          setPagination(response.pagination);
+          setPagination(pageOf(pageToFetch, response));
         }
         if (!append) setOffline(false);
       } catch (err: any) {

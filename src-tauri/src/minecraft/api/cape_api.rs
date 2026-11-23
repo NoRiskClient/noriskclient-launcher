@@ -84,6 +84,32 @@ pub struct CapesBrowseResponse {
     pub pagination: PaginationInfo,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapeBrowsePage {
+    pub capes: Vec<CosmeticCape>,
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct CapeBrowseQuery<'a> {
+    pub sort_by: Option<&'a str>,
+    pub filter_has_elytra: Option<bool>,
+    pub filter_creator: Option<&'a Uuid>,
+    pub time_frame: Option<&'a str>,
+}
+
+const LEGACY_CURSOR: &str = "page:";
+
+pub fn legacy_page(cursor: &str) -> Option<u32> {
+    cursor.strip_prefix(LEGACY_CURSOR)?.parse().ok()
+}
+
+pub fn legacy_next(page: u32, total_pages: i32) -> Option<String> {
+    (i64::from(page) + 1 < i64::from(total_pages)).then(|| format!("{LEGACY_CURSOR}{}", page + 1))
+}
+
 
 
 /// Response struct for cape upload operations (serializable for Tauri)
@@ -121,6 +147,7 @@ impl CapeApi {
     /// - filterCreator: Filter by creator UUID
     /// - timeFrame: Time frame filter (weekly, monthly)
     /// - request_uuid: UUID for tracking the request
+    #[deprecated(note = "pages through /cape/browse with skip; use browse_capes_page, which prefers /cape/browse/v2")]
     pub async fn browse_capes(
         &self,
         norisk_token: &str,
@@ -179,6 +206,100 @@ impl CapeApi {
             .query(&query_params)
             .json::<CapesBrowseResponse>("Cape browse")
             .await
+    }
+
+    pub async fn browse_capes_page(
+        &self,
+        norisk_token: &str,
+        query: &CapeBrowseQuery<'_>,
+        cursor: Option<&str>,
+        limit: u32,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<CapeBrowsePage> {
+        if let Some(page) = cursor.and_then(legacy_page) {
+            return self
+                .browse_legacy(norisk_token, query, page, limit, request_uuid, is_experimental)
+                .await;
+        }
+        match self.browse_v2(norisk_token, query, cursor, limit, is_experimental).await? {
+            Some(page) => Ok(page),
+            None if cursor.is_none() => {
+                self.browse_legacy(norisk_token, query, 0, limit, request_uuid, is_experimental)
+                    .await
+            }
+            None => Ok(CapeBrowsePage { capes: Vec::new(), next_cursor: None }),
+        }
+    }
+
+    async fn browse_v2(
+        &self,
+        norisk_token: &str,
+        query: &CapeBrowseQuery<'_>,
+        cursor: Option<&str>,
+        limit: u32,
+        is_experimental: bool,
+    ) -> Result<Option<CapeBrowsePage>> {
+        let url = format!("{}/cape/browse/v2", Self::get_api_base(is_experimental));
+        let mut params = HashMap::new();
+        params.insert("limit", limit.to_string());
+        if let Some(cursor) = cursor {
+            params.insert("cursor", cursor.to_string());
+        }
+        if let Some(sort_by) = query.sort_by {
+            params.insert("sortBy", sort_by.to_string());
+        }
+        if let Some(has_elytra) = query.filter_has_elytra {
+            params.insert("filterHasElytra", has_elytra.to_string());
+        }
+        if let Some(creator) = query.filter_creator {
+            params.insert("filterCreator", creator.to_string());
+        }
+        if let Some(time_frame) = query.time_frame {
+            params.insert("timeFrame", time_frame.to_string());
+        }
+
+        let response = nrc_get(url)
+            .bearer(norisk_token)
+            .query(&params)
+            .send("Cape browse v2")
+            .await?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            debug!("[Cape API] /cape/browse/v2 is not deployed here; using the old route");
+            return Ok(None);
+        }
+        crate::utils::api_utils::parse_response_with_logging::<CapeBrowsePage>(response, "Cape browse v2")
+            .await
+            .map(Some)
+    }
+
+    #[allow(deprecated)]
+    async fn browse_legacy(
+        &self,
+        norisk_token: &str,
+        query: &CapeBrowseQuery<'_>,
+        page: u32,
+        limit: u32,
+        request_uuid: &str,
+        is_experimental: bool,
+    ) -> Result<CapeBrowsePage> {
+        let response = self
+            .browse_capes(
+                norisk_token,
+                Some(page),
+                Some(limit),
+                query.sort_by,
+                query.filter_has_elytra,
+                query.filter_creator,
+                query.time_frame,
+                request_uuid,
+                is_experimental,
+            )
+            .await?;
+        Ok(CapeBrowsePage {
+            next_cursor: legacy_next(page, response.pagination.total_pages),
+            capes: response.capes,
+        })
     }
 
     /// Get capes for a specific player

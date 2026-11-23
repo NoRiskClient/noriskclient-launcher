@@ -11,6 +11,7 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"
   label: string;
   tone?: "default" | "danger";
   tooltipPosition?: "top" | "bottom";
+  withTooltip?: boolean;
 }
 
 export function ClipIconButton({
@@ -18,26 +19,33 @@ export function ClipIconButton({
   label,
   tone = "default",
   tooltipPosition = "bottom",
+  withTooltip = true,
   className,
   disabled,
   ...rest
 }: Props) {
+  const button = (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      className={cn(
+        "w-8 h-8 flex shrink-0 items-center justify-center rounded border border-white/10 bg-black/30 text-white/80 transition-colors duration-200 enabled:hover:border-white/20 enabled:hover:text-white",
+        tone === "danger" ? "enabled:hover:bg-red-700/80" : "enabled:hover:bg-white/10",
+        disabled && "cursor-not-allowed opacity-40",
+        className,
+      )}
+      {...rest}
+    >
+      <Icon icon={icon} className="pointer-events-none w-4 h-4" />
+    </button>
+  );
+
+  if (!withTooltip) return button;
+
   return (
     <Tooltip content={label} position={tooltipPosition}>
-      <button
-        type="button"
-        aria-label={label}
-        disabled={disabled}
-        className={cn(
-          "w-8 h-8 flex items-center justify-center rounded bg-black/30 text-white/70 hover:text-white border border-white/10 hover:border-white/20 transition-all duration-200",
-          tone === "danger" ? "hover:bg-red-700/80" : "hover:bg-black/50",
-          disabled && "cursor-not-allowed opacity-40",
-          className,
-        )}
-        {...rest}
-      >
-        <Icon icon={icon} className="w-4 h-4" />
-      </button>
+      {button}
     </Tooltip>
   );
 }

@@ -53,11 +53,11 @@ import { Button } from "../../ui/buttons/Button";
 import { ProfileIconV2 } from "../ProfileIconV2";
 import { ExportProfileModal } from "../ExportProfileModal";
 import { ModpackVersionsModal } from "../../modals/ModpackVersionsModal";
-import { ConfirmDeleteDialog } from "../../modals/ConfirmDeleteDialog";
+import { useDeleteProfile } from "../../../hooks/useDeleteProfile";
 import { SettingsContextMenu, type ContextMenuItem } from "../../ui/SettingsContextMenu";
 import { Tooltip } from "../../ui/Tooltip";
 
-import { ProfileLeftRailV3, type NavKey, CONTENT_NAV_KEYS } from "./ProfileLeftRailV3";
+import { ProfileLeftRailV3, type NavKey, contentTabOf } from "./ProfileLeftRailV3";
 import { EditableChipV3 } from "./chips/EditableChipV3";
 import { GameVersionPickerV3 } from "./chips/GameVersionPickerV3";
 import { LoaderBadgeV3 } from "./chips/LoaderBadgeV3";
@@ -72,12 +72,13 @@ import { parseErrorMessage } from "../../../utils/error-utils";
 import { useContentCacheStore } from "../../../store/content-cache-store";
 
 const mainTabFor = (k: NavKey): string =>
-  CONTENT_NAV_KEYS.includes(k) ? "content" : k;
+  contentTabOf(k) ? "content" : k;
 
 interface ProfileDetailViewV3Props {
   profile: Profile;
   onClose: () => void;
   onEdit: () => void;
+  initialNav?: NavKey;
 }
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
@@ -103,11 +104,12 @@ export function ProfileDetailViewV3({
   profile,
   onClose,
   onEdit,
+  initialNav,
 }: ProfileDetailViewV3Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentProfile, setCurrentProfile] = useState<Profile>(profile);
-  const [activeNavItem, setActiveNavItem] = useState<NavKey>("mods");
+  const [activeNavItem, setActiveNavItem] = useState<NavKey>(initialNav ?? "mods");
 
   // Inline-edit chip editors — owns fetchers + save + lock state
   const chipEditors = useHeroChipEditors(currentProfile, setCurrentProfile);
@@ -123,9 +125,7 @@ export function ProfileDetailViewV3({
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Delete modal state
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { requestDelete, deleteDialog } = useDeleteProfile();
 
   const [modpackVersions, setModpackVersions] = useState<UnifiedModpackVersionsResponse | null>(() => {
     const source = profile.modpack_info?.source;
@@ -155,10 +155,24 @@ export function ProfileDetailViewV3({
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const getGenericDisplayFileName = useCallback((item: LocalContentItem) => item.filename, []);
+  const getGenericDisplayFileName = useCallback(
+    (item: LocalContentItem) => item.modrinth_info?.name || item.curseforge_info?.name || item.filename,
+    [],
+  );
 
   // Stub — tabs handle their own refresh; mirrors V2's handleRefresh noop.
   const handleRefresh = useCallback(() => {}, []);
+
+  const refreshNoRiskMods = useCallback(async () => {
+    try {
+      await fetchProfiles();
+      setCurrentProfile((prev) => ({ ...prev }));
+    } catch (err) {
+      console.error("[V3] Failed to refresh profile data:", err);
+    }
+  }, [fetchProfiles]);
+
+  const contentTab = contentTabOf(activeNavItem);
 
   const handleLaunchRequest = useCallback(async (params: {
     profileId: string;
@@ -176,39 +190,11 @@ export function ProfileDetailViewV3({
     }
   }, [handleQuickPlayLaunch, t]);
 
-  const handleDeleteProfile = useCallback(() => {
-    if (currentProfile.is_standard_version) {
-      toast.error(t('profiles.cannotDeleteStandard'));
-      return;
+  const handleDeleteProfile = useCallback(async () => {
+    if (await requestDelete(currentProfile)) {
+      navigate("/profiles");
     }
-    setIsDeleteModalOpen(true);
-  }, [currentProfile, t]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    setIsDeleting(true);
-    try {
-      const deletePromise = useProfileStore.getState().deleteProfile(currentProfile.id);
-      await toast.promise(deletePromise, {
-        loading: t('profiles.deletingProfile', { name: currentProfile.name }),
-        success: () => {
-          fetchProfiles();
-          navigate("/profiles");
-          setIsDeleteModalOpen(false);
-          return t('profiles.deleteSuccess', { name: currentProfile.name });
-        },
-        error: (err) =>
-          t('profiles.deleteError', { error: parseErrorMessage(err) }),
-      });
-    } catch (error) {
-      console.error("[V3] Delete failed:", error);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [currentProfile, fetchProfiles, navigate, t]);
-
-  const handleCancelDelete = useCallback(() => {
-    setIsDeleteModalOpen(false);
-  }, []);
+  }, [currentProfile, navigate, requestDelete]);
 
   const handleOpenExportModal = useCallback(() => {
     showModal(`export-profile-${currentProfile.id}`, (
@@ -454,7 +440,7 @@ export function ProfileDetailViewV3({
           </Tooltip>
 
           <SettingsContextMenu
-            profile={currentProfile}
+            target={currentProfile}
             isOpen={isContextMenuOpen}
             position={contextMenuPosition}
             items={contextMenuItems}
@@ -700,79 +686,20 @@ export function ProfileDetailViewV3({
       {/* ── Body: Main + Right-Rail ─────────────────────────────────────── */}
       <div className={`flex-1 min-h-0 flex border-t border-white/5 ${activeNavItem === "logs" ? "" : "overflow-hidden"}`}>
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
-          {activeNavItem === "mods" && (
+          {contentTab && (
             <LocalContentTabV3<LocalContentItem>
+              key={contentTab.key}
               profile={currentProfile}
-              contentType="Mod"
+              contentType={contentTab.contentType}
               getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.mod')}
-              itemTypeNamePlural={t('profiles.content.mods')}
-              addContentButtonText={t('profiles.content.addMods')}
-              emptyStateIconOverride="solar:bolt-bold-duotone"
-              onRefreshRequired={handleRefresh}
+              itemTypeName={t(contentTab.nameKey)}
+              itemTypeNamePlural={t(contentTab.pluralKey)}
+              addContentButtonText={t(contentTab.addKey)}
+              emptyStateIconOverride={contentTab.icon}
+              onRefreshRequired={contentTab.contentType === "NoRiskMod" ? refreshNoRiskMods : handleRefresh}
             />
           )}
 
-          {activeNavItem === "resourcepacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="ResourcePack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.resourcePack')}
-              itemTypeNamePlural={t('profiles.content.resourcePacks')}
-              addContentButtonText={t('profiles.content.addResourcePacks')}
-              emptyStateIconOverride="solar:gallery-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "shaderpacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="ShaderPack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.shaderPack')}
-              itemTypeNamePlural={t('profiles.content.shaderPacks')}
-              addContentButtonText={t('profiles.content.addShaderPacks')}
-              emptyStateIconOverride="solar:sun-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "datapacks" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="DataPack"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.dataPack')}
-              itemTypeNamePlural={t('profiles.content.dataPacks')}
-              addContentButtonText={t('profiles.content.addDataPacks')}
-              emptyStateIconOverride="solar:database-bold-duotone"
-              onRefreshRequired={handleRefresh}
-            />
-          )}
-
-          {activeNavItem === "nrc" && (
-            <LocalContentTabV3<LocalContentItem>
-              profile={currentProfile}
-              contentType="NoRiskMod"
-              getDisplayFileName={getGenericDisplayFileName}
-              itemTypeName={t('profiles.content.noriskMod')}
-              itemTypeNamePlural={t('profiles.content.noriskMods')}
-              addContentButtonText={t('profiles.content.addNoriskMods')}
-              emptyStateIconOverride="solar:shield-check-bold-duotone"
-              onRefreshRequired={async () => {
-                try {
-                  await fetchProfiles();
-                  setCurrentProfile(prev => ({ ...prev }));
-                } catch (err) {
-                  console.error("[V3] Failed to refresh profile data:", err);
-                }
-                handleRefresh();
-              }}
-              /* Kein Add-CTA: NoRisk-Mods kommen ueber den Pack-Selector, nicht via Browse. */
-            />
-          )}
 
           {activeNavItem === "worlds" && (
             <WorldsTabV3
@@ -800,19 +727,7 @@ export function ProfileDetailViewV3({
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
-      <ConfirmDeleteDialog
-        isOpen={isDeleteModalOpen}
-        itemName={currentProfile.name}
-        onClose={handleCancelDelete}
-        onConfirm={handleConfirmDelete}
-        isDeleting={isDeleting}
-        title={t('profiles.deleteProfileTitle')}
-        message={
-          <p className="text-white/80 font-minecraft">
-            {t('profiles.deleteConfirmMessage', { name: currentProfile.name })}
-          </p>
-        }
-      />
+      {deleteDialog}
 
     </div>
   );

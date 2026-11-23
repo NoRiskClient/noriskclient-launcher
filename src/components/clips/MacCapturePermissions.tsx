@@ -9,6 +9,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import {
   applyClipSettings,
   openCapturePermissionSettings,
+  resetCapturePermissions,
   type CapturePermission,
 } from "../../services/clip-service";
 import {
@@ -54,6 +55,20 @@ export function MacCapturePermissions({ enabled, saving }: Props) {
     } finally {
       setRetrying(false);
       void check();
+    }
+  };
+
+  const reset = async () => {
+    setRetrying(true);
+    try {
+      await resetCapturePermissions();
+      setActionError(null);
+      await check("screen_recording");
+      await check("input_monitoring");
+    } catch (err) {
+      setActionError(parseErrorMessage(err));
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -128,6 +143,22 @@ export function MacCapturePermissions({ enabled, saving }: Props) {
         />
       )}
       {problem && <StatusMessage type="error" message={problem} className="mb-0 mt-3" />}
+
+      {!ready && permissions && (
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5">
+          <p className="min-w-0 flex-1 font-minecraft text-xs leading-relaxed text-white/60">
+            {t("settings.clips.permissions.reset_hint")}
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!!busy || retrying}
+            onClick={() => void reset()}
+          >
+            {t("settings.clips.permissions.reset")}
+          </Button>
+        </div>
+      )}
 
       {enabled && ready && (
         <Button

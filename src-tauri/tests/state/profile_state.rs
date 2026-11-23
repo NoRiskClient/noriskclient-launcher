@@ -2,9 +2,10 @@ use noriskclient_launcher_v3_lib::state::profile_state::*;
 use noriskclient_launcher_v3_lib::utils::profile_utils::{
     ContentType, GenericModrinthInfo, LocalContentItem,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+#[allow(deprecated)]
 fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bool) -> Mod {
     Mod {
         id: Uuid::new_v4(),
@@ -21,6 +22,7 @@ fn modrinth_mod(project_id: &str, version_id: &str, file_name: &str, enabled: bo
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -191,6 +193,7 @@ fn replacing_keeps_the_entry_identity_and_user_choices() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn local_mods_never_match_a_platform_project() {
     let mods = vec![Mod {
         id: Uuid::new_v4(),
@@ -203,6 +206,7 @@ fn local_mods_never_match_a_platform_project() {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -405,6 +409,7 @@ fn adding_a_field_to_profile_must_break_this_test() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn adding_a_field_to_mod_must_break_this_test() {
     let entry = Mod {
         id: Uuid::new_v4(),
@@ -417,6 +422,7 @@ fn adding_a_field_to_mod_must_break_this_test() {
         game_versions: None,
         file_name_override: None,
         associated_loader: None,
+        mod_loaders: Vec::new(),
         modpack_origin: None,
         updates_enabled: true,
         force_include_versions: Vec::new(),
@@ -432,6 +438,7 @@ fn adding_a_field_to_mod_must_break_this_test() {
         game_versions: _,
         file_name_override: _,
         associated_loader: _,
+        mod_loaders: _,
         modpack_origin: _,
         updates_enabled: _,
         force_include_versions: _,
@@ -560,5 +567,47 @@ fn an_editable_copy_of_a_standard_profile_is_persisted() {
     assert!(
         should_persist(&profile, &HashSet::new()),
         "a user's editable copy carries their changes and must be written"
+    );
+}
+
+#[test]
+fn a_new_standard_profile_gets_a_copy() {
+    let standard = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(standard, &HashMap::new(), &HashSet::new()),
+        StandardProfileSync::Create
+    );
+}
+
+#[test]
+fn a_standard_profile_the_user_removed_does_not_come_back() {
+    let standard = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(standard, &HashMap::new(), &HashSet::from([standard])),
+        StandardProfileSync::Skip
+    );
+}
+
+#[test]
+fn removing_one_standard_profile_leaves_the_others_alone() {
+    let removed = Uuid::new_v4();
+    let other = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(other, &HashMap::new(), &HashSet::from([removed])),
+        StandardProfileSync::Create
+    );
+}
+
+#[test]
+fn an_existing_copy_keeps_getting_updates() {
+    let standard = Uuid::new_v4();
+    let copy = Uuid::new_v4();
+    assert_eq!(
+        standard_profile_sync_action(
+            standard,
+            &HashMap::from([(standard, copy)]),
+            &HashSet::from([standard])
+        ),
+        StandardProfileSync::Update(copy)
     );
 }

@@ -7,10 +7,12 @@ use crate::state::state_manager::State;
 use crate::sync::engine::SyncEngine;
 use crate::sync::ingest::{self, DroppedSyncResult};
 use crate::sync::model::{
+    jar_exclusion_key,
     DetachMode, SyncPack, SyncPackSubscriber, SyncTarget, SyncTargetKind,
     VersionOverride,
 };
 use crate::sync::report::{SyncConflict, SyncPreviewEntry, SyncReport};
+use crate::sync::profile_mods::{self, ProfileSyncPackMod};
 use crate::sync::resolution::{self, SyncPackModMatrix, SyncPackModMatrixRow};
 use crate::sync::{paths, shortcuts, subscribers};
 use crate::utils::{import_safety, trash_utils};
@@ -415,11 +417,7 @@ pub async fn remove_mod_from_sync_pack(pack_id: Uuid, mod_id: Uuid) -> Result<()
 
 #[tauri::command]
 pub async fn get_sync_pack_local_jars(pack_id: Uuid) -> Result<Vec<String>, CommandError> {
-    let jars = paths::list_pack_local_jars(pack_id).await?;
-    Ok(jars
-        .into_iter()
-        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-        .collect())
+    Ok(paths::list_pack_local_jar_names(pack_id).await?)
 }
 
 #[tauri::command]
@@ -432,6 +430,11 @@ pub async fn remove_sync_pack_local_jar(
     if path.exists() {
         trash_utils::move_path_to_trash(&path, Some("sync_packs")).await?;
     }
+    let state = State::get().await?;
+    state
+        .sync_pack_manager
+        .clear_exclusions(pack_id, &[jar_exclusion_key(&file_name)])
+        .await?;
     Ok(())
 }
 
@@ -589,6 +592,39 @@ pub async fn get_profile_sync_conflicts(
     let state = State::get().await?;
     let profile = state.profile_manager.get_profile(profile_id).await?;
     Ok(SyncEngine::detect_conflicts(&profile).await?)
+}
+
+#[tauri::command]
+pub async fn get_profile_sync_pack_mods(
+    profile_id: Uuid,
+) -> Result<Vec<ProfileSyncPackMod>, CommandError> {
+    let state = State::get().await?;
+    let profile = state.profile_manager.get_profile(profile_id).await?;
+    Ok(profile_mods::load_for_profile(&state, &profile).await?)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProfileSyncModRef {
+    pub pack_id: Uuid,
+    pub mod_key: String,
+}
+
+#[tauri::command]
+pub async fn set_profile_sync_mods_excluded(
+    profile_id: Uuid,
+    mods: Vec<ProfileSyncModRef>,
+    excluded: bool,
+) -> Result<(), CommandError> {
+    let state = State::get().await?;
+    let entries: Vec<(Uuid, String)> = mods
+        .into_iter()
+        .map(|entry| (entry.pack_id, entry.mod_key))
+        .collect();
+    state
+        .sync_pack_manager
+        .set_profile_exclusions(profile_id, &entries, excluded)
+        .await?;
+    Ok(())
 }
 
 #[tauri::command]

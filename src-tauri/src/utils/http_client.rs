@@ -16,6 +16,7 @@ const NRC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// translation, sensitive-data masking live there).
 pub struct NrcRequest {
     builder: RequestBuilder,
+    log_target: Option<String>,
 }
 
 pub fn nrc_get(url: impl IntoUrl) -> NrcRequest {
@@ -38,6 +39,7 @@ impl NrcRequest {
     fn new(builder: RequestBuilder) -> Self {
         Self {
             builder: builder.timeout(NRC_REQUEST_TIMEOUT),
+            log_target: None,
         }
     }
 
@@ -45,6 +47,11 @@ impl NrcRequest {
         self.builder = self
             .builder
             .header("Authorization", format!("Bearer {}", token));
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.builder = self.builder.timeout(timeout);
         self
     }
 
@@ -63,16 +70,29 @@ impl NrcRequest {
         self
     }
 
+    pub fn multipart(mut self, form: reqwest::multipart::Form) -> Self {
+        self.builder = self.builder.multipart(form);
+        self
+    }
+
+    pub fn log_as(mut self, target: impl Into<String>) -> Self {
+        self.log_target = Some(target.into());
+        self
+    }
+
     /// Send the request, mapping transport failures to `AppError::RequestError`.
     /// The single place that error is built for this lane.
     async fn send_inner(self, ctx: &str) -> Result<reqwest::Response> {
-        let target = self
-            .builder
-            .try_clone()
-            .and_then(|b| b.build().ok())
-            .map(|req| format!("{} {}", req.method(), req.url().path()));
+        let hide_url = self.log_target.is_some();
+        let target = self.log_target.or_else(|| {
+            self.builder
+                .try_clone()
+                .and_then(|b| b.build().ok())
+                .map(|req| format!("{} {}", req.method(), req.url().path()))
+        });
         let started = Instant::now();
         let response = self.builder.send().await.map_err(|e| {
+            let e = if hide_url { e.without_url() } else { e };
             error!("[HTTP] {} request failed: {}", ctx, e);
             AppError::RequestError(format!("Failed to send {} request: {}", ctx, e))
         })?;

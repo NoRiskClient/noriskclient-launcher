@@ -69,6 +69,15 @@ pub struct Arguments {
     pub jvm: Vec<GameArgument>,
 }
 
+impl Arguments {
+    pub fn simple_jvm(&self) -> impl Iterator<Item = &str> {
+        self.jvm.iter().filter_map(|argument| match argument {
+            GameArgument::Simple(value) => Some(value.as_str()),
+            GameArgument::Complex(_) => None,
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum GameArgument {

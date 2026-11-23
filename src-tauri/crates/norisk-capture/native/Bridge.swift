@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 
 @_cdecl("nrc_open_apps")
@@ -20,6 +21,22 @@ func openApps(_ foreground: Bool) -> UnsafeMutablePointer<CChar>? {
                 "name": app.localizedName ?? URL(fileURLWithPath: executable).lastPathComponent]
     }
     guard let data = try? JSONSerialization.data(withJSONObject: apps),
+          let json = String(data: data, encoding: .utf8) else { return nil }
+    return strdup(json)
+}
+
+@_cdecl("nrc_screens")
+func screens() -> UnsafeMutablePointer<CChar>? {
+    var count: UInt32 = 0
+    guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return strdup("[]") }
+    var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+    guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return strdup("[]") }
+    let main = CGMainDisplayID()
+    let found: [[String: Any]] = ids.prefix(Int(count)).compactMap { id in
+        guard let mode = CGDisplayCopyDisplayMode(id) else { return nil }
+        return ["device": String(id), "width": mode.pixelWidth, "height": mode.pixelHeight, "primary": id == main]
+    }
+    guard let data = try? JSONSerialization.data(withJSONObject: found),
           let json = String(data: data, encoding: .utf8) else { return nil }
     return strdup(json)
 }
@@ -116,4 +133,40 @@ func installHotkeys(_ json: UnsafePointer<CChar>, _ callback: @escaping @convent
 func captureSupported() -> Bool {
     if #available(macOS 15.0, *) { return true }
     return false
+}
+
+private var denoiserNew: (@convention(c) (UInt16) -> UnsafeMutableRawPointer?)?
+private var denoiserProcess: (@convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<Float>?, Int) -> Void)?
+private var denoiserFree: (@convention(c) (UnsafeMutableRawPointer?) -> Void)?
+
+@_cdecl("nrc_set_denoiser")
+func setDenoiser(_ new: @escaping @convention(c) (UInt16) -> UnsafeMutableRawPointer?,
+                 _ process: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<Float>?, Int) -> Void,
+                 _ free: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void) {
+    denoiserNew = new; denoiserProcess = process; denoiserFree = free
+}
+
+final class Denoiser {
+    private var states: [UnsafeMutableRawPointer?] = []
+    private var warned = false
+
+    deinit { states.forEach { denoiserFree?($0) } }
+
+    func clean(_ sample: CMSampleBuffer) {
+        guard let format = CMSampleBufferGetFormatDescription(sample),
+              let description = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee else { return }
+        guard description.mFormatID == kAudioFormatLinearPCM, description.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              description.mBitsPerChannel == 32, description.mSampleRate == 48000 else {
+            if !warned { warned = true; captureLog("Noise suppression needs a 48000 Hz float microphone, this one runs at \(description.mSampleRate) Hz, so it is recorded without") }
+            return
+        }
+        _ = withAudioBuffers(sample) { buffers -> Void? in
+            for (index, buffer) in UnsafeMutableAudioBufferListPointer(buffers).enumerated() {
+                guard let data = buffer.mData else { continue }
+                while states.count <= index { states.append(denoiserNew?(UInt16(max(1, buffer.mNumberChannels)))) }
+                denoiserProcess?(states[index], data.assumingMemoryBound(to: Float.self), Int(buffer.mDataByteSize) / MemoryLayout<Float>.size)
+            }
+            return ()
+        }
+    }
 }

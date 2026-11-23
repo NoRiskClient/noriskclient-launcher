@@ -149,7 +149,7 @@ async fn add_jar(
                 &platform,
                 &project_id,
                 &version_id,
-                entry.associated_loader.map(|l| l.as_str().to_string()),
+                entry.primary_loader().map(|l| l.as_str().to_string()),
                 entry
                     .game_versions
                     .as_ref()
@@ -397,7 +397,7 @@ pub async fn add_dependencies(
         .into_iter()
         .filter(|d| find_mod_by_project_id(&existing, &d.project_id).is_none())
         .filter_map(|d| {
-            mod_from_unified_version(&d.version).inspect(|_| {
+            mod_from_unified_version(&d.version, d.display_name()).inspect(|_| {
                 info!("Adding dependency {} to sync pack {}", d.project_id, pack_id);
             })
         })

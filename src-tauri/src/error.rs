@@ -67,6 +67,9 @@ pub enum AppError {
     #[error("Other error: {0}")]
     Other(String),
 
+    #[error("The clip engine is not running")]
+    ClipEngineOff,
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 

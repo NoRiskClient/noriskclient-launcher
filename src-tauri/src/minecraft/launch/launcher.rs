@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::Result;
+use crate::minecraft::downloads::norisk_natives_download::NoriskNativesDownloadService as Natives;
 use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
@@ -446,6 +447,17 @@ impl MinecraftLauncher {
             }
         } else {
             info!("[NoRisk Launcher] No credentials available, skipping NoRisk parameters");
+        }
+
+        if let Some(creds) = &self.credentials {
+            if let Err(e) = state.minecraft_account_manager_v2.ensure_fresh_twitch_token(creds.id).await {
+                warn!("[Twitch] Could not refresh the Twitch token: {}", e);
+            }
+        }
+
+        if let Some(dir) = Natives::ffmpeg_dir() {
+            info!("[NRC Natives] Passing ffmpeg natives directory to the game: {}", dir.display());
+            command.arg(format!("-Dnrc.ffmpeg.natives={}", dir.display()));
         }
 
         // Add per-loader mods-folder JVM argument so the loader picks up jars from the

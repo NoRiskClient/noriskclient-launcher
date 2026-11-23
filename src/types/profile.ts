@@ -165,6 +165,7 @@ export interface Mod {
   game_versions: string[] | null;
   file_name_override: string | null;
   associated_loader: ModLoader | null;
+  mod_loaders?: ModLoader[];
 
   /// Origin modpack identifier in format: "platform:project_id[:version_id]"
   /// Example: "modrinth:AANobbMI:tFw0iWAk" or "curseforge:12345:67890"

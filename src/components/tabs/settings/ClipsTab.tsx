@@ -1,12 +1,14 @@
 "use client";
 
-import { allCapturePermissionsGranted, useCapturePermissionsStore } from "../../../store/capture-permissions-store";
+import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { getLogFileContent, listLauncherLogs, uploadLogToMclogs } from "../../../services/log-service";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { Select } from "../../ui/Select";
@@ -99,8 +101,7 @@ export function ClipsTab() {
   const kw = useSettingsKeywords();
   const { tempConfig, setTempConfig, saving } = useSettingsConfig();
   const supported = supportsClips();
-  const permissions = useCapturePermissionsStore((state) => state.permissions);
-  const permissionsReady = !isMacOS() || allCapturePermissionsGranted(permissions);
+  const permissionsReady = useCapturePermissionsReady();
 
   const [status, setStatus] = useState<CaptureStatus | null>(null);
   const [capabilities, setCapabilities] = useState<EncoderCapability[] | null>(null);
@@ -252,13 +253,15 @@ export function ClipsTab() {
           )}
         >
           <span className="font-minecraft text-sm text-white/60">
-            {clips.other_game?.name ?? t("settings.clips.games.none")}
+            {clips.other_screen?.name ?? clips.other_game?.name ?? t("settings.clips.games.none")}
           </span>
         </SettingRow>}
 
         {permissionsReady && <GamePicker
           value={clips.other_game}
-          onChange={(other_game) => patch({ other_game })}
+          onChange={(other_game) => patch({ other_game, other_screen: null })}
+          screen={clips.other_screen ?? null}
+          onScreen={(other_screen) => patch({ other_screen, other_game: null })}
           disabled={saving || !clips.enabled}
           t={t}
         />}
@@ -450,6 +453,8 @@ export function ClipsTab() {
         <BitrateNotice spec={spec} t={t} />
 
         <FallbackNotice status={status} clips={clips} t={t} />
+
+        <DriverNotice matrix={matrix} t={t} />
         </div>
 
         <SettingRow
@@ -546,6 +551,38 @@ export function ClipsTab() {
               </div>
             </SettingRow>
 
+            {effectiveAudioSource === "system" && (
+              <SettingRow
+                label={t("settings.clips.audio.exclude")}
+                description={t(
+                  clips.audio_device_id
+                    ? "settings.clips.audio.exclude.needs_default_device"
+                    : "settings.clips.audio.exclude.description",
+                )}
+                searchKeywords={kw("settings.clips.audio.exclude", "spotify", "musik", "music", "ausnehmen", "exclude", "programm")}
+                disabled={!clips.enabled}
+                vertical
+              >
+                <GamePicker
+                  value={
+                    clips.excluded_audio_executable
+                      ? {
+                          executable: clips.excluded_audio_executable,
+                          name: clips.excluded_audio_executable,
+                        }
+                      : null
+                  }
+                  onChange={(app) =>
+                    patch({ excluded_audio_executable: app?.executable ?? null })
+                  }
+                  disabled={!clips.enabled || saving || Boolean(clips.audio_device_id)}
+                  icon="solar:volume-cross-bold"
+                  noneDescription={t("settings.clips.audio.exclude.none")}
+                  t={t}
+                />
+              </SettingRow>
+            )}
+
             {effectiveAudioSource !== "game_only" && (
               <SettingRow
                 label={t(
@@ -600,7 +637,7 @@ export function ClipsTab() {
               </SettingRow>
             )}
 
-            {effectiveAudioSource === "system" && (
+            {effectiveAudioSource === "system" && !isMacOS() && (
               <SettingRow
                 label={t("settings.clips.audio.device")}
                 description={t("settings.clips.audio.device.description")}
@@ -682,6 +719,19 @@ export function ClipsTab() {
                     maxLabel="200%"
                     disabled={!clips.enabled || saving}
                     recommendedValue={100}
+                  />
+                </SettingRow>
+
+                <SettingRow
+                  label={t("settings.clips.audio.microphone_denoise")}
+                  description={t("settings.clips.audio.microphone_denoise.description")}
+                  searchKeywords={kw("settings.clips.audio.microphone_denoise", "rauschen", "noise", "luefter", "fan", "tastatur", "hintergrund")}
+                  disabled={!clips.enabled}
+                >
+                  <ToggleSwitch
+                    checked={clips.microphone_denoise}
+                    onChange={(microphone_denoise) => patch({ microphone_denoise })}
+                    disabled={!clips.enabled || saving}
                   />
                 </SettingRow>
               </>
@@ -806,6 +856,14 @@ export function ClipsTab() {
             {t("settings.clips.library.open")}
           </Button>
         </SettingRow>
+
+        <SettingRow
+          label={t("settings.clips.support.label")}
+          description={t("settings.clips.support.description")}
+          searchKeywords={kw("settings.clips.support.label", "log", "support", "hilfe", "help", "fehler", "problem")}
+        >
+          <ShareCaptureLog t={t} />
+        </SettingRow>
       </SettingsSection>
       </>}
     </div>
@@ -905,6 +963,67 @@ function FallbackNotice({
             ? t("settings.clips.quality.encoder.cpu")
             : t("settings.clips.quality.encoder.gpu"),
       })}
+    />
+  );
+}
+
+function ShareCaptureLog({
+  t,
+}: {
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const share = async () => {
+    setUploading(true);
+    try {
+      const log = (await listLauncherLogs()).find((file) => file.name === "capture.log");
+      if (!log) {
+        toast.error(t("settings.clips.support.missing"));
+        return;
+      }
+      const url = await uploadLogToMclogs(await getLogFileContent(log.path));
+      await writeText(url);
+      toast.success(t("settings.clips.support.uploaded"));
+    } catch (e) {
+      toast.error(t("debug.upload_failed", { error: parseErrorMessage(e) }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="flat"
+      size="sm"
+      icon={
+        <Icon
+          icon={uploading ? "svg-spinners:ring-resize" : "solar:upload-bold"}
+          className="w-4 h-4"
+        />
+      }
+      onClick={() => void share()}
+      disabled={uploading}
+    >
+      {t("settings.clips.support.upload")}
+    </Button>
+  );
+}
+
+function DriverNotice({
+  matrix,
+  t,
+}: {
+  matrix: EncoderCapability[] | null;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  if (!matrix?.some((capability) => capability.driver_too_old)) return null;
+
+  return (
+    <StatusMessage
+      type="warning"
+      className="mb-0"
+      message={t("settings.clips.quality.encoder.driver_too_old")}
     />
   );
 }

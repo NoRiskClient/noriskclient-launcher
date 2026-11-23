@@ -43,6 +43,7 @@ async fn tick() -> anyhow::Result<()> {
     }
 
     let attached = supervisor.attached();
+    let attached_screen = supervisor.attached_screen();
     let front = crate::utils::game_detect::foreground_app();
 
     if let (Some(chosen), Some(front)) = (clips.other_game.as_ref(), front.as_ref()) {
@@ -54,7 +55,29 @@ async fn tick() -> anyhow::Result<()> {
         }
     }
 
-    let Some(minecraft) = crate::utils::window_finder::find_running_game() else {
+    let chosen_screen = clips.other_screen.as_ref().filter(|screen| {
+        crate::utils::screens::list()
+            .iter()
+            .any(|connected| connected.device == screen.device)
+    });
+    if let Some(screen) = chosen_screen {
+        if attached_screen.as_deref() != Some(screen.device.as_str()) {
+            log::info!("Recording screen {} ({})", screen.name, screen.device);
+            if let Err(e) = supervisor.attach_screen(screen.device.clone(), screen.name.clone()) {
+                log::warn!("Could not point the capture engine at screen {}: {e}", screen.device);
+            }
+        }
+        return Ok(());
+    }
+
+    let minecraft = crate::utils::window_finder::find_running_game();
+
+    if attached_screen.is_some() {
+        log::info!("No screen is chosen any more; stopping its recording");
+        let _ = supervisor.detach();
+    }
+
+    let Some(minecraft) = minecraft else {
         return Ok(());
     };
     if attached == Some(minecraft) {
