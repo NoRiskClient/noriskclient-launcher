@@ -13,6 +13,14 @@ import { toast } from "react-hot-toast";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
 import { formatCompactNumber } from "../../utils/format-number";
+import { formatShortAge } from "../../utils/format-relative-time";
+import { ChannelBadge } from "../mods/ChannelBadge";
+import { GameVersionPill } from "../mods/GameVersionPill";
+import { shortModpackVersion } from "../../utils/modpack-version";
+import { cn } from "../../lib/utils";
+import { logError } from "../../utils/logging-utils";
+import { useLatest } from "../../hooks/useLatest";
+import { PLAIN_TEXT } from "../ui/typography";
 
 interface ModpackVersionsModalProps {
   isOpen: boolean;
@@ -25,13 +33,7 @@ interface ModpackVersionsModalProps {
   isSwitching?: boolean;
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-}
+const VERSION_COLS = "grid grid-cols-[minmax(0,1fr)_minmax(0,7rem)_3rem_3.75rem_2rem] items-center gap-3";
 
 function VersionItem({
   version,
@@ -58,7 +60,6 @@ function VersionItem({
   const toggleExpanded = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // If expanding and it's a CurseForge version without changelog loaded, load it
     if (!isExpanded && version.source === "CurseForge" && !version.changelog && !curseforgeChangelog) {
       setIsLoadingChangelog(true);
       try {
@@ -78,81 +79,55 @@ function VersionItem({
     setIsExpanded(!isExpanded);
   };
 
-  // Determine which changelog to show
   const displayChangelog = version.changelog || curseforgeChangelog;
 
   return (
-    <div
-      className={`relative p-3 rounded-lg border transition-all duration-200 ${
-        isInstalled
-          ? "bg-black/30 border-white/30 cursor-not-allowed"
-          : isSelected
-          ? "border-white/30 cursor-pointer"
-          : "bg-black/20 border-white/10 hover:bg-black/30 hover:border-white/20 cursor-pointer"
-      }`}
-      style={isSelected && !isInstalled ? {
-        backgroundColor: `rgba(var(--accent-rgb), 0.15)`,
-        borderColor: `var(--accent)`
-      } : undefined}
-      onClick={handleClick}
-    >
-      {/* Stats - oben rechts */}
-      <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-white/50 font-minecraft">
-        <span>{formatCompactNumber(version.downloads)}</span>
-        <span>{formatDate(version.date_published)}</span>
-      </div>
-
-      {/* Hauptinhalt */}
-      <div className="flex items-center justify-between pr-20">
-        <div className="flex-1 min-w-0">
-          {/* Name und Version in einer Zeile */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-white font-minecraft text-sm font-medium truncate">
-              {version.version_number}
+    <div className="border-b border-white/5 last:border-b-0">
+      <div
+        onClick={handleClick}
+        className={cn(
+          `${VERSION_COLS} px-4 py-2.5 transition-colors select-none`,
+          isInstalled ? "cursor-default" : "cursor-pointer",
+          !isSelected && !isInstalled && "hover:bg-white/[0.03]",
+        )}
+        style={isSelected && !isInstalled ? { backgroundColor: "rgba(var(--accent-rgb), 0.15)" } : undefined}
+      >
+        <span className="min-w-0 flex items-center gap-2">
+          <ChannelBadge releaseType={version.release_type} />
+          <span className="font-minecraft text-sm text-white normal-case truncate">{shortModpackVersion(version.version_number)}</span>
+          {isInstalled && (
+            <span className="shrink-0 rounded px-1.5 text-xs font-minecraft bg-green-500/20 text-green-300 border border-green-500/40">
+              {t('modpack_versions.current')}
             </span>
-            {isInstalled && (
-              <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-minecraft uppercase">
-                {t('modpack_versions.current')}
-              </span>
-            )}
-          </div>
-
-          {/* MC Versionen */}
-          <div className="text-xs text-white/60 font-minecraft">
-            MC: {version.game_versions.slice(0, 2).join(', ')}
-            {version.game_versions.length > 2 && ` +${version.game_versions.length - 2}`}
-          </div>
-
-          {/* Changelog Button */}
+          )}
+        </span>
+        <GameVersionPill versions={version.game_versions} />
+        <span className="truncate font-minecraft text-xs text-white/45" title={new Date(version.date_published).toLocaleDateString()}>
+          {formatShortAge(version.date_published)}
+        </span>
+        <span className="font-minecraft text-xs text-white/45 tabular-nums" title={version.downloads.toLocaleString()}>
+          {formatCompactNumber(version.downloads)}
+        </span>
+        <span className="flex justify-end">
           {(version.changelog || version.source === "CurseForge") && (
             <button
+              type="button"
               onClick={toggleExpanded}
-              className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors font-minecraft border border-white/20"
-              title={isExpanded ? "Hide changelog" : "Show changelog"}
               disabled={isLoadingChangelog}
-            >
-              {isLoadingChangelog ? (
-                <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
-              ) : (
-                <Icon
-                  icon={isExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
-                  className="w-3 h-3"
-                />
+              title={t('modpack_versions.changelog')}
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                isExpanded ? "bg-white/10 text-white" : "text-white/50 hover:text-white hover:bg-white/10",
               )}
-              <span className="text-white/70">
-                {isLoadingChangelog ? t('common.loading') : t('modpack_versions.changelog')}
-              </span>
+            >
+              <Icon icon={isLoadingChangelog ? "svg-spinners:ring-resize" : "solar:document-text-bold"} className="w-4 h-4" />
             </button>
           )}
-        </div>
+        </span>
       </div>
 
-      {/* Changelog Bereich */}
       {isExpanded && displayChangelog && (
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <div className="text-xs font-minecraft text-white/70 mb-2 uppercase">
-            {t('modpack_versions.changelog')}
-          </div>
+        <div className="px-4 pb-3 pt-2 border-t border-white/5 bg-black/20 select-text">
           <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
             {isLoadingChangelog ? (
               <div className="flex items-center justify-center py-4">
@@ -161,13 +136,11 @@ function VersionItem({
               </div>
             ) : displayChangelog ? (
               version.source === "CurseForge" ? (
-                // Render HTML for CurseForge (sanitized)
                 <div
                   className="prose prose-invert prose-sm max-w-none font-minecraft [&_*]:text-white [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:first:mt-0 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mb-1 [&_h3]:mt-2 [&_p]:text-sm [&_p]:text-white/90 [&_p]:mb-2 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:list-inside [&_ul]:text-sm [&_ul]:text-white/90 [&_ul]:mb-2 [&_ul]:space-y-1 [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:text-sm [&_ol]:text-white/90 [&_ol]:mb-2 [&_ol]:space-y-1 [&_ol]:ml-4 [&_li]:leading-relaxed [&_strong]:font-bold [&_strong]:text-white [&_em]:italic [&_em]:text-white/80 [&_code]:bg-black/30 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_code]:text-white/90 [&_pre]:bg-black/30 [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-xs [&_pre]:font-mono [&_pre]:text-white/90 [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-accent [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-white/70 [&_blockquote]:my-2 [&_a]:text-accent [&_a]:hover:text-accent/80 [&_a]:underline"
                   dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(displayChangelog) }}
                 />
               ) : (
-                // Render Markdown for Modrinth
                 <div className="prose prose-invert prose-sm max-w-none font-minecraft">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
@@ -225,53 +198,44 @@ export function ModpackVersionsModal({
 }: ModpackVersionsModalProps) {
   const { t } = useTranslation();
   const [versions, setVersions] = useState<UnifiedModpackVersionsResponse | null>(initialVersions);
-  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<UnifiedVersion | null>(null);
+  const onCloseRef = useLatest(onClose);
 
-  // Load fresh versions when modal opens by loading the current profile
-  React.useEffect(() => {
-    if (isOpen && profileId) {
-      setIsLoadingVersions(true);
-
-      console.log("Loading modpack versions for profile:", profileId);
-      console.log("Initial versions:", initialVersions);
-
-      // Load the current profile to get the latest modpack source
-      ProfileService.getProfile(profileId)
-        .then(profile => {
-          if (profile.modpack_info?.source) {
-            return UnifiedService.getModpackVersions(profile.modpack_info.source);
-          } else {
-            throw new Error("No modpack source found in profile");
-          }
-        })
-        .then(versions => {
-          console.log("Loaded modpack versions:", versions);
-          console.log("First version has changelog:", versions.all_versions[0]?.changelog);
-
-          setVersions(versions);
-        })
-        .catch(err => {
-          console.error("Failed to load fresh modpack versions:", err);
-          setVersions(initialVersions); // fallback to initial versions
-        })
-        .finally(() => setIsLoadingVersions(false));
-    }
-  }, [isOpen, profileId, initialVersions]);
-
-  // Reset when modal closes
   React.useEffect(() => {
     if (!isOpen) {
-      setVersions(initialVersions);
       setSelectedVersion(null);
+      setVersions(initialVersions);
+      return;
     }
-  }, [isOpen, initialVersions]);
+    if (initialVersions) {
+      setVersions(initialVersions);
+      return;
+    }
+    if (!profileId) return;
+    let cancelled = false;
+    ProfileService.getProfile(profileId)
+      .then((profile) => {
+        if (!profile.modpack_info?.source) throw new Error("No modpack source found in profile");
+        return UnifiedService.getModpackVersions(profile.modpack_info.source);
+      })
+      .then((loaded) => {
+        if (!cancelled) setVersions(loaded);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logError(`Failed to load modpack versions: ${parseErrorMessage(err)}`);
+        toast.error(parseErrorMessage(err));
+        onCloseRef.current();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, profileId, initialVersions, onCloseRef]);
 
   if (!isOpen || !versions) {
     return null;
   }
 
-  // Sort versions by date (newest first)
   const sortedVersions = [...versions.all_versions].sort(
     (a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime()
   );
@@ -279,7 +243,6 @@ export function ModpackVersionsModal({
   const installedVersionId = versions.installed_version?.id;
 
   const handleVersionSelect = (version: UnifiedVersion) => {
-    // Don't allow selecting already installed version
     if (version.id === installedVersionId) return;
     setSelectedVersion(version);
   };
@@ -287,13 +250,10 @@ export function ModpackVersionsModal({
   const handleSwitchVersion = async () => {
     if (!selectedVersion) return;
 
-    // Check if we have all required information for the new modpack switching
     if (profileId && selectedVersion.files.length > 0) {
       try {
-        // Find the primary file
         const primaryFile = selectedVersion.files.find(f => f.primary) || selectedVersion.files[0];
 
-        // Create new ModPackSource based on selected version
         let newModpackSource: ModPackSource;
         if (selectedVersion.source === "Modrinth") {
           newModpackSource = {
@@ -302,10 +262,9 @@ export function ModpackVersionsModal({
             version_id: selectedVersion.id,
           };
         } else if (selectedVersion.source === "CurseForge") {
-          // For CurseForge, we need the file_id from the primary file
-          const fileId = primaryFile.fingerprint; // CurseForge uses fingerprint as file_id
-          if (!fileId) {
-            throw new Error("CurseForge file fingerprint (file_id) not found");
+          const fileId = /^\d+$/.test(selectedVersion.id) ? Number(selectedVersion.id) : 0;
+          if (fileId <= 0) {
+            throw new Error("CurseForge file id not found");
           }
           newModpackSource = {
             source: "curse_forge",
@@ -322,30 +281,24 @@ export function ModpackVersionsModal({
           profile_id: profileId,
         };
 
-        // Show loading toast
         const loadingToast = toast.loading(t('modpack_versions.toast.switching', { name: modpackName, version: selectedVersion.version_number }));
 
         await UnifiedService.switchModpackVersion(request);
 
-        // Dismiss loading toast and show success
         toast.dismiss(loadingToast);
         toast.success(t('modpack_versions.toast.switch_success', { name: modpackName, version: selectedVersion.version_number }));
 
-        // Don't refresh here - let parent components handle the refresh
 
-        // Call completion callback if provided (wait for parent components to update their state)
         if (onSwitchComplete) {
           await onSwitchComplete();
         }
 
-        // Close modal after parent states are updated
         onClose();
 
       } catch (error) {
         toast.error(t('modpack_versions.toast.switch_failed', { error: parseErrorMessage(error) }));
       }
     } else if (onVersionSwitch) {
-      // Fallback to old method if we don't have all required info
       onVersionSwitch(selectedVersion);
     }
   };
@@ -353,7 +306,8 @@ export function ModpackVersionsModal({
   return (
     <Modal
       title={t('modpack_versions.title', { name: modpackName })}
-      titleIcon={<Icon icon="solar:archive-bold" className="w-6 h-6 text-blue-400" />}
+      titleIcon={<Icon icon="solar:archive-bold" className="w-6 h-6" />}
+      titleClassName={PLAIN_TEXT}
       onClose={onClose}
       width="lg"
       className="max-h-[80vh]"
@@ -361,13 +315,15 @@ export function ModpackVersionsModal({
         <div className="flex justify-end items-center gap-3">
           <Button
             variant="secondary"
+            className={PLAIN_TEXT}
             onClick={onClose}
             disabled={isSwitching}
           >
             {t('common.cancel')}
           </Button>
           <Button
-            variant="default"
+            variant="success"
+            className={PLAIN_TEXT}
             onClick={handleSwitchVersion}
             disabled={!selectedVersion || isSwitching}
             icon={isSwitching ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : <Icon icon="solar:refresh-circle-bold" className="h-4 w-4" />}
@@ -377,38 +333,19 @@ export function ModpackVersionsModal({
         </div>
       }
     >
-      <div className="p-4">
-        <div className="mb-4 text-sm text-white/70 font-minecraft">
-          {isLoadingVersions ? (
-            t('modpack_versions.loading')
-          ) : (
-            <>
-              {versions.all_versions.length} version{versions.all_versions.length !== 1 ? 's' : ''} available
-              {versions.updates_available && (
-                <span className="ml-2 text-green-400">
-                  {t('modpack_versions.updates_available')}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-
-        {selectedVersion ? (
-          <div className="mb-4">
-            <div
-              className="text-xs font-minecraft text-center font-medium mb-1"
-              style={{ color: `var(--accent)` }}
-            >
-              Selected: {selectedVersion.name} ({selectedVersion.version_number})
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 text-xs text-white/50 font-minecraft text-center">
-            {t('modpack_versions.select_hint')}
-          </div>
+      <div className="px-6 pt-5 pb-1">
+        {versions.updates_available && (
+          <p className="mb-3 font-minecraft text-sm text-green-300">{t('modpack_versions.updates_available')}</p>
         )}
 
-        <div className="space-y-4">
+        <div className="rounded-lg border border-white/10 bg-black/20 overflow-hidden">
+          <div className={`${VERSION_COLS} px-4 py-2.5 border-b border-white/10 font-minecraft text-xs text-white/40`}>
+            <span className="truncate pl-9">{t("mod_detail.versions.col_version")}</span>
+            <span className="truncate">{t("mod_detail.versions.col_game_version")}</span>
+            <span className="truncate">{t("mod_detail.versions.col_published")}</span>
+            <span className="truncate">{t("mod_detail.versions.col_downloads")}</span>
+            <span />
+          </div>
           {sortedVersions.map((version) => (
             <VersionItem
               key={version.id}

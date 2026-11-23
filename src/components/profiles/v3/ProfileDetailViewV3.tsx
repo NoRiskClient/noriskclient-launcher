@@ -34,6 +34,7 @@ preloadIcons([
 import type { Profile } from "../../../types/profile";
 import { setDiscordState } from "../../../utils/discordRpc";
 import { formatRelativeTime, formatPlaytime } from "../../../utils/format-relative-time";
+import { shortModpackVersion } from "../../../utils/modpack-version";
 import { parseMotdToHtml } from "../../../utils/motd-utils";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useProfileStore } from "../../../store/profile-store";
@@ -345,10 +346,10 @@ export function ProfileDetailViewV3({
   // ── Render ────────────────────────────────────────────────────────────────
   const hasModpack = !!currentProfile.modpack_info;
   const isVanillaLoader = !currentProfile.loader || currentProfile.loader === "vanilla";
-  const modpackLabel = modpackVersions?.installed_version
-    ? `${modpackVersions.installed_version.name ?? t("profiles.v3.stats.modpack")}`
-    : hasModpack ? t("profiles.v3.stats.modpack") : t("profiles.v3.time.placeholder");
-  const modpackVersionNumber = modpackVersions?.installed_version?.version_number ?? null;
+  const installedModpackVersion = modpackVersions?.installed_version;
+  const modpackLabel = installedModpackVersion
+    ? shortModpackVersion(installedModpackVersion.version_number)
+    : t("profiles.v3.stats.modpack");
 
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
@@ -560,7 +561,7 @@ export function ProfileDetailViewV3({
                 const versionsReady = !!modpackVersions;
                 const tooltip = !versionsReady
                   ? t("profiles.v3.chips.modpack.loading")
-                  : modpackVersionNumber ? `${modpackLabel} · ${modpackVersionNumber}` : modpackLabel;
+                  : installedModpackVersion?.name ?? modpackLabel;
                 return (
                   <Tooltip content={tooltip}>
                     <button
@@ -575,7 +576,9 @@ export function ProfileDetailViewV3({
                     >
                       <Icon icon="solar:widget-bold" className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate">{modpackLabel}</span>
-                      {modpackVersionNumber && <span className="text-white/40 flex-shrink-0">· {modpackVersionNumber}</span>}
+                      {modpackVersions?.updates_available && (
+                        <span title={t("modpack_versions.updates_available")} className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                      )}
                       {versionsReady && (
                         <Icon
                           icon="solar:pen-linear"
