@@ -1,6 +1,7 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
 use crate::minecraft::launch::launch_summary::DownloadStats;
+use crate::utils::api_utils::api_error_from_body;
 use crate::utils::hash_utils;
 use crate::utils::verified_files;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
@@ -213,8 +214,12 @@ impl DownloadUtils {
                 }
                 Err(e) => {
                     error!("Download attempt {} failed for {}: {}", attempt + 1, url, e);
+                    let retryable = Self::is_retryable(&e);
                     last_error = Some(e);
                     attempt += 1;
+                    if !retryable {
+                        break;
+                    }
                     
                     if attempt <= config.max_retries {
                         // Clean up partially downloaded file
@@ -239,7 +244,7 @@ impl DownloadUtils {
         
         error!(
             "Download failed after {} attempts for {}: {}", 
-            config.max_retries + 1, url, final_error
+            attempt, url, final_error
         );
         if let Some(stats) = &config.stats {
             stats.record_failed();
@@ -279,6 +284,15 @@ impl DownloadUtils {
         }
     }
 
+    fn is_retryable(error: &AppError) -> bool {
+        match error {
+            AppError::ApiError { status, .. } | AppError::HttpStatus { status, .. } => {
+                matches!(status, 408 | 429) || *status >= 500
+            }
+            _ => true,
+        }
+    }
+
     /// Single download attempt
     async fn download_attempt(
         url: &str,
@@ -315,17 +329,14 @@ impl DownloadUtils {
                 url, status.as_u16(), status.canonical_reason().unwrap_or("Unknown")
             );
             error!("{}", error_msg);
-            
-            // Try to get response body for more details (but limit to avoid hanging)
-            if let Ok(body) = response.text().await {
-                let truncated_body = if body.len() > 200 {
-                    format!("{}...", safe_truncate(&body, 200))
-                } else {
-                    body
-                };
-                error!("Response body: {}", truncated_body);
+            let body = response.text().await.unwrap_or_default();
+            error!("Response body: {}", safe_truncate(&body, 200));
+            if status.is_client_error() {
+                return Err(match api_error_from_body(status, body) {
+                    api @ AppError::ApiError { .. } => api,
+                    _ => AppError::HttpStatus { status: status.as_u16(), message: error_msg },
+                });
             }
-            
             return Err(AppError::Download(error_msg));
         }
 
