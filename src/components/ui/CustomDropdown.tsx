@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
@@ -20,6 +21,8 @@ interface CustomDropdownProps {
   size?: 'sm' | 'md';
 }
 
+const FLOATING_MENU_WIDTH = 224;
+
 export function CustomDropdown({
   label,
   value,
@@ -32,13 +35,17 @@ export function CustomDropdown({
   const isSm = size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [floatingAt, setFloatingAt] = useState<{ top: number; left: number } | null>(null);
+  const floating = variant !== 'search' && !label;
   const accentColor = useThemeStore((state) => state.accentColor);
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target) && !menuRef.current?.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -46,6 +53,49 @@ export function CustomDropdown({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const menu = (
+        <div
+          ref={menuRef}
+          className={`${MENU_PANEL_CLASSES} ${floating ? 'fixed z-[10000]' : 'absolute top-full mt-2 left-0 right-0'}`}
+          style={floating && floatingAt ? { top: floatingAt.top, left: floatingAt.left, width: FLOATING_MENU_WIDTH } : undefined}
+        >
+          <div className="py-2">
+            {options.map((option, index) => (
+              <div key={option.value}>
+                {option.separator && index > 0 && (
+                  <div className={menuSeparatorClasses(isSm)} />
+                )}
+                <button
+                  onClick={() => handleOptionClick(option.value)}
+                  className={`${menuItemClasses(isSm)} ${
+                    option.value === value
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/80 hover:bg-white/5 hover:text-white'
+                  }`}
+                  style={{
+                    backgroundColor: option.value === value ? `${accentColor.value}20` : undefined,
+                  }}
+                >
+                  {option.icon && (
+                    <Icon icon={option.icon} className="w-4 h-4 text-white/70 flex-shrink-0" />
+                  )}
+                  <span className="flex-1">{option.label}</span>
+                  <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                    {option.value === value && (
+                      <Icon
+                        icon="solar:check-circle-bold"
+                        className="w-4 h-4"
+                        style={{ color: accentColor.value }}
+                      />
+                    )}
+                  </div>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+  );
 
   const handleOptionClick = (optionValue: string) => {
     onChange(optionValue);
@@ -63,7 +113,16 @@ export function CustomDropdown({
 
       {/* Dropdown Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(event) => {
+          if (floating && !isOpen) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setFloatingAt({
+              top: rect.bottom + 8,
+              left: Math.max(8, Math.min(rect.left, window.innerWidth - FLOATING_MENU_WIDTH - 8)),
+            });
+          }
+          setIsOpen(!isOpen);
+        }}
         className={`flex items-center gap-2 transition-all duration-200 focus:outline-none focus:ring-0 focus:border-transparent ${
           variant === 'search'
             ? `w-full justify-between bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 text-white font-minecraft ${isSm ? 'text-sm' : 'text-xl'}`
@@ -109,46 +168,7 @@ export function CustomDropdown({
       </button>
 
       {/* Dropdown Menu */}
-      {isOpen && (
-        <div className={`absolute top-full mt-2 ${MENU_PANEL_CLASSES} ${
-          variant === 'search' ? 'left-0 right-0' : label ? 'left-0 right-0' : 'left-0 w-56'
-        }`}>
-          <div className="py-2">
-            {options.map((option, index) => (
-              <div key={option.value}>
-                {option.separator && index > 0 && (
-                  <div className={menuSeparatorClasses(isSm)} />
-                )}
-                <button
-                  onClick={() => handleOptionClick(option.value)}
-                  className={`${menuItemClasses(isSm)} ${
-                    option.value === value
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/80 hover:bg-white/5 hover:text-white'
-                  }`}
-                  style={{
-                    backgroundColor: option.value === value ? `${accentColor.value}20` : undefined,
-                  }}
-                >
-                  {option.icon && (
-                    <Icon icon={option.icon} className="w-4 h-4 text-white/70 flex-shrink-0" />
-                  )}
-                  <span className="flex-1">{option.label}</span>
-                  <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                    {option.value === value && (
-                      <Icon
-                        icon="solar:check-circle-bold"
-                        className="w-4 h-4"
-                        style={{ color: accentColor.value }}
-                      />
-                    )}
-                  </div>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {isOpen && (floating ? createPortal(menu, document.body) : menu)}
     </div>
   );
 }

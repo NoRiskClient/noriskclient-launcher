@@ -588,3 +588,25 @@ html.no-backdrop-blur .glass-scrim {
 .animate-claim-glow {
     animation: nrc-claim-glow 1.6s ease-in-out infinite;
 }
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(calc(100% + 32px));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 32px));
+    opacity: 0;
+  }
+}

@@ -124,7 +124,7 @@ export function ThemedDropdown({
     if (!pos) return null;
     return createPortal(
       <>
-        <div className="fixed inset-0 z-[1000]" onClick={onClose} />
+        <div data-ad-passthrough className="fixed inset-0 z-[1000]" onClick={onClose} />
         <div
           ref={panelRef}
           style={{
@@ -147,7 +147,7 @@ export function ThemedDropdown({
   const alignClass = align === "right" ? "right-0" : "left-0";
   return (
     <>
-      <div className="fixed inset-0 z-10" onClick={onClose} />
+      <div data-ad-passthrough className="fixed inset-0 z-10" onClick={onClose} />
       <div
         style={panelStyle}
         className={`glass-panel absolute top-full ${alignClass} mt-1 w-max ${maxWidth} rounded-md border shadow-2xl z-20 py-1 ${scrollClass} ${className}`}

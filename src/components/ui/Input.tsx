@@ -36,7 +36,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
   ({ className, placeholder = "Enter name for new profile", icon, error, ...props }, ref) => {
     return (
       <div className="w-full">
-        <div className="flex items-center gap-2 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex items-center gap-2 min-w-0 bg-black/50 rounded-lg px-4 py-3 border border-white/10 hover:border-white/20 transition-colors">
           {icon && (
             <Icon icon={icon} className="w-4 h-4 text-white/50 flex-shrink-0" />
           )}
@@ -45,7 +45,7 @@ export const SearchStyleInput = forwardRef<HTMLInputElement, SearchStyleInputPro
             type="text"
             placeholder={placeholder}
             className={cn(
-              "bg-transparent text-white placeholder-white/50 font-minecraft text-lg flex-1 outline-none",
+              "bg-transparent text-white placeholder-white/50 font-minecraft text-lg flex-1 min-w-0 outline-none",
               className
             )}
             spellCheck={false}

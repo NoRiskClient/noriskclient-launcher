@@ -23,7 +23,7 @@ interface SelectProps {
   className?: string;
   disabled?: boolean;
   size?: "sm" | "md" | "lg";
-  variant?: "default" | "themed-surface" | "flat" | "3d";
+  variant?: "default" | "themed-surface" | "flat" | "3d" | "secondary";
 }
 
 export function Select({
@@ -127,16 +127,21 @@ export function Select({
 
   const colors = getVariantColors();
 
+  const neutral = variant === "secondary";
+
   const getBackgroundColor = () => {
+    if (neutral) return isHovered || isOpen ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.5)";
     const baseOpacity = isHovered || isOpen ? "50" : "30";
     return `${colors.main}${baseOpacity}`;
   };
 
   const getBorderColor = () => {
+    if (neutral) return isHovered || isOpen ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.1)";
     return isHovered || isOpen ? `${colors.light}` : `${colors.main}80`;
   };
   const getBorderClasses = () => {
     if (variant === "3d") return "border-2 border-b-4";
+    if (neutral) return "border rounded-lg";
     return "border border-b-2";
   };
 

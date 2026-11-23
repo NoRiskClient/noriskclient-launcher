@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
+import { toast as hotToast, Toaster as HotToaster, ToastBar } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
@@ -99,6 +99,9 @@ function animateToast(id: string) {
   }, 10);
 }
 
+const REDUCED_MOTION =
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function GlobalToaster() {
   const accentColor = useThemeStore((state) => state.accentColor);
   const borderRadius = useThemeStore((state) => state.borderRadius);
@@ -129,7 +132,8 @@ export function GlobalToaster() {
   return (
     <div ref={toasterRef}>
       <HotToaster
-        position="bottom-right"
+        position="top-right"
+        containerStyle={{ top: 96, right: 24 }}
         toastOptions={{
           className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
           style: baseStyles,
@@ -169,7 +173,21 @@ export function GlobalToaster() {
           },
           duration: 3000,
         }}
-      />
+      >
+        {(item) => (
+          <ToastBar
+            toast={item}
+            style={{
+              ...item.style,
+              animation: REDUCED_MOTION
+                ? undefined
+                : item.visible
+                  ? "toast-slide-in 0.4s cubic-bezier(0.22, 1.2, 0.36, 1) forwards"
+                  : "toast-slide-out 0.25s ease-in forwards",
+            }}
+          />
+        )}
+      </HotToaster>
     </div>
   );
 }

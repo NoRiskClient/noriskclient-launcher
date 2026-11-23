@@ -10,6 +10,7 @@ interface ModalProps {
   title: string;
   titleIcon?: React.ReactNode;
   titleSubtitle?: React.ReactNode;
+  titleClassName?: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -26,6 +27,7 @@ export function Modal({
   title,
   titleIcon,
   titleSubtitle,
+  titleClassName,
   onClose,
   children,
   footer,
@@ -156,7 +158,7 @@ export function Modal({
               </span>
             )}
             <div className="flex flex-col">
-              <h2 className="text-lg font-smallcaps text-white">
+              <h2 className={cn("text-lg font-smallcaps text-white", titleClassName)}>
                 {title}
               </h2>
               {titleSubtitle && <div className="mt-0.5">{titleSubtitle}</div>}

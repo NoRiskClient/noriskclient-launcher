@@ -129,6 +129,8 @@ export function Tooltip({
     return `${baseClasses} ${className}`;
   };
 
+  if (content === null || content === undefined || content === "") return <>{children}</>;
+
   return (
     <>
       <div
