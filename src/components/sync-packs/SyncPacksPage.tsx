@@ -219,8 +219,7 @@ export function SyncPacksPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden relative select-none">
       <RailPanel>
-        <SyncPacksRail
-          packs={packs}
+        <SyncPacksRail
           onCreate={() => setIsCreating(true)}
           createDisabled={showBusy || isCreating}
           feedbackUrl={SYNC_PACKS_DISCORD_URL}
