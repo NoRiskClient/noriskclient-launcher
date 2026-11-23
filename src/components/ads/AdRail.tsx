@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
 import { AdCaption, AdFrame, MAIN_AD_SLOT, useAdSize } from "./AdCard";
+import { NewsSection } from "../news/NewsSection";
 
 const RAIL_BORDER = 2;
 const AD_PADDING = 12;
@@ -48,7 +49,9 @@ export function AdRailLayout({ children }: { children: ReactNode }) {
                 background: `linear-gradient(180deg, ${accentColor.value}1f, ${accentColor.value}0a), rgba(0, 0, 0, 0.3)`,
               }}
             >
-              <div ref={setTarget} className="flex-1 min-h-0 flex flex-col gap-2 p-2.5" />
+              <div ref={setTarget} className="flex-1 min-h-0 flex flex-col gap-2 p-2.5">
+                {panels === 0 && <NewsSection />}
+              </div>
               {railAd && (
                 <div className="shrink-0 flex flex-col gap-2 p-3 pt-0">
                   <AdFrame slot={MAIN_AD_SLOT} size={railAd} />
