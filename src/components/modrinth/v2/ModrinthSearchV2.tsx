@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { setDiscordState } from '../../../utils/discordRpc';
 import { logInfo } from '../../../utils/logging-utils';
 import { findBestVersionForProfile, statusForNewInstall } from '../../../utils/content-status';
 import {
   buildInstallPayload,
-  fetchVersions,
-  paint,
+  fetchVersions,
   profileTargetFor,
   resolveVersionFiles,
   selectVersion,
@@ -50,6 +49,11 @@ import { ProgressToast } from '../../ui/ProgressToast';
 import { ModrinthQuickInstallModalV2 } from './ModrinthQuickInstallModalV2'; // Import the quick install modal
 // Removed ModrinthInstallModalV2 - now using the universal ModrinthQuickInstallProfilesModal
 import { ModrinthFilterSidebarV2 } from './ModrinthFilterSidebarV2'; // Import the new sidebar component
+import { RailPanel } from '../../ads/AdRail';
+
+function MaybeRail({ inRail, children }: { inRail: boolean; children: ReactNode }) {
+  return inRail ? <RailPanel>{children}</RailPanel> : <>{children}</>;
+}
 import { ModrinthProjectCardV2 } from './ModrinthProjectCardV2'; // Import the new project card component
 import { ModrinthSearchControlsV2 } from './ModrinthSearchControlsV2'; // Import the new search controls component
 import { ModrinthQuickInstallProfilesModal } from './ModrinthQuickInstallProfilesModal'; // Import the new quick install profiles modal
@@ -94,6 +98,7 @@ export interface ModrinthSearchV2Props {
   className?: string;
   selectedProfileId?: string; // Optional ID of pre-selected profile
   initialSidebarVisible?: boolean; // New prop for initial sidebar visibility
+  filtersInRail?: boolean;
   overrideDisplayContext?: "detail" | "standalone"; // New prop
   initialProjectType?: ModrinthProjectType; // Added new prop
   allowedProjectTypes?: ModrinthProjectType[]; // New prop for allowed project types
@@ -130,6 +135,7 @@ export function ModrinthSearchV2({
   className = '',
   selectedProfileId,
   initialSidebarVisible = true, // Default to true if not provided
+  filtersInRail = false,
   overrideDisplayContext, // Destructure new prop
   initialProjectType, // Added new prop
   allowedProjectTypes, // Destructure new prop
@@ -1020,143 +1026,44 @@ export function ModrinthSearchV2({
 
   // Open install modal using global modal system
   const openInstallModal = async (project: UnifiedModSearchResult | any, version: UnifiedVersion) => {
-    console.log('🚀 Opening install modal for:', project.title, version.version_number);
     setSelectedVersion(version);
     setSelectedProject(project);
     setCurrentInstallProject(project);
     setCurrentInstallVersion(version);
-    setInstallingVersion(prev => ({ ...prev, [version.id]: true }));
-    setInstallStatus({}); // Reset install status
+    setInstallStatus({});
 
     const modalId = `install-${project.project_id}-${version.id}`;
-
-    try {
-      const primaryFile = version.files.find(file => file.primary) || version.files[0];
-      if (!primaryFile) {
-        throw new Error("No primary file available for this version");
-      }
-
-      const statuses: Record<string, boolean> = {};
-      // Initialize all statuses to false
-      for (const profile of internalProfiles) {
-        statuses[profile.id] = false;
-      }
-
-      // One profile at a time made the button wait for as many round trips as there are profiles.
-      const PARALLEL_CHECKS = 12;
-      for (let i = 0; i < internalProfiles.length; i += PARALLEL_CHECKS) {
-        await Promise.all(
-          internalProfiles.slice(i, i + PARALLEL_CHECKS).map(async (profile) => {
-            try {
-              const status = await ProfileService.isContentInstalled({
-                profile_id: profile.id,
-                project_id: project.project_id,
-                version_id: version.id,
-                project_type: project.project_type as ModrinthProjectType,
-                game_version: version.game_versions[0],
-                loader: version.loaders[0],
-                file_hash_sha1: primaryFile.hashes?.sha1,
-                pack_version_number: version.version_number,
-                file_name: primaryFile.filename,
-              });
-              statuses[profile.id] = !!status.is_installed;
-            } catch (e) {
-              console.error(`[openInstallModal] Failed to check status for profile ${profile.id}:`, e);
-              statuses[profile.id] = false;
-            }
-          }),
-        );
-      }
-
-      setInstallStatus(statuses);
-
-      // Open the global modal with the universal profiles modal
-      showModal(
-        modalId,
-        <ModrinthQuickInstallProfilesModal
-          project={project}
-          version={version}
-          profiles={internalProfiles}
-          onInstallToProfile={(profileId) => {
-            console.log('🎯 Installing to profile:', profileId, 'project:', project.title, 'version:', version.version_number);
-            installToProfile(profileId, project, version);
-          }}
-          onUninstallClick={async (profileId, project, version) => {
-            console.log('🗑️ Uninstalling from profile:', profileId);
-            await handleDeleteVersionFromProfile(profileId, project, version);
-          }}
-          onInstallToNewProfile={handleInstallToNewProfile}
-          onProfileClick={(profile) => {
-            console.log('🖱️ Navigating to profile:', profile.name);
-            hideModal(modalId);
-            navigate(`/profilesv2/${profile.id}`);
-          }}
-          onClose={() => {
-            console.log('❌ Closing install modal');
-            hideModal(modalId);
-            setSelectedVersion(null);
-            setSelectedProject(null);
-            setCurrentInstallProject(null);
-            setCurrentInstallVersion(null);
-            setInstallStatus({});
-            setUninstalling({});
-          }}
-          installingProfiles={installing}
-          uninstallingProfiles={uninstalling}
-          installStatus={installStatus}
-        />,
-        1200 // Higher z-index to ensure it's on top
-      );
-
-    } catch (error) {
-      console.error("[openInstallModal] Failed to check installation status for modal:", error);
-      // Fallback: Initialize all statuses to false if there's a general error (e.g., no primary file)
-      const fallbackStatuses: Record<string, boolean> = {};
-      internalProfiles.forEach(profile => {
-        fallbackStatuses[profile.id] = false;
-      });
-      setInstallStatus(fallbackStatuses);
-
-      // Still open the modal even if status check failed
-      showModal(
-        modalId,
-        <ModrinthQuickInstallProfilesModal
-          project={project}
-          version={version}
-          profiles={internalProfiles}
-          onInstallToProfile={(profileId) => {
-            console.log('🎯 Installing to profile:', profileId, 'project:', project.title, 'version:', version.version_number);
-            installToProfile(profileId, project, version);
-          }}
-          onUninstallClick={async (profileId, project, version) => {
-            console.log('🗑️ Uninstalling from profile:', profileId);
-            await handleDeleteVersionFromProfile(profileId, project, version);
-          }}
-          onInstallToNewProfile={handleInstallToNewProfile}
-          onProfileClick={(profile) => {
-            console.log('🖱️ Navigating to profile:', profile.name);
-            hideModal(modalId);
-            navigate(`/profilesv2/${profile.id}`);
-          }}
-          onClose={() => {
-            console.log('❌ Closing install modal');
-            hideModal(modalId);
-            setSelectedVersion(null);
-            setSelectedProject(null);
-            setCurrentInstallProject(null);
-            setCurrentInstallVersion(null);
-            setInstallStatus({});
-            setUninstalling({});
-          }}
-          installingProfiles={installing}
-          uninstallingProfiles={uninstalling}
-          installStatus={installStatus}
-        />,
-        1200
-      );
-    } finally {
-      setInstallingVersion(prev => ({ ...prev, [version.id]: false }));
-    }
+    showModal(
+      modalId,
+      <ModrinthQuickInstallProfilesModal
+        project={project}
+        version={version}
+        profiles={internalProfiles}
+        onInstallToProfile={(profileId) => {
+          installToProfile(profileId, project, version);
+        }}
+        onUninstallClick={async (profileId, project, version) => {
+          await handleDeleteVersionFromProfile(profileId, project, version);
+        }}
+        onInstallToNewProfile={handleInstallToNewProfile}
+        onProfileClick={(profile) => {
+          hideModal(modalId);
+          navigate(`/profilesv2/${profile.id}`);
+        }}
+        onClose={() => {
+          hideModal(modalId);
+          setSelectedVersion(null);
+          setSelectedProject(null);
+          setCurrentInstallProject(null);
+          setCurrentInstallVersion(null);
+          setInstallStatus({});
+          setUninstalling({});
+        }}
+        installingProfiles={installing}
+        uninstallingProfiles={uninstalling}
+      />,
+      1200 // Higher z-index to ensure it's on top
+    );
   };
 
   // Update the install modal when installation states change
@@ -1196,8 +1103,7 @@ export function ModrinthSearchV2({
             setUninstalling({});
           }}
           installingProfiles={installing}
-          uninstallingProfiles={uninstalling}
-          installStatus={installStatus}
+          uninstallingProfiles={uninstalling}
         />,
         1200
       );
@@ -1267,7 +1173,6 @@ export function ModrinthSearchV2({
 
       await installContentToTarget(payload, installTarget, { pinVersion: true });
 
-      toast.success(t('content.install.success', { title: targetProject.title, version: targetVersion.version_number, profile: internalProfiles.find(p => p.id === profileId)?.name || 'profile' }));
 
       // Check for Iris shader mod if a shader pack was installed
       if (targetProject.project_type === 'shader') {
@@ -1374,14 +1279,7 @@ export function ModrinthSearchV2({
         source: project.source,
       };
 
-      await toast.promise(
-        installContentToTarget(payload, installTarget, { pinVersion: true }),
-        {
-          loading: `Installing ${project.title} (${version.version_number}) to ${profileName}...`,
-          success: t('content.install.success', { title: project.title, version: version.version_number, profile: profileName }),
-          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
-        }
-      );
+      await installContentToTarget(payload, installTarget, { pinVersion: true });
 
       // Check for Iris shader mod if a shader pack was installed
       if (project.project_type === 'shader') {
@@ -1420,7 +1318,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Direct install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the version
       setInstallingVersion(prev => ({ ...prev, [version.id]: false }));
@@ -1522,19 +1420,11 @@ export function ModrinthSearchV2({
   const quickInstall = async (project: UnifiedModSearchResult | any) => {
     const modalId = `quick-install-${project.project_id}`;
 
-    setQuickInstallingProjects(prev => ({ ...prev, [project.project_id]: true }));
-    await paint();
-
     let profilesForModal = internalProfiles;
-    try {
-      if (profilesForModal.length === 0) {
-        const loaded = await ProfileService.getAllProfilesAndLastPlayed();
-        profilesForModal = loaded.all_profiles;
-        setInternalProfiles(profilesForModal);
-      }
-      await checkInstallationStatusForModal(project, profilesForModal);
-    } finally {
-      setQuickInstallingProjects(prev => ({ ...prev, [project.project_id]: false }));
+    if (profilesForModal.length === 0) {
+      const loaded = await ProfileService.getAllProfilesAndLastPlayed();
+      profilesForModal = loaded.all_profiles;
+      setInternalProfiles(profilesForModal);
     }
 
     setCurrentQuickInstallProject(project);
@@ -1557,8 +1447,7 @@ export function ModrinthSearchV2({
           hideModal(modalId);
           setCurrentQuickInstallProject(null);
         }}
-        installingProfiles={installing}
-        installStatus={installStatus}
+        installingProfiles={installing}
       />,
       1200 // Higher z-index to ensure it's on top
     );
@@ -1638,14 +1527,7 @@ export function ModrinthSearchV2({
         source: project.source,
         };
 
-        await toast.promise(
-        installContentToTarget(payload, installTarget),
-        {
-          loading: `Installing ${project.title} (${bestVersion.version_number}) to ${selectedProfile.name}...`,
-          success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: selectedProfile.name }),
-          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
-        }
-      );
+        await installContentToTarget(payload, installTarget);
 
       // Update installation status
       setInstalledProjects(prev => ({
@@ -1684,54 +1566,10 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Quick install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the project
       setQuickInstallingProjects(prev => ({ ...prev, [project.project_id]: false }));
-    }
-  };
-
-  // Check installation status for all profiles when opening modal
-  const checkInstallationStatusForModal = async (project: UnifiedModSearchResult | any, profiles: Profile[]) => {
-    console.log('🔍 Checking installation status for modal:', project.title, profiles.length, 'profiles');
-
-    if (profiles.length === 0) {
-      console.log('❌ No profiles to check');
-      return;
-    }
-
-    const newInstallStatuses: Record<string, boolean> = {};
-
-    // Initialize all profiles as false first
-    profiles.forEach(profile => {
-      newInstallStatuses[profile.id] = false;
-    });
-
-    try {
-      // One profile at a time made the button wait for as many round trips as there are profiles.
-      const PARALLEL_CHECKS = 12;
-      for (let i = 0; i < profiles.length; i += PARALLEL_CHECKS) {
-        await Promise.all(
-          profiles.slice(i, i + PARALLEL_CHECKS).map(async (profile) => {
-            try {
-              const status = await ProfileService.isContentInstalled({
-                profile_id: profile.id,
-                project_id: project.project_id,
-                project_type: project.project_type,
-              });
-              newInstallStatuses[profile.id] = !!status?.is_installed;
-            } catch (error) {
-              console.error(`Failed to check profile ${profile.name}:`, error);
-              newInstallStatuses[profile.id] = false;
-            }
-          }),
-        );
-      }
-
-      setInstallStatus(newInstallStatuses);
-    } catch (error) {
-      console.error('❌ Failed to check installation status for modal:', error);
-      setInstallStatus(newInstallStatuses); // Keep the initialized false values
     }
   };
 
@@ -1759,20 +1597,12 @@ export function ModrinthSearchV2({
             setCurrentQuickInstallProject(null);
           }}
           installingProfiles={installing}
-          uninstallingProfiles={uninstalling}
-          installStatus={installStatus}
+          uninstallingProfiles={uninstalling}
         />,
         1200
       );
     }
   }, [installing, uninstalling, installStatus, currentQuickInstallProject]);
-
-  // Re-check installation status when profiles change
-  useEffect(() => {
-    if (currentQuickInstallProject && internalProfiles.length > 0) {
-      checkInstallationStatusForModal(currentQuickInstallProject, internalProfiles);
-    }
-  }, [internalProfiles]);
 
   // Handle profile selection and proceed with installation
   const handleProfileSelectionForQuickInstall = async (project: UnifiedModSearchResult | any, profile: Profile) => {
@@ -1841,14 +1671,7 @@ export function ModrinthSearchV2({
         source: project.source,
         };
 
-        await toast.promise(
-        installContentToTarget(payload, installTarget),
-        {
-          loading: `Installing ${project.title} (${bestVersion.version_number}) to ${profile.name}...`,
-          success: t('content.install.success', { title: project.title, version: bestVersion.version_number, profile: profile.name }),
-          error: (err) => t('content.install.failed', { error: err.message || parseErrorMessage(err) }),
-        }
-      );
+        await installContentToTarget(payload, installTarget);
 
       // Check for Iris shader mod if a shader pack was installed
       if (project.project_type === 'shader') {
@@ -1890,7 +1713,7 @@ export function ModrinthSearchV2({
 
     } catch (error) {
       console.error(`Quick install failed for ${project.title}:`, error);
-      toast.error(t('content.install.failed', { error: project.title }));
+      toast.error(t('content.install.failed', { error: parseErrorMessage(error) }));
     } finally {
       // Reset loading state for the profile
       setInstalling(prev => ({ ...prev, [profile.id]: false }));
@@ -1965,7 +1788,6 @@ export function ModrinthSearchV2({
 
       await installContentToTarget(payload, installTarget);
 
-      toast.success(t('content.install.success', { title: quickInstallProject.title, version: bestVersion.version_number, profile: profile.name }));
 
       // Check for Iris shader mod if a shader pack was installed
       if (quickInstallProject.project_type === 'shader') {
@@ -2199,35 +2021,6 @@ export function ModrinthSearchV2({
   }, []);
 
   const accentColor = useThemeStore((state) => state.accentColor); // Get accent color
-  const [hoveredVersionId, setHoveredVersionId] = useState<string | null>(null); // New state for version hover
-  const [openVersionDropdowns, setOpenVersionDropdowns] = useState<Record<string, { type: boolean; gameVersion: boolean; loader: boolean }>>({});
-
-  const toggleVersionDropdown = (projectId: string, dropdownType: 'type' | 'gameVersion' | 'loader') => {
-    setOpenVersionDropdowns(prev => {
-      const currentProjectDropdowns = prev[projectId] || { type: false, gameVersion: false, loader: false };
-      const isOpen = currentProjectDropdowns[dropdownType];
-      
-      // Close all dropdowns for this project first, then open the target one if it was closed
-      const newStateForProject = {
-        type: false,
-        gameVersion: false,
-        loader: false,
-        [dropdownType]: !isOpen, // Toggle the state of the clicked dropdown
-      };
-
-      return {
-        ...prev,
-        [projectId]: newStateForProject,
-      };
-    });
-  };
-
-  const closeAllVersionDropdowns = (projectId: string) => {
-    setOpenVersionDropdowns(prev => ({
-      ...prev,
-      [projectId]: { type: false, gameVersion: false, loader: false },
-    }));
-  };
 
   // New state for version filtering UI controls within the expanded view
   const [versionDropdownUIState, setVersionDropdownUIState] = useState<Record<string, {
@@ -3026,7 +2819,6 @@ export function ModrinthSearchV2({
                   const currentProjectInstallStatus = selectedProfile ? installedProjects[hit.project_id] : null;
                   const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
                   const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
-                  const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
                   const projectNoRiskStatus = getProjectNoRiskStatus(hit);
 
                   return (
@@ -3050,21 +2842,16 @@ export function ModrinthSearchV2({
                       displayedCount={displayedCount}
                       versionFilters={currentVersionFilters}
                       versionDropdownUIState={currentVersionDropdownUIState}
-                      openVersionDropdowns={currentOpenVersionDropdowns}
                       installedVersions={selectedProfile ? (installedVersions[selectedProfile.id] || {}) : {}}
                       selectedProfile={selectedProfile}
                       selectedProfileId={selectedProfile?.id}
-                      hoveredVersionId={hoveredVersionId}
                       gameVersionsData={gameVersionsData}
                       showAllGameVersionsSidebar={showAllGameVersionsSidebar}
                       selectedGameVersionsSidebar={selectedGameVersions}
                       onVersionFilterChange={handleVersionFilterChange}
                       onVersionUiStateChange={handleVersionDropdownUIChange}
-                      onToggleVersionDropdown={toggleVersionDropdown}
-                      onCloseAllVersionDropdowns={closeAllVersionDropdowns}
                       onLoadMoreVersions={loadMoreProjectVersions}
                       onInstallVersionClick={handleDirectInstall}
-                      onHoverVersion={setHoveredVersionId}
                       onDeleteVersionClick={handleDeleteVersionFromProfile}
                       onToggleEnableClick={
                         installTarget?.type === "syncPack"
@@ -3123,7 +2910,6 @@ export function ModrinthSearchV2({
                   const currentProjectInstallStatus = selectedProfile ? installedProjects[hit.project_id] : null;
                   const currentVersionFilters = versionFilters[hit.project_id] || { gameVersions: [], loaders: [], versionType: 'all' };
                   const currentVersionDropdownUIState = versionDropdownUIState[hit.project_id] || { showAllGameVersions: false, gameVersionSearchTerm: '' };
-                  const currentOpenVersionDropdowns = openVersionDropdowns[hit.project_id] || { type: false, gameVersion: false, loader: false };
                   const projectNoRiskStatus = getProjectNoRiskStatus(hit);
 
                   return (
@@ -3147,21 +2933,16 @@ export function ModrinthSearchV2({
                       displayedCount={displayedCount}
                       versionFilters={currentVersionFilters}
                       versionDropdownUIState={currentVersionDropdownUIState}
-                      openVersionDropdowns={currentOpenVersionDropdowns}
                       installedVersions={selectedProfile ? (installedVersions[selectedProfile.id] || {}) : {}}
                       selectedProfile={selectedProfile}
                       selectedProfileId={selectedProfile?.id}
-                      hoveredVersionId={hoveredVersionId}
                       gameVersionsData={gameVersionsData}
                       showAllGameVersionsSidebar={showAllGameVersionsSidebar}
                       selectedGameVersionsSidebar={selectedGameVersions}
                       onVersionFilterChange={handleVersionFilterChange}
                       onVersionUiStateChange={handleVersionDropdownUIChange}
-                      onToggleVersionDropdown={toggleVersionDropdown}
-                      onCloseAllVersionDropdowns={closeAllVersionDropdowns}
                       onLoadMoreVersions={loadMoreProjectVersions}
                       onInstallVersionClick={handleDirectInstall}
-                      onHoverVersion={setHoveredVersionId}
                       onDeleteVersionClick={handleDeleteVersionFromProfile}
                       onToggleEnableClick={
                         installTarget?.type === "syncPack"
@@ -3202,7 +2983,9 @@ export function ModrinthSearchV2({
 
       {/* Filters Sidebar (Right, full height, scrollable) - Now with conditional rendering */} 
       {isSidebarVisible && (
+        <MaybeRail inRail={filtersInRail}>
         <ModrinthFilterSidebarV2
+          inRail={filtersInRail}
           projectType={projectType}
           accentColor={accentColor}
           gameVersionSearchTerm={gameVersionSearchTerm}
@@ -3224,6 +3007,7 @@ export function ModrinthSearchV2({
           filterServerRequired={filterServerRequired}
           onServerRequiredToggle={() => setFilterServerRequired(!filterServerRequired)}
         />
+        </MaybeRail>
       )}
 
       {/* Regular Install Modal - Now using global modal system */}

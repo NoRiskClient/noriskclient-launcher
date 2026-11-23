@@ -15,6 +15,7 @@ import { ModDetailGallery } from "./ModDetailGallery";
 import { ModDetailDescription } from "./ModDetailDescription";
 import { ModDetailVersions } from "./ModDetailVersions";
 import { ModDetailSidebar } from "./ModDetailSidebar";
+import { RailPanel } from "../ads/AdRail";
 import { useThemeStore } from "../../store/useThemeStore";
 
 // Convert Modrinth project to unified format
@@ -469,6 +470,12 @@ export function ModDetailPage({
           installTarget={installTarget}
         />
 
+        <RailPanel>
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+            <ModDetailSidebar project={project} accentColor={accentColor} />
+          </div>
+        </RailPanel>
+
         {showVersions ? (
           /* Versions View */
           <div className="mt-6">
@@ -488,24 +495,10 @@ export function ModDetailPage({
               </div>
             )}
 
-            {/* Content Layout */}
-            <div className="mt-6 flex flex-col lg:flex-row gap-6">
-              {/* Main Content - grows to fill space */}
-              <div className="flex-1 min-w-0">
-                <ModDetailDescription
-                  body={project.body}
-                  source={project.source}
-                />
-              </div>
-
-              {/* Sidebar - fixed max width */}
-              <div className="w-full lg:w-72 xl:w-80 flex-shrink-0">
-                <ModDetailSidebar
-                  project={project}
-                  accentColor={accentColor}
-                />
-              </div>
+            <div className="mt-6 min-w-0">
+              <ModDetailDescription body={project.body} source={project.source} />
             </div>
+
           </>
         )}
       </div>

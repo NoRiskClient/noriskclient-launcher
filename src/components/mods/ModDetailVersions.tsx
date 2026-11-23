@@ -14,13 +14,14 @@ import { useProfileStore } from "../../store/profile-store";
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
 import { useThemeStore } from "../../store/useThemeStore";
 import { ModrinthQuickInstallProfilesModal } from "../modrinth/v2/ModrinthQuickInstallProfilesModal";
-import { ModrinthVersionItemV2 } from "../modrinth/v2/ModrinthVersionItemV2";
 import { ProgressToast } from "../ui/ProgressToast";
 import { installContentToProfile, installContentToTarget } from "../../services/content-service";
 import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
 import { TagBadge } from "../ui/TagBadge";
+import { VersionTable } from "./VersionTable";
+import { FilterDropdown } from "../ui/FilterDropdown";
 import { Select, type SelectOption } from "../ui/Select";
 
 interface ModDetailVersionsProps {
@@ -82,11 +83,9 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   const [error, setError] = useState<string | null>(null);
   const [installingModpackVersions, setInstallingModpackVersions] = useState<Record<string, boolean>>({});
   const [installingProfiles, setInstallingProfiles] = useState<Record<string, boolean>>({});
-  const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
   const [installModalSearchHit, setInstallModalSearchHit] = useState<ModrinthSearchHit | null>(null);
   const [installModalVersion, setInstallModalVersion] = useState<UnifiedVersion | null>(null);
   const [displayedCount, setDisplayedCount] = useState(10);
-  const [hoveredVersionId, setHoveredVersionId] = useState<string | null>(null);
 
   // Filters
   const [versionTypeFilter, setVersionTypeFilter] = useState<string>("all");
@@ -294,9 +293,6 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
       };
 
       await installContentToTarget(payload, installTarget, { pinVersion: true });
-      const versionNumber = version.version_number ?? '';
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: versionNumber, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
-      setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
       toast.error(t('mod_detail.install_failed', { error }));
@@ -355,8 +351,6 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         };
 
         await installContentToProfile(payload);
-        toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: version.version_number ?? '', profile: profile.name }));
-        setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
         toast.error(t('mod_detail.install_failed', { error }));
@@ -376,15 +370,13 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
           setInstallModalSearchHit(null);
           setInstallModalVersion(null);
           setInstallingProfiles({});
-          setInstallStatus({});
         }}
         installingProfiles={installingProfiles}
-        installStatus={installStatus}
       />,
       1200
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [installModalSearchHit, installModalVersion, installingProfiles, installStatus, profiles, project.id]);
+  }, [installModalSearchHit, installModalVersion, installingProfiles, profiles, project.id]);
 
   // Loading state
   if (isLoading) {
@@ -409,46 +401,40 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
   return (
     <div className="p-3">
       {/* Filter Bar */}
-      <div
-        className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
-        style={{
-          backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
-        }}
-      >
-        <div className="flex flex-wrap gap-2 items-center">
+      <div className="mb-4">
+        <div className="flex gap-2 items-center">
           {/* Version Type */}
-          <Select
+          <FilterDropdown
+            icon="solar:tag-bold"
             value={versionTypeFilter}
             onChange={setVersionTypeFilter}
             options={versionTypeOptions}
-            size="sm"
-            className="w-32"
+            className="flex-1 min-w-0"
           />
 
           {/* Game Version */}
-          <Select
+          <FilterDropdown
+            icon="solar:gamepad-bold"
             value={gameVersionFilter}
             onChange={setGameVersionFilter}
             options={gameVersionOptions}
-            size="sm"
-            className="w-44"
+            className="flex-1 min-w-0"
           />
 
           {/* Loader */}
           {availableLoaders.length > 0 && (
-            <Select
+            <FilterDropdown
+              icon="solar:box-bold"
               value={loaderFilter}
               onChange={setLoaderFilter}
               options={loaderOptions}
-              size="sm"
-              className="w-36"
+              className="flex-1 min-w-0"
             />
           )}
 
           {/* Results count */}
-          <div className="ml-auto text-xs text-white/50 font-minecraft">
-            {filteredVersions.length} version{filteredVersions.length !== 1 ? "s" : ""}
+          <div className="shrink-0 pl-2 text-xs text-white/50 font-minecraft whitespace-nowrap">
+            {t("mod_detail.versions.count", { count: filteredVersions.length })}
           </div>
         </div>
 
@@ -513,41 +499,18 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
         )}
       </div>
 
-      {/* Version List - Using shared ModrinthVersionItemV2 */}
       {filteredVersions.length > 0 ? (
         <div className="space-y-2">
-          {filteredVersions.slice(0, displayedCount).map((version) => (
-            <ModrinthVersionItemV2
-              key={version.id}
-              version={version}
-              project={projectAsSearchHit}
-              versionStatus={null}
-              isInstalling={false}
-              isInstallingModpackVersion={installingModpackVersions[version.id] || false}
-              accentColor={accentColor}
-              isHovered={hoveredVersionId === version.id}
-              onMouseEnter={setHoveredVersionId}
-              onMouseLeave={() => setHoveredVersionId(null)}
-              onInstallClick={handleContentInstall}
-              onInstallModpackVersionAsProfileClick={isModpack ? handleModpackInstall : undefined}
-              noRiskStatus={version.isBlocked ? 'blocked' : null}
-            />
-          ))}
+          <VersionTable
+            versions={filteredVersions.slice(0, displayedCount)}
+            remaining={filteredVersions.length - displayedCount}
+            onLoadMore={() => setDisplayedCount((prev) => prev + 20)}
+            installingIds={installingModpackVersions}
+            onInstall={(version) =>
+              isModpack ? handleModpackInstall(projectAsSearchHit, version) : handleContentInstall(projectAsSearchHit, version)
+            }
+          />
 
-          {/* Load More Button */}
-          {filteredVersions.length > displayedCount && (
-            <button
-              onClick={() => setDisplayedCount(prev => prev + 10)}
-              className="w-full mt-2 py-2 rounded-lg text-xs font-minecraft transition-colors"
-              style={{
-                backgroundColor: `${accentColor.value}15`,
-                borderColor: `${accentColor.value}30`,
-                color: accentColor.value,
-              }}
-            >
-              Load More ({filteredVersions.length - displayedCount} more)
-            </button>
-          )}
         </div>
       ) : (
         <div

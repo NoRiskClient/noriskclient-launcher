@@ -45,6 +45,7 @@ export function ModrinthTabV2({
         onInstallSuccess={handleInstallSuccess}
         className="h-full"
         traceScope="modstab"
+        filtersInRail
       />
     ),
     [profiles, handleInstallSuccess],

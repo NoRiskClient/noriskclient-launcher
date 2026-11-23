@@ -32,14 +32,8 @@ interface VersionListPassthroughProps {
     showAllGameVersions: boolean;
     gameVersionSearchTerm: string;
   };
-  openVersionDropdowns: {
-    type: boolean;
-    gameVersion: boolean;
-    loader: boolean;
-  };
   installedVersions: Record<string, ContentInstallStatus | null>;
   selectedProfile: Profile | null;
-  hoveredVersionId: string | null;
   gameVersionsData: ModrinthGameVersion[];
   showAllGameVersionsSidebar: boolean;
   selectedGameVersionsSidebar: string[];
@@ -53,17 +47,11 @@ interface VersionListPassthroughProps {
     field: "showAllGameVersions" | "gameVersionSearchTerm",
     value: boolean | string,
   ) => void;
-  onToggleVersionDropdown: (
-    projectId: string,
-    dropdownType: "type" | "gameVersion" | "loader",
-  ) => void;
-  onCloseAllVersionDropdowns: (projectId: string) => void;
   onLoadMoreVersions: (projectId: string) => void;
   onInstallVersionClick: (
     project: UnifiedModSearchResult | any,
     version: UnifiedVersion,
   ) => void;
-  onHoverVersion: (versionId: string | null) => void;
   selectedProfileId?: string | null;
   onDeleteVersionClick?: (
     profileId: string,
@@ -106,14 +94,8 @@ export interface ModrinthProjectCardV2Props
     showAllGameVersions: boolean;
     gameVersionSearchTerm: string;
   };
-  openVersionDropdowns: {
-    type: boolean;
-    gameVersion: boolean;
-    loader: boolean;
-  };
   installedVersions: Record<string, ContentInstallStatus | null>;
   selectedProfile: Profile | null;
-  hoveredVersionId: string | null;
   gameVersionsData: ModrinthGameVersion[];
   showAllGameVersionsSidebar: boolean;
   selectedGameVersionsSidebar: string[];
@@ -127,17 +109,11 @@ export interface ModrinthProjectCardV2Props
     field: "showAllGameVersions" | "gameVersionSearchTerm",
     value: boolean | string,
   ) => void;
-  onToggleVersionDropdown: (
-    projectId: string,
-    dropdownType: "type" | "gameVersion" | "loader",
-  ) => void;
-  onCloseAllVersionDropdowns: (projectId: string) => void;
   onLoadMoreVersions: (projectId: string) => void;
   onInstallVersionClick: (
     project: UnifiedModSearchResult | any,
     version: UnifiedVersion,
   ) => void;
-  onHoverVersion: (versionId: string | null) => void;
   selectedProfileId?: string | null;
   onDeleteVersionClick?: (
     profileId: string,
@@ -183,20 +159,15 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
     displayedCount,
     versionFilters,
     versionDropdownUIState,
-    openVersionDropdowns,
     installedVersions,
     selectedProfile,
-    hoveredVersionId,
     gameVersionsData,
     showAllGameVersionsSidebar,
     selectedGameVersionsSidebar,
     onVersionFilterChange,
     onVersionUiStateChange,
-    onToggleVersionDropdown,
-    onCloseAllVersionDropdowns,
     onLoadMoreVersions,
     onInstallVersionClick,
-    onHoverVersion,
     selectedProfileId,
     onDeleteVersionClick,
     onToggleEnableClick,
@@ -483,27 +454,21 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               displayedCount={displayedCount}
               filters={versionFilters}
               uiState={versionDropdownUIState}
-              openDropdowns={openVersionDropdowns}
               installedVersions={installedVersions}
               installingVersionStates={installingVersionStates}
               installingModpackVersionStates={installingModpackVersionStates}
               selectedProfile={selectedProfile}
               selectedProfileId={selectedProfileId}
-              hoveredVersionId={hoveredVersionId}
               gameVersionsData={gameVersionsData}
               showAllGameVersionsSidebar={showAllGameVersionsSidebar}
               selectedGameVersionsSidebar={selectedGameVersionsSidebar}
-              accentColor={accentColor}
               onFilterChange={onVersionFilterChange}
               onUiStateChange={onVersionUiStateChange}
-              onToggleDropdown={onToggleVersionDropdown}
-              onCloseAllDropdowns={onCloseAllVersionDropdowns}
               onLoadMore={onLoadMoreVersions}
               onInstallClick={onInstallVersionClick}
               onInstallModpackVersionAsProfileClick={
                 onInstallModpackVersionAsProfileClick
               }
-              onHoverVersion={onHoverVersion}
               onDeleteClick={onDeleteVersionClick}
                 onToggleEnableClick={onToggleEnableClick}
                 isProjectBlocked={isBlocked}

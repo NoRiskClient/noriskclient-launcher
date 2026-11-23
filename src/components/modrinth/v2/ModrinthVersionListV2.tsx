@@ -10,10 +10,9 @@ import type { AccentColor } from "../../../store/useThemeStore";
 import type { ContentInstallStatus } from "../../../types/profile";
 import { Icon } from "@iconify/react";
 import { Button } from "../../ui/buttons/Button";
-import { Checkbox } from "../../ui/Checkbox";
-import { ModrinthVersionItemV2 } from "./ModrinthVersionItemV2";
+import { VersionTable, type VersionRowState } from "../../mods/VersionTable";
+import { FilterDropdown } from "../../ui/FilterDropdown";
 import { Select, type SelectOption } from "../../ui/Select";
-import { TagBadge } from "../../ui/TagBadge";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 
@@ -32,17 +31,10 @@ interface ModrinthVersionListV2Props {
     showAllGameVersions: boolean;
     gameVersionSearchTerm: string;
   };
-  openDropdowns: {
-    type: boolean;
-    gameVersion: boolean;
-    loader: boolean;
-  };
   installedVersions: Record<string, ContentInstallStatus | null>;
   installingVersionStates?: Record<string, boolean>;
   installingModpackVersionStates?: Record<string, boolean>;
   selectedProfile: any | null; // Replace 'any' with actual Profile type if available
-  accentColor: AccentColor;
-  hoveredVersionId: string | null;
   gameVersionsData: ModrinthGameVersion[]; // Needed for filtering
   showAllGameVersionsSidebar: boolean; // State from main sidebar
   selectedGameVersionsSidebar: string[]; // State from main sidebar
@@ -56,11 +48,6 @@ interface ModrinthVersionListV2Props {
     field: keyof ModrinthVersionListV2Props["uiState"],
     value: boolean | string,
   ) => void;
-  onToggleDropdown: (
-    projectId: string,
-    dropdownType: "type" | "gameVersion" | "loader",
-  ) => void;
-  onCloseAllDropdowns: (projectId: string) => void;
   onLoadMore: (projectId: string) => void;
   onInstallClick: (
     project: ModrinthSearchHit,
@@ -70,7 +57,6 @@ interface ModrinthVersionListV2Props {
     project: ModrinthSearchHit,
     version: UnifiedVersion,
   ) => void;
-  onHoverVersion: (id: string | null) => void;
   selectedProfileId?: string | null;
   onDeleteClick?: (
     profileId: string,
@@ -96,24 +82,18 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
   displayedCount,
   filters,
   uiState,
-  openDropdowns,
   installedVersions,
   installingVersionStates,
   installingModpackVersionStates,
   selectedProfile,
-  accentColor,
-  hoveredVersionId,
   gameVersionsData,
   showAllGameVersionsSidebar,
   selectedGameVersionsSidebar,
   onFilterChange,
   onUiStateChange,
-  onToggleDropdown,
-  onCloseAllDropdowns,
   onLoadMore,
   onInstallClick,
   onInstallModpackVersionAsProfileClick,
-  onHoverVersion,
   selectedProfileId,
   onDeleteClick,
   onToggleEnableClick,
@@ -122,7 +102,6 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
 
   // Create Select options for version type
@@ -151,15 +130,6 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
       });
     }
   }, [isAnimationEnabled]);
-
-  // Update showFilters state when filters change
-  useEffect(() => {
-    setShowFilters(
-      filters.gameVersions.length > 0 ||
-        filters.loaders.length > 0 ||
-        filters.versionType !== "all",
-    );
-  }, [filters]);
 
   // --- Helper function to get filtered versions (moved from parent) ---
   const getFilteredVersions = (
@@ -255,12 +225,9 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
       ...availableGameVersions.map((gv) => ({
         value: gv,
         label: gv,
-        icon: filters.gameVersions.includes(gv) ? (
-          <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-        ) : undefined,
       })),
     ],
-    [availableGameVersions, filters.gameVersions],
+    [availableGameVersions, t],
   );
 
   const loaderOptions = useMemo(
@@ -269,265 +236,103 @@ export const ModrinthVersionListV2: React.FC<ModrinthVersionListV2Props> = ({
       ...availableLoaders.map((loader) => ({
         value: loader,
         label: loader,
-        icon: filters.loaders.includes(loader) ? (
-          <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
-        ) : undefined,
       })),
     ],
-    [availableLoaders, filters.loaders],
+    [availableLoaders, t],
   );
 
-  // Handle clearing all filters
-  const handleClearAllFilters = () => {
-    onFilterChange(projectId, "versionType", "all");
-    onFilterChange(projectId, "gameVersions", []);
-    onFilterChange(projectId, "loaders", []);
+
+  const stateFor = (version: UnifiedVersion): VersionRowState | null => {
+    const status = selectedProfile ? installedVersions?.[version.id] ?? null : null;
+    const noRisk = (version as { noRiskStatus?: string }).noRiskStatus ?? projectNoRiskStatus;
+    return {
+      installed: !!status?.is_installed,
+      enabled: status?.is_enabled,
+      inPack: !!status?.is_included_in_norisk_pack,
+      blocked: noRisk === "blocked" || !!isProjectBlocked,
+    };
   };
 
-  // --- JSX Rendering (To be moved here in the next step) ---
+  const isModpack = project.project_type === "modpack";
+
+  const handleToggleEnabled = (version: UnifiedVersion, enabled: boolean) => {
+    if (!onToggleEnableClick || !selectedProfileId || isModpack) return;
+    const status = installedVersions?.[version.id];
+    if (status?.norisk_pack_item_details?.norisk_mod_identifier) {
+      onToggleEnableClick(selectedProfileId, project, version, enabled, "");
+      return;
+    }
+    const primaryFile = version.files.find((f) => f.primary) || version.files[0];
+    if (primaryFile?.hashes?.sha1) {
+      onToggleEnableClick(selectedProfileId, project, version, enabled, primaryFile.hashes.sha1);
+    }
+  };
+
   return (
     <div ref={containerRef} className="p-3 relative">
-      {/* Header with version filters - New design */}
-      <div
-        className="mb-4 p-3 rounded-lg border backdrop-blur-sm"
-        style={{
-          backgroundColor: `${accentColor.value}10`,
-          borderColor: `${accentColor.value}30`,
-        }}
-      >
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Version Type Select */}
-          <div className="relative">
-            <Select
-              value={filters.versionType}
-              onChange={(value) => {
-                onFilterChange(projectId, "versionType", value);
-              }}
-              options={versionTypeOptions}
-              size="sm"
-              className="w-40"
-            />
-          </div>
-
-          {/* Game Version Select */}
-          <div className="relative">
-            <Select
-              value={
-                filters.gameVersions.length > 0
-                  ? filters.gameVersions[0]
-                  : "all"
-              }
-              onChange={(value) => {
-                if (value === "all") {
-                  onFilterChange(projectId, "gameVersions", []);
-                } else {
-                  // Toggle the selected version
-                  const current = filters.gameVersions || [];
-                  const isAlreadySelected = current.includes(value);
-                  const newValue = isAlreadySelected
-                    ? current.filter((v) => v !== value)
-                    : [...current, value];
-                  onFilterChange(projectId, "gameVersions", newValue);
-                }
-              }}
-              options={gameVersionOptions}
-              size="sm"
-              className="w-52"
-            />
-          </div>
-
-          {/* Loader Select */}
-          <div className="relative">
-            <Select
-              value={filters.loaders.length > 0 ? filters.loaders[0] : "all"}
-              onChange={(value) => {
-                if (value === "all") {
-                  onFilterChange(projectId, "loaders", []);
-                } else {
-                  // Toggle the selected loader
-                  const current = filters.loaders || [];
-                  const isAlreadySelected = current.includes(value);
-                  const newValue = isAlreadySelected
-                    ? current.filter((l) => l !== value)
-                    : [...current, value];
-                  onFilterChange(projectId, "loaders", newValue);
-                }
-              }}
-              options={loaderOptions}
-              size="sm"
-              className="w-40"
-            />
-          </div>
-
-          {/* Show checkbox for 'Show All' when using game versions dropdown */}
-          <div className="ml-auto">
-            <Checkbox
-              id={`show-all-gv-${projectId}`}
-              label={t('modrinth.show_all_versions')}
-              checked={uiState?.showAllGameVersions || false}
-              onChange={(e) =>
-                onUiStateChange(
-                  projectId,
-                  "showAllGameVersions",
-                  e.target.checked,
-                )
-              }
-              className="text-sm"
-            />
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="flex items-center mt-2 gap-2">
-            <div
-              className="flex-1 border rounded-md h-[48px] overflow-x-auto overflow-y-hidden whitespace-nowrap hide-scrollbar"
-              style={{
-                backgroundColor: `${accentColor.value}08`,
-                borderColor: `${accentColor.value}30`,
-              }}
-            >
-              <div className="flex items-center gap-1.5 p-2">
-                <TagBadge
-                  variant="destructive"
-                  className="cursor-pointer hover:brightness-110 transition-all flex-shrink-0 flex items-center"
-                  onClick={handleClearAllFilters}
-                >
-                  <Icon icon="solar:trash-bin-trash-bold" className="w-3 h-3 mr-1.5" />
-                  <span>{t('content.filters.clear_all')}</span>
-                </TagBadge>
-
-                {filters.versionType !== "all" && (
-                  <TagBadge 
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap">
-                    {t('mod_detail.type')}: {filters.versionType}
-                    <button
-                      onClick={() =>
-                        onFilterChange(projectId, "versionType", "all")
-                      }
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove version type ${filters.versionType}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                )}
-
-                {filters.gameVersions.map((version) => (
-                  <TagBadge
-                    key={`gv-${version}`}
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap"
-                  >
-                    {version}
-                    <button
-                      onClick={() => {
-                        const newVersions = filters.gameVersions.filter(
-                          (v) => v !== version,
-                        );
-                        onFilterChange(projectId, "gameVersions", newVersions);
-                      }}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove game version ${version}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                ))}
-
-                {filters.loaders.map((loader) => (
-                  <TagBadge
-                    key={`loader-${loader}`}
-                    variant="filter"
-                    className="inline-flex whitespace-nowrap"
-                  >
-                    {loader}
-                    <button
-                      onClick={() => {
-                        const newLoaders = filters.loaders.filter(
-                          (l) => l !== loader,
-                        );
-                        onFilterChange(projectId, "loaders", newLoaders);
-                      }}
-                      className="ml-1.5 text-current opacity-70 hover:opacity-100 focus:outline-none"
-                      aria-label={`Remove loader ${loader}`}
-                    >
-                      <Icon
-                        icon="solar:close-circle-bold"
-                        className="w-3 h-3"
-                      />
-                    </button>
-                  </TagBadge>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="mb-3 flex items-center gap-2">
+        <FilterDropdown
+          icon="solar:tag-bold"
+          value={filters.versionType}
+          onChange={(value) => onFilterChange(projectId, "versionType", value)}
+          options={versionTypeOptions}
+          className="flex-1 min-w-0"
+        />
+        <FilterDropdown
+          icon="solar:gamepad-bold"
+          multiple
+          value={filters.gameVersions}
+          onChange={(value) => onFilterChange(projectId, "gameVersions", value)}
+          options={gameVersionOptions}
+          className="flex-1 min-w-0"
+        />
+        <FilterDropdown
+          icon="solar:box-bold"
+          multiple
+          value={filters.loaders}
+          onChange={(value) => onFilterChange(projectId, "loaders", value)}
+          options={loaderOptions}
+          className="flex-1 min-w-0"
+        />
+        <button
+          type="button"
+          aria-pressed={!!uiState?.showAllGameVersions}
+          onClick={() => onUiStateChange(projectId, "showAllGameVersions", !uiState?.showAllGameVersions)}
+          title={t('modrinth.show_all_versions')}
+          className={`shrink-0 h-[42px] px-3 flex items-center gap-2 rounded-lg border font-minecraft text-sm transition-colors ${
+            uiState?.showAllGameVersions
+              ? "bg-white/10 border-white/25 text-white"
+              : "bg-black/50 border-white/10 text-white/60 hover:text-white hover:border-white/20"
+          }`}
+        >
+          <Icon icon="solar:history-bold" className="w-4 h-4" />
+          <span className="normal-case">{t('modrinth.show_all_versions')}</span>
+        </button>
       </div>
 
-      {/* Filtered Versions List - Moved from ModrinthSearchV2 */}
       {filteredVersions.length > 0 ? (
         <div className="space-y-2">
-          {filteredVersions.slice(0, displayedCount).map((version) => {
-            const versionStatus = selectedProfile
-              ? installedVersions?.[version.id] || null
-              : null;
-            const isInstalling = installingVersionStates?.[version.id] || false;
-            const isInstallingModpackVersion =
-              installingModpackVersionStates?.[version.id] || false;
-            const isVersionHovered = hoveredVersionId === version.id;
-            return (
-              <ModrinthVersionItemV2
-                key={version.id}
-                version={version}
-                project={project}
-                versionStatus={versionStatus}
-                isInstalling={isInstalling}
-                isInstallingModpackVersion={isInstallingModpackVersion}
-                accentColor={accentColor}
-                isHovered={isVersionHovered}
-                onMouseEnter={() => onHoverVersion(version.id)}
-                onMouseLeave={() => onHoverVersion(null)}
-                onInstallClick={onInstallClick}
-                onInstallModpackVersionAsProfileClick={
-                  onInstallModpackVersionAsProfileClick
-                }
-                selectedProfileId={selectedProfileId}
-                onDeleteClick={onDeleteClick}
-                onToggleEnableClick={onToggleEnableClick}
-                noRiskStatus={(version as any).noRiskStatus || projectNoRiskStatus}
-              />
-            );
-          })}
-          {/* Load More Button */}
-          {filteredVersions.length > displayedCount && (
-            <Button
-              onClick={() => onLoadMore(projectId)}
-              variant="ghost"
-              size="xs"
-              shadowDepth="short"
-              className="w-full mt-2 text-xs"
-            >
-              {t('content.search.load_more', { remaining: filteredVersions.length - displayedCount })}
-            </Button>
-          )}
+          <VersionTable
+            versions={filteredVersions.slice(0, displayedCount)}
+            remaining={filteredVersions.length - displayedCount}
+            onLoadMore={() => onLoadMore(projectId)}
+            installingIds={{ ...(installingVersionStates ?? {}), ...(installingModpackVersionStates ?? {}) }}
+            stateFor={stateFor}
+            onInstall={(version) =>
+              isModpack && onInstallModpackVersionAsProfileClick
+                ? onInstallModpackVersionAsProfileClick(project, version)
+                : onInstallClick(project, version)
+            }
+            onToggleEnabled={selectedProfileId && onToggleEnableClick && !isModpack ? handleToggleEnabled : undefined}
+            onDelete={
+              selectedProfileId && onDeleteClick && !isModpack
+                ? (version) => onDeleteClick(selectedProfileId, project, version)
+                : undefined
+            }
+          />
         </div>
       ) : (
-        <div
-          className="relative overflow-hidden transition-colors duration-150 rounded-md p-4 text-sm text-gray-400 text-center border-2 border-b-4 backdrop-blur-md"
-          style={{
-            borderColor: `${accentColor.value}60`,
-            borderBottomColor: accentColor.value,
-            boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)`,
-            backgroundColor: `${accentColor.value}15`,
-          }}
-        >
+        <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-white/50 text-center font-minecraft">
           {t('modrinth.no_versions_match_filters')}
         </div>
       )}

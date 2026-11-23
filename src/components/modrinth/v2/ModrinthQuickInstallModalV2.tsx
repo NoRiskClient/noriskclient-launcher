@@ -134,9 +134,6 @@ export const ModrinthQuickInstallModalV2: React.FC<ModrinthQuickInstallModalV2Pr
       {showQuickProfileView && project ? (
         <div className="px-6 py-2 sm:py-4">
           <ModrinthQuickProfile
-            accentColor={accentColor}
-            projectTitle={project.title}
-            versionNumber={versions && versions.length > 0 ? versions[0].version_number : undefined}
             profileName={quickProfileName}
             onProfileNameChange={(name) => {
               setQuickProfileName(name);

@@ -12,6 +12,7 @@ import * as ProfileService from "../../services/profile-service";
 import { toast } from "react-hot-toast";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
+import { formatCompactNumber } from "../../utils/format-number";
 
 interface ModpackVersionsModalProps {
   isOpen: boolean;
@@ -30,16 +31,6 @@ function formatDate(dateString: string): string {
     month: 'short',
     day: 'numeric'
   });
-}
-
-function formatDownloads(downloads: number): string {
-  if (downloads >= 1000000) {
-    return `${(downloads / 1000000).toFixed(1)}M`;
-  }
-  if (downloads >= 1000) {
-    return `${(downloads / 1000).toFixed(1)}K`;
-  }
-  return downloads.toString();
 }
 
 function VersionItem({
@@ -107,7 +98,7 @@ function VersionItem({
     >
       {/* Stats - oben rechts */}
       <div className="absolute top-2 right-2 flex items-center space-x-1 text-xs text-white/50 font-minecraft">
-        <span>{formatDownloads(version.downloads)}</span>
+        <span>{formatCompactNumber(version.downloads)}</span>
         <span>{formatDate(version.date_published)}</span>
       </div>
 

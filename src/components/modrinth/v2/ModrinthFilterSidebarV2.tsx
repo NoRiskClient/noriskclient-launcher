@@ -234,9 +234,11 @@ interface ModrinthFilterSidebarV2Props {
   onClientRequiredToggle: () => void;
   filterServerRequired: boolean;
   onServerRequiredToggle: () => void;
+  inRail?: boolean;
 }
 
 export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = ({
+  inRail = false,
   projectType,
   accentColor,
   gameVersionSearchTerm,
@@ -308,13 +310,10 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
     <div 
       ref={sidebarRef}
       className={cn(
-        "filters-sidebar w-1/4 max-w-[15rem] flex-shrink-0 overflow-y-auto h-full space-y-1",
-        "hide-scrollbar"
+        "filters-sidebar overflow-y-auto space-y-1",
+        inRail ? "flex-1 min-h-0 custom-scrollbar pr-1" : "w-1/4 max-w-[15rem] flex-shrink-0 h-full hide-scrollbar"
       )}
-      style={{
-        scrollbarWidth: "none",
-        msOverflowStyle: "none",
-      }}
+      style={inRail ? undefined : { scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
       <div className="">
         <AccordionItem
@@ -336,7 +335,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
               </div>
             </div>
 
-            <div className="space-y-1 pr-1 overflow-y-auto hide-scrollbar max-h-96">
+            <div className="space-y-1 pr-1">
               {displayedGameVersions.map((gv) => (
                 <FilterOption
                   key={gv.version}
@@ -371,7 +370,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
             defaultOpen={categoryActiveCount > 0}
             activeCount={categoryActiveCount}
           >
-            <div className="space-y-1 pr-1 overflow-y-auto hide-scrollbar max-h-96">
+            <div className="space-y-1 pr-1">
               {categoriesGroup && categoriesGroup.options.length > 0 ? (
                 categoriesGroup.options.map(cat => (
                   <FilterOption
@@ -397,7 +396,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
           defaultOpen={totalLoaderFilters > 0}
           activeCount={totalLoaderFilters}
         >
-          <div className="space-y-1 pr-1 overflow-y-auto hide-scrollbar max-h-96">
+          <div className="space-y-1 pr-1">
             {availableLoaders.map(loader => {
               const fullLoaderData = allLoadersData.find(l => l.name === loader.name);
               return (
@@ -423,7 +422,7 @@ export const ModrinthFilterSidebarV2: React.FC<ModrinthFilterSidebarV2Props> = (
             defaultOpen={dynamicGroupCounts[group.headerValue] > 0}
             activeCount={dynamicGroupCounts[group.headerValue]}
           >
-            <div className="space-y-1 pr-1 overflow-y-auto hide-scrollbar max-h-96"> 
+            <div className="space-y-1 pr-1"> 
               {group.options.length > 0 ? group.options.map(cat => (
                 <FilterOption
                   key={cat.name}

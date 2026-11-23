@@ -174,11 +174,11 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
   const formattedVersions = formatGameVersions(project.game_versions);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-1">
       {/* Compatibility Section */}
       {hasCompatibilityInfo && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+        <div className="pb-4 border-b border-white/10 last:border-b-0">
+          <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
             <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
             {t('mod_detail.compatibility')}
           </h3>
@@ -262,8 +262,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Dependencies Section */}
       {hasDependencies && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+        <div className="pb-4 border-b border-white/10 last:border-b-0">
+          <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
             <Icon icon="solar:widget-add-bold" className="w-4 h-4" />
             Dependencies ({project.dependencies.length})
           </h3>
@@ -310,8 +310,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Team Members Section */}
       {project.team_members.length > 0 && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+        <div className="pb-4 border-b border-white/10 last:border-b-0">
+          <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
             <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
             Team ({project.team_members.length})
           </h3>
@@ -350,8 +350,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Donate Section */}
       {hasDonations && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+        <div className="pb-4 border-b border-white/10 last:border-b-0">
+          <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
             <Icon icon="solar:heart-bold" className="w-4 h-4 text-red-400" />
             {t('mod_detail.support')}
           </h3>
@@ -371,8 +371,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
 
       {/* Links Section */}
       {hasLinks && (
-        <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-          <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+        <div className="pb-4 border-b border-white/10 last:border-b-0">
+          <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
             <Icon icon="solar:link-bold" className="w-4 h-4" />
             {t('mod_detail.links_title')}
           </h3>
@@ -408,8 +408,8 @@ export function ModDetailSidebar({ project, accentColor }: ModDetailSidebarProps
       )}
 
       {/* Details Section */}
-      <div className="bg-black/20 rounded-lg p-4 border border-white/10">
-        <h3 className="text-sm font-minecraft text-white/70 mb-3 uppercase flex items-center gap-2">
+      <div className="pb-4 border-b border-white/10 last:border-b-0">
+        <h3 className="text-xs font-minecraft text-white/60 mb-2.5 uppercase tracking-wider flex items-center gap-2">
           <Icon icon="solar:info-circle-bold" className="w-4 h-4" />
           {t('mod_detail.details')}
         </h3>

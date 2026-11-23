@@ -21,6 +21,7 @@ import { installContentToProfile, installContentToTarget } from "../../services/
 import { ContentType, type ContentInstallTarget, type InstallContentPayload } from "../../types/content";
 import { EventType, type EventPayload } from "../../types/events";
 import { useNavigate } from "react-router-dom";
+import { formatCompactNumber } from "../../utils/format-number";
 
 interface ModDetailHeaderProps {
   project: UnifiedProjectDetails;
@@ -29,16 +30,6 @@ interface ModDetailHeaderProps {
   onToggleVersions: () => void;
   targetProfile?: Profile;
   installTarget?: ContentInstallTarget;
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toLocaleString();
 }
 
 function getProjectTypeIcon(type: string): string {
@@ -103,7 +94,6 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
   const hideModal = useGlobalModalStore(state => state.closeModal);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installingProfiles, setInstallingProfiles] = useState<Record<string, boolean>>({});
-  const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
   const [installModalVersions, setInstallModalVersions] = useState<UnifiedVersion[] | null>(null);
 
   // Check if this is a modpack
@@ -286,8 +276,6 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
       };
 
       await installContentToTarget(payload, installTarget);
-      toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: installTarget?.type === 'syncPack' ? installTarget.packName : profile.name }));
-      setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
     } catch (error) {
       console.error("Installation failed:", error);
       toast.error(t('mod_detail.install_failed', { error }));
@@ -379,8 +367,6 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
         };
 
         await installContentToProfile(payload);
-        toast.success(t('mod_detail.installed_to_profile', { title: project.title, version: bestVersion.version_number, profile: profile.name }));
-        setInstallStatus(prev => ({ ...prev, [profile.id]: true }));
       } catch (error) {
         console.error("Installation failed:", error);
         toast.error(t('mod_detail.install_failed', { error }));
@@ -400,15 +386,13 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
           setInstallModalVersions(null);
           setIsInstalling(false);
           setInstallingProfiles({});
-          setInstallStatus({});
         }}
-        installingProfiles={installingProfiles}
-        installStatus={installStatus}
+        installingProfiles={installingProfiles}
       />,
       1200
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [installModalVersions, installingProfiles, installStatus, profiles, project.id]);
+  }, [installModalVersions, installingProfiles, profiles, project.id]);
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 bg-black/20 rounded-lg p-4 border border-white/10">
@@ -456,11 +440,11 @@ export function ModDetailHeader({ project, accentColor, showVersions, onToggleVe
             <div className="flex items-center gap-4 text-sm text-white/70 font-minecraft">
               <div className="flex items-center gap-1">
                 <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
-                <span>{formatNumber(project.downloads)}</span>
+                <span>{formatCompactNumber(project.downloads)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Icon icon="solar:heart-bold" className="w-4 h-4" />
-                <span>{formatNumber(project.followers)}</span>
+                <span>{formatCompactNumber(project.followers)}</span>
               </div>
             </div>
 
