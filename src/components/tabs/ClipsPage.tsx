@@ -25,7 +25,7 @@ import { setDiscordState } from "../../utils/discordRpc";
 import { trackEvent } from "../../services/analytics-service";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { cn } from "../../lib/utils";
-import { RailActionButton } from "../ads/RailActionButton";
+import { AccentButton } from "../ui/AccentButton";
 
 const STATUS_POLL_MS = 2000;
 const DROP_SHARE = 0.05;
@@ -296,15 +296,15 @@ export function ClipsPage() {
           />
           <CaptureStatusCard state={state} hotkey={state.tone === "live" ? hotkey : null} t={t} />
           <div className="grid grid-cols-2 gap-2">
-            <RailActionButton
+            <AccentButton
               icon="solar:folder-open-bold"
               onClick={() => void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))}
             >
               {t("clips.page.folder")}
-            </RailActionButton>
-            <RailActionButton icon="solar:settings-bold" onClick={toClipSettings}>
+            </AccentButton>
+            <AccentButton icon="solar:settings-bold" onClick={toClipSettings}>
               {t("clips.page.settings")}
-            </RailActionButton>
+            </AccentButton>
           </div>
         </div>
       </RailPanel>

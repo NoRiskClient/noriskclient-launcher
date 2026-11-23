@@ -3,7 +3,7 @@ import { Icon } from "@iconify/react";
 import type { CapeSelection } from "./CapeList";
 import { NO_CAPE_ID } from "./noCape";
 import { PlayerPreview3D } from "../launcher/PlayerPreview3D";
-import { RailActionButton } from "../ads/RailActionButton";
+import { AccentButton } from "../ui/AccentButton";
 import { useActiveSkinTexture } from "../../hooks/useActiveSkinTexture";
 import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 
@@ -36,9 +36,9 @@ export function CapePanel({ selection, equippedCapeId, busy, canFavorite, onEqui
       />
       <div className="flex gap-2 shrink-0">
         <div className="flex-1 min-w-0">
-          <RailActionButton disabled={!selection || busy || isEquipped} onClick={() => selection && onEquip(selection.capeId)}>
+          <AccentButton disabled={!selection || busy || isEquipped} onClick={() => selection && onEquip(selection.capeId)}>
             {isEquipped ? t("capes.equipped") : isNoCape ? t("capes.unequipCape") : t("capes.equipCape")}
-          </RailActionButton>
+          </AccentButton>
         </div>
         {canFavorite && (
           <button

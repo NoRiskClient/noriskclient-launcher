@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../../ui/buttons/Button";
+import { AccentButton } from "../../ui/AccentButton";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { getAdStatus, onAdConsentMode, onAdStatusChanged } from "../../../services/ads-service";
@@ -8,8 +8,6 @@ import { useLauncherAdsStore } from "../../../store/launcher-ads-store";
 import { useSettingsKeywords } from "./settings-context";
 import { useOpenAdPause } from "../../ads/AdPauseDialog";
 import { trackEvent } from "../../../services/analytics-service";
-
-const BUTTON_CLASS = "px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors";
 
 export function useAdSettings() {
   const launcherAds = useLauncherAdsStore((state) => state.active);
@@ -74,9 +72,9 @@ export function AdsTab() {
             }
             searchKeywords={kw("settings.ads.pause", "pause", "pausieren", "werbung", "ads", "timer")}
           >
-            <Button variant="ghost" className={BUTTON_CLASS} onClick={pausedUntil ? resume : openPause}>
+            <AccentButton className="w-auto" onClick={pausedUntil ? resume : openPause}>
               {pausedUntil ? t("settings.ads.pause.resume") : t("settings.ads.pause.button")}
-            </Button>
+            </AccentButton>
           </SettingRow>
         )}
         {launcherAds && (
@@ -85,9 +83,9 @@ export function AdsTab() {
             description={t("settings.ads.privacy.tooltip")}
             searchKeywords={kw("settings.ads.privacy", "consent", "werbung", "privacy", "datenschutz")}
           >
-            <Button variant="ghost" className={BUTTON_CLASS} onClick={openConsent}>
+            <AccentButton className="w-auto" onClick={openConsent}>
               {t("settings.ads.privacy.button")}
-            </Button>
+            </AccentButton>
           </SettingRow>
         )}
         {launcherAds && (

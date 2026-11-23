@@ -22,7 +22,7 @@ import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { RailPanel } from "../ads/AdRail";
 import { PlayerPreview3D } from "../launcher/PlayerPreview3D";
-import { RailActionButton } from "../ads/RailActionButton";
+import { AccentButton } from "../ui/AccentButton";
 import { CardContextMenu, useCardContextMenu } from "../ui/CardContextMenu";
 import type { ContextMenuItem } from "../ui/SettingsContextMenu";
 
@@ -62,9 +62,9 @@ function SkinPanel({ skin, applied, busy, onApply }: SkinPanelProps) {
   return (
     <>
       <PlayerPreview3D skinUrl={skin?.textureUrl ?? null} variant={skin?.variant} />
-      <RailActionButton disabled={!onApply || busy || applied} onClick={() => onApply?.()}>
+      <AccentButton disabled={!onApply || busy || applied} onClick={() => onApply?.()}>
         {busy ? t("skins.applying") : applied ? t("skins.applied") : t("skins.applySkin")}
-      </RailActionButton>
+      </AccentButton>
     </>
   );
 }

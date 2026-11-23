@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
-import { RailActionButton } from "../ads/RailActionButton";
+import { AccentButton } from "../ui/AccentButton";
 import { useThemeStore } from "../../store/useThemeStore";
 import { RailIntro } from "../ads/RailIntro";
 
@@ -41,9 +41,9 @@ export function SyncPacksRail({ onCreate, createDisabled, feedbackUrl }: SyncPac
         ))}
       </div>
 
-      <RailActionButton icon="solar:add-circle-bold" onClick={onCreate} disabled={createDisabled}>
+      <AccentButton icon="solar:add-circle-bold" onClick={onCreate} disabled={createDisabled}>
         {t("syncPacks.create")}
-      </RailActionButton>
+      </AccentButton>
     </div>
   );
 }

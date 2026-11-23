@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../ui/buttons/Button";
+import { AccentButton } from "../../ui/AccentButton";
 import { SettingsSection } from "../../ui/settings/SettingsSection";
 import { SettingRow } from "../../ui/settings/SettingRow";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
@@ -69,9 +70,9 @@ export function AdvancedTab() {
             readOnly
           />
           {tempConfig?.custom_game_directory && (
-            <Button
-              variant="ghost"
-              className="px-4 py-3 border border-[#ffffff20] hover:bg-red-500/20 hover:border-red-500/30 transition-colors"
+            <AccentButton
+              className="w-12 h-12 px-0"
+              icon="solar:close-circle-bold"
               disabled={saving}
               onClick={() => {
                 if (tempConfig) {
@@ -82,13 +83,11 @@ export function AdvancedTab() {
                 }
               }}
               title={t("settings.game_data_dir.reset_tooltip")}
-            >
-              <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-red-400" />
-            </Button>
+            />
           )}
-          <Button
-            variant="ghost"
-            className="px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
+          <AccentButton
+            className="w-12 h-12 px-0"
+            icon="solar:folder-open-bold"
             disabled={saving}
             onClick={async () => {
               try {
@@ -105,13 +104,11 @@ export function AdvancedTab() {
                   });
                 }
               } catch (error) {
-                console.error('Fehler beim Ordner-Dialog:', error);
+                console.error('Folder dialog failed:', error);
               }
             }}
             title={t("settings.game_data_dir.select_tooltip")}
-          >
-            <Icon icon="solar:folder-open-bold" className="w-5 h-5" />
-          </Button>
+          />
         </div>
       </SettingsSection>
 

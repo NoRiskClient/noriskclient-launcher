@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { useThemeStore } from "../../store/useThemeStore";
 import { IconButton } from "../ui/buttons/IconButton";
-import { Button } from "../ui/buttons/Button";
+import { AccentButton } from "../ui/AccentButton";
 import { openExternalUrl } from "../../services/tauri-service";
 
 interface CreditsModalProps {
@@ -106,16 +106,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
             </div>
           </div>
 
-          {/* Open Source Licenses Button */}
           <div className="flex justify-center pt-4">
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 px-6 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors"
-              onClick={() => handleOpenUrl("https://norisk.gg/licenses")}
-            >
-              <Icon icon="solar:arrow-right-up-bold" className="w-5 h-5" />
-              <span className="font-smallcaps text-xs">{t('credits_modal.view_licenses')}</span>
-            </Button>
+            <AccentButton className="w-auto" icon="solar:arrow-right-up-bold" onClick={() => handleOpenUrl("https://norisk.gg/licenses")}>
+              {t('credits_modal.view_licenses')}
+            </AccentButton>
           </div>
         </div>
       </div>
