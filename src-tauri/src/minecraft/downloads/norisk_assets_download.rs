@@ -84,6 +84,11 @@ impl NoriskClientAssetsDownloadService {
             .profile_manager
             .calculate_instance_path_for_profile(profile)?;
 
+        let legacy_instance = game_directory.clone();
+        tokio::spawn(async move {
+            remove_legacy_asset_copy(&legacy_instance).await;
+        });
+
         // Use profile's effective pack as the *main* pack ID (honors rollout alias)
         let main_pack_id = match profile.effective_norisk_pack_id().await {
             Some(pack_id) if !pack_id.is_empty() => {
@@ -820,5 +825,22 @@ impl NoriskClientAssetsDownloadService {
             })
             .await?;
         Ok(event_id)
+    }
+}
+
+pub async fn remove_legacy_asset_copy(instance: &Path) -> bool {
+    let legacy = instance.join("NoRiskClient").join(ASSETS_DIR);
+    if !fs::try_exists(&legacy).await.unwrap_or(false) {
+        return false;
+    }
+    match fs::remove_dir_all(&legacy).await {
+        Ok(()) => {
+            info!("[NRC Assets] Removed old asset copy {}", legacy.display());
+            true
+        }
+        Err(e) => {
+            warn!("Could not remove old NRC asset copy {}: {}", legacy.display(), e);
+            false
+        }
     }
 }

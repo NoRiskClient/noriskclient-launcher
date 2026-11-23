@@ -2,6 +2,7 @@ mod cape_browse;
 mod cosmetic_pack_api;
 mod jvm_security;
 mod launcher_news;
+mod legacy_nrc_assets;
 mod loader_overwrite;
 mod logging_config_download;
 mod minecraft_auth;
