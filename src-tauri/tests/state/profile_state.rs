@@ -317,6 +317,18 @@ fn the_corpus_round_trips_through_serde_without_loss() {
         {
             set.sort_by_key(|entry| entry.to_string());
         }
+        if let Some(info) = expected
+            .get_mut("norisk_information")
+            .and_then(|v| v.as_object_mut())
+        {
+            info.remove("keep_local_assets");
+        }
+        if let Some(settings) = expected.get_mut("settings").and_then(|v| v.as_object_mut()) {
+            let legacy = settings.remove("custom_jvm_args").and_then(|v| v.as_str().map(str::to_string));
+            let args = legacy.filter(|args| !args.trim().is_empty()).unwrap_or_default();
+            settings.insert("use_custom_jvm_args".into(), (!args.is_empty()).into());
+            settings.insert("jvm_args".into(), args.into());
+        }
 
         assert_eq!(
             canonical(&profile),

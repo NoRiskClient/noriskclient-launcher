@@ -25,8 +25,8 @@ import { useTranslation } from "react-i18next";
 import { PlayerRig } from "../launcher/PlayerRig";
 import { isMobile } from "../../lib/platform";
 import { usePullToRefresh, PullToRefreshIndicator } from "../../hooks/usePullToRefresh";
-import { fetchNewsAndChangelogs } from "../../services/nrc-service";
-import { useNewsStore } from "../../store/useNewsStore";
+import { fetchLauncherNews } from "../../services/nrc-service";
+import { NEWS_PAGE_SIZE, useNewsStore } from "../../store/useNewsStore";
 
 export function PlayTab() {
   const { t } = useTranslation();
@@ -59,9 +59,6 @@ export function PlayTab() {
     setSelectedProfile(profileToSelect);
   };
 
-  const currentDisplayProfile =
-    storeSelectedProfile || (profiles.length > 0 ? profiles[0] : null);
-
   const versions = profiles.map((profile) => ({
     id: profile.id,
     label: `${profile.name}`,
@@ -72,7 +69,7 @@ export function PlayTab() {
 
   const homeRef = useRef<HTMLDivElement>(null);
   const homePull = usePullToRefresh(homeRef, () =>
-    fetchNewsAndChangelogs().then((posts) => useNewsStore.getState().setPosts(posts)),
+    fetchLauncherNews(1, NEWS_PAGE_SIZE).then((page) => useNewsStore.getState().setFirstPage(page)),
   );
 
   // promo-outline shader settings for the 3D player preview

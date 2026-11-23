@@ -1,10 +1,14 @@
-"use client";
-
 import { Fragment, type ReactNode, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
+import { useThemeStore } from "../../../store/useThemeStore";
 import { REDACTION_RE } from "./parse";
+
+export function AccentIcon({ icon, className }: { icon: string; className?: string }) {
+  const accent = useThemeStore((s) => s.accentColor.value);
+  return <Icon icon={icon} className={cn("shrink-0", className)} style={{ color: accent }} />;
+}
 
 export function RedactedText({ text }: { text: string }) {
   const { t } = useTranslation();

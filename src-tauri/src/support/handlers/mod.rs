@@ -2,15 +2,18 @@ pub mod logs;
 pub mod mc_settings;
 pub mod mod_list;
 pub mod nrc_profile;
+pub mod profile_snapshot;
 pub mod profile_summary;
 pub mod switch_pack;
 pub mod system_info;
+pub mod temp_profile;
 pub mod update_loader;
 
 use crate::minecraft::modloader::ModloaderFactory;
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
 use crate::support::handler::{PreparedItem, SupportContext};
+use crate::support::types::ItemParams;
 use crate::utils::security_utils::mask_sensitive_data;
 use serde::Serialize;
 use serde_json::Value;
@@ -69,11 +72,8 @@ pub fn clean_loader_version(version: &str) -> String {
         .to_string()
 }
 
-fn is_valid_loader_version(version: &str) -> bool {
-    let mut chars = version.chars();
-    matches!(chars.next(), Some(c) if c.is_ascii_digit())
-        && version.len() <= 64
-        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '+' | '_' | '-'))
+pub fn param_str<'a>(params: &'a ItemParams, key: &str) -> Option<&'a str> {
+    params.get(key).and_then(|v| v.as_str()).map(str::trim)
 }
 
 pub async fn state() -> Result<Arc<State>, String> {
@@ -111,7 +111,7 @@ pub async fn editable_profile(
     let state = state().await?;
     let profile = state
         .profile_manager
-        .get_profile(ctx.profile.id)
+        .get_profile(ctx.profile()?.id)
         .await
         .map_err(|e| format!("profile_not_found: {}", e))?;
     check_editable(&profile, vanilla_reason)?;

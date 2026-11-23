@@ -134,11 +134,4 @@ impl JavaDistribution {
         }
     }
 
-    pub fn supports_version(&self, version: u32) -> bool {
-        match self {
-            JavaDistribution::Temurin => true, // Supports 8, 11, 17, 21
-            JavaDistribution::GraalVM => version >= 17, // Only supports 17+
-            JavaDistribution::Zulu => true,    // Supports 7, 8, 11, 17, 21
-        }
-    }
 }

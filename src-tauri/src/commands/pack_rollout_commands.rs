@@ -67,7 +67,7 @@ pub async fn is_pack_aliased(pack_id: String) -> Result<bool, CommandError> {
 #[tauri::command]
 pub async fn set_pack_rollout_config(config: PackRolloutConfig) -> Result<(), CommandError> {
     if config.aliases.is_empty() {
-        info!("[PackRollout] No rollout active (flagsmith returned empty aliases)");
+        info!("[PackRollout] No rollout active (empty aliases)");
     } else {
         info!(
             "[PackRollout] Rollout ACTIVE — {} alias(es):",

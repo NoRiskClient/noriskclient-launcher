@@ -55,6 +55,10 @@ impl SupportItemHandler for SystemInfoHandler {
         "SYSTEM_INFO"
     }
 
+    fn needs_profile(&self) -> bool {
+        false
+    }
+
     fn category(&self) -> ItemCategory {
         ItemCategory::Collect
     }

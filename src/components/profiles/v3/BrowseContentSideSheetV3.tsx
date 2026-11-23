@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * BrowseContentSideSheetV3 — "Add content" as a docked right-side panel.
  *

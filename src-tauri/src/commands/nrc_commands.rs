@@ -2,7 +2,7 @@ use crate::error::{AppError, CommandError};
 #[cfg(desktop)]
 use crate::minecraft::api::norisk_api::CrashlogDto;
 use crate::minecraft::api::norisk_api::{AdventCalendarDay, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
-use crate::minecraft::api::wordpress_api::{BlogPost, WordPressApi};
+use crate::minecraft::api::launcher_news_api::{LauncherNewsApi, LauncherNewsPage};
 use crate::state::state_manager::State;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::info;
@@ -11,15 +11,12 @@ use tauri::{AppHandle, Manager, Url, UserAttentionType, WebviewUrl, WebviewWindo
 #[cfg(desktop)]
 use crate::utils::updater_utils;
 
-/// Fetches news and changelog posts from the WordPress API.
-///
-/// # Returns
-///
-/// * `Result<Vec<BlogPost>, CommandError>` - A vector of blog posts or an error.
 #[tauri::command]
-pub async fn get_news_and_changelogs_command() -> Result<Vec<BlogPost>, CommandError> {
-    info!("Executing get_news_and_changelogs_command");
-    Ok(WordPressApi::get_news_and_changelogs().await?)
+pub async fn get_launcher_news_command(page: u32, limit: u32) -> Result<LauncherNewsPage, CommandError> {
+    debug!("Executing get_launcher_news_command (page {page}, limit {limit})");
+    let state = State::get().await?;
+    let is_experimental = state.config_manager.is_experimental_mode().await;
+    Ok(LauncherNewsApi::get_page_cached(&state.content_cache, is_experimental, page, limit).await?)
 }
 
 #[cfg(desktop)]
@@ -474,6 +471,12 @@ pub async fn check_update_available_command(app: AppHandle) -> Result<Option<cra
 
     debug!("Using beta channel setting from config: {}", is_beta_channel);
     Ok(updater_utils::check_update_available(&app, is_beta_channel).await?)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn get_launcher_update_command() -> Option<crate::utils::background_updater::LauncherUpdate> {
+    crate::utils::background_updater::ready_update()
 }
 
 #[cfg(desktop)]

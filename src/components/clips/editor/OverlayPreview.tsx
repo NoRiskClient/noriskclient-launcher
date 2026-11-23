@@ -1,5 +1,3 @@
-"use client";
-
 import type { ClipOverlay, ClipTextVertical } from "../../../services/clip-service";
 import { cn } from "../../../lib/utils";
 import { toHex } from "./shared";

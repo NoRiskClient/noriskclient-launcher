@@ -155,12 +155,6 @@ pub fn get_default_minecraft_dir() -> PathBuf {
     }
 }
 
-/// Checks if standard Minecraft assets can be reused and copies them if possible
-/// Returns Ok(true) if assets were copied, Ok(false) if they weren't
-pub async fn try_reuse_minecraft_assets(asset_index: &AssetIndex) -> Result<bool> {
-    try_reuse_minecraft_assets_with_progress(asset_index, Uuid::nil()).await
-}
-
 /// Version of try_reuse_minecraft_assets that reports progress events
 pub async fn try_reuse_minecraft_assets_with_progress(
     asset_index: &AssetIndex,

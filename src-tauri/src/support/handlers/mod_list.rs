@@ -83,8 +83,9 @@ async fn load(
 }
 
 pub async fn collect_mods(ctx: &SupportContext) -> crate::error::Result<Vec<ModEntry>> {
-    let user_mods = load(ctx.profile.id, ContentType::Mod).await?;
-    let pack_mods = load(ctx.profile.id, ContentType::NoRiskMod)
+    let profile_id = ctx.profile().map_err(crate::error::AppError::Other)?.id;
+    let user_mods = load(profile_id, ContentType::Mod).await?;
+    let pack_mods = load(profile_id, ContentType::NoRiskMod)
         .await
         .unwrap_or_default();
     let mut mods: Vec<ModEntry> = pack_mods.iter().map(|m| to_entry(m, true)).collect();

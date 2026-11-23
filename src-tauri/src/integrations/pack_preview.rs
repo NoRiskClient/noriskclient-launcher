@@ -1,8 +1,8 @@
 use crate::error::{AppError, Result};
 use crate::integrations::curseforge::CurseForgeManifest;
 use crate::integrations::mrpack::{
-    ModrinthIndex, FABRIC_LOADER_DEPENDENCY, FORGE_DEPENDENCY, MINECRAFT_DEPENDENCY,
-    NEOFORGE_DEPENDENCY, QUILT_LOADER_DEPENDENCY,
+    is_manifest_mod_path, ModrinthIndex, FABRIC_LOADER_DEPENDENCY, FORGE_DEPENDENCY,
+    MINECRAFT_DEPENDENCY, NEOFORGE_DEPENDENCY, QUILT_LOADER_DEPENDENCY,
 };
 use crate::state::profile_state::{ModSource, Profile};
 use crate::utils::import_safety::{mod_label, parse_untrusted_profile, ImportSecurityReport};
@@ -61,6 +61,46 @@ pub struct ImportPackPreview {
     pub provenance: ProvenanceReport,
     pub norisk_pack: NoriskPackOffer,
     pub executable_content: ExecutableContentReport,
+    #[serde(default)]
+    pub origin: Option<PackOrigin>,
+}
+
+pub const ORIGIN_ENTRY: &str = "support-snapshot.json";
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PackOrigin {
+    pub ticket_number: i64,
+    pub owner: String,
+    #[serde(default)]
+    pub owner_uuid: Option<String>,
+    pub profile_name: String,
+    #[serde(default)]
+    pub not_transferred: Vec<OriginDroppedFile>,
+    #[serde(default)]
+    pub local_mods: Vec<OriginLocalMod>,
+    #[serde(default)]
+    pub added_by_player: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OriginDroppedFile {
+    pub path: String,
+    pub reason: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OriginLocalMod {
+    pub file_name: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+pub async fn read_origin(pack_path: &Path) -> Option<PackOrigin> {
+    let raw = read_pack_entry(pack_path, ORIGIN_ENTRY).await.ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -153,6 +193,10 @@ pub async fn preview_pack(pack_path: &Path) -> Result<ImportPackPreview> {
             preselected: details.declared_norisk_pack.is_some(),
         },
         executable_content: details.executable_content,
+        origin: match pack_type {
+            PackFormat::Noriskpack => read_origin(pack_path).await,
+            _ => None,
+        },
     };
 
     info!(
@@ -225,7 +269,11 @@ async fn read_mrpack(zip: &mut PackZip) -> Result<PackDetails> {
         }
     }
 
-    let mod_files: Vec<_> = index.files.iter().filter(|f| is_mod_path(&f.path)).collect();
+    let mod_files: Vec<_> = index
+        .files
+        .iter()
+        .filter(|f| is_manifest_mod_path(&f.path))
+        .collect();
 
     let mut provenance = ProvenanceReport::default();
     let mut hashed = Vec::new();
@@ -317,7 +365,7 @@ fn collect_third_party_hosts(index: &ModrinthIndex) -> Vec<String> {
     let mut hosts: Vec<String> = index
         .files
         .iter()
-        .filter(|file| !is_mod_path(&file.path))
+        .filter(|file| !is_manifest_mod_path(&file.path))
         .flat_map(|file| file.downloads.iter())
         .filter(|url| !crate::integrations::modrinth::is_whitelisted_modpack_url(url))
         .filter_map(|url| {
@@ -485,6 +533,11 @@ async fn open_archive(pack_path: &Path) -> Result<PackZip> {
         .map_err(|e| AppError::Other(format!("Failed to read modpack archive: {}", e)))
 }
 
+async fn read_pack_entry(pack_path: &Path, name: &str) -> Result<String> {
+    let mut zip = open_archive(pack_path).await?;
+    read_zip_entry(&mut zip, &[name]).await
+}
+
 async fn read_zip_entry(zip: &mut PackZip, candidates: &[&str]) -> Result<String> {
     let index = zip
         .file()
@@ -528,12 +581,6 @@ fn count_entries_under(zip: &PackZip, prefixes: &[&str]) -> usize {
             })
         })
         .count()
-}
-
-fn is_mod_path(path: &str) -> bool {
-    path.replace('\\', "/")
-        .trim_start_matches("./")
-        .starts_with("mods/")
 }
 
 fn base_name(path: &str) -> String {

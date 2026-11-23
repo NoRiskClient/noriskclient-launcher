@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { setDiscordState } from '../../../utils/discordRpc';
 import { logInfo } from '../../../utils/logging-utils';
 import { findBestVersionForProfile, statusForNewInstall } from '../../../utils/content-status';
@@ -21,16 +19,13 @@ import type {
   UnifiedVersion
 } from '../../../types/unified';
 import { ModPlatform, UnifiedSortType, UnifiedProjectType } from '../../../types/unified';
-import { getBlockedModsConfig, getModNoRiskStatus } from '../../../services/flagsmith-service';
+import { getBlockedModsConfig, getModNoRiskStatus } from '../../../services/feature-flags-service';
 import type {
   ModrinthProjectType,
-  ModrinthSearchResponse,
   ModrinthCategory,
   ModrinthGameVersion,
   ModrinthLoader,
-  ModrinthSortType,
   ModrinthTags,
-  ModrinthVersion
 } from '../../../types/modrinth';
 import { useContentCacheStore } from '../../../store/content-cache-store';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -52,18 +47,6 @@ import { toast } from 'react-hot-toast';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { EventType, type EventPayload } from '../../../types/events';
 import { ProgressToast } from '../../ui/ProgressToast';
-import { Button } from '../../ui/buttons/Button';
-import { SearchInput } from '../../ui/SearchInput';
-import { Dropdown } from '../../ui/dropdown/Dropdown';
-import { Icon } from '@iconify/react';
-import { cn } from '../../../lib/utils';
-import { Select } from '../../ui/Select'; // Import Select component
-import { IconButton } from '../../ui/buttons/IconButton'; // Import IconButton
-import { TagBadge } from '../../ui/TagBadge'; // Import TagBadge
-import { Input } from '../../ui/Input'; // Import Input component
-import { Checkbox } from '../../ui/Checkbox'; // Import Checkbox component
-import { ModrinthVersionItemV2 } from './ModrinthVersionItemV2'; // Import the new component
-import { ModrinthVersionListV2 } from './ModrinthVersionListV2'; // Import the new version list component
 import { ModrinthQuickInstallModalV2 } from './ModrinthQuickInstallModalV2'; // Import the quick install modal
 // Removed ModrinthInstallModalV2 - now using the universal ModrinthQuickInstallProfilesModal
 import { ModrinthFilterSidebarV2 } from './ModrinthFilterSidebarV2'; // Import the new sidebar component
@@ -85,7 +68,7 @@ import {
   type UninstallContentPayload,
   type ToggleContentPayload
 } from '../../../types/content';
-import type { ContentInstallStatus, ContentCheckRequest, BatchCheckContentParams } from '../../../types/profile'; // For the extended status
+import type { ContentInstallStatus, ContentCheckRequest } from '../../../types/profile'; // For the extended status
 
 import { useProfileStore } from '../../../store/profile-store'; // Hinzufügen des ProfileStore Imports
 import { useModSearchStore } from '../../../store/useModSearchStore';
@@ -93,7 +76,7 @@ import { Virtuoso } from 'react-virtuoso'; // Import Virtuoso
 import { useNavigate } from 'react-router-dom';
 import { useGlobalModal } from '../../../hooks/useGlobalModal';
 import { useThemeStore } from '../../../store/useThemeStore';
-import { handleIrisCheckAndShowModal, IrisRequiredModal } from '../../../utils/iris-detection.tsx';
+import { handleIrisCheckAndShowModal } from '../../../utils/iris-detection.tsx';
 import { parseErrorMessage } from "../../../utils/error-utils";
 import { useTranslation } from "react-i18next";
 
@@ -1499,8 +1482,6 @@ export function ModrinthSearchV2({
   const [quickInstallModalOpen, setQuickInstallModalOpen] = useState(false);
   const [quickInstallProject, setQuickInstallProject] = useState<UnifiedModSearchResult | any | null>(null);
   const [quickInstallVersions, setQuickInstallVersions] = useState<any[] | null>(null); // Changed to any[] to handle UnifiedVersion
-  const [quickInstallLoading, setQuickInstallLoading] = useState(false); // Loading for fetching versions for modal
-  const [quickInstallError, setQuickInstallError] = useState<string | null>(null);
   const [quickInstallingProjects, setQuickInstallingProjects] = useState<Record<string, boolean>>({}); // New state for card button loading
   const [installingModpackAsProfile, setInstallingModpackAsProfile] = useState<Record<string, boolean>>({}); // New state for modpack install loading
   const [installingVersion, setInstallingVersion] = useState<Record<string, boolean>>({}); // New state for specific version install loading
@@ -2550,8 +2531,6 @@ export function ModrinthSearchV2({
           throw new Error(`Source profile with ID ${sourceProfileIdToCopy} not found`);
         }
 
-        const sourceProfileName = sourceProfile.name;
-
         // Copy profile using the service directly
         const copyParams = {
           source_profile_id: sourceProfileIdToCopy,
@@ -2565,7 +2544,7 @@ export function ModrinthSearchV2({
 
         // If the source profile is a standard version, update the new profile to be custom
         if (sourceProfile?.is_standard_version) {
-          await ProfileService.updateProfile(newProfileId, {
+          await ProfileService.patchProfile(newProfileId, {
             group: "CUSTOM",
           });
         }
@@ -2970,16 +2949,11 @@ export function ModrinthSearchV2({
 
   // Helper function to get NoRisk status for a project
   const getProjectNoRiskStatus = (project: UnifiedModSearchResult): 'blocked' | 'warning' | null => {
-    console.log('[getProjectNoRiskStatus] Checking project:', project.title, 'ID:', project.project_id);
-    console.log('[getProjectNoRiskStatus] Config loaded:', blockedModsConfigLoaded);
-    
     if (!blockedModsConfigLoaded) {
-      console.log('[getProjectNoRiskStatus] Config not loaded yet, returning null');
       return null;
     }
     
     const result = getModNoRiskStatus('', project.project_id, null);
-    console.log('[getProjectNoRiskStatus] Result for', project.project_id, ':', result);
     return result;
   };
 
@@ -3261,8 +3235,8 @@ export function ModrinthSearchV2({
         onClose={closeQuickInstallModal}
         project={quickInstallProject}
         versions={quickInstallVersions}
-        isLoading={quickInstallLoading}
-        error={quickInstallError}
+        isLoading={false}
+        error={null}
         profiles={internalProfiles}
         selectedProfileId={selectedProfile?.id}
         installStatus={installStatus}

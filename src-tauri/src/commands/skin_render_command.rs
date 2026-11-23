@@ -1,9 +1,9 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, CommandError};
+use crate::utils::file_utils::{remove_older_than, ONE_DAY};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use log::{debug, warn};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
 use tokio::fs as tokio_fs;
 use tokio::io::AsyncReadExt;
 
@@ -130,28 +130,8 @@ pub async fn prune_skin_renders(max_age_days: u64) -> Result<u32, AppError> {
         return Ok(0);
     }
 
-    let max_age = Duration::from_secs(max_age_days.max(1) * 24 * 60 * 60);
-    let now = SystemTime::now();
-
-    let mut entries = tokio_fs::read_dir(&dir)
-        .await
-        .map_err(|e| AppError::Other(format!("Failed to read skin render cache: {}", e)))?;
-
-    let mut removed = 0u32;
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let path = entry.path();
-        let modified = match entry.metadata().await.and_then(|m| m.modified()) {
-            Ok(modified) => modified,
-            Err(_) => continue,
-        };
-        let age = match now.duration_since(modified) {
-            Ok(age) => age,
-            Err(_) => continue,
-        };
-        if age > max_age && tokio_fs::remove_file(&path).await.is_ok() {
-            removed += 1;
-        }
-    }
+    let max_age = ONE_DAY * max_age_days.max(1) as u32;
+    let removed = remove_older_than(&dir, max_age).await;
 
     if removed > 0 {
         debug!("Pruned {} skin renders older than {:?}", removed, max_age);

@@ -44,7 +44,6 @@ interface ModSearchState {
       | ((prev: UnifiedModSearchResult[]) => UnifiedModSearchResult[])
   ) => void;
   setTotalHits: (hits: number) => void;
-  resetFilters: () => void;
 }
 
 const DEFAULT_CATEGORIES_STATE: Record<ModrinthProjectType, string[]> = {
@@ -110,21 +109,6 @@ export const useModSearchStore = create<ModSearchState>()(
               : updater,
         })),
       setTotalHits: (hits) => set({ totalHits: hits }),
-      resetFilters: () =>
-        set({
-          searchTerm: "",
-          projectType: "mod",
-          sortOrder: UnifiedSortType.Relevance,
-          selectedCategoriesByProjectType: { ...DEFAULT_CATEGORIES_STATE },
-          selectedLoadersByProjectType: { ...DEFAULT_CATEGORIES_STATE },
-          selectedGameVersions: [],
-          filterClientRequired: false,
-          filterServerRequired: false,
-          scrollPosition: 0,
-          offset: 0,
-          searchResults: [],
-          totalHits: 0,
-        }),
     }),
     {
       name: "norisk-mod-search",

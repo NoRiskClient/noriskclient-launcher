@@ -48,6 +48,17 @@ pub struct RemoteSupportRequest {
     pub max_upload_bytes: u64,
     #[serde(default)]
     pub max_files: u32,
+    #[serde(default)]
+    pub profile_limits: Option<ProfileLimits>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileLimits {
+    #[serde(default)]
+    pub max_pack_bytes: u64,
+    #[serde(default)]
+    pub category_paths: std::collections::HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]

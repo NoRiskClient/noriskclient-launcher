@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
@@ -26,10 +24,7 @@ export function NoriskPackSelector({ profile, onChanged }: NoriskPackSelectorPro
   const handleChange = useCallback(async (newPackId: string | null) => {
     if (newPackId === selectedPackId) return;
     try {
-      await ProfileService.updateProfile(profile.id, {
-        selected_norisk_pack_id: newPackId,
-        clear_selected_norisk_pack: newPackId === null,
-      });
+      await ProfileService.patchProfile(profile.id, { selected_norisk_pack_id: newPackId });
       await fetchProfiles();
       onChanged?.();
     } catch (err) {

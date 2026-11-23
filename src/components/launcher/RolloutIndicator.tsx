@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
@@ -14,7 +12,7 @@ import {
   getLauncherConfig,
   setLauncherConfig,
 } from "../../services/launcher-config-service";
-import { getPackRolloutConfig } from "../../services/flagsmith-service";
+import { getPackRolloutConfig } from "../../services/feature-flags-service";
 
 const ACTIVE_COLOR = "#f59e0b";
 const FALLBACK_PCT = 5;

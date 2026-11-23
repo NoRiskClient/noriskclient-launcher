@@ -1,5 +1,4 @@
-"use client";
-
+import { shareLogWithToast } from "../../share/share-toast";
 import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
 
 import { useCallback, useEffect, useState } from "react";
@@ -7,8 +6,7 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { getLogFileContent, listLauncherLogs, uploadLogToMclogs } from "../../../services/log-service";
+import { getLogFileContent, listLauncherLogs } from "../../../services/log-service";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { Select } from "../../ui/Select";
@@ -982,9 +980,7 @@ function ShareCaptureLog({
         toast.error(t("settings.clips.support.missing"));
         return;
       }
-      const url = await uploadLogToMclogs(await getLogFileContent(log.path));
-      await writeText(url);
-      toast.success(t("settings.clips.support.uploaded"));
+      await shareLogWithToast(await getLogFileContent(log.path), log.name);
     } catch (e) {
       toast.error(t("debug.upload_failed", { error: parseErrorMessage(e) }));
     } finally {

@@ -142,9 +142,6 @@ pub enum AppError {
     #[error("Unsupported architecture: {0}")]
     UnsupportedArchitecture(String),
 
-    #[error("Failed to upload log to mclo.gs: {0}")]
-    MclogsUploadFailed(String),
-
     #[error("Request error: {0}")]
     RequestError(String),
 
@@ -154,6 +151,9 @@ pub enum AppError {
         translatable_key: String,
         args: Vec<String>,
     },
+
+    #[error("HTTP {status}: {message}")]
+    HttpStatus { status: u16, message: String },
 
     #[error("Parse error: {0}")]
     ParseError(String),

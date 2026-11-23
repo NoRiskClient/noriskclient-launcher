@@ -1,15 +1,11 @@
-"use client";
-
 import type React from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
-import type { MinecraftProfile, TexturesData } from "../../types/minecraft";
+import type { TexturesData } from "../../types/minecraft";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { MinecraftSkinService } from "../../services/minecraft-skin-service";
-import { Button } from "../ui/buttons/Button";
-import { IconButton } from "../ui/buttons/IconButton";
 import { Icon } from "@iconify/react";
 import { StatusMessage } from "../ui/StatusMessage";
 import { SignedOutState } from "../account/SignedOutState";
@@ -320,14 +316,12 @@ export function SkinsTab() {
     activeAccount,
     isLoading: accountLoading,
     error: accountError,
-    initializeAccounts,
   } = useMinecraftAuthStore();
   const { showModal, hideModal } = useGlobalModal();
   const { t } = useTranslation();
   const { selectedSkinId, setSelectedSkinId } = useSkinStore();
 
   useEffect(() => { setDiscordState("Browsing Skins"); }, []);
-  const [skinData, setSkinData] = useState<MinecraftProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [localSkins, setLocalSkins] = useState<MinecraftSkin[]>([]);
   const [localSkinsLoading, setLocalSkinsLoading] = useState<boolean>(false);
@@ -338,7 +332,6 @@ export function SkinsTab() {
   const [currentSkinId, setCurrentSkinId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
-  const accentColor = useThemeStore((state) => state.accentColor);
 
   const filteredSkins = useMemo(() => {
     if (!debouncedSearch.trim()) return localSkins;
@@ -354,7 +347,6 @@ export function SkinsTab() {
 
     try {
       const data = await MinecraftSkinService.getUserSkinData();
-      setSkinData(data);
 
       if (data?.properties) {
         const texturesProp = data.properties.find(

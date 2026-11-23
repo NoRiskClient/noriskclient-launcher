@@ -1,6 +1,3 @@
-"use client";
-
-import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -25,6 +22,15 @@ import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { useResolvedLoaderVersion } from "../../hooks/useResolvedLoaderVersion";
 import { loaderIconSrc } from "../../lib/loader-icons";
+
+function TemporaryTag() {
+  const { t } = useTranslation();
+  return (
+    <span className="flex-shrink-0 rounded border border-white/15 bg-white/10 px-1.5 py-0.5 font-minecraft text-xs text-white/60 normal-case">
+      {t("profiles.card.temporary")}
+    </span>
+  );
+}
 
 // Custom JSX component for tooltip content
 function StandardVersionTooltipContent() {
@@ -82,6 +88,7 @@ export function ProfileCardV2({
 
   const { isPinned, togglePin } = usePinnedProfilesStore();
   const pinned = isPinned(profile.id);
+  const temporary = profile.is_temporary === true;
 
   // Profile settings store
   const { openModal } = useProfileSettingsStore();
@@ -396,13 +403,12 @@ export function ProfileCardV2({
     // Grid layout (more compact, similar to ProfileCard.tsx)
   if (layoutMode === "grid" || layoutMode === "compact") {
     const isCompact = layoutMode === "compact";
-    const iconSize = isCompact ? 16 : 20; // Smaller icons for compact mode
     const padding = isCompact ? "p-3" : "p-4"; // Less padding for compact mode
     const gap = isCompact ? "gap-2" : "gap-3"; // Smaller gaps for compact mode
     
     return (
       <div
-        className={`relative flex flex-col ${gap} ${padding} rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+        className={`relative flex flex-col ${gap} ${padding} rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer ${temporary ? "opacity-60" : ""}`}
         style={variant === "3d" ? get3DStyling() : {}}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -417,8 +423,7 @@ export function ProfileCardV2({
               } else {
                 handleLaunch();
               }
-            } else {
-              // Default behavior: manage mods
+            } else if (!temporary) {
               if (onMods) {
                 onMods(profile);
               } else {
@@ -456,6 +461,7 @@ export function ProfileCardV2({
           </div>
         )}
 
+        {!temporary && (
         <div className={`absolute ${isCompact ? 'top-2 right-2' : 'top-3 right-3'} z-20 flex flex-col gap-1`}>
           {variant === "default" && (
             <button
@@ -519,6 +525,7 @@ export function ProfileCardV2({
             )}
           </button>
         </div>
+        )}
 
         <div className={`flex items-center ${isCompact ? 'gap-3' : 'gap-4'} relative z-10 w-full`}>
           <div className={`relative ${isCompact ? 'w-16 h-16' : 'w-20 h-20'} flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden border-2 transition-all duration-200`}
@@ -556,7 +563,8 @@ export function ProfileCardV2({
               >
                 <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
               </h3>
-              {(pinned || isHovered) && (
+              {temporary && <TemporaryTag />}
+              {!temporary && (pinned || isHovered) && (
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
                   className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
@@ -660,7 +668,7 @@ export function ProfileCardV2({
            target={profile}
            isOpen={isContextMenuOpen}
            position={contextMenuPosition}
-           items={contextMenuItems}
+           items={temporary ? contextMenuItems.filter((item) => item.id === "open-folder") : contextMenuItems}
            onClose={() => {
              setIsContextMenuOpen(false);
              setOpenContextMenuId(null);
@@ -674,7 +682,7 @@ export function ProfileCardV2({
   // List layout (original layout)
   return (
     <div
-      className={`relative flex items-center gap-4 p-3 rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer`}
+      className={`relative flex items-center gap-4 p-3 rounded-lg ${variant === "3d" ? "backdrop-blur-md" : "bg-black/20 border border-white/10 hover:border-white/20"} transition-all duration-200 cursor-pointer ${temporary ? "opacity-60" : ""}`}
       style={variant === "3d" ? get3DStyling() : {}}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -689,8 +697,7 @@ export function ProfileCardV2({
             } else {
               handleLaunch();
             }
-          } else {
-            // Default behavior: manage mods
+          } else if (!temporary) {
             if (onMods) {
               onMods(profile);
             } else {
@@ -741,7 +748,8 @@ export function ProfileCardV2({
           >
             <span dangerouslySetInnerHTML={{ __html: parseMotdToHtml(profile.name) }} />
           </h3>
-          {(pinned || isHovered) && (
+          {temporary && <TemporaryTag />}
+          {!temporary && (pinned || isHovered) && (
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(profile.id); }}
               className={`flex-shrink-0 transition-all duration-200 ${pinned ? 'text-white' : 'text-white/40 hover:text-white'}`}
@@ -820,7 +828,7 @@ export function ProfileCardV2({
       {/* Action Buttons */}
       <ProfileActionButtons
         profile={profile}
-        actions={actionButtons}
+        actions={temporary ? actionButtons.filter((action) => action.id === "play") : actionButtons}
         useFlexSpacer={true}
         flexSpacerAfterIndex={1}
       />
@@ -830,7 +838,7 @@ export function ProfileCardV2({
          target={profile}
          isOpen={isContextMenuOpen}
          position={contextMenuPosition}
-         items={contextMenuItems}
+         items={temporary ? contextMenuItems.filter((item) => item.id === "open-folder") : contextMenuItems}
          onClose={() => {
            setIsContextMenuOpen(false);
            setOpenContextMenuId(null);

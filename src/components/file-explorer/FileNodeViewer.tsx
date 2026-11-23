@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@iconify/react';
@@ -7,6 +5,7 @@ import { cn } from '../../lib/utils';
 import type { FileNode } from '../../types/fileSystem'; // Adjust path as necessary
 import { Checkbox } from '../ui/Checkbox'; // Adjust path as necessary
 import { useThemeStore } from '../../store/useThemeStore'; // For styling consistency if needed
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 // Helper to format file size
 export function formatFileSize(sizeInBytes: number): string {
@@ -28,7 +27,7 @@ interface FileNodeItemProps {
   depth: number;
   isExpanded: boolean;
   isSelected: boolean;
-  onToggleExpand: (path: string, event?: React.MouseEvent) => void;
+  onToggleExpand: (node: FileNode, event?: React.MouseEvent) => void;
   onNodeSelected: (node: FileNode, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => void;
   checkboxesEnabled: boolean;
   isBackgroundAnimationEnabled: boolean;
@@ -58,7 +57,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
     }
 
     if (node.is_dir) {
-        onToggleExpand(node.path, event); 
+        onToggleExpand(node, event); 
     } else if (!checkboxesEnabled) {
         onNodeSelected(node, event);
     }
@@ -97,7 +96,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
             type="button"
             onClick={(e) => {
                 e.stopPropagation();
-                onToggleExpand(node.path, e);
+                onToggleExpand(node, e);
             }}
             className="expand-toggle-button p-0.5 mr-1 text-white/70 hover:text-white flex-shrink-0"
             aria-label={currentIsExpanded ? 'Collapse' : 'Expand'}
@@ -126,7 +125,7 @@ const FileNodeItem: React.FC<FileNodeItemProps> = ({
             onClick={(e) => {
                 e.stopPropagation();
                 if (node.is_dir) {
-                    onToggleExpand(node.path, e);
+                    onToggleExpand(node, e);
                 } else if (checkboxesEnabled) {
                     onNodeSelected(node, e);
                 } 
@@ -180,8 +179,13 @@ export interface FileNodeViewerProps {
   selectChildrenWithParent?: boolean;
   hideRootNode?: boolean;
   defaultRootCollapsed?: boolean;
+  onExpandDir?: (node: FileNode) => void;
   className?: string;
 }
+
+const slashed = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+
+const isProfilePath = (root: string, path: string, wanted: string) => slashed(path) === `${slashed(root)}/${slashed(wanted)}`;
 
 export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   rootNode,
@@ -194,6 +198,7 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   selectChildrenWithParent = true,
   hideRootNode = false,
   defaultRootCollapsed = false,
+  onExpandDir,
   className,
 }) => {
   const { t } = useTranslation();
@@ -230,7 +235,7 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
         let nodeMatchedByPreselect = false;
         if (preSelectPaths.length > 0) {
           for (const pattern of preSelectPaths) {
-            if (node.path.includes(pattern)) {
+            if (isProfilePath(rootNode.path, node.path, pattern)) {
               nodeMatchedByPreselect = true;
               if (selectChildrenWithParent && node.is_dir) {
                 addNodeAndChildren(node, newSelected);
@@ -284,18 +289,19 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   ]);
 
 
-  const handleToggleExpand = useCallback((path: string, event?: React.MouseEvent) => {
+  const handleToggleExpand = useCallback((node: FileNode, event?: React.MouseEvent) => {
     event?.stopPropagation();
+    if (!expandedNodes.has(node.path)) onExpandDir?.(node);
     setExpandedNodes((prevExpanded) => {
       const newExpanded = new Set(prevExpanded);
-      if (newExpanded.has(path)) {
-        newExpanded.delete(path);
+      if (newExpanded.has(node.path)) {
+        newExpanded.delete(node.path);
       } else {
-        newExpanded.add(path);
+        newExpanded.add(node.path);
       }
       return newExpanded;
     });
-  }, []);  const handleNodeSelected = useCallback((node: FileNode, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
+  }, [expandedNodes, onExpandDir]);  const handleNodeSelected = useCallback((node: FileNode, event: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
     if (event.stopPropagation) {
       event.stopPropagation();
     }
@@ -346,7 +352,7 @@ export const FileNodeViewer: React.FC<FileNodeViewerProps> = ({
   };
 
   if (loading) {
-    return <div className="p-4 text-center text-white/70 font-minecraft">{t('files.loading_structure')}</div>;
+    return <LoadingSpinner size="sm" shadowDepth="none" message={t('files.loading_structure')} className="p-4 font-minecraft text-white/70" />;
   }
 
   if (error) {

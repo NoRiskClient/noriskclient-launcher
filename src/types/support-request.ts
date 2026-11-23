@@ -70,8 +70,8 @@ export const SUPPORT_ERROR_KINDS = [
   "rate_limited",
   "too_large",
   "invalid_code",
-  "discord_not_linked",
   "busy",
+  "forbidden",
   "unknown",
 ] as const;
 

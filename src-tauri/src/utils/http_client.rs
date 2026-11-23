@@ -50,6 +50,11 @@ impl NrcRequest {
         self
     }
 
+    pub fn header(mut self, name: &str, value: impl AsRef<str>) -> Self {
+        self.builder = self.builder.header(name, value.as_ref());
+        self
+    }
+
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.builder = self.builder.timeout(timeout);
         self
@@ -67,6 +72,11 @@ impl NrcRequest {
 
     pub fn body(mut self, body: impl Into<reqwest::Body>) -> Self {
         self.builder = self.builder.body(body);
+        self
+    }
+
+    pub fn form<T: Serialize + ?Sized>(mut self, form: &T) -> Self {
+        self.builder = self.builder.form(form);
         self
     }
 

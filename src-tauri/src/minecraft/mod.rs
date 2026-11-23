@@ -9,6 +9,8 @@ pub mod installer;
 pub mod launch;
 #[cfg(desktop)]
 pub mod modloader;
+#[cfg(desktop)]
+pub mod temp_profile;
 
 pub use api::*;
 pub use auth::*;

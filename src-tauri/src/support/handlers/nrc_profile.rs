@@ -1,6 +1,6 @@
 use crate::support::files::{read_head_lossy, resolve_safe_file};
 use crate::support::handler::SupportContext;
-use crate::support::handlers::logs::{found, FileItemHandler, Located};
+use crate::support::handlers::logs::{found, in_instance, FileItemHandler, Located};
 use crate::utils::security_utils::mask_sensitive_data;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
@@ -191,5 +191,5 @@ fn locate(instance: &Path) -> Result<Located, String> {
 }
 
 fn locate_nrc_profile(ctx: &SupportContext) -> Located {
-    locate(&ctx.instance_path).unwrap_or_else(Located::Rejected)
+    in_instance(ctx, |root| locate(root).unwrap_or_else(Located::Rejected))
 }

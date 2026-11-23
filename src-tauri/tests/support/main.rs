@@ -2,8 +2,11 @@ mod error;
 mod files;
 mod handler;
 mod handlers;
+mod no_profile;
 mod registry;
 mod service;
+mod snapshot;
+mod temp_profile;
 mod types;
 
 use noriskclient_launcher_v3_lib::state::profile_state::Profile;
@@ -20,9 +23,21 @@ pub fn test_ctx(instance: &Path, file_byte_budget: u64) -> SupportContext {
     }))
     .unwrap();
     SupportContext {
-        profile,
-        instance_path: instance.to_path_buf(),
+        profile: Some(profile),
+        instance_path: Some(instance.to_path_buf()),
         file_byte_budget,
+        session: None,
+        choice: None,
+    }
+}
+
+pub fn test_ctx_without_profile(file_byte_budget: u64) -> SupportContext {
+    SupportContext {
+        profile: None,
+        instance_path: None,
+        file_byte_budget,
+        session: None,
+        choice: None,
     }
 }
 
@@ -37,18 +52,20 @@ pub fn temp_dir(name: &str) -> PathBuf {
 }
 
 #[test]
-fn accepts_and_uppercases_valid_codes() {
-    assert_eq!(normalize_code("k7qm-2xpa"), Some("K7QM-2XPA".to_string()));
-    assert_eq!(normalize_code(" ABCDEFGH "), Some("ABCDEFGH".to_string()));
-    assert!(normalize_code(&"A".repeat(40)).is_some());
+fn accepts_and_uppercases_the_code_from_the_link() {
+    assert_eq!(
+        normalize_code(" 0123456789abcdefghjkmnpqrs "),
+        Some("0123456789ABCDEFGHJKMNPQRS".to_string())
+    );
 }
 
 #[test]
-fn rejects_invalid_codes() {
-    assert_eq!(normalize_code("short"), None);
-    assert_eq!(normalize_code(&"A".repeat(41)), None);
-    assert_eq!(normalize_code("ABCD/../EFGH"), None);
-    assert_eq!(normalize_code("ABCD EFGH"), None);
-    assert_eq!(normalize_code("ABCDEFGH?x=1"), None);
-    assert_eq!(normalize_code("ÄBCDEFGHI"), None);
+fn rejects_short_codes_and_anything_that_is_not_a_link_code() {
+    assert_eq!(normalize_code("K7QM-2XPA"), None);
+    assert_eq!(normalize_code("K7QM2XPA"), None);
+    assert_eq!(normalize_code(&"A".repeat(25)), None);
+    assert_eq!(normalize_code(&"A".repeat(27)), None);
+    assert_eq!(normalize_code("0123456789ABCD-FGHJKMNPQRS"), None);
+    assert_eq!(normalize_code("0123456789ABCD/../HJKMNPQR"), None);
+    assert_eq!(normalize_code("0123456789ABCDÄFGHJKMNPQR"), None);
 }

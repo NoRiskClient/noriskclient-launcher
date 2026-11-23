@@ -8,7 +8,6 @@ import type { LauncherConfig, MemorySettings } from "../types/launcherConfig";
 export async function getLauncherConfig(): Promise<LauncherConfig> {
   try {
     const config = await invoke<LauncherConfig>("get_launcher_config");
-    console.log("[LauncherConfigService] Fetched config:", config);
     return config;
   } catch (error) {
     console.error("[LauncherConfigService] Failed to get launcher config:", error);
@@ -31,7 +30,6 @@ export async function setLauncherConfig(config: LauncherConfig): Promise<Launche
     const updatedConfig = await invoke<LauncherConfig>("set_launcher_config", {
       config: config, // Ensure this matches the argument name in the Rust command handler
     });
-    console.log("[LauncherConfigService] Saved config:", updatedConfig);
     return updatedConfig;
   } catch (error) {
     console.error("[LauncherConfigService] Failed to set launcher config:", error);
@@ -52,29 +50,6 @@ export async function getAppVersion(): Promise<string> {
   } catch (error) {
     console.error("[LauncherConfigService] Failed to get app version:", error);
     throw error;
-  }
-}
-
-/**
- * Sets the profile grouping preference in the launcher configuration.
- * Fetches the current config, updates the criterion, and saves it back.
- * @param criterion The new grouping criterion string (e.g., "none", "loader").
- * @returns A promise that resolves when the preference is successfully set.
- * @throws If fetching or setting the config fails.
- */
-export async function setProfileGroupingPreference(criterion: string): Promise<void> {
-  console.log(`[LauncherConfigService] Setting profile grouping preference to: ${criterion}`);
-  try {
-    const currentConfig = await getLauncherConfig();
-    const newConfig: LauncherConfig = {
-      ...currentConfig,
-      profile_grouping_criterion: criterion === "none" ? null : criterion,
-    };
-    await setLauncherConfig(newConfig);
-    console.log("[LauncherConfigService] Successfully set profile grouping preference.");
-  } catch (error) {
-    console.error("[LauncherConfigService] Failed to set profile grouping preference:", error);
-    throw error; // Re-throw the error to be handled by the caller
   }
 }
 
@@ -117,40 +92,14 @@ export async function setGlobalMemorySettings(memorySettings: MemorySettings): P
   }
 }
 
-/**
- * Gets the global custom JVM arguments from the launcher configuration.
- * @returns A promise that resolves with the global custom JVM arguments string or null.
- */
-export async function getGlobalCustomJvmArgs(): Promise<string | null> {
-  console.log("[LauncherConfigService] Getting global custom JVM args");
-  try {
-    const config = await getLauncherConfig();
-    console.log("[LauncherConfigService] Retrieved global custom JVM args:", config.global_custom_jvm_args);
-    return config.global_custom_jvm_args;
-  } catch (error) {
-    console.error("[LauncherConfigService] Failed to get global custom JVM args:", error);
-    throw error;
-  }
+type GlobalJvmArgs = Pick<LauncherConfig, "use_global_jvm_args" | "global_jvm_args">;
+
+export async function getGlobalJvmArgs(): Promise<GlobalJvmArgs> {
+  const { use_global_jvm_args, global_jvm_args } = await getLauncherConfig();
+  return { use_global_jvm_args, global_jvm_args };
 }
 
-/**
- * Sets the global custom JVM arguments in the launcher configuration.
- * @param jvmArgs The new JVM arguments string to save, or null to clear.
- * @returns A promise that resolves when the settings are successfully set.
- * @throws If fetching or setting the config fails.
- */
-export async function setGlobalCustomJvmArgs(jvmArgs: string | null): Promise<void> {
-  console.log(`[LauncherConfigService] Setting global custom JVM args:`, jvmArgs);
-  try {
-    const currentConfig = await getLauncherConfig();
-    const newConfig: LauncherConfig = {
-      ...currentConfig,
-      global_custom_jvm_args: jvmArgs,
-    };
-    await setLauncherConfig(newConfig);
-    console.log("[LauncherConfigService] Successfully set global custom JVM args.");
-  } catch (error) {
-    console.error("[LauncherConfigService] Failed to set global custom JVM args:", error);
-    throw error;
-  }
+export async function setGlobalJvmArgs(patch: Partial<GlobalJvmArgs>): Promise<void> {
+  const currentConfig = await getLauncherConfig();
+  await setLauncherConfig({ ...currentConfig, ...patch });
 }

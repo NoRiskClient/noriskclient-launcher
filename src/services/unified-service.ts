@@ -1,12 +1,9 @@
 import {
-  ModPlatform,
   type UnifiedModSearchParams,
   type UnifiedModSearchResponse,
   type UnifiedModVersionsParams,
   type UnifiedModpackVersionsResponse,
   type UnifiedVersionResponse,
-  type UnifiedProjectType,
-  type UnifiedSortType,
   type UnifiedUpdateCheckRequest,
   type UnifiedUpdateCheckResponse,
   type UnifiedVersion,

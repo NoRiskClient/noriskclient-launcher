@@ -250,8 +250,6 @@ fn default_true() -> bool {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NoriskInformation {
     #[serde(default)]
-    pub keep_local_assets: bool,
-    #[serde(default)]
     pub is_experimental: bool,
     #[serde(default = "default_true")]
     pub copy_initial_mc_data: bool,
@@ -346,6 +344,7 @@ impl ModLoader {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(from = "StoredProfileSettings")]
 pub struct ProfileSettings {
     pub java_path: Option<String>, // Java Pfad
     #[serde(default)]
@@ -371,10 +370,75 @@ pub struct ProfileSettings {
     pub fullscreen: bool, // Vollbild
     #[serde(default)]
     pub extra_game_args: Vec<String>, // Zusätzliche Argumente für das Spiel
-    #[serde(default)] // Für Abwärtskompatibilität
-    pub custom_jvm_args: Option<String>, // Zusätzliche JVM-Argumente als String
+    #[serde(default)]
+    pub use_custom_jvm_args: bool,
+    #[serde(default)]
+    pub jvm_args: String,
     #[serde(default)]
     pub quick_play_path: Option<String>, // Quick Play Pfad für direkten Welt-/Server-Start
+}
+
+impl ProfileSettings {
+    pub fn enabled_jvm_args(&self) -> Option<&str> {
+        enabled_jvm_args(self.use_custom_jvm_args, &self.jvm_args)
+    }
+}
+
+pub fn enabled_jvm_args(enabled: bool, args: &str) -> Option<&str> {
+    (enabled && !args.trim().is_empty()).then_some(args)
+}
+
+#[derive(Deserialize, Default)]
+struct StoredProfileSettings {
+    #[serde(default)]
+    java_path: Option<String>,
+    #[serde(default)]
+    use_custom_java_path: bool,
+    #[serde(default)]
+    use_overwrite_loader_version: bool,
+    #[serde(default)]
+    overwrite_loader_version: Option<String>,
+    #[serde(default)]
+    overwrite_loader_versions: HashMap<String, String>,
+    #[serde(default)]
+    memory: Option<MemorySettings>,
+    #[serde(default)]
+    resolution: Option<WindowSize>,
+    #[serde(default)]
+    fullscreen: bool,
+    #[serde(default)]
+    extra_game_args: Vec<String>,
+    #[serde(default)]
+    use_custom_jvm_args: Option<bool>,
+    #[serde(default)]
+    jvm_args: Option<String>,
+    #[deprecated(note = "replaced by `jvm_args` + `use_custom_jvm_args`; only read to migrate old profiles")]
+    #[serde(default)]
+    custom_jvm_args: Option<String>,
+    #[serde(default)]
+    quick_play_path: Option<String>,
+}
+impl From<StoredProfileSettings> for ProfileSettings {
+    #[allow(deprecated)]
+    fn from(stored: StoredProfileSettings) -> Self {
+        let legacy_args = stored.custom_jvm_args.filter(|args| !args.trim().is_empty());
+        let use_custom_jvm_args = stored.use_custom_jvm_args.unwrap_or(legacy_args.is_some());
+        let jvm_args = stored.jvm_args.or(legacy_args).unwrap_or_default();
+        ProfileSettings {
+            java_path: stored.java_path,
+            use_custom_java_path: stored.use_custom_java_path,
+            use_overwrite_loader_version: stored.use_overwrite_loader_version,
+            overwrite_loader_version: stored.overwrite_loader_version,
+            overwrite_loader_versions: stored.overwrite_loader_versions,
+            memory: stored.memory.unwrap_or_default(),
+            resolution: stored.resolution,
+            fullscreen: stored.fullscreen,
+            extra_game_args: stored.extra_game_args,
+            use_custom_jvm_args,
+            jvm_args,
+            quick_play_path: stored.quick_play_path,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -914,6 +978,36 @@ impl ProfileManager {
             profiles.insert(id, profile);
         }
         self.save_profile(id).await?;
+        Ok(())
+    }
+
+    pub async fn patch_profile(
+        &self,
+        id: Uuid,
+        patch: crate::state::profile_patch::ProfilePatch,
+    ) -> Result<Profile> {
+        let current = self.get_profile(id).await?;
+        let profile = {
+            let mut profiles = self.profiles.write().await;
+            let profile = profiles.entry(id).or_insert(current);
+            patch.apply(profile);
+            profile.clone()
+        };
+        self.save_profile_fields(id).await?;
+        Ok(profile)
+    }
+
+    async fn save_profile_fields(&self, id: Uuid) -> Result<()> {
+        let _guard = self.save_lock.lock().await;
+
+        let transient = self.transient.read().await.clone();
+        let profile = match self.profiles.read().await.get(&id) {
+            Some(profile) if should_persist(profile, &transient) => profile.clone(),
+            _ => return Ok(()),
+        };
+
+        self.store.upsert_profile_fields(&profile).await?;
+        self.persisted.lock().await.remove(&id);
         Ok(())
     }
 
@@ -1627,66 +1721,22 @@ impl ProfileManager {
         game_versions: Option<Vec<String>>,
         add_dependencies: bool, // Allow caller to decide
     ) -> Result<()> {
-           // Always use the same behavior for all profiles (add to profile mods + optional deps)
-           // if profile.is_standard_version {
-           //     let mods_dir = self.get_profile_mods_path(&profile)?;
-           //     tokio::fs::create_dir_all(&mods_dir).await?;
-           //
-           //     let target_path = mods_dir.join(&file_name);
-           //     let tmp_path = target_path.with_extension("jar.nrc_tmp");
-           //
-           //     let mut config = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
-           //     if let Some(sha1) = &file_hash_sha1 { config = config.with_sha1(sha1); }
-           //     crate::utils::download_utils::DownloadUtils::download_file(
-           //         &download_url,
-           //         &tmp_path,
-           //         config,
-           //     ).await?;
-           //     // Atomic move
-           //     tokio::fs::rename(&tmp_path, &target_path).await?;
-           //
-           //     // Optionally install required dependencies if requested
-           //     if add_dependencies {
-           //         // Fetch version details to read dependencies
-           //         if let Ok(ver_details) = modrinth::get_version_details(version_id.clone()).await {
-           //             for dep in ver_details.dependencies.iter().filter(|d| d.dependency_type == ModrinthDependencyType::Required) {
-           //                 if let Some(dep_project_id) = &dep.project_id {
-           //                     // Find a compatible version by loader/profile game version
-           //                     if let Ok(dep_versions) = modrinth::get_mod_versions(dep_project_id.clone(), Some(vec![profile.loader.as_str().to_string()]), Some(vec![profile.game_version.clone()])).await {
-           //                         if let Some(best) = dep_versions.iter().max_by_key(|v| &v.date_published) {
-           //                             if let Some(primary) = best.files.iter().find(|f| f.primary) {
-           //                                 let dep_tmp = mods_dir.join(&primary.filename).with_extension("jar.nrc_tmp");
-           //                                 let dep_target = mods_dir.join(&primary.filename);
-           //                                 let mut cfg = crate::utils::download_utils::DownloadConfig::new().with_streaming(true);
-           //                                 if let Some(s) = &primary.hashes.sha1 { cfg = cfg.with_sha1(s); }
-           //                                 let _ = crate::utils::download_utils::DownloadUtils::download_file(&primary.url, &dep_tmp, cfg).await;
-           //                                 let _ = tokio::fs::rename(&dep_tmp, &dep_target).await;
-           //                             }
-           //                         }
-           //                     }
-           //                 }
-           //             }
-           //         }
-           //     }
-           //     Ok(())
-           // } else {
-               // Use the same behavior for all profiles (add to profile mods + optional deps)
-               self.add_modrinth_mod_internal(
-                   profile_id,
-                   project_id,
-                   version_id,
-                   file_name,
-                   download_url,
-                   file_hash_sha1,
-                   mod_name,
-                   version_number,
-                   loaders,
-                   game_versions,
-                   add_dependencies,
-                   HashSet::new(),
-               )
-               .await
-           // }
+        // Use the same behavior for all profiles (add to profile mods + optional deps)
+        self.add_modrinth_mod_internal(
+            profile_id,
+            project_id,
+            version_id,
+            file_name,
+            download_url,
+            file_hash_sha1,
+            mod_name,
+            version_number,
+            loaders,
+            game_versions,
+            add_dependencies,
+            HashSet::new(),
+        )
+        .await
     }
 
     // Set the enabled status of a specific mod within a profile
@@ -3937,7 +3987,8 @@ impl Default for ProfileSettings {
             resolution: None,
             fullscreen: false,
             extra_game_args: Vec::new(),
-            custom_jvm_args: None, // Standardmäßig keine benutzerdefinierten JVM-Args
+            use_custom_jvm_args: false,
+            jvm_args: String::new(),
             quick_play_path: None,
         }
     }

@@ -128,6 +128,18 @@ async fn create_hardlink(target: &Path, link: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+pub fn is_link(meta: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    meta.file_type().is_symlink() || meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+pub fn is_link(meta: &std::fs::Metadata) -> bool {
+    meta.file_type().is_symlink()
+}
+
 /// Checks if a path is a symlink
 pub async fn is_symlink(path: &Path) -> Result<bool> {
     let metadata = fs::symlink_metadata(path).await?;

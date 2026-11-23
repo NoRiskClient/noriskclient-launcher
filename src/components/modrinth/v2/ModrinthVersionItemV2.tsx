@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
@@ -12,8 +10,6 @@ import type { ContentInstallStatus } from "../../../types/profile";
 import { Icon } from "@iconify/react";
 import { ActionButton } from "../../ui/ActionButton";
 import { TagBadge } from "../../ui/TagBadge";
-import { gsap } from "gsap";
-import { useIsFirstRender } from "../../../hooks/useIsFirstRender";
 import { Tooltip } from "../../ui/Tooltip";
 
 interface ModrinthVersionItemV2Props {
@@ -73,10 +69,8 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     const { t } = useTranslation();
     const isModpack = project.project_type === "modpack";
     const cardRef = useRef<HTMLDivElement>(null);
-    const [isCardHovered, setIsCardHovered] = useState(false);
     const [localIsInstalling, setLocalIsInstalling] = useState(false);
     const [installationStartTime, setInstallationStartTime] = useState<number | null>(null);
-    const isFirstRender = useIsFirstRender();
 
     // Use local state or external state
     const isInstalling = localIsInstalling || externalIsInstalling;
@@ -124,33 +118,6 @@ export const ModrinthVersionItemV2 = React.memo<ModrinthVersionItemV2Props>(
     const handleMouseLeaveLocal = () => {
       onMouseLeave();
     };
-
-    useEffect(() => {
-      // GSAP animation is removed as the style will be more static like GenericList
-      // if (cardRef.current) {
-      //   if (isFirstRender) return;
-
-      //   if (isCardHovered) { // isCardHovered is also effectively removed for this
-      //     gsap.to(cardRef.current, {
-      //       backgroundColor: `${accentColor.value}15`,
-      //       borderColor: `${accentColor.value}60`,
-      //       y: -3,
-      //       boxShadow: `0 8px 0 rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.35), inset 0 1px 0 ${accentColor.value}30, inset 0 0 0 1px ${accentColor.value}15`,
-      //       duration: 0.2,
-      //       ease: "power2.out",
-      //     });
-      //   } else {
-      //     gsap.to(cardRef.current, {
-      //       backgroundColor: `${accentColor.value}08`,
-      //       borderColor: `${accentColor.value}30`,
-      //       y: 0,
-      //       boxShadow: `0 2px 0 rgba(0,0,0,0.1), 0 3px 5px rgba(0,0,0,0.1)`,
-      //       duration: 0.2,
-      //       ease: "power2.out",
-      //     });
-      //   }
-      // }
-    }, [isCardHovered, accentColor, isFirstRender]);
 
     const handleButtonClick = () => {
     console.log('Button clicked, localIsInstalling:', localIsInstalling, 'externalIsInstalling:', externalIsInstalling);

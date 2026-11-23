@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { invoke } from "@tauri-apps/api/core";

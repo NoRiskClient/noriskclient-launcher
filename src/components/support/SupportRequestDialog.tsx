@@ -1,17 +1,16 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../ui/buttons/Button";
 import { useGlobalModalStore } from "../../hooks/useGlobalModal";
 import { SupportRequestService } from "../../services/support-request-service";
 import { DataStep } from "./DataStep";
+import { DoneStep } from "./DoneStep";
 import { ErrorStep } from "./ErrorStep";
 import { FixStep } from "./FixStep";
 import { HelloStep } from "./HelloStep";
-import { Spinner, Status, SupportFrame, type StepFlow } from "./parts";
+import { Spinner, SupportFrame, type StepFlow } from "./parts";
 import { ProfileStep } from "./ProfileStep";
-import { getSupportItemDefinition } from "./supportItems";
+import { ShareProfileStep } from "./ShareProfileStep";
+import { getSupportItemDefinition, requestNeedsProfile, type SupportItemGroup } from "./supportItems";
 import { usePreparedItems } from "./usePreparedItems";
 import { useSupportProfiles } from "./useSupportProfiles";
 import { useSupportRequest } from "./useSupportRequest";
@@ -31,7 +30,7 @@ export function openSupportRequestDialog(code: string | undefined) {
   );
 }
 
-type Step = "hello" | "profile" | "fix" | "data" | "done";
+type Step = "hello" | "profile" | "fix" | "data" | "share" | "done";
 
 const LOADING_DELAY_MS = 300;
 
@@ -41,12 +40,16 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
   const profiles = useSupportProfiles();
   const [step, setStep] = useState<Step>("hello");
   const [actionCursor, setActionCursor] = useState(0);
+  const [sent, setSent] = useState(false);
   const [slow, setSlow] = useState(false);
+  const profileNeeded = requestNeedsProfile(request.info?.items ?? []);
+  const profileMissing = profileNeeded && !profiles.profile && profiles.ready;
   const items = usePreparedItems({
     code,
     accountId: request.info?.account.id,
     profileId: profiles.profileId,
-    active: step === "fix" || step === "data",
+    profileNeeded,
+    active: step !== "hello" && step !== "profile",
     showError: request.showError,
   });
 
@@ -55,13 +58,19 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
     onClose();
   };
 
-  const multiProfile = profiles.sorted.length > 1;
+  const requested = (group: SupportItemGroup) =>
+    !!request.info?.items.some((i) => getSupportItemDefinition(i.type)?.group === group);
+  const pickProfile = profiles.sorted.length > 1 && profileNeeded;
   const hasFixStep =
-    !!profiles.profileId &&
-    (items.prepared
-      ? items.runnableActions.length > 0
-      : !!request.info?.items.some((i) => getSupportItemDefinition(i.type)?.group === "action"));
-  const steps: Step[] = ["hello", ...(multiProfile ? ["profile" as const] : []), ...(hasFixStep ? ["fix" as const] : []), "data"];
+    (!profileNeeded || !!profiles.profileId) && (items.prepared ? items.runnableActions.length > 0 : requested("action"));
+  const hasDataStep = items.prepared ? items.dataItems.length > 0 : requested("data");
+  const lastStep: Step = requested("share") ? "share" : hasDataStep ? "data" : "done";
+  const steps: Step[] = [
+    "hello",
+    ...(pickProfile ? ["profile" as const] : []),
+    ...(hasFixStep ? ["fix" as const] : []),
+    ...(lastStep === "done" ? [] : [lastStep]),
+  ];
   const lastAction = Math.max(0, items.runnableActions.length - 1);
 
   useEffect(() => {
@@ -70,15 +79,24 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
   }, []);
 
   useEffect(() => {
-    if (step === "fix" && items.prepared && !items.preparing && items.runnableActions.length === 0) setStep("data");
-  }, [step, items.prepared, items.preparing, items.runnableActions.length]);
+    if (step === "fix" && items.prepared && !items.preparing && items.runnableActions.length === 0) setStep(lastStep);
+  }, [step, items.prepared, items.preparing, items.runnableActions.length, lastStep]);
+
+  useEffect(() => {
+    if (step === "data" && items.prepared && !items.preparing && items.dataItems.length === 0) setStep("done");
+  }, [step, items.prepared, items.preparing, items.dataItems.length]);
 
   const goToFix = (cursor: number) => {
     setActionCursor(cursor);
     setStep("fix");
   };
-  const afterProfile = () => (hasFixStep ? goToFix(0) : setStep("data"));
-  const beforeFix = () => setStep(multiProfile ? "profile" : "hello");
+  const afterProfile = () => (hasFixStep ? goToFix(0) : setStep(lastStep));
+  const beforeFix = () => setStep(pickProfile ? "profile" : "hello");
+  const beforeLast = () => (hasFixStep ? goToFix(lastAction) : beforeFix());
+  const onSent = () => {
+    setSent(true);
+    setStep("done");
+  };
 
   if (request.error) {
     return (
@@ -101,7 +119,6 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
     );
   }
 
-  const name = request.info.requestedBy.displayName;
   const flow = (next: () => void, back: () => void): StepFlow => ({
     code,
     info: request.info!,
@@ -116,7 +133,7 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
     case "hello":
       return (
         <HelloStep
-          flow={flow(() => (multiProfile ? setStep("profile") : afterProfile()), () => {})}
+          flow={flow(() => (pickProfile ? setStep("profile") : afterProfile()), () => {})}
           profilesReady={profiles.ready}
         />
       );
@@ -132,7 +149,7 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
       return (
         <FixStep
           flow={flow(
-            () => (actionCursor < lastAction ? setActionCursor((c) => c + 1) : setStep("data")),
+            () => (actionCursor < lastAction ? setActionCursor((c) => c + 1) : setStep(lastStep)),
             () => (actionCursor > 0 ? setActionCursor((c) => c - 1) : beforeFix()),
           )}
           items={items}
@@ -143,32 +160,31 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
     case "data":
       return (
         <DataStep
-          flow={flow(() => {}, () => (hasFixStep ? goToFix(lastAction) : beforeFix()))}
+          flow={flow(() => {}, beforeLast)}
           items={items}
           profile={profiles.profile}
-          profilesReady={profiles.ready}
-          onSent={() => setStep("done")}
+          profileMissing={profileMissing}
+          onSent={onSent}
+        />
+      );
+    case "share":
+      return (
+        <ShareProfileStep
+          flow={flow(() => {}, beforeLast)}
+          items={items}
+          profile={profiles.profile}
+          profileMissing={profileMissing}
+          onSent={onSent}
         />
       );
     case "done":
       return (
-        <SupportFrame
-          onClose={close}
-          stepper={{ count: steps.length, current: steps.length }}
-          right={
-            <Button variant="default" size="lg" onClick={close}>
-              {t("support_request.close")}
-            </Button>
-          }
-        >
-          <Status
-            centered
-            icon="solar:check-circle-bold"
-            tone="good"
-            title={t("support_request.done.title")}
-            text={t("support_request.done.text", { name })}
-          />
-        </SupportFrame>
+        <DoneStep
+          flow={{ ...flow(() => {}, beforeLast), stepper: { count: steps.length, current: steps.length } }}
+          items={items}
+          sent={sent}
+          profileMissing={profileMissing}
+        />
       );
   }
 }

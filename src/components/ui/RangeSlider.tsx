@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useThemeStore } from "../../store/useThemeStore";

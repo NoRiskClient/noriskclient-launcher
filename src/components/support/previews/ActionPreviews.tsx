@@ -1,8 +1,6 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
-import { Bullets } from "./common";
+import { AccentIcon, Bullets } from "./common";
 import { loaderName } from "./parse";
 import type { SupportPreviewProps } from "./types";
 
@@ -25,7 +23,7 @@ function ChangeCard({
     <div className="space-y-3">
       <div className="rounded-lg border-2 border-white/15 bg-black/20 p-4 space-y-2">
         <div className="flex items-center gap-3">
-          <Icon icon={icon} className="w-9 h-9 shrink-0 text-amber-300" />
+          <AccentIcon icon={icon} className="w-9 h-9" />
           <div className="min-w-0">
             <p className="font-minecraft text-lg text-white tracking-wide">{title}</p>
             {ctx.profile && (
@@ -46,6 +44,32 @@ function ChangeCard({
         </div>
       </div>
       <Bullets items={[t("support_request.preview.action.only_this_profile"), note]} />
+    </div>
+  );
+}
+
+export function TempProfilePreview({ ctx }: SupportPreviewProps) {
+  const { t } = useTranslation();
+  const params = ctx.params ?? {};
+  const rows: [icon: string, label: string, value: string | undefined][] = [
+    ["solar:gamepad-bold", t("support_request.preview.temp_profile.minecraft"), params.minecraft],
+    ["solar:box-bold", t("support_request.preview.temp_profile.loader"), loaderName(params.loader)],
+    ["solar:widget-4-bold", t("support_request.preview.temp_profile.pack"), params.pack],
+  ];
+  return (
+    <div className="space-y-3">
+      <p className="font-minecraft text-lg text-white/85 tracking-wide">{t("support_request.preview.temp_profile.intro")}</p>
+      <div className="rounded-lg border-2 border-white/15 bg-black/20 divide-y divide-white/10">
+        {rows
+          .filter(([, , value]) => value)
+          .map(([icon, label, value]) => (
+            <div key={label} className="flex items-center gap-3 px-4 py-3">
+              <AccentIcon icon={icon} className="w-6 h-6" />
+              <span className="font-minecraft text-lg text-white/60 tracking-wide">{label}</span>
+              <span className="ml-auto min-w-0 break-all font-minecraft text-lg text-white tracking-wide">{value}</span>
+            </div>
+          ))}
+      </div>
     </div>
   );
 }

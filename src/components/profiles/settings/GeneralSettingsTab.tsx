@@ -1,295 +1,182 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import type { Profile } from "../../../types/profile";
-import { useThemeStore } from "../../../store/useThemeStore";
-import { SearchStyleInput } from "../../ui/Input";
-import { Checkbox } from "../../ui/Checkbox";
 import { gsap } from "gsap";
-import { ProfileIcon } from "../ProfileIcon";
-import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
-import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
-import type { MinecraftAccount } from "../../../types/minecraft";
-import { cn } from "../../../lib/utils";
 import { useTranslation } from "react-i18next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "react-hot-toast";
 
+import type { Profile, ProfilePatch } from "../../../types/profile";
+import { TYPING_SAVE_DELAY_MS } from "../../../utils/profile-patch";
+import type { MinecraftAccount } from "../../../types/minecraft";
+import { useThemeStore } from "../../../store/useThemeStore";
+import { useMinecraftAuthStore } from "../../../store/minecraft-auth-store";
+import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
+import { SearchStyleInput } from "../../ui/Input";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import { ProfileIcon } from "../ProfileIcon";
+import { logError } from "../../../utils/logging-utils";
+import { Chip, Section } from "./SettingsSection";
+
 interface GeneralSettingsTabProps {
   profile: Profile;
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   onRefresh?: () => Promise<Profile>;
   onDelete?: () => void;
   isDeleting?: boolean;
 }
 
-
-
-export function GeneralSettingsTab({
-  profile,
-  editedProfile,
-  updateProfile,
-  onRefresh,
-  onDelete,
-  isDeleting,
-}: GeneralSettingsTabProps) {
-  const { t } = useTranslation();
-  const accentColor = useThemeStore((state) => state.accentColor);
-  const isBackgroundAnimationEnabled = useThemeStore(
-    (state) => state.isBackgroundAnimationEnabled,
+function AccountAvatar({ account }: { account: MinecraftAccount }) {
+  const avatarUrl = usePlayerAvatar({ uuid: account.id, overlay: true });
+  if (!avatarUrl) return null;
+  return (
+    <img
+      src={avatarUrl}
+      alt={account.username}
+      className="h-full w-full object-cover"
+      style={{ imageRendering: "pixelated" }}
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+      }}
+    />
   );
+}
+
+export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRefresh }: GeneralSettingsTabProps) {
+  const { t } = useTranslation();
+  const [groupDraft, setGroupDraft] = useState(editedProfile.group || "");
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const isBackgroundAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
   const tabRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
-  const accountRef = useRef<HTMLDivElement>(null);
   const { accounts } = useMinecraftAuthStore();
+  const locked = profile.is_standard_version;
 
   useEffect(() => {
-    if (isBackgroundAnimationEnabled) {
-      if (tabRef.current) {
-        gsap.fromTo(
-          tabRef.current,
-          { opacity: 0 },
-          { opacity: 1, duration: 0.4, ease: "power2.out" },
-        );
-      }
-
-      if (formRef.current) {
-        gsap.fromTo(
-          formRef.current.children,
-          { opacity: 0, y: 20 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.4,
-            stagger: 0.1,
-            ease: "power2.out",
-            delay: 0.2,
-          },
-        );
-      }
-
-
+    if (isBackgroundAnimationEnabled && tabRef.current) {
+      gsap.fromTo(tabRef.current, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" });
     }
   }, [isBackgroundAnimationEnabled]);
-
-  // Component for account avatar with caching
-  function AccountAvatar({ account }: { account: MinecraftAccount }) {
-    const avatarUrl = usePlayerAvatar({
-      uuid: account.id,
-      overlay: true,
-    });
-
-    if (!avatarUrl) {
-      return null;
-    }
-
-    return (
-      <img
-        src={avatarUrl}
-        alt={account.username}
-        className="w-full h-full object-cover pixelated"
-        style={{ imageRendering: 'pixelated' }}
-        onError={(e) => {
-          e.currentTarget.style.display = 'none';
-        }}
-      />
-    );
-  }
-
-  const handleAccountSelect = (accountId: string | null) => {
-    updateProfile({ preferred_account_id: accountId });
-  };
 
   const handleCopyProfileId = async () => {
     try {
       await writeText(profile.id);
-      toast.success(t('profiles.settings.profileIdCopied'));
+      toast.success(t("profiles.settings.profileIdCopied"));
     } catch (e) {
-      console.error("Failed to copy profile ID:", e);
+      logError(`Failed to copy profile ID: ${e}`);
     }
   };
 
   return (
-    <div ref={tabRef} className="space-y-6 select-none">
-      <div ref={formRef} className="space-y-6">
-        <div className="flex gap-6">
-          <div className="flex-1 flex flex-col">
-            <label className="block text-lg font-smallcaps text-white mb-2">
-              {t('profiles.settings.profileName')}
-            </label>
-            <div className="flex items-center gap-4">
-              <ProfileIcon
-                profileId={profile.id}
-                banner={profile.banner}
-                profileName={profile.name}
-                accentColor={accentColor.value}
-                onSuccessfulUpdate={async () => {
-                  try {
-                    if (onRefresh) {
-                      await onRefresh();
-                    }
-                  } catch (error) {
-                    console.error("Failed to refresh profile after icon update:", error);
-                  }
-                }}
-                className="w-12 h-12 flex-shrink-0"
-              />
+    <div ref={tabRef} className="space-y-4 select-none">
+      <Section title={t("profiles.settings.general")}>
+        <div className="flex items-start gap-4">
+          <ProfileIcon
+            profileId={profile.id}
+            banner={profile.banner}
+            profileName={profile.name}
+            accentColor={accentColor.value}
+            onSuccessfulUpdate={async () => {
+              try {
+                await onRefresh?.();
+              } catch (error) {
+                logError(`Failed to refresh profile after icon update: ${error}`);
+              }
+            }}
+            className="h-14 w-14 flex-shrink-0"
+          />
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0 space-y-1.5">
+              <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.profileName")}</p>
               <SearchStyleInput
                 value={editedProfile.name}
-                onChange={(e) => updateProfile({ name: e.target.value })}
-                placeholder={t('profiles.settings.enterProfileName')}
-                className="text-sm flex-1"
-                disabled={profile.is_standard_version ? true : false}
+                onChange={(e) => updateProfile({ name: e.target.value }, TYPING_SAVE_DELAY_MS)}
+                placeholder={t("profiles.settings.enterProfileName")}
+                className="text-sm"
+                disabled={locked}
               />
             </div>
-          </div>
-
-          <div className="flex-1 flex flex-col">
-            <label className="block text-lg font-smallcaps text-white mb-2">
-              {t('profiles.settings.group')}
-            </label>
-            <div className="flex items-center">
+            <div className="min-w-0 space-y-1.5">
+              <p className="font-minecraft text-xs text-white/50">{t("profiles.settings.group")}</p>
               <SearchStyleInput
-                value={editedProfile.group || ""}
-                onChange={(e) => updateProfile({ group: e.target.value || null })}
-                placeholder={t('placeholders.group_name')}
-                className="text-sm w-full"
-                disabled={profile.is_standard_version ? true : false}
+                value={groupDraft}
+                onChange={(e) => setGroupDraft(e.target.value)}
+                onBlur={() => (groupDraft || null) !== (editedProfile.group || null) && updateProfile({ group: groupDraft || null })}
+                placeholder={t("placeholders.group_name")}
+                className="text-sm"
+                disabled={locked}
               />
             </div>
           </div>
         </div>
+      </Section>
 
-        {/* Shared Minecraft Folder Checkbox */}
-        <div className="space-y-1">
-          <Checkbox
-            label={t('profiles.settings.useSharedFolder')}
+      <Section
+        title={t("profiles.settings.useSharedFolder")}
+        description={
+          <>
+            {t("profiles.settings.sharedFolderDescription")} {t("profiles.settings.canChangeAnytime")}
+          </>
+        }
+        aside={
+          <ToggleSwitch
             checked={editedProfile.use_shared_minecraft_folder ?? false}
-            onChange={(event) => {
-              const newValue = event.target.checked;
-              updateProfile({
-                use_shared_minecraft_folder: newValue
-              });
-            }}
-            description={t('profiles.settings.sharedFolderDescription')}
-            descriptionClassName="font-minecraft text-sm"
-            size="lg"
+            onChange={(checked) => updateProfile({ use_shared_minecraft_folder: checked })}
+            size="sm"
           />
-          <p className="text-xs text-white/50 font-minecraft ml-10 -mt-1">
-            {t('profiles.settings.canChangeAnytime')}
-          </p>
-        </div>
+        }
+      />
 
-        <div>
-          <label className="block text-lg font-smallcaps text-white mb-2">
-            {t('profiles.settings.quickPlayPath')}
-          </label>
-          <SearchStyleInput
-            value={editedProfile.settings.quick_play_path || ""}
-            onChange={(e) =>
-              updateProfile({
-                settings: {
-                  ...editedProfile.settings,
-                  quick_play_path: e.target.value || null
-                }
-              })
-            }
-            placeholder={t('profiles.settings.quickPlayPlaceholder')}
-            className="text-sm"
-          />
-          <p className="text-xs text-white/70 mt-2 font-minecraft tracking-wide select-none">
-            {t('profiles.settings.quickPlayDescription')}
-          </p>
-        </div>
+      <Section title={t("profiles.settings.quickPlayPath")} description={t("profiles.settings.quickPlayDescription")}>
+        <SearchStyleInput
+          value={editedProfile.settings.quick_play_path || ""}
+          onChange={(e) =>
+            updateProfile({ settings: { quick_play_path: e.target.value || null } }, TYPING_SAVE_DELAY_MS)
+          }
+          placeholder={t("profiles.settings.quickPlayPlaceholder")}
+          icon="solar:play-bold"
+          className="text-sm"
+        />
+      </Section>
 
-        <div ref={accountRef} className="space-y-3">
-          <h3 className="text-lg font-smallcaps text-white">
-            {t('profiles.settings.preferredAccount')}
-          </h3>
-          
-          {accounts.length > 0 ? (
-            <div className="flex flex-wrap gap-3 p-1">
-              {accounts.map((account) => {
-                const isSelected = editedProfile.preferred_account_id === account.id;
-                
-                return (
-                  <button
-                    key={account.id}
-                    onClick={() => handleAccountSelect(isSelected ? null : account.id)}
-                    className={cn(
-                      "relative group flex flex-col items-center p-3 border-2 transition-all duration-200 rounded-lg hover:scale-105",
-                      isSelected
-                        ? "border-accent shadow-lg"
-                        : "border-white/10 hover:border-white/30",
-                    )}
-                    style={
-                      isSelected
-                        ? {
-                            borderColor: accentColor.value,
-                            backgroundColor: `${accentColor.value}15`,
-                          }
-                        : {}
-                    }
-                    title={`${account.username} (${account.id})`}
-                  >
-                    {/* Player Head */}
-                    <div className={cn(
-                      "relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all duration-200",
-                      isSelected ? "border-accent" : "border-white/20"
-                    )}
-                    style={isSelected ? { borderColor: accentColor.value } : {}}>
-                      <AccountAvatar account={account} />
-                      {isSelected && (
-                        <div 
-                          className="absolute inset-0 flex items-center justify-center bg-black/50"
-                        >
-                          <Icon
-                            icon="solar:check-circle-bold"
-                            className="w-8 h-8"
-                            style={{ color: accentColor.value }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Username */}
-                    <div className={cn(
-                      "mt-2 font-smallcaps text-sm text-center max-w-[100px] truncate",
-                      isSelected ? "text-white" : "text-white/70"
-                    )}>
-                      {account.username}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-white/50 font-smallcaps text-xs">
-              {t('profiles.settings.noAccountsFound')}
-            </div>
-          )}
-        </div>
+      <Section title={t("profiles.settings.preferredAccount")}>
+        {accounts.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {accounts.map((account) => {
+              const selected = editedProfile.preferred_account_id === account.id;
+              return (
+                <Chip
+                  key={account.id}
+                  active={selected}
+                  accent={accentColor.value}
+                  onClick={() => updateProfile({ preferred_account_id: selected ? null : account.id })}
+                  title={`${account.username} (${account.id})`}
+                  className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-3"
+                >
+                  <span className="h-8 w-8 shrink-0 overflow-hidden rounded bg-black/40">
+                    <AccountAvatar account={account} />
+                  </span>
+                  <span className="max-w-[140px] truncate text-sm normal-case">{account.username}</span>
+                  {selected && (
+                    <Icon icon="solar:check-circle-bold" className="h-4 w-4 shrink-0" style={{ color: accentColor.value }} />
+                  )}
+                </Chip>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="font-minecraft text-sm text-white/50">{t("profiles.settings.noAccountsFound")}</p>
+        )}
+      </Section>
 
-        {/* Profile ID — discreet, click to copy */}
-        <div className="pt-4 mt-2 border-t border-white/10">
-          <button
-            type="button"
-            onClick={handleCopyProfileId}
-            title={t('profiles.settings.copyProfileId')}
-            className="group flex items-center gap-1.5 text-white/30 hover:text-white/55 transition-colors"
-          >
-            <Icon icon="solar:copy-linear" className="w-3.5 h-3.5" />
-            <span className="font-minecraft text-xs tracking-wide">
-              {profile.id}
-            </span>
-          </button>
-        </div>
-
-      </div>
-
-
+      <button
+        type="button"
+        onClick={handleCopyProfileId}
+        title={t("profiles.settings.copyProfileId")}
+        className="flex items-center gap-1.5 px-1 text-white/30 transition-colors hover:text-white/60"
+      >
+        <Icon icon="solar:copy-linear" className="h-3.5 w-3.5" />
+        <span className="font-minecraft text-xs tracking-wide">{profile.id}</span>
+      </button>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { Icon } from "@iconify/react";
 import { useRef } from "react";
 import { StableIcon } from "./IconWrapper";

@@ -1,5 +1,3 @@
-"use client";
-
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from ".././ui/buttons/Button";

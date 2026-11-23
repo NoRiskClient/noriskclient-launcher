@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
@@ -7,7 +5,6 @@ import { gsap } from "gsap";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { 
   getVariantColors,
-  getSizeClasses,
   getBorderRadiusClass,
   getAccessibilityProps,
   createRadiusStyle,
@@ -25,13 +22,6 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   heightClassName?: string;
   label?: string;
   description?: string;
-}
-
-interface RippleType {
-  x: number;
-  y: number;
-  size: number;
-  id: number;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -238,7 +228,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           boxShadow: getBoxShadow(),
           color: getTextColor(),
           transform: isPressed ? "translateY(1px)" : "translateY(0)",
-          filter: isHovered && !disabled ? "brightness(1.1)" : "brightness(1)",
+          filter: isHovered && !disabled ? "brightness(1.1)" : undefined,
           ...createRadiusStyle(borderRadius),
         }}
         onClick={handleRipple}

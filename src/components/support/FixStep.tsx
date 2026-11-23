@@ -1,14 +1,22 @@
-"use client";
-
 import { Icon } from "@iconify/react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/buttons/Button";
 import { useClickGuard } from "../../hooks/useClickGuard";
 import type { Profile } from "../../types/profile";
-import { BackButton, CollectingProgress, Spinner, SupportFrame, TextLink, type StepFlow } from "./parts";
-import { getPreviewTemplate } from "./previews/registry";
-import { getSupportItemDefinition, supportItemKey } from "./supportItems";
-import type { PreparedItems } from "./usePreparedItems";
+import { AccentIcon } from "./previews/common";
+import { BackButton, CollectingProgress, Spinner, SupportFrame, type StepFlow } from "./parts";
+import {
+  getPreviewTemplate,
+  getSupportItemDefinition,
+  needsProfile,
+  supportItemKey,
+  type SupportItemTextPart,
+} from "./supportItems";
+import type { ActionPhase, PreparedItems } from "./usePreparedItems";
+
+const AUTO_NEXT_MS = 800;
+const FINISHED: ReadonlySet<ActionPhase | undefined> = new Set(["done", "declined"]);
 
 export function FixStep({
   flow,
@@ -26,6 +34,18 @@ export function FixStep({
   const position = Math.min(cursor, runnableActions.length - 1);
   const item = runnableActions[position];
   const armed = useClickGuard(item?.index);
+  const phase = item ? actions[item.index] : undefined;
+  const seen = useRef({ index: item?.index, phase });
+  const next = useRef(flow.next);
+  next.current = flow.next;
+
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = { index: item?.index, phase };
+    if (before.index !== item?.index || before.phase === phase || !FINISHED.has(phase)) return;
+    const timer = window.setTimeout(() => next.current(), phase === "done" ? AUTO_NEXT_MS : 0);
+    return () => window.clearTimeout(timer);
+  }, [item?.index, phase]);
 
   if (!item) {
     return (
@@ -35,28 +55,32 @@ export function FixStep({
     );
   }
 
-  const questionKey = supportItemKey(item.type, "question");
-  const phase = actions[item.index];
+  const text = (part: SupportItemTextPart, fallback: string) => {
+    const key = supportItemKey(item.type, part);
+    return i18n.exists(key) ? t(key) : t(fallback);
+  };
   const ActionPreview = getPreviewTemplate(item.type).Preview;
+  const standalone = !needsProfile(item.type);
+  const params = flow.info.items[item.index]?.params;
 
   return (
     <SupportFrame
       onClose={flow.close}
       busy={actionRunning}
       stepper={flow.stepper}
-      left={<BackButton onClick={flow.back} disabled={actionRunning} />}
+      left={standalone ? undefined : <BackButton onClick={flow.back} disabled={actionRunning} />}
       right={
-        phase ? (
-          <Button variant="default" size="lg" onClick={flow.next} disabled={phase === "running"}>
-            {t("support_request.next")}
+        phase === "failed" ? (
+          <Button variant="3d" size="lg" onClick={() => items.runAction(item.index)}>
+            {t("support_request.retry")}
           </Button>
-        ) : (
+        ) : phase ? undefined : (
           <div className="flex gap-3">
-            <Button variant="secondary" size="lg" onClick={() => items.declineAction(item.index)}>
-              {t("support_request.fix.no")}
+            <Button variant="secondary" size="lg" onClick={() => items.declineAction(item.index)} disabled={!armed}>
+              {text("no", "support_request.fix.no")}
             </Button>
-            <Button variant="default" size="lg" onClick={() => items.runAction(item.index)} disabled={!armed}>
-              {t("support_request.fix.yes")}
+            <Button variant="3d" size="lg" onClick={() => items.runAction(item.index)} disabled={!armed}>
+              {text("yes", "support_request.fix.yes")}
             </Button>
           </div>
         )
@@ -69,30 +93,27 @@ export function FixStep({
           </p>
         )}
         <p className="font-minecraft text-xl text-white tracking-wide">
-          {i18n.exists(questionKey) ? t(questionKey) : t("support_request.fix.title")}
+          {text("question", "support_request.fix.title")}
         </p>
-        {ActionPreview && (item.action?.from || item.action?.to) ? (
-          <ActionPreview item={item} ctx={{ profile }} />
+        {ActionPreview && (standalone || item.action?.from || item.action?.to) ? (
+          <ActionPreview item={item} ctx={{ profile, params }} />
         ) : (
           <div className="flex items-start gap-4 rounded-lg border-2 border-white/15 bg-black/20 p-4">
-            <Icon icon={getSupportItemDefinition(item.type)!.icon} className="w-10 h-10 shrink-0 text-amber-300" />
+            <AccentIcon icon={getSupportItemDefinition(item.type)!.icon} className="w-10 h-10" />
             <p className="font-minecraft text-lg text-white/90 tracking-wide">
               {item.action?.description ?? t(supportItemKey(item.type, "label"))}
             </p>
           </div>
         )}
-        {phase === "running" && <Spinner text={t("support_request.fix.running")} />}
+        {phase === "running" && <Spinner text={text("running", "support_request.fix.running")} />}
         {phase === "done" && (
           <p className="flex items-center gap-2 font-minecraft text-lg text-green-300 tracking-wide">
             <Icon icon="solar:check-circle-bold" className="w-6 h-6" />
-            {t("support_request.fix.done")}
+            {text("done", "support_request.fix.done")}
           </p>
         )}
         {phase === "failed" && (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="font-minecraft text-lg text-white/85 tracking-wide">{t("support_request.fix.failed")}</p>
-            <TextLink onClick={() => items.runAction(item.index)}>{t("support_request.retry")}</TextLink>
-          </div>
+          <p className="font-minecraft text-lg text-white/85 tracking-wide">{text("failed", "support_request.fix.failed")}</p>
         )}
         {phase === "declined" && (
           <p className="font-minecraft text-lg text-white/70 tracking-wide">{t("support_request.fix.skipped")}</p>

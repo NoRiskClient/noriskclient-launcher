@@ -1,4 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import i18n from "../i18n/i18n";
+import { shareErrorKey, shareLog } from "./share-service";
+import { logError } from "../utils/logging-utils";
 
 export const LOG_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'] as const;
 export type LogLevel = typeof LOG_LEVELS[number];
@@ -253,14 +256,13 @@ export async function getLogFileContent(logFilePath: string): Promise<string> {
     return await invoke<string>('get_log_file_content', { logFilePath });
 }
 
-/**
- * Uploads log content to mclo.gs.
- * @param logContent The raw log content to upload.
- * @returns A promise that resolves to the URL of the uploaded log.
- */
-export async function uploadLogToMclogs(logContent: string): Promise<string> {
-    // Ensure the backend command name matches exactly
-    return await invoke<string>('upload_log_to_mclogs_command', { logContent });
+export async function uploadLog(logContent: string, name: string): Promise<string> {
+    try {
+        return (await shareLog(logContent, name)).pageUrl;
+    } catch (e) {
+        logError(`Could not share the log: ${e}`);
+        throw new Error(i18n.t(shareErrorKey(e)));
+    }
 }
 
 /**

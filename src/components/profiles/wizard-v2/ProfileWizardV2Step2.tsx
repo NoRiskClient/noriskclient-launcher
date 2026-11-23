@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import type { ModLoader } from "../../../types/profile";
@@ -53,7 +51,6 @@ export function ProfileWizardV2Step2({
 }: ProfileWizardV2Step2Props) {
   const { t } = useTranslation();
   const accentColor = useThemeStore((state) => state.accentColor);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLoader, setSelectedLoader] = useState<ModLoader>("fabric");
   const [selectedLoaderVersion, setSelectedLoaderVersion] = useState<string | null>(null);
@@ -295,15 +292,6 @@ export function ProfileWizardV2Step2({
   };
 
   const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <Icon icon="svg-spinners:ring-resize" className="w-12 h-12 text-white mb-4" />
-          <p className="text-sm font-smallcaps text-white">{t('profiles.wizard.loading')}</p>
-        </div>
-      );
-    }
-
     if (error) {
       return <StatusMessage type="error" message={error} />;
     }
@@ -421,7 +409,7 @@ export function ProfileWizardV2Step2({
       <Button
         variant="secondary"
         onClick={onBack}
-        disabled={loading || loadingVersions}
+        disabled={loadingVersions}
         size="md"
         className="text-sm"
         icon={<Icon icon="solar:arrow-left-bold" className="w-5 h-5" />}
@@ -433,7 +421,7 @@ export function ProfileWizardV2Step2({
       <Button
         variant="default"
         onClick={handleNext}
-        disabled={loading || loadingVersions || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
+        disabled={loadingVersions || (selectedLoader !== "vanilla" && !selectedLoaderVersion)}
         size="md"
         className="min-w-[180px] text-sm"
         icon={<Icon icon="solar:arrow-right-bold" className="w-5 h-5" />}

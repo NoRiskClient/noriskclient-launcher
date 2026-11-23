@@ -2,8 +2,7 @@ import { create } from "zustand";
 import type {
   CreateProfileParams,
   Profile,
-  UpdateProfileParams,
-  AllProfilesAndLastPlayed,
+  ProfilePatch,
 } from "../types/profile";
 import * as ProfileService from "../services/profile-service";
 import type { FileNode } from "../types/fileSystem";
@@ -21,12 +20,8 @@ interface ProfileState {
   fetchProfiles: () => Promise<void>;
   getProfile: (id: string) => Promise<Profile>;
   createProfile: (params: CreateProfileParams) => Promise<string>;
-  updateProfile: (id: string, updates: UpdateProfileParams) => Promise<void>;
+  patchProfile: (id: string, patch: ProfilePatch) => Promise<Profile>;
   deleteProfile: (id: string) => Promise<void>;
-  launchProfile: (id: string) => Promise<void>;
-  installProfile: (id: string) => Promise<void>;
-  abortProfileLaunch: (id: string) => Promise<void>;
-  isProfileLaunching: (id: string) => Promise<boolean>;
   copyProfile: (
     sourceId: string,
     newName: string,
@@ -103,25 +98,14 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }
   },
 
-  updateProfile: async (id: string, updates: UpdateProfileParams) => {
-    try {
-      await ProfileService.updateProfile(id, updates);
-      const { profiles } = get();
-      const updatedProfiles = profiles.map((profile) =>
-        profile.id === id ? { ...profile, ...updates } : profile,
-      );
-      //@ts-ignore
-      set({ profiles: updatedProfiles });
-
-      const { selectedProfile } = get();
-      if (selectedProfile && selectedProfile.id === id) {
-        //@ts-ignore
-        set({ selectedProfile: { ...selectedProfile, ...updates } });
-      }
-    } catch (error) {
-      console.error(`Failed to update profile ${id}:`, error);
-      throw error;
-    }
+  patchProfile: async (id: string, patch: ProfilePatch) => {
+    const updated = await ProfileService.patchProfile(id, patch);
+    const { profiles, selectedProfile } = get();
+    set({
+      profiles: profiles.map((profile) => (profile.id === id ? updated : profile)),
+      selectedProfile: selectedProfile?.id === id ? updated : selectedProfile,
+    });
+    return updated;
   },
 
   deleteProfile: async (id: string) => {
@@ -138,43 +122,6 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (error) {
       console.error(`Failed to delete profile ${id}:`, error);
       throw error;
-    }
-  },
-
-  launchProfile: async (id: string) => {
-    try {
-      await ProfileService.launchProfile(id);
-    } catch (error) {
-      console.error(`Failed to launch profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  installProfile: async (id: string) => {
-    try {
-      //@ts-ignore
-      await ProfileService.installProfile(id);
-    } catch (error) {
-      console.error(`Failed to install profile ${id}:`, error);
-      throw error;
-    }
-  },
-
-  abortProfileLaunch: async (id: string) => {
-    try {
-      await ProfileService.abortProfileLaunch(id);
-    } catch (error) {
-      console.error(`Failed to abort profile launch ${id}:`, error);
-      throw error;
-    }
-  },
-
-  isProfileLaunching: async (id: string) => {
-    try {
-      return await ProfileService.isProfileLaunching(id);
-    } catch (error) {
-      console.error(`Failed to check if profile ${id} is launching:`, error);
-      return false;
     }
   },
 
@@ -216,7 +163,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const newProfileId = await ProfileService.copyProfile(params);
       let sourceProfile = await get().getProfile(sourceId);
       if (sourceProfile.is_standard_version) {
-        await ProfileService.updateProfile(newProfileId, {
+        await ProfileService.patchProfile(newProfileId, {
           group: "CUSTOM",
         });
       }

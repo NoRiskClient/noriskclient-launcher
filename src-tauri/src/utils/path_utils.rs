@@ -193,10 +193,14 @@ pub struct FileNode {
 /// # Returns
 /// A Result containing the root FileNode with all its children
 pub async fn get_directory_structure(root_path: &Path, include_hidden: bool) -> Result<FileNode> {
-    walk_directory(root_path, include_hidden, &mut Vec::new()).await
+    walk_directory(root_path, include_hidden, None, &mut Vec::new()).await
 }
 
-async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<FileNode> {
+pub async fn get_directory_level(root_path: &Path, include_hidden: bool) -> Result<FileNode> {
+    walk_directory(root_path, include_hidden, Some(1), &mut Vec::new()).await
+}
+
+async fn walk_directory(root_path: &Path, include_hidden: bool, depth: Option<usize>, ancestors: &mut Vec<PathBuf>) -> Result<FileNode> {
     // Get metadata for the root path
     let metadata = fs::metadata(root_path).await.map_err(|e| AppError::Io(e))?;
 
@@ -224,8 +228,11 @@ async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut 
         });
     }
 
-    let canonical = fs::canonicalize(root_path).await.unwrap_or_else(|_| root_path.to_path_buf());
-    if ancestors.contains(&canonical) {
+    let canonical = match depth {
+        Some(0) => None,
+        _ => Some(fs::canonicalize(root_path).await.unwrap_or_else(|_| root_path.to_path_buf())),
+    };
+    let Some(canonical) = canonical.filter(|c| !ancestors.contains(c)) else {
         return Ok(FileNode {
             name,
             path: root_path.to_path_buf(),
@@ -234,9 +241,9 @@ async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut 
             size: 0,
             last_modified,
         });
-    }
+    };
     ancestors.push(canonical);
-    let listed = read_children(root_path, include_hidden, ancestors).await;
+    let listed = read_children(root_path, include_hidden, depth.map(|d| d - 1), ancestors).await;
     ancestors.pop();
     let mut children = listed?;
 
@@ -256,7 +263,7 @@ async fn walk_directory(root_path: &Path, include_hidden: bool, ancestors: &mut 
     })
 }
 
-async fn read_children(root_path: &Path, include_hidden: bool, ancestors: &mut Vec<PathBuf>) -> Result<Vec<FileNode>> {
+async fn read_children(root_path: &Path, include_hidden: bool, depth: Option<usize>, ancestors: &mut Vec<PathBuf>) -> Result<Vec<FileNode>> {
     // If it's a directory, read its entries and process each one
     let mut children = Vec::new();
     let mut entries = fs::read_dir(root_path).await.map_err(|e| AppError::Io(e))?;
@@ -274,7 +281,7 @@ async fn read_children(root_path: &Path, include_hidden: bool, ancestors: &mut V
         }
 
         // Recursively process this entry - using Box::pin to handle recursion
-        match Box::pin(walk_directory(&path, include_hidden, ancestors)).await {
+        match Box::pin(walk_directory(&path, include_hidden, depth, ancestors)).await {
             Ok(node) => children.push(node),
             Err(e) => {
                 // Log the error but continue with other entries
@@ -608,66 +615,6 @@ pub async fn copy_profile_files(
     );
 
     Ok(total_files_copied)
-}
-
-/// Example function showing how to copy a profile with exclusions.
-/// This demonstrates how to use the directory structure and filtering functions.
-///
-/// # Arguments
-/// * `source_profile_path` - The source profile directory path
-/// * `dest_profile_path` - The destination profile directory path
-/// * `excluded_paths` - Paths to exclude from copying
-///
-/// # Returns
-/// Result with the number of files copied
-pub async fn copy_profile_with_exclusions(
-    source_profile_path: &Path,
-    dest_profile_path: &Path,
-    excluded_paths: &[PathBuf],
-) -> Result<u64> {
-    info!(
-        "Copying profile from {} to {} with {} exclusions",
-        source_profile_path.display(),
-        dest_profile_path.display(),
-        excluded_paths.len()
-    );
-
-    // Get the io_semaphore from global state
-    let state = crate::state::State::get().await?;
-    let io_semaphore = state.io_semaphore.clone();
-
-    // Convert excluded paths to strings and put them in a HashSet for efficient lookup
-    let excluded_set: std::collections::HashSet<String> = excluded_paths
-        .iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
-
-    // First, get the complete directory structure
-    let dir_structure = get_directory_structure(source_profile_path, false).await?;
-
-    // Filter the structure based on exclusions
-    let filtered_structure = filter_directory_structure(&dir_structure, &excluded_set)
-        .ok_or_else(|| AppError::Other("All files were excluded, nothing to copy".to_string()))?;
-
-    // Create the destination directory if it doesn't exist
-    if !dest_profile_path.exists() {
-        fs::create_dir_all(dest_profile_path)
-            .await
-            .map_err(|e| AppError::Io(e))?;
-    }
-
-    // Copy the files according to the filtered structure
-    let files_copied = copy_profile_files(
-        &filtered_structure,
-        source_profile_path,
-        dest_profile_path,
-        io_semaphore,
-    )
-    .await?;
-
-    info!("Profile copy completed. Copied {} files.", files_copied);
-
-    Ok(files_copied)
 }
 
 // Konstante aus dem mod_downloader/norisk_pack_downloader übernehmen

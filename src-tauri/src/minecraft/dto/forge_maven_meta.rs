@@ -23,13 +23,6 @@ pub struct Versions {
 }
 
 impl ForgeMavenMetadata {
-    pub fn get_latest_version(&self) -> &str {
-        &self.versioning.latest
-    }
-
-    pub fn get_release_version(&self) -> &str {
-        &self.versioning.release
-    }
 
     pub fn get_all_versions(&self) -> &[String] {
         &self.versioning.versions.versions
@@ -57,11 +50,6 @@ impl ForgeMavenMetadata {
         versions
     }
 
-    pub fn get_latest_version_for_minecraft(&self, minecraft_version: &str) -> Option<String> {
-        self.get_versions_for_minecraft(minecraft_version)
-            .into_iter()
-            .next()
-    }
 }
 
 // Split the FORGE_BUILD part (strip MC prefix + optional trailing MC suffix)

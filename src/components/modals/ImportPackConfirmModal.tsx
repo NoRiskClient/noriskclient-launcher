@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
@@ -16,6 +14,7 @@ import {
   ImportTrustWarning,
 } from "../profiles/import/ImportSecurityPanel";
 import { ImportRemovedList } from "../profiles/import/ImportRemovedList";
+import { ImportOriginPanel } from "../profiles/import/ImportOriginPanel";
 import { useImportConfirmStore } from "../../store/import-confirm-store";
 import { useKnownProfileGroups } from "../../hooks/useKnownProfileGroups";
 import { runPackImport } from "../../utils/pack-import";
@@ -109,6 +108,8 @@ export function ImportPackConfirmModal() {
           </div>
         ) : (
           <>
+            {preview.origin && <ImportOriginPanel origin={preview.origin} />}
+
             <div className="space-y-4">
               <div className="flex flex-col">
                 <label className="block text-lg font-smallcaps text-white mb-2">

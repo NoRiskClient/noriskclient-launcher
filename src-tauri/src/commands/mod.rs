@@ -2,6 +2,7 @@ pub mod applixir_command;
 pub mod assets_command;
 #[cfg(desktop)]
 pub mod deep_link_handler;
+pub mod feature_flags_command;
 #[cfg(desktop)]
 pub mod support_command;
 pub mod cape_command;
@@ -21,8 +22,7 @@ pub mod crash_fix_command;
 #[cfg(desktop)]
 pub mod curseforge_commands;
 pub mod file_command;
-#[cfg(desktop)]
-pub mod flagsmith_commands;
+pub mod blocked_mods_commands;
 pub mod friends_command;
 pub mod mcreal_commands;
 #[cfg(desktop)]
@@ -46,7 +46,11 @@ pub mod path_commands;
 pub mod process_command;
 #[cfg(desktop)]
 pub mod profile_command;
+#[cfg(desktop)]
+pub mod share;
 pub mod skin_render_command;
+#[cfg(desktop)]
+pub mod support_profile_command;
 #[cfg(desktop)]
 pub mod sync_pack_command;
 pub mod twitch_command;

@@ -7,8 +7,8 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod error;
+pub mod feature_flags;
 pub mod friends;
-#[cfg(desktop)]
 pub mod integrations;
 pub mod logging;
 pub mod minecraft;
@@ -18,6 +18,7 @@ pub mod sync;
 #[cfg(desktop)]
 pub mod support;
 
+use futures::FutureExt;
 use log::{error, info, trace};
 use std::sync::Arc;
 use tauri::Listener;
@@ -60,7 +61,6 @@ use commands::minecraft_command::{
     remove_skin,
     reset_skin,
     update_skin_properties,
-    upload_log_to_mclogs_command,
     upload_skin,
 };
 #[cfg(desktop)]
@@ -70,10 +70,10 @@ use commands::profile_command::{
     create_profile, delete_custom_mod, delete_mod_from_profile, delete_profile, delete_world,
     export_profile, get_all_profiles_and_last_played, get_custom_mods, get_local_content,
     get_local_datapacks, get_local_resourcepacks, get_local_shaderpacks, get_log_file_content,
-    get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_structure,
-    get_profile_log_files,
+    get_norisk_packs, get_norisk_packs_resolved, get_profile, get_profile_directory_level,
+    get_profile_directory_structure, get_profile_log_files,
     get_servers_for_profile,
-    get_default_memory_max_mb, get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
+    get_default_jvm_args, get_default_memory_max_mb, patch_profile, get_standard_profiles, get_system_ram_mb, get_worlds_for_profile, import_local_mods,
     import_profile, import_world, is_content_installed, is_profile_launching,
     launch_profile, list_profile_backups, list_profile_screenshots, list_profiles, open_profile_folder,
     open_profile_latest_log, preview_import_pack, refresh_norisk_packs, refresh_standard_versions,
@@ -81,7 +81,7 @@ use commands::profile_command::{
     get_profile_store_status, reimport_profiles_from_legacy_json,
     resolve_loader_version, restore_profile_backup, search_profiles, set_custom_mod_enabled, set_norisk_mod_status,
     set_profile_mod_enabled, update_datapack_from_modrinth, update_modrinth_mod_version,
-    update_profile, update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
+    update_resourcepack_from_modrinth, update_shaderpack_from_modrinth,
 };
 
 // Use statements for registered commands only
@@ -147,9 +147,9 @@ use commands::vanilla_cape_command::{
 use commands::assets_command::get_or_download_asset_model;
 
 // Import NRC commands
-use commands::nrc_commands::get_news_and_changelogs_command;
+use commands::nrc_commands::get_launcher_news_command;
 #[cfg(desktop)]
-use commands::nrc_commands::{check_update_available_command, download_and_install_update_command};
+use commands::nrc_commands::{check_update_available_command, download_and_install_update_command, get_launcher_update_command};
 
 // Import Content commands
 #[cfg(desktop)]
@@ -258,7 +258,212 @@ pub fn run() {
             if cli::dispatch_cold_start(&app_handle) {
                 return Ok(());
             }
+            }
 
+            commands::legal_commands::request_updates_at_startup();
+
+            // --- Handle .noriskpack file opening on initial startup (all platforms) ---
+            // The single-instance plugin does not handle the *very first* launch with arguments.
+            // We still need to check std::env::args() here for that first launch.
+            /*info!("Checking for startup file arguments...");
+            let startup_args: Vec<String> = std::env::args().collect();
+            if startup_args.len() > 1 { // args[0] is exe path, check if there are more
+                let handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Pass all startup_args; handle_noriskpack_file_paths will skip the exe path if needed
+                    norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
+                });
+            }*/
+            // --- End .noriskpack handling on startup ---
+
+            // Task for State Init and Updater Window
+            let (windows_built, updater_window) =
+                tokio::sync::oneshot::channel::<Option<tauri::WebviewWindow>>();
+            let state_init_app_handle = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let updater_window = updater_window.map(|built| built.ok().flatten()).shared();
+
+                // --- State Initialization ---
+                info!("Initiating state initialization...");
+                if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
+                    error!("CRITICAL: Failed to initialize state: {}", e);
+                    if let Some(win) = updater_window.clone().await {
+                        if let Err(close_err) = win.close() {
+                            error!("Failed to close updater window after state init error: {}", close_err);
+                        }
+                    }
+                    {
+                        use tauri_plugin_dialog::{
+                            DialogExt, MessageDialogButtons, MessageDialogKind,
+                        };
+
+                        let reset = state_init_app_handle
+                            .dialog()
+                            .message(
+                                [
+                                    "The NoRisk Launcher could not start.".to_string(),
+                                    String::new(),
+                                    e.to_string(),
+                                    String::new(),
+                                    "If that does not help:".to_string(),
+                                    concat!(
+                                        "\"Reset database and restart\" keeps the old ",
+                                        "database as app.db.broken.<time> and restores ",
+                                        "your profiles from profiles.json.migrated."
+                                    )
+                                    .to_string(),
+                                    String::new(),
+                                    "Support: https://discord.norisk.gg".to_string(),
+                                ]
+                                .join("\n"),
+                            )
+                            .kind(MessageDialogKind::Error)
+                            .title("NoRisk Launcher - Startup Failed")
+                            .buttons(MessageDialogButtons::OkCancelCustom(
+                                "Reset database and restart".to_string(),
+                                "Quit".to_string(),
+                            ))
+                            .blocking_show();
+
+                        if reset {
+                            match state::db::quarantine_database().await {
+                                Ok(moved) => {
+                                    info!("Database moved aside to {:?}, restarting", moved);
+                                    state_init_app_handle.restart();
+                                }
+                                Err(err) => {
+                                    error!("Could not move the database aside: {}", err);
+                                    let _ = state_init_app_handle
+                                        .dialog()
+                                        .message(format!("{}", err))
+                                        .kind(MessageDialogKind::Error)
+                                        .title("NoRisk Launcher - Reset Failed")
+                                        .blocking_show();
+                                }
+                            }
+                        }
+                    }
+                    std::process::exit(1);
+                }
+                info!("State initialization finished successfully.");
+                feature_flags::start(state_init_app_handle.clone());
+
+                // Sweep last session's throwaway temp profiles into the trash
+                // (non-blocking, best-effort). The trash's purge_expired retention
+                // then deletes them for good. See utils::trash_utils.
+                #[cfg(desktop)]
+                tauri::async_runtime::spawn(async {
+                    utils::trash_utils::reap_temp_profiles().await;
+                });
+
+                #[cfg(desktop)]
+                tauri::async_runtime::spawn_blocking(utils::game_sessions::remove_stale);
+
+                tauri::async_runtime::spawn(async {
+                    if let Err(e) =
+                        commands::skin_render_command::prune_skin_renders(30).await
+                    {
+                        log::warn!("Failed to prune skin renders: {}", e);
+                    }
+                });
+
+                // Issue #130: recover disk from pre-fix runaway logs.
+                #[cfg(desktop)]
+                tauri::async_runtime::spawn(async {
+                    utils::log_archive::cleanup_oversized_logs().await;
+                });
+
+                // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
+                #[cfg(desktop)]
+                tauri::async_runtime::spawn(async {
+                    utils::mod_cache_cleanup::run_startup_cleanup().await;
+                });
+
+                #[cfg(any(windows, target_os = "macos"))]
+                commands::clip_commands::start_on_launch(state_init_app_handle.clone());
+
+                #[cfg(desktop)]
+                {
+                utils::background_updater::install_from_last_session(&state_init_app_handle, updater_window.clone()).await;
+                utils::background_updater::spawn(state_init_app_handle.clone());
+                }
+
+                if let Some(win) = updater_window.await {
+                    let _ = win.close();
+                }
+
+                #[cfg(desktop)]
+                {
+                info!("Updater process finished. Attempting to show main window...");
+                if let Some(main_window) = state_init_app_handle.get_webview_window("main") {
+                    match main_window.show() {
+                        Ok(_) => {
+                            info!("Main window shown successfully.");
+                            if let Err(e) = main_window.set_focus() {
+                                error!("Failed to focus main window (non-critical): {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("CRITICAL: Failed to show main window: {}", e);
+
+                            #[cfg(target_os = "windows")]
+                            {
+                                use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                                let _ = state_init_app_handle
+                                    .dialog()
+                                    .message("The NoRisk Launcher encountered a critical error.\n\n\
+                                        Please join our Discord for support:\n\
+                                        https://discord.norisk.gg")
+                                    .kind(MessageDialogKind::Error)
+                                    .title("NoRisk Launcher - Critical Error")
+                                    .blocking_show();
+                            }
+
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    error!("CRITICAL: Could not get main window handle!");
+
+                    #[cfg(target_os = "windows")]
+                    {
+                        use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                        let _ = state_init_app_handle
+                            .dialog()
+                            .message("The NoRisk Launcher encountered a critical error.\n\n\
+                                Please join our Discord for support:\n\
+                                https://discord.norisk.gg")
+                            .kind(MessageDialogKind::Error)
+                            .title("NoRisk Launcher - Critical Error")
+                            .blocking_show();
+                    }
+
+                    std::process::exit(1);
+                }
+                }
+            });
+
+            if app.get_webview_window("main").is_none() {
+                tauri::WebviewWindowBuilder::from_config(&app_handle, &app.config().app.windows[0])?
+                    .build()?;
+            }
+            #[cfg(desktop)]
+            let updater_window = match updater_utils::create_updater_window(&app_handle) {
+                Ok(win) => {
+                    trace!("Updater window created successfully (initially hidden).");
+                    Some(win)
+                }
+                Err(e) => {
+                    error!("Failed to create updater window: {}", e);
+                    None
+                }
+            };
+            #[cfg(mobile)]
+            let updater_window = None;
+            let _ = windows_built.send(updater_window);
+
+            #[cfg(desktop)]
+            {
             // --- Initialize System Tray (Tauri 2.0) ---
             let show_item = MenuItem::with_id(app, "show", "Show NoRisk Launcher", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -318,232 +523,6 @@ pub fn run() {
             // --- End Deep Link Setup ---
             }
 
-            // --- Handle .noriskpack file opening on initial startup (all platforms) ---
-            // The single-instance plugin does not handle the *very first* launch with arguments.
-            // We still need to check std::env::args() here for that first launch.
-            /*info!("Checking for startup file arguments...");
-            let startup_args: Vec<String> = std::env::args().collect();
-            if startup_args.len() > 1 { // args[0] is exe path, check if there are more
-                let handle_clone = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    // Pass all startup_args; handle_noriskpack_file_paths will skip the exe path if needed
-                    norisk_packs::handle_noriskpack_file_paths(&handle_clone, startup_args).await;
-                });
-            }*/
-            // --- End .noriskpack handling on startup ---
-
-            // Task for State Init and Updater Window
-            let state_init_app_handle = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                // --- Create Updater Window (but keep hidden initially) ---
-                #[cfg(desktop)]
-                let updater_window = match updater_utils::create_updater_window(&state_init_app_handle).await {
-                    Ok(win) => {
-                        trace!("Updater window created successfully (initially hidden).");
-                        Some(win)
-                    }
-                    Err(e) => {
-                        error!("Failed to create updater window: {}", e);
-                        None
-                    }
-                };
-
-                // --- State Initialization ---
-                info!("Initiating state initialization...");
-                if let Err(e) = state::state_manager::State::init(Arc::new(state_init_app_handle.clone())).await {
-                    error!("CRITICAL: Failed to initialize state: {}", e);
-                    #[cfg(desktop)]
-                    if let Some(win) = updater_window {
-                        updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state init error.".to_string(), None);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-                        if let Err(close_err) = win.close() {
-                            error!("Failed to close updater window after state init error: {}", close_err);
-                        }
-                    }
-                    {
-                        use tauri_plugin_dialog::{
-                            DialogExt, MessageDialogButtons, MessageDialogKind,
-                        };
-
-                        let reset = state_init_app_handle
-                            .dialog()
-                            .message(
-                                [
-                                    "The NoRisk Launcher could not start.".to_string(),
-                                    String::new(),
-                                    e.to_string(),
-                                    String::new(),
-                                    "If that does not help:".to_string(),
-                                    concat!(
-                                        "\"Reset database and restart\" keeps the old ",
-                                        "database as app.db.broken.<time> and restores ",
-                                        "your profiles from profiles.json.migrated."
-                                    )
-                                    .to_string(),
-                                    String::new(),
-                                    "Support: https://discord.norisk.gg".to_string(),
-                                ]
-                                .join("\n"),
-                            )
-                            .kind(MessageDialogKind::Error)
-                            .title("NoRisk Launcher - Startup Failed")
-                            .buttons(MessageDialogButtons::OkCancelCustom(
-                                "Reset database and restart".to_string(),
-                                "Quit".to_string(),
-                            ))
-                            .blocking_show();
-
-                        if reset {
-                            match state::db::quarantine_database().await {
-                                Ok(moved) => {
-                                    info!("Database moved aside to {:?}, restarting", moved);
-                                    state_init_app_handle.restart();
-                                }
-                                Err(err) => {
-                                    error!("Could not move the database aside: {}", err);
-                                    let _ = state_init_app_handle
-                                        .dialog()
-                                        .message(format!("{}", err))
-                                        .kind(MessageDialogKind::Error)
-                                        .title("NoRisk Launcher - Reset Failed")
-                                        .blocking_show();
-                                }
-                            }
-                        }
-                    }
-                    std::process::exit(1);
-                }
-                info!("State initialization finished successfully.");
-
-                // Sweep last session's throwaway temp profiles into the trash
-                // (non-blocking, best-effort). The trash's purge_expired retention
-                // then deletes them for good. See utils::trash_utils.
-                #[cfg(desktop)]
-                tauri::async_runtime::spawn(async {
-                    utils::trash_utils::reap_temp_profiles().await;
-                });
-
-                tauri::async_runtime::spawn(async {
-                    if let Err(e) =
-                        commands::skin_render_command::prune_skin_renders(30).await
-                    {
-                        log::warn!("Failed to prune skin renders: {}", e);
-                    }
-                });
-
-                // Issue #130: recover disk from pre-fix runaway logs.
-                #[cfg(desktop)]
-                tauri::async_runtime::spawn(async {
-                    utils::log_archive::cleanup_oversized_logs().await;
-                });
-
-                // Issue #242: drop stale/orphan cached jars (debounced, best-effort).
-                #[cfg(desktop)]
-                tauri::async_runtime::spawn(async {
-                    utils::mod_cache_cleanup::run_startup_cleanup().await;
-                });
-
-                #[cfg(any(windows, target_os = "macos"))]
-                commands::clip_commands::start_on_launch(state_init_app_handle.clone());
-
-                #[cfg(desktop)]
-                {
-                trace!("Attempting to retrieve launcher configuration for update check...");
-                match state::state_manager::State::get().await {
-                    Ok(state_manager_instance) => {
-                        let config = state_manager_instance.config_manager.get_config().await;
-                        let check_beta_channel = config.check_beta_channel;
-                        let mut auto_check_updates_enabled = config.auto_check_updates;
-
-                        // Disable auto-updates when running in Flatpak
-                        if updater_utils::is_flatpak() {
-                            info!("Running in Flatpak environment - disabling automatic updates (Flatpak handles updates through its own mechanism).");
-                            auto_check_updates_enabled = false;
-                        }
-
-                        if auto_check_updates_enabled {
-                            trace!("Initiating application update check (Channel determined by config: Beta={})...", check_beta_channel);
-                            updater_utils::check_for_updates(state_init_app_handle.clone(), check_beta_channel, updater_window.clone()).await;
-                            trace!("Update check process has finished.");
-                        } else {
-                            info!("Auto-check for updates is disabled in settings. Skipping update check.");
-                            // Ensure the updater window (if created) is closed if we skip the check.
-                            if let Some(win) = updater_window {
-                                updater_utils::emit_status(&state_init_app_handle, "close", "Auto-update disabled.".to_string(), None);
-                                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await; // Give time for emit to process
-                                if let Err(close_err) = win.close() {
-                                    error!("Failed to close updater window when skipping updates: {}", close_err);
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to get global state for update check: {}.", e);
-                        if let Some(win) = updater_window {
-                            updater_utils::emit_status(&state_init_app_handle, "close", "Closing due to state fetch error.".to_string(), None);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-                            if let Err(close_err) = win.close() {
-                                error!("Failed to close updater window after state fetch error: {}", close_err);
-                            }
-                        }
-                    }
-                }
-
-                info!("Updater process finished. Attempting to show main window...");
-                if let Some(main_window) = state_init_app_handle.get_webview_window("main") {
-                    match main_window.show() {
-                        Ok(_) => {
-                            info!("Main window shown successfully.");
-                            if let Err(e) = main_window.set_focus() {
-                                error!("Failed to focus main window (non-critical): {}", e);
-                            }
-                        }
-                        Err(e) => {
-                            error!("CRITICAL: Failed to show main window: {}", e);
-
-                            #[cfg(target_os = "windows")]
-                            {
-                                use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-                                let _ = state_init_app_handle
-                                    .dialog()
-                                    .message("The NoRisk Launcher encountered a critical error.\n\n\
-                                        Please join our Discord for support:\n\
-                                        https://discord.norisk.gg")
-                                    .kind(MessageDialogKind::Error)
-                                    .title("NoRisk Launcher - Critical Error")
-                                    .blocking_show();
-                            }
-
-                            std::process::exit(1);
-                        }
-                    }
-                } else {
-                    error!("CRITICAL: Could not get main window handle!");
-
-                    #[cfg(target_os = "windows")]
-                    {
-                        use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-                        let _ = state_init_app_handle
-                            .dialog()
-                            .message("The NoRisk Launcher encountered a critical error.\n\n\
-                                Please join our Discord for support:\n\
-                                https://discord.norisk.gg")
-                            .kind(MessageDialogKind::Error)
-                            .title("NoRisk Launcher - Critical Error")
-                            .blocking_show();
-                    }
-
-                    std::process::exit(1);
-                }
-                }
-
-                // --- Test Unified Mod Search ---
-                //debug_utils::debug_unified_mod_search().await;
-
-                // --- Test Unified Mod Versions ---
-                //debug_utils::debug_unified_mod_versions().await;
-            });
-
             utils::screen_time::spawn(app_handle.clone());
 
             // --- Register Focus Event Listener for Discord RPC ---
@@ -582,8 +561,6 @@ pub fn run() {
             create_profile,
             #[cfg(desktop)]
             get_profile,
-            #[cfg(desktop)]
-            update_profile,
             #[cfg(desktop)]
             delete_profile,
             #[cfg(desktop)]
@@ -707,6 +684,10 @@ pub fn run() {
             #[cfg(desktop)]
             get_default_memory_max_mb,
             #[cfg(desktop)]
+            get_default_jvm_args,
+            #[cfg(desktop)]
+            patch_profile,
+            #[cfg(desktop)]
             delete_custom_mod,
             #[cfg(desktop)]
             open_profile_folder,
@@ -714,7 +695,6 @@ pub fn run() {
             import_profile,
             #[cfg(desktop)]
             preview_import_pack,
-            upload_log_to_mclogs_command,
             get_fabric_loader_versions,
             get_forge_versions,
             get_neoforge_versions,
@@ -731,6 +711,8 @@ pub fn run() {
             get_standard_profiles,
             #[cfg(desktop)]
             get_profile_directory_structure,
+            #[cfg(desktop)]
+            get_profile_directory_level,
             #[cfg(desktop)]
             copy_profile,
             #[cfg(desktop)]
@@ -830,9 +812,11 @@ pub fn run() {
             open_file,
             read_file_bytes,
             get_app_version,
-            get_news_and_changelogs_command,
+            get_launcher_news_command,
             #[cfg(desktop)]
             check_update_available_command,
+            #[cfg(desktop)]
+            get_launcher_update_command,
             #[cfg(desktop)]
             download_and_install_update_command,
             #[cfg(desktop)]
@@ -901,17 +885,15 @@ pub fn run() {
             commands::crash_fix_command::revert_crash_fix,
             commands::nrc_commands::log_message_command,
             #[cfg(desktop)]
-            commands::flagsmith_commands::set_blocked_mods_config,
+            commands::blocked_mods_commands::set_blocked_mods_config,
             #[cfg(desktop)]
-            commands::flagsmith_commands::get_blocked_mods_config,
+            commands::blocked_mods_commands::get_blocked_mods_config,
             #[cfg(desktop)]
-            commands::flagsmith_commands::is_filename_blocked,
+            commands::blocked_mods_commands::is_filename_blocked,
             #[cfg(desktop)]
-            commands::flagsmith_commands::is_mod_id_blocked,
+            commands::blocked_mods_commands::is_mod_id_blocked,
             #[cfg(desktop)]
-            commands::flagsmith_commands::is_modrinth_project_id_blocked,
-            #[cfg(desktop)]
-            commands::flagsmith_commands::refresh_blocked_mods_config,
+            commands::blocked_mods_commands::is_modrinth_project_id_blocked,
             #[cfg(desktop)]
             commands::pack_rollout_commands::set_pack_rollout_config,
             #[cfg(desktop)]
@@ -926,6 +908,7 @@ pub fn run() {
             commands::pack_rollout_commands::is_pack_aliased,
             #[cfg(desktop)]
             commands::pack_fallback_commands::set_pack_fallback_config,
+            commands::feature_flags_command::get_feature_flags,
             #[cfg(desktop)]
             commands::pack_fallback_commands::get_pack_fallback_config,
             commands::permission_commands::refresh_permissions,
@@ -1097,6 +1080,8 @@ pub fn run() {
             #[cfg(desktop)]
             commands::support_command::support_request_close,
             #[cfg(desktop)]
+            commands::support_profile_command::support_request_share_profile,
+            #[cfg(desktop)]
             commands::clip_commands::capture_apply_settings,
             #[cfg(desktop)]
             commands::clip_commands::capture_release_hotkeys,
@@ -1152,6 +1137,14 @@ pub fn run() {
             commands::clip_commands::clip_editor_current,
             #[cfg(desktop)]
             commands::clip_commands::clip_editor_close,
+            #[cfg(desktop)]
+            commands::share::share_clip,
+            #[cfg(desktop)]
+            commands::share::share_screenshot,
+            #[cfg(desktop)]
+            commands::share::share_log,
+            #[cfg(desktop)]
+            commands::share::share_choices,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -1160,6 +1153,8 @@ pub fn run() {
             |app_handle, event| {
                 if matches!(event, tauri::RunEvent::Exit) {
                     utils::screen_time::report_before_exit();
+                    #[cfg(desktop)]
+                    utils::background_updater::install_on_exit();
                 }
 
                 #[cfg(target_os = "macos")]

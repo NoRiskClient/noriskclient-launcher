@@ -201,6 +201,46 @@ async fn rewriting_a_profile_does_not_lose_its_mods() {
 }
 
 #[tokio::test]
+async fn writing_profile_fields_leaves_the_mods_rows_alone() {
+    let store = store().await;
+    let profile = corpus()
+        .into_iter()
+        .find(|p| p.mods.len() > 1)
+        .expect("need a profile with mods");
+    store.upsert_many(&[profile.clone()]).await.unwrap();
+
+    let mut fields_only = profile.clone();
+    fields_only.name = "renamed".to_string();
+    fields_only.settings.jvm_args = "-XX:+UseZGC".to_string();
+    fields_only.mods.clear();
+    store.upsert_profile_fields(&fields_only).await.unwrap();
+
+    let loaded = &store.load_all().await.unwrap()[&profile.id];
+    assert_eq!(loaded.name, "renamed");
+    assert_eq!(
+        loaded.settings.jvm_args.as_str(),
+        "-XX:+UseZGC"
+    );
+    assert_eq!(loaded.mods.len(), profile.mods.len());
+}
+
+#[tokio::test]
+async fn writing_fields_of_an_unstored_profile_stores_it_whole() {
+    let store = store().await;
+    let profile = corpus()
+        .into_iter()
+        .find(|p| !p.mods.is_empty())
+        .expect("need a profile with mods");
+
+    store.upsert_profile_fields(&profile).await.unwrap();
+
+    assert_eq!(
+        store.load_all().await.unwrap()[&profile.id].mods.len(),
+        profile.mods.len()
+    );
+}
+
+#[tokio::test]
 async fn deleting_a_profile_takes_its_children_with_it() {
     let store = store().await;
     let profile = corpus()

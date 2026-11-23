@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { useThemeStore } from "../store/useThemeStore";
 import { useFontStore } from "../store/font-store";

@@ -176,43 +176,6 @@ impl NoRiskApi {
         Ok(server_response)
     }
 
-    pub async fn post_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
-        endpoint: &str,
-        norisk_token: &str,
-        params: &str,
-        extra_params: Option<HashMap<&str, &str>>,
-        is_experimental: bool,
-    ) -> Result<T> {
-        let base_url = Self::get_api_base(is_experimental);
-        let url = format!("{}/{}", base_url, endpoint);
-
-        trace!("[NoRisk API] Making request to endpoint: {}", endpoint);
-        trace!("[NoRisk API] Full URL: {}", url);
-
-        let mut query_params: HashMap<&str, &str> = HashMap::new();
-        if !params.is_empty() {
-            query_params.insert("params", params);
-            trace!("[NoRisk API] Added base params: {}", params);
-        }
-
-        if let Some(extra) = extra_params {
-            for (key, value) in extra {
-                query_params.insert(key, value);
-                trace!("[NoRisk API] Added extra param: {} = {}", key, value);
-            }
-        }
-
-        trace!(
-            "[NoRisk API] Sending POST request with {} parameters",
-            query_params.len()
-        );
-        nrc_post(url)
-            .bearer(norisk_token)
-            .query(&query_params)
-            .json::<T>(endpoint)
-            .await
-    }
-
     pub async fn get_from_norisk_endpoint_with_parameters<T: for<'de> Deserialize<'de>>(
         endpoint: &str,
         norisk_token: &str,
@@ -343,29 +306,6 @@ impl NoRiskApi {
         nrc_post(url)
             .query(&query_params)
             .json::<NoRiskToken>("NoRisk token refresh v3")
-            .await
-    }
-
-    pub async fn request_from_norisk_endpoint<T: for<'de> Deserialize<'de>>(
-        endpoint: &str,
-        norisk_token: &str,
-        request_uuid: &str,
-        is_experimental: bool,
-    ) -> Result<T> {
-        debug!(
-            "[NoRisk API] Request from endpoint: {} with UUID: {}",
-            endpoint, request_uuid
-        );
-        let mut extra_params = HashMap::new();
-        extra_params.insert("uuid", request_uuid);
-
-        Self::post_from_norisk_endpoint_with_parameters(
-            endpoint,
-            norisk_token,
-            "",
-            Some(extra_params),
-            is_experimental,
-        )
             .await
     }
 

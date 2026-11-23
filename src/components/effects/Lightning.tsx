@@ -1,4 +1,3 @@
-"use client";
 import { useEffect, useRef } from "react";
 import { useQualitySettingsStore } from "../../store/quality-settings-store";
 import { useWindowFocus } from "../../hooks/useWindowFocus";

@@ -14,8 +14,6 @@ macro_rules! measure_time {
 pub mod content_copy;
 #[cfg(desktop)]
 pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von DataPacks
-#[cfg(desktop)]
-pub mod debug_utils;
 pub mod disk_space_utils; // Disk space utility for checking available space before downloads
 pub mod download_utils; // Central download utility for robust file downloads
 #[cfg(desktop)]
@@ -28,6 +26,7 @@ pub mod hash_utils;
 pub mod capture_runtime;
 #[cfg(desktop)]
 pub mod clip_library;
+pub mod mp4_probe;
 #[cfg(desktop)]
 pub mod clip_overlay;
 #[cfg(windows)]
@@ -42,6 +41,8 @@ pub mod window_focus;
 pub mod screens;
 #[cfg(desktop)]
 pub mod game_detect; // Recognises a game on screen so clips are not Minecraft-only
+#[cfg(desktop)]
+pub mod game_sessions;
 #[cfg(desktop)]
 pub mod game_watch; // Follows the foreground game and keeps the engine pointed at it
 pub mod screen_time;
@@ -58,6 +59,7 @@ pub mod java_detector; // Java detector to find Java installations
 pub mod log_archive; // Archives per-session game logs centrally
 #[cfg(desktop)]
 pub mod bounded_log_writer;
+pub mod metered_network;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 #[cfg(desktop)]
 pub mod migration_utils; // Migration utilities for profile and config updates
@@ -76,7 +78,10 @@ pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-S
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks
 pub mod system_info; // <-- Hinzufügen
 #[cfg(desktop)]
+pub mod background_updater;
+#[cfg(desktop)]
 pub mod updater_utils;
+pub mod verified_files;
 #[cfg(desktop)]
 pub mod world_utils; // <-- Hinzugefügt
 #[cfg(desktop)]

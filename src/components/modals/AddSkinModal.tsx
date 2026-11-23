@@ -1,9 +1,6 @@
-"use client";
-
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MinecraftSkin, SkinVariant } from "../../types/localSkin";
-import { useThemeStore } from "../../store/useThemeStore";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -38,7 +35,6 @@ interface AddSkinModalProps {
 export const AddSkinModal = memo(
   ({ skin, onSave, onSaveAndApply, onAdd, isLoading }: AddSkinModalProps) => {
     const { t } = useTranslation();
-    const [name, setName] = useState<string>(skin?.name ?? "");
     const [isSlimVariant, setIsSlimVariant] = useState<boolean>(
       skin?.variant === "slim",
     );
@@ -53,7 +49,6 @@ export const AddSkinModal = memo(
     const [previewSkinName, setPreviewSkinName] = useState<string>(skin?.name ?? "");
 
     const variant: SkinVariant = isSlimVariant ? "slim" : "classic";
-    const accentColor = useThemeStore((state) => state.accentColor);
     const { hideModal } = useGlobalModal();
     const idleEmote = useIdleEmote();
 
@@ -196,12 +191,6 @@ export const AddSkinModal = memo(
       } finally {
         setIsPreviewLoading(false);
       }
-    };
-
-    const handleBackToEdit = () => {
-      setIsPreviewMode(false);
-      setPreviewBase64Url(null);
-      setIsPreviewLoading(false);
     };
 
     const handleOpenFileUpload = async () => {

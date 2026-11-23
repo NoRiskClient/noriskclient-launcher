@@ -89,12 +89,6 @@ impl QuiltMainClass {
         }
     }
 
-    pub fn get_server(&self) -> String {
-        match self {
-            QuiltMainClass::String(s) => s.clone(),
-            QuiltMainClass::Object(o) => o.server.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

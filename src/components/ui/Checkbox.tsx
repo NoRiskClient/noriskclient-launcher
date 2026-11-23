@@ -1,12 +1,9 @@
-"use client";
-
 import type React from "react";
 import { forwardRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { 
-  getSizeClasses,
   getBorderRadiusClass,
   createRadiusStyle,
   getVariantColors,
@@ -56,10 +53,8 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
     title,
     ...props
   }, ref) => {
-    const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
       const accentColor = useThemeStore((state) => state.accentColor);
-    const isAnimationEnabled = useThemeStore((state) => state.isBackgroundAnimationEnabled);
     const borderRadius = useThemeStore((state) => state.borderRadius);    const handleClick = () => {
       if (!disabled) {
         const event = {
@@ -124,8 +119,6 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(  ({
             {...accessibilityProps}            disabled={disabled}
             onClick={onClick || handleClick}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}className={cn(
               "relative flex-shrink-0 flex items-center justify-center backdrop-blur-md",

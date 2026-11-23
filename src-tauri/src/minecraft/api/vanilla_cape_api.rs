@@ -243,8 +243,4 @@ impl VanillaCapeApi {
         self.cape_info.values().cloned().collect()
     }
 
-    /// Get information about a specific cape
-    pub fn get_cape_info_by_id(&self, cape_id: &str) -> Option<&VanillaCapeInfo> {
-        self.cape_info.get(cape_id)
-    }
 }

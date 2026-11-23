@@ -6,14 +6,15 @@ pub mod cosmetic_icons;
 pub mod cosmetic_pack_api;
 pub mod fabric_api;
 pub mod forge_api;
+pub mod launcher_news_api;
 pub mod legal_api;
 pub mod mc_api;
-pub mod mclogs_api;
 pub mod neo_forge_api;
 pub mod norisk_api;
 pub mod quilt_api;
+pub mod mclogs_api;
+pub mod share_api;
 pub mod vanilla_cape_api;
-pub mod wordpress_api;
 
 pub use neo_forge_api::NeoForgeApi;
 pub use norisk_api::NoRiskApi;

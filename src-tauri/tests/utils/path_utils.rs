@@ -25,6 +25,26 @@ fn derives_a_stable_name_when_nothing_is_left() {
     assert_eq!(empty, to_launchable_ascii(""));
 }
 
+#[tokio::test]
+async fn a_level_lists_only_the_direct_entries_folders_first() {
+    let root = tempfile::tempdir().expect("temp dir");
+    let assets = root.path().join("NoRiskClient").join("assets");
+    std::fs::create_dir_all(&assets).expect("assets");
+    std::fs::write(assets.join("a.png"), b"x").expect("asset");
+    std::fs::write(root.path().join("options.txt"), b"abc").expect("options");
+    std::fs::write(root.path().join(".hidden"), b"x").expect("hidden");
+
+    let level = get_directory_level(root.path(), false).await.expect("level");
+
+    let names: Vec<_> = level.children.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, ["NoRiskClient", "options.txt"]);
+    assert!(level.children[0].is_dir && level.children[0].children.is_empty());
+    assert_eq!(level.children[1].size, 3);
+
+    let nested = get_directory_level(&root.path().join("NoRiskClient"), false).await.expect("nested");
+    assert_eq!(nested.children[0].path, assets);
+}
+
 #[cfg(windows)]
 fn junction(link: &std::path::Path, target: &std::path::Path) {
     let status = std::process::Command::new("cmd")

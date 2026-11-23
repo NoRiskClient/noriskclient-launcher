@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ExportPackFormat, Profile } from "../../../types/profile"; // Adjust path as needed
@@ -8,16 +6,13 @@ import { Checkbox } from "../../ui/Checkbox";
 import { Tooltip } from "../../ui/Tooltip";
 import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/buttons/Button";
-import { Card } from "../../ui/Card";
+import { ExportFileSelector } from "./ExportFileSelector";
 import { Icon } from "@iconify/react";
-import { FileNodeViewer } from "../../file-explorer/FileNodeViewer"; // Adjust path as needed
-import type { FileNode } from "../../../types/fileSystem"; // Adjust path as needed
 import * as ProfileService from "../../../services/profile-service"; // Adjust path as needed
 import { toast } from "react-hot-toast";
 import { useThemeStore } from "../../../store/useThemeStore";
 import gsap from "gsap";
-import { listen } from "@tauri-apps/api/event";
-import { EventType, type EventPayload } from "../../../types/events";
+import { exportStepText, useExportProgress } from "../../../hooks/useExportProgress";
 import { parseErrorMessage } from "../../../utils/error-utils";
 
 const EXPORT_FORMATS: {
@@ -81,11 +76,7 @@ export function ExportSettingsTab({
 
   const [exportOpenFolder, setExportOpenFolder] = useState(true);
 
-  const [directoryStructure, setDirectoryStructure] = useState<FileNode | null>(
-    null
-  );
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(true);
-  const [directoryError, setDirectoryError] = useState<string | null>(null);
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
@@ -105,92 +96,19 @@ export function ExportSettingsTab({
     selectedExportPathsRef.current = selectedExportPaths;
   }, [selectedExportPaths]);
 
-  // Listen for export progress events
-  useEffect(() => {
-    if (!isExporting || !profile.id) return;
-
-    let isMounted = true;
-    const unlistenPromise = listen<EventPayload>("state_event", (event) => {
-      if (!isMounted) return;
-      const payload = event.payload;
-
-      // Only handle events for this profile
-      if (payload.target_id === profile.id && payload.event_type === EventType.ExportingProfile) {
-        setExportMessage(payload.message);
-        
-        if (payload.progress !== null) {
-          const progressPercent = Math.round(payload.progress * 100);
-          setExportProgress(progressPercent);
-          
-          // Update the existing loading toast with progress
-          if (exportToastIdRef.current) {
-            toast.loading(
-              `${payload.message} (${progressPercent}%)`,
-              { id: exportToastIdRef.current }
-            );
-          }
-        }
+  useExportProgress(
+    profile.id,
+    (step, progressPercent) => {
+      const message = exportStepText(t, step);
+      setExportMessage(message);
+      if (progressPercent === null) return;
+      setExportProgress(progressPercent);
+      if (exportToastIdRef.current) {
+        toast.loading(`${message} (${progressPercent}%)`, { id: exportToastIdRef.current });
       }
-    });
-
-    return () => {
-      isMounted = false;
-      unlistenPromise.then((unlisten) => unlisten()).catch(console.error);
-    };
-  }, [isExporting, profile.id]);
-
-  useEffect(() => {
-    const fetchStructure = async () => {
-      if (!profile.id) {
-        setDirectoryError(t('export.profile_id_missing'));
-        setIsLoadingDirectory(false);
-        return;
-      }
-      setIsLoadingDirectory(true);
-      setDirectoryError(null);
-      try {
-        const structure = await ProfileService.getProfileDirectoryStructure(
-          profile.id
-        );
-        console.log(structure);
-        setDirectoryStructure(structure);
-      } catch (err) {
-        console.error("Failed to fetch directory structure:", err);
-        const message = parseErrorMessage(err);
-        setDirectoryError(t('export.load_structure_failed', { error: message }));
-        toast.error(t('export.load_structure_failed', { error: message }));
-      } finally {
-        setIsLoadingDirectory(false);
-      }
-    };
-    fetchStructure();
-  }, [profile.id]);
-
-  const getAllPathsRecursive = (node: FileNode, paths: Set<string>) => {
-    paths.add(node.path);
-    if (node.is_dir && node.children) {
-      for (const child of node.children) {
-        getAllPathsRecursive(child, paths);
-      }
-    }
-  };
-  const handleSelectAll = () => {
-    if (!directoryStructure) return;
-    const newSelectedPaths = new Set<string>();
-    if (directoryStructure.children) {
-      directoryStructure.children.forEach((childNode) =>
-        getAllPathsRecursive(childNode, newSelectedPaths)
-      );
-    }
-    setSelectedExportPaths(newSelectedPaths);
-    selectedExportPathsRef.current = newSelectedPaths;
-  };
-
-  const handleDeselectAll = () => {
-    const emptySet = new Set<string>();
-    setSelectedExportPaths(emptySet);
-    selectedExportPathsRef.current = emptySet;
-  };
+    },
+    isExporting,
+  );
 
   const handleExport = async () => {
     if (!exportFilename.trim()) {
@@ -378,63 +296,12 @@ export function ExportSettingsTab({
           <p className="text-xs text-white/70 mb-3 font-minecraft tracking-wide">
             {t('export.select_files_description')}
           </p>
-          <div className="flex gap-2 mb-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={
-                isLoadingDirectory ||
-                !directoryStructure ||
-                !directoryStructure.children ||
-                directoryStructure.children.length === 0
-              }
-              icon={
-                <Icon icon="solar:check-read-outline" className="w-4 h-4" />
-              }
-              className="text-xs px-3 py-1.5"
-            >
-              {t('common.select_all')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDeselectAll}
-              disabled={isLoadingDirectory || selectedExportPaths.size === 0}
-              icon={
-                <Icon icon="solar:close-circle-outline" className="w-4 h-4" />
-              }
-              className="text-xs px-3 py-1.5"
-            >
-              {t('export.deselect_all')}
-            </Button>
-          </div>
-          <Card
-            variant="flat"
-            className="p-3 bg-black/20 border border-white/10 max-h-64 min-h-64 overflow-y-auto custom-scrollbar"
-          >
-            <FileNodeViewer
-              rootNode={directoryStructure}
-              loading={isLoadingDirectory}
-              error={directoryError}
-              selectedFiles={selectedExportPaths}
-              onSelectionChange={handleFileSelectionChange}
-              checkboxesEnabled={true}
-              hideRootNode={true}
-              preSelectPaths={[
-                "resourcepacks",
-                "shaderpacks",
-                "options.txt",
-                "NoRiskClientLauncher",
-                "config",
-                "custom_mods",
-                "mods",
-              ]}
-              selectChildrenWithParent={true}
-              defaultRootCollapsed={false}
-              className="text-sm"
-            />
-          </Card>
+          <ExportFileSelector
+            profileId={profile.id}
+            selected={selectedExportPaths}
+            onSelectionChange={handleFileSelectionChange}
+            onLoadingChange={setIsLoadingDirectory}
+          />
         </div>
 
         {/* Progress indicator during export (shown in both contexts) */}

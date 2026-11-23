@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * useHeroChipEditors — orchestrates fetch + save for the Hero inline-edit
  * chips (Group, Game Version, Loader, Loader Version). Picker components stay
@@ -31,7 +29,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
-import type { Profile, UpdateProfileParams } from "../../../../types/profile";
+import type { Profile, ProfilePatch } from "../../../../types/profile";
 import type { MinecraftVersion } from "../../../../types/minecraft";
 import * as ProfileService from "../../../../services/profile-service";
 import { useProfileStore } from "../../../../store/profile-store";
@@ -162,9 +160,9 @@ export function useHeroChipEditors(
 
   // ── Shared save helper ───────────────────────────────────────────────────
   const save = useCallback(
-    async (params: UpdateProfileParams): Promise<void> => {
+    async (patch: ProfilePatch): Promise<void> => {
       try {
-        await ProfileService.updateProfile(profile.id, params);
+        await ProfileService.patchProfile(profile.id, patch);
         await fetchProfiles();
         const fresh = useProfileStore
           .getState()
@@ -189,7 +187,7 @@ export function useHeroChipEditors(
       if (trimmed) {
         await save({ group: trimmed });
       } else {
-        await save({ clear_group: true });
+        await save({ group: null });
       }
     },
     [profile.group, save],
@@ -235,17 +233,10 @@ export function useHeroChipEditors(
       // yet). Legacy field is cleared so it can't leak across loader types.
       const hasOverrideForNew = !!preservedMap[loader] && preservedMap[loader] !== "";
 
-      // Also wipe the wizard-stored `loader_version` (e.g. "0.16.0 (stable)"
-      // for fabric) — that string belongs to the OLD loader and would leak
-      // into the ProfileDefault fallback for the new loader (mod.rs:138-146).
-      // Backend has no `clear_loader_version` API, so we send the empty
-      // string: the resolve at mod.rs:140 explicitly treats "" as "no value"
-      // and falls through to NotResolved → chip renders "latest".
       await save({
         loader,
-        loader_version: "",
+        loader_version: null,
         settings: {
-          ...settings,
           use_overwrite_loader_version: hasOverrideForNew,
           overwrite_loader_version: null,
           overwrite_loader_versions: preservedMap,
@@ -274,7 +265,6 @@ export function useHeroChipEditors(
 
       await save({
         settings: {
-          ...settings,
           use_overwrite_loader_version: true,
           overwrite_loader_version: null,
           overwrite_loader_versions: { ...existingMap, [loaderKey]: version },

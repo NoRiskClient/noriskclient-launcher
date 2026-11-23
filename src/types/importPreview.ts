@@ -63,4 +63,15 @@ export interface ImportPackPreview {
   provenance: ProvenanceReport;
   noriskPack: NoriskPackOffer;
   executableContent: ExecutableContentReport;
+  origin?: PackOrigin | null;
+}
+
+export interface PackOrigin {
+  ticketNumber: number;
+  owner: string;
+  ownerUuid?: string | null;
+  profileName: string;
+  notTransferred: { path: string; reason: string }[];
+  localMods: { fileName: string; size: number; sha256: string }[];
+  addedByPlayer: string[];
 }

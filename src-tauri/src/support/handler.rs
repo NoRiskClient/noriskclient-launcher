@@ -1,17 +1,52 @@
 use crate::state::profile_state::Profile;
 use crate::support::files::preview_excerpt;
-use crate::support::types::{ActionPlanView, ItemCategory, ItemParams, ItemStatus};
+use crate::support::types::{ActionPlanView, ItemCategory, ItemParams, ItemStatus, ProfileLimits};
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use uuid::Uuid;
+
+pub const NO_PROFILE: &str = "no_profile: no Minecraft profile was picked";
+
+#[derive(Debug, Clone)]
+pub struct SessionRef {
+    pub code: String,
+    pub account_id: Uuid,
+    pub is_experimental: bool,
+    pub profile_limits: Option<ProfileLimits>,
+}
 
 #[derive(Debug, Clone)]
 pub struct SupportContext {
-    pub profile: Profile,
-    pub instance_path: PathBuf,
+    pub profile: Option<Profile>,
+    pub instance_path: Option<PathBuf>,
     pub file_byte_budget: u64,
+    pub session: Option<SessionRef>,
+    pub choice: Option<Value>,
+}
+
+impl SupportContext {
+    pub fn session(&self) -> Result<&SessionRef, String> {
+        self.session
+            .as_ref()
+            .ok_or_else(|| "not_loaded".to_string())
+    }
+
+    pub fn profile_id(&self) -> Option<Uuid> {
+        self.profile.as_ref().map(|p| p.id)
+    }
+
+    pub fn profile(&self) -> Result<&Profile, String> {
+        self.profile.as_ref().ok_or_else(|| NO_PROFILE.to_string())
+    }
+
+    pub fn instance_path(&self) -> Result<&Path, String> {
+        self.instance_path
+            .as_deref()
+            .ok_or_else(|| NO_PROFILE.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -118,6 +153,14 @@ impl ActionOutcome {
         }
     }
 
+    pub fn done_quiet(data: Option<Value>) -> Self {
+        Self {
+            status: ItemStatus::Done,
+            message: None,
+            data,
+        }
+    }
+
     pub fn failed(message: impl Into<String>) -> Self {
         Self {
             status: ItemStatus::Failed,
@@ -132,6 +175,14 @@ pub trait SupportItemHandler: Send + Sync {
     fn type_id(&self) -> &'static str;
 
     fn category(&self) -> ItemCategory;
+
+    fn needs_profile(&self) -> bool {
+        true
+    }
+
+    fn runs_on_confirm(&self) -> bool {
+        self.category() == ItemCategory::Action
+    }
 
     async fn prepare(&self, ctx: &SupportContext, params: &ItemParams) -> PreparedItem;
 

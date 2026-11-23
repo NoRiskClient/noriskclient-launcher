@@ -1,12 +1,13 @@
 use crate::error::Result;
 #[cfg(desktop)]
 use crate::state::process_state::ProcessMetadata;
-use dashmap::DashMap;
 use log::info;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -76,6 +77,7 @@ pub struct MinecraftProcessExitedPayload {
     pub process_id: Uuid,
     pub exit_code: Option<i32>,
     pub success: bool,
+    pub was_intentionally_stopped: bool,
     pub process_metadata: Option<ProcessMetadata>,
     pub crash_report_content: Option<String>,
 }
@@ -94,43 +96,34 @@ pub struct ProcessMetricsPayload {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Clone)]
-pub struct EventInfo {
-    pub event_type: EventType,
-    pub target_id: Option<Uuid>,
-    pub start_time: std::time::SystemTime,
+#[cfg(desktop)]
+static PROCESS_EXITS: Lazy<broadcast::Sender<MinecraftProcessExitedPayload>> =
+    Lazy::new(|| broadcast::channel(16).0);
+
+#[cfg(desktop)]
+pub fn subscribe_process_exits() -> broadcast::Receiver<MinecraftProcessExitedPayload> {
+    PROCESS_EXITS.subscribe()
+}
+
+#[cfg(desktop)]
+pub fn publish_process_exit(payload: &MinecraftProcessExitedPayload) {
+    let _ = PROCESS_EXITS.send(payload.clone());
 }
 
 #[derive(Clone)]
 pub struct EventState {
     app: Option<Arc<tauri::AppHandle>>,
-    active_events: DashMap<Uuid, EventInfo>,
 }
 
 impl EventState {
     pub fn new(app: Option<Arc<tauri::AppHandle>>) -> Self {
         info!("Initializing EventState...");
-        let state = Self {
-            app,
-            active_events: DashMap::new(),
-        };
+        let state = Self { app };
         info!("Successfully initialized EventState.");
         state
     }
 
     pub async fn emit(&self, payload: EventPayload) -> Result<()> {
-        // Track the event if it's a new one
-        if !self.active_events.contains_key(&payload.event_id) {
-            self.active_events.insert(
-                payload.event_id,
-                EventInfo {
-                    event_type: payload.event_type.clone(),
-                    target_id: payload.target_id,
-                    start_time: std::time::SystemTime::now(),
-                },
-            );
-        }
-
         // Emit the event to the frontend
         if let Some(app) = &self.app {
             app.emit("state_event", payload)
@@ -163,18 +156,6 @@ impl EventState {
             error: None,
         };
         self.emit(payload).await
-    }
-
-    pub async fn complete_event(&self, event_id: Uuid) -> Result<()> {
-        self.active_events.remove(&event_id);
-        Ok(())
-    }
-
-    pub fn get_active_events(&self) -> Vec<(Uuid, EventInfo)> {
-        self.active_events
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect()
     }
 }
 

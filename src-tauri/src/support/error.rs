@@ -2,6 +2,12 @@ use crate::error::{AppError, CommandError};
 use crate::utils::api_utils::api_error_from_body;
 use std::fmt;
 
+const TOO_LARGE_KEYS: &[&str] = &["too_large", "too_many_entries", "suspicious_compression"];
+
+fn names_too_large(detail: &str) -> bool {
+    TOO_LARGE_KEYS.iter().any(|key| detail.contains(key))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SupportErrorKind {
     NotLoggedIn,
@@ -13,7 +19,6 @@ pub enum SupportErrorKind {
     InvalidCode,
     Busy,
     Forbidden,
-    DiscordNotLinked,
     Unknown,
 }
 
@@ -29,7 +34,6 @@ impl SupportErrorKind {
             Self::InvalidCode => "invalid_code",
             Self::Busy => "busy",
             Self::Forbidden => "forbidden",
-            Self::DiscordNotLinked => "discord_not_linked",
             Self::Unknown => "unknown",
         }
     }
@@ -74,11 +78,14 @@ impl SupportError {
             } => Some(translatable_key),
             _ => None,
         };
-        if key
-            .as_deref()
-            .is_some_and(|k| k.ends_with("discord_not_linked"))
-        {
-            return Self::new(SupportErrorKind::DiscordNotLinked);
+        Self::from_key(status, key, retry_after_secs)
+    }
+
+    fn from_key(status: u16, key: Option<String>, retry_after_secs: Option<u64>) -> Self {
+        if status == 403 {
+            if let Some(key) = key.clone().filter(|k| !k.ends_with("invalid_or_expired_token")) {
+                return Self::with_detail(SupportErrorKind::Forbidden, key);
+            }
         }
         if status == 503 {
             let last = key
@@ -102,6 +109,7 @@ impl SupportError {
 
     pub fn from_status(status: u16, detail: Option<String>) -> Self {
         let kind = match status {
+            _ if detail.as_deref().is_some_and(names_too_large) => SupportErrorKind::TooLarge,
             401 | 403 => SupportErrorKind::NotLoggedIn,
             408 => SupportErrorKind::Offline,
             404 => SupportErrorKind::NotFound,
@@ -133,7 +141,21 @@ impl From<AppError> for SupportError {
                 SupportError::with_detail(SupportErrorKind::Offline, error.to_string())
             }
             AppError::NoCredentialsError => SupportError::new(SupportErrorKind::NotLoggedIn),
-            _ => SupportError::unknown(error.to_string()),
+            AppError::ApiError {
+                status,
+                translatable_key,
+                ..
+            } => SupportError::from_key(*status, Some(translatable_key.clone()), None),
+            AppError::HttpStatus { status, .. } => SupportError::from_status(*status, None),
+            _ => {
+                let message = error.to_string();
+                let kind = if names_too_large(&message) {
+                    SupportErrorKind::TooLarge
+                } else {
+                    SupportErrorKind::Unknown
+                };
+                SupportError::with_detail(kind, message)
+            }
         }
     }
 }

@@ -17,6 +17,8 @@ pub mod post_init;
 #[cfg(desktop)]
 pub mod process_state;
 #[cfg(desktop)]
+pub mod profile_patch;
+#[cfg(desktop)]
 pub mod profile_state;
 #[cfg(desktop)]
 pub mod profile_store;

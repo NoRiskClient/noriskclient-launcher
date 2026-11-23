@@ -2,10 +2,43 @@ use crate::error::{AppError, Result};
 use async_zip::tokio::read::seek::ZipFileReader;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures::AsyncReadExt;
-use log::debug;
+use log::{debug, warn};
+use std::collections::HashMap;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs::File;
+
+pub const ONE_DAY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+pub async fn remove_older_than(dir: &Path, max_age: std::time::Duration) -> u32 {
+    let mut removed = 0;
+    let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
+        return removed;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let Ok(meta) = entry.metadata().await else {
+            continue;
+        };
+        let stale = meta
+            .modified()
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age >= max_age);
+        if !stale {
+            continue;
+        }
+        let outcome = if meta.is_dir() {
+            tokio::fs::remove_dir_all(entry.path()).await
+        } else {
+            tokio::fs::remove_file(entry.path()).await
+        };
+        match outcome {
+            Ok(()) => removed += 1,
+            Err(e) => warn!("Could not remove stale {}: {}", entry.path().display(), e),
+        }
+    }
+    removed
+}
 
 /// Writes `contents` to `path` atomically: readers see either the previous file or the
 /// complete new one, never a half-written mix.
@@ -41,6 +74,39 @@ pub fn write_atomic_sync(path: &Path, contents: &[u8]) -> Result<()> {
     tmp.as_file().sync_all().map_err(AppError::Io)?;
     tmp.persist(path).map_err(|e| AppError::Io(e.error))?;
     Ok(())
+}
+
+pub async fn scan_object_store(root: &Path) -> HashMap<String, u64> {
+    let root = root.to_path_buf();
+    tokio::task::spawn_blocking(move || scan_object_store_sync(root))
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_object_store_sync(root: PathBuf) -> HashMap<String, u64> {
+    let mut files = HashMap::new();
+    let mut pending = vec![root];
+    while let Some(dir) = pending.pop() {
+        let reader = match std::fs::read_dir(&dir) {
+            Ok(reader) => reader,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                warn!("Could not list {}: {}", dir.display(), e);
+                continue;
+            }
+        };
+        for entry in reader.flatten() {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else {
+                files.insert(entry.file_name().to_string_lossy().into_owned(), metadata.len());
+            }
+        }
+    }
+    files
 }
 
 /// Helper function to read a specific zip entry by index and encode it as Base64
@@ -177,34 +243,6 @@ pub async fn find_first_png_in_archive_as_base64(archive_path: &Path) -> Result<
 
     debug!("No PNG found in archive: {}", archive_path.display());
     Err(AppError::PngNotFoundInArchive(archive_path.to_path_buf()))
-}
-
-pub async fn get_jar_icon_test() {
-    // Verwende einen Raw-String für den Windows-Pfad
-    let path_str = r"C:\Users\sheesh\AppData\Roaming\norisk\NoRiskClientV3\meta\mod_cache\§fAbsolute §7[§f16x§7]§8.zip";
-    let archive_path = Path::new(path_str);
-
-    match find_first_png_in_archive_as_base64(archive_path).await {
-        Ok(base64_icon) => {
-            log::debug!(
-                "Erstes PNG als Base64 gefunden (erste 50 Zeichen): {}...",
-                &base64_icon[..50.min(base64_icon.len())]
-            );
-            // Hier kannst du den base64_icon String verwenden
-        }
-        Err(AppError::PngNotFoundInArchive(path)) => {
-            log::debug!("Fehler: Kein PNG im Archiv gefunden: {:?}", path);
-        }
-        Err(AppError::FileNotFound(path)) => {
-            log::debug!("Fehler: Archivdatei nicht gefunden: {:?}", path);
-        }
-        Err(AppError::ArchiveReadError(msg)) => {
-            log::debug!("Fehler beim Lesen des Archivs: {}", msg);
-        }
-        Err(e) => {
-            log::debug!("Ein unerwarteter Fehler ist aufgetreten: {}", e);
-        }
-    }
 }
 
 

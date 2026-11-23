@@ -1,7 +1,4 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type React from "react";
 import { VirtuosoGrid } from "react-virtuoso";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
@@ -16,8 +13,7 @@ import {
 } from "../../../../hooks/useLocalContentManager";
 import { useVersionOptions } from "../../../../hooks/useVersionOptions";
 import { getUpdateIdentifier } from "../../../../utils/update-identifier-utils";
-import * as FlagsmithService from "../../../../services/flagsmith-service";
-import UnifiedService from "../../../../services/unified-service";
+import * as FeatureFlagsService from "../../../../services/feature-flags-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
 import { ContentType as BackendContentType } from "../../../../types/content";
@@ -264,7 +260,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
   const [isBlockedConfigLoaded, setIsBlockedConfigLoaded] = useState(false);
   useEffect(() => {
     if (profile?.selected_norisk_pack_id) {
-      FlagsmithService.getBlockedModsConfig()
+      FeatureFlagsService.getBlockedModsConfig()
         .then(() => setIsBlockedConfigLoaded(true))
         .catch((err) => {
           console.error("[V3] Failed to load NoRisk blocked mods config:", err);
@@ -293,7 +289,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       case "updatesPaused": list = list.filter(i => i.updates_enabled === false); break;
       case "noriskIssues":  list = list.filter(i => {
         if (!isBlockedConfigLoaded) return false;
-        const status = FlagsmithService.getModNoRiskStatus(
+        const status = FeatureFlagsService.getModNoRiskStatus(
           i.filename,
           i.modrinth_info?.project_id || i.curseforge_info?.project_id,
           i.modrinth_info?.version_id || (i.curseforge_info as any)?.file_id,
@@ -509,7 +505,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
     const updateKey = getUpdateIdentifier(item);
     const updateAvailable = updateKey ? manager.contentUpdates[updateKey] ?? null : null;
     const noRiskStatus = isBlockedConfigLoaded
-      ? FlagsmithService.getModNoRiskStatus(
+      ? FeatureFlagsService.getModNoRiskStatus(
           item.filename,
           item.modrinth_info?.project_id || item.curseforge_info?.project_id,
           item.modrinth_info?.version_id || (item.curseforge_info as any)?.file_id,
