@@ -21,7 +21,7 @@ export function AccentButton({ disabled, icon, title, className, onClick, childr
       onClick={onClick}
       title={title}
       className={cn(
-        "w-full shrink-0 min-w-0 h-10 px-4 flex items-center justify-center gap-2 rounded-lg border-2 font-minecraft text-xs uppercase tracking-wider text-white transition-colors hover:brightness-125 disabled:opacity-50 disabled:hover:brightness-100",
+        "w-full shrink-0 min-w-0 h-10 px-4 flex items-center justify-center gap-2 rounded-lg border-2 font-minecraft text-sm normal-case text-white transition-colors hover:brightness-125 disabled:opacity-50 disabled:hover:brightness-100",
         className,
       )}
       style={{ backgroundColor: `${accentColor.value}25`, borderColor: `${accentColor.value}90` }}
