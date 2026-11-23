@@ -2591,7 +2591,6 @@
   "syncPacks.title": "Паки синхронизации",
   "syncPacks.description": "Делитесь папками, настройками и модами между профилями.",
   "syncPacks.betaTag": "Бета",
-  "syncPacks.rail.howTitle": "Как это работает",
   "syncPacks.rail.step.create": "Создай пак, например «Performance».",
   "syncPacks.rail.step.fill": "Добавь в него моды, папки или настройки.",
   "syncPacks.rail.step.sync": "Включи его в своих профилях. Изменения попадут во все.",

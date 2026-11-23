@@ -2590,7 +2590,6 @@
   "syncPacks.title": "सिंक पैक",
   "syncPacks.description": "फ़ोल्डर, सेटिंग्स और मॉड अपने प्रोफ़ाइलों के बीच साझा करें।",
   "syncPacks.betaTag": "बीटा",
-  "syncPacks.rail.howTitle": "यह कैसे काम करता है",
   "syncPacks.rail.step.create": "एक पैक बनाएँ, जैसे \"Performance\"।",
   "syncPacks.rail.step.fill": "इसमें मॉड, फ़ोल्डर या सेटिंग्स जोड़ें।",
   "syncPacks.rail.step.sync": "इसे अपनी प्रोफ़ाइलों में चालू करें। बदलाव सभी में पहुँचते हैं।",

@@ -2575,7 +2575,6 @@
   "syncPacks.title": "Pacotes de sincronização",
   "syncPacks.description": "Partilha pastas, definições e mods entre os teus perfis.",
   "syncPacks.betaTag": "Beta",
-  "syncPacks.rail.howTitle": "Como funciona",
   "syncPacks.rail.step.create": "Crie um pack, por exemplo \"Performance\".",
   "syncPacks.rail.step.fill": "Adicione mods, pastas ou configurações.",
   "syncPacks.rail.step.sync": "Ative-o nos seus perfis. As mudanças vão para todos.",
