@@ -8,13 +8,11 @@ import { EmptyState } from "../ui/EmptyState";
 import { Button } from "../ui/buttons/Button";
 
 import { ProfileCardV2 } from "../profiles/ProfileCardV2";
-import { toast } from "react-hot-toast";
 import { SearchWithFilters } from "../ui/SearchWithFilters";
 import { MultiVersionFilter } from "../ui/MultiVersionFilter";
 import { GroupTabs, type GroupTab } from "../ui/GroupTabs";
 import { ActionButtons, type ActionButton } from "../ui/ActionButtons";
 import { useNavigate } from "react-router-dom";
-import * as ProfileService from "../../services/profile-service";
 import { useDeleteProfile } from "../../hooks/useDeleteProfile";
 import { useProfileWizardStore } from "../../store/profile-wizard-store";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -22,8 +20,8 @@ import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { usePinnedProfilesStore } from "../../store/usePinnedProfilesStore";
 import { setDiscordState } from "../../utils/discordRpc";
-import { parseErrorMessage } from "../../utils/error-utils";
 import { compareByLastPlayed } from "../../utils/profile-sort";
+import { openProfileFolder } from "../../utils/open-profile-folder";
 
 // A vertical virtualizer row: a version-section divider header, or a row of up to N cards.
 type VirtualRow =
@@ -179,19 +177,7 @@ export function ProfilesTabV2() {
     if (profile) requestDelete(profile);
   };
 
-  const handleOpenFolder = async (profile: Profile) => {
-    console.log("[ProfilesTabV2] handleOpenFolder called for:", profile.name);
-    const openPromise = ProfileService.openProfileFolder(profile.id);
-    toast.promise(openPromise, {
-      loading: t('profiles.openingFolder', { name: profile.name }),
-      success: t('profiles.openFolderSuccess', { name: profile.name }),
-      error: (err) => {
-        const message = parseErrorMessage(err);
-        console.error(`Failed to open folder for ${profile.name}:`, err);
-        return t('profiles.openFolderError', { error: message });
-      },
-    });
-  };
+  const handleOpenFolder = (profile: Profile) => openProfileFolder(profile.id);
 
   // Note: Launch functionality is now handled directly in ProfileCardV2
 

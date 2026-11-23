@@ -35,11 +35,11 @@ import type { Profile } from "../../../types/profile";
 import { setDiscordState } from "../../../utils/discordRpc";
 import { formatRelativeTime, formatPlaytime } from "../../../utils/format-relative-time";
 import { shortModpackVersion } from "../../../utils/modpack-version";
+import { openProfileFolder } from "../../../utils/open-profile-folder";
 import { parseMotdToHtml } from "../../../utils/motd-utils";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { useProfileStore } from "../../../store/profile-store";
 import { useGlobalModal } from "../../../hooks/useGlobalModal";
-import * as ProfileService from "../../../services/profile-service";
 import UnifiedService from "../../../services/unified-service";
 import type { UnifiedModpackVersionsResponse } from "../../../types/unified";
 import { useProfileDuplicateStore } from "../../../store/profile-duplicate-store";
@@ -69,7 +69,6 @@ import { WorldsTabV3 } from "./tabs/WorldsTabV3";
 import { ScreenshotsTabV3 } from "./tabs/ScreenshotsTabV3";
 import { LogsTabV3 } from "./tabs/LogsTabV3";
 import type { LocalContentItem } from "../../../hooks/useLocalContentManager";
-import { parseErrorMessage } from "../../../utils/error-utils";
 import { useContentCacheStore } from "../../../store/content-cache-store";
 
 const mainTabFor = (k: NavKey): string =>
@@ -193,17 +192,7 @@ export function ProfileDetailViewV3({
     ));
   }, [currentProfile, showModal, hideModal]);
 
-  const handleOpenFolder = useCallback(async () => {
-    const openPromise = ProfileService.openProfileFolder(currentProfile.id);
-    toast.promise(openPromise, {
-      loading: t('profiles.openingFolder', { name: currentProfile.name }),
-      success: t('profiles.openFolderSuccess', { name: currentProfile.name }),
-      error: (err) => {
-        const message = parseErrorMessage(err);
-        return t('profiles.openFolderError', { error: message });
-      },
-    });
-  }, [currentProfile, t]);
+  const handleOpenFolder = useCallback(() => openProfileFolder(currentProfile.id), [currentProfile.id]);
 
   const handleDuplicateProfile = useCallback(() => {
     openDuplicateModal(currentProfile);
