@@ -159,7 +159,8 @@ export interface LauncherConfig {
   hide_on_process_start: boolean;
   close_to_tray: boolean;
   global_memory_settings: MemorySettings;
-  global_custom_jvm_args: string | null; // Option<String> - Global JVM args for standard profiles
+  use_global_jvm_args: boolean;
+  global_jvm_args: string;
   custom_game_directory: string | null; // Option<PathBuf>
   enable_analytics: boolean;
   use_browser_based_login: boolean;

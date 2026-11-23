@@ -78,51 +78,6 @@ fn saturating_i64(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-#[derive(serde::Deserialize, Default)]
-struct SettingsData {
-    #[serde(default)]
-    java_path: Option<String>,
-    #[serde(default)]
-    use_custom_java_path: bool,
-    #[serde(default)]
-    use_overwrite_loader_version: bool,
-    #[serde(default)]
-    overwrite_loader_version: Option<String>,
-    #[serde(default)]
-    overwrite_loader_versions: HashMap<String, String>,
-    #[serde(default)]
-    memory: Option<crate::state::profile_state::MemorySettings>,
-    #[serde(default)]
-    resolution: Option<crate::state::profile_state::WindowSize>,
-    #[serde(default)]
-    fullscreen: bool,
-    #[serde(default)]
-    extra_game_args: Vec<String>,
-    #[serde(default)]
-    custom_jvm_args: Option<String>,
-    #[serde(default)]
-    quick_play_path: Option<String>,
-}
-
-impl From<SettingsData> for ProfileSettings {
-    fn from(data: SettingsData) -> Self {
-        let defaults = ProfileSettings::default();
-        ProfileSettings {
-            java_path: data.java_path,
-            use_custom_java_path: data.use_custom_java_path,
-            use_overwrite_loader_version: data.use_overwrite_loader_version,
-            overwrite_loader_version: data.overwrite_loader_version,
-            overwrite_loader_versions: data.overwrite_loader_versions,
-            memory: data.memory.unwrap_or(defaults.memory),
-            resolution: data.resolution,
-            fullscreen: data.fullscreen,
-            extra_game_args: data.extra_game_args,
-            custom_jvm_args: data.custom_jvm_args,
-            quick_play_path: data.quick_play_path,
-        }
-    }
-}
-
 pub fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
     let raw_id: String = row.get("id");
     let id = Uuid::parse_str(&raw_id)
@@ -131,7 +86,7 @@ pub fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
     let loader_raw: String = row.get("loader");
     let state_raw: String = row.get("state");
 
-    let settings: SettingsData = json_into(&row.get::<String, _>("settings"), "profile settings");
+    let settings: ProfileSettings = json_into(&row.get::<String, _>("settings"), "profile settings");
 
     Ok(Profile {
         sync_pack_ids: Vec::new(),
@@ -146,7 +101,7 @@ pub fn row_to_profile(row: &sqlx::sqlite::SqliteRow) -> Result<Profile> {
         loader_version: row.get("loader_version"),
         created: nanos_into(row.get::<i64, _>("created")),
         last_played: row.get::<Option<i64>, _>("last_played").map(nanos_into),
-        settings: settings.into(),
+        settings,
         state: tag_into(&state_raw).unwrap_or_else(|| {
             warn!("Unknown state '{}' on profile {}", state_raw, id);
             ProfileState::NotInstalled
@@ -379,6 +334,23 @@ impl ProfileStore {
         perf.mark(&format!("write {} profiles", profiles.len()));
         tx.commit().await?;
         perf.mark("commit");
+        Ok(())
+    }
+
+    pub async fn upsert_profile_fields(&self, profile: &Profile) -> Result<()> {
+        let pool = self.pool().await?;
+        let mut tx = pool.begin().await?;
+        let exists = sqlx::query("SELECT 1 FROM profiles WHERE id = ?1")
+            .bind(profile.id.to_string())
+            .fetch_optional(&mut *tx)
+            .await?
+            .is_some();
+        if exists {
+            write_profile_row(&mut tx, profile).await?;
+        } else {
+            write_profile(&mut tx, profile).await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -627,7 +599,7 @@ async fn write_mod(
     Ok(())
 }
 
-async fn write_profile(
+async fn write_profile_row(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     profile: &Profile,
 ) -> Result<()> {
@@ -697,6 +669,16 @@ async fn write_profile(
     .bind(Utc::now().timestamp_millis())
     .execute(&mut **tx)
     .await?;
+
+    Ok(())
+}
+
+async fn write_profile(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    profile: &Profile,
+) -> Result<()> {
+    write_profile_row(tx, profile).await?;
+    let id = profile.id.to_string();
 
     sqlx::query("DELETE FROM profile_mods WHERE profile_id = ?1")
         .bind(&id)

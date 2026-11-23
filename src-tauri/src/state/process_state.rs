@@ -4,7 +4,7 @@ use crate::minecraft::downloads::mod_resolver::{
     ModOutcome, ModResolutionReport, ModResolutionStatus,
 };
 use crate::state::event_state::{
-    EventPayload, EventType, MinecraftProcessExitedPayload,
+    publish_process_exit, EventPayload, EventType, MinecraftProcessExitedPayload,
 };
 use crate::state::{self, post_init::PostInitializationHandler, State};
 use async_trait::async_trait;
@@ -787,9 +787,11 @@ impl ProcessManager {
                     process_id,
                     exit_code,
                     success,
+                    was_intentionally_stopped,
                     process_metadata: exiting_process_metadata_clone,
                     crash_report_content: crash_content_for_payload,
                 };
+                publish_process_exit(&specific_payload);
                 let specific_payload_json = serde_json::to_string(&specific_payload)
                     .unwrap_or_else(|e| {
                         log::error!(

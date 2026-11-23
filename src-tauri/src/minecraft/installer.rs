@@ -15,7 +15,10 @@ use crate::minecraft::downloads::NoriskPackDownloadService;
 use crate::minecraft::downloads::{ModDownloadService, NoriskClientAssetsDownloadService};
 use crate::minecraft::dto::JavaDistribution;
 use crate::minecraft::launch::launch_summary::LaunchSummary;
-use crate::minecraft::{base64_intrinsics_mitigation, MinecraftLaunchParameters, MinecraftLauncher};
+use crate::minecraft::{
+    base64_intrinsics_mitigation, parse_jvm_rules, plan_jvm_rules, sets_gc, JvmContext, MinecraftLaunchParameters,
+    MinecraftLauncher,
+};
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
@@ -620,24 +623,21 @@ pub async fn install_minecraft_version(
     let custom_jvm_args_str = if profile.is_standard_version {
         let state = State::get().await?;
         let config = state.config_manager.get_config().await;
-        config.global_custom_jvm_args.clone()
+        config.enabled_global_jvm_args().map(str::to_string)
     } else {
-        profile.settings.custom_jvm_args.clone()
+        profile.settings.enabled_jvm_args().map(str::to_string)
     };
 
     if let Some(jvm_args_str) = custom_jvm_args_str {
-        if !jvm_args_str.trim().is_empty() {
-            let mut current_jvm_args = launch_params.additional_jvm_args.clone();
-            let custom_args: Vec<String> =
-                jvm_args_str.split_whitespace().map(String::from).collect();
-            info!(
-                "Adding custom JVM arguments from {}: {:?}",
-                if profile.is_standard_version { "global settings" } else { "profile" },
-                custom_args
-            );
-            current_jvm_args.extend(custom_args);
-            launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
-        }
+        let mut current_jvm_args = launch_params.additional_jvm_args.clone();
+        let custom_args: Vec<String> = jvm_args_str.split_whitespace().map(String::from).collect();
+        info!(
+            "Adding custom JVM arguments from {}: {:?}",
+            if profile.is_standard_version { "global settings" } else { "profile" },
+            custom_args
+        );
+        current_jvm_args.extend(custom_args);
+        launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
     }
 
     if !extra_jvm_args.is_empty() {
@@ -645,6 +645,27 @@ pub async fn install_minecraft_version(
         let mut current_jvm_args = launch_params.additional_jvm_args.clone();
         current_jvm_args.extend(extra_jvm_args);
         launch_params = launch_params.with_additional_jvm_args(current_jvm_args);
+    }
+
+    if let Some(rules) = norisk_pack.as_ref().and_then(|pack| pack.jvm.as_ref()) {
+        let context = JvmContext {
+            java_major,
+            minecraft: version_id.to_string(),
+            loader: modloader_str.to_string(),
+            os: std::env::consts::OS.to_string(),
+            arch: std::env::consts::ARCH.to_string(),
+            ram_mb: crate::utils::system_info::total_ram_mb(),
+            heap_mb: memory_max,
+            user_gc: sets_gc(launch_params.additional_jvm_args.iter().map(String::as_str)),
+            player: credentials.as_ref().map(|creds| creds.id),
+        };
+        let plan = plan_jvm_rules(&parse_jvm_rules(rules), &context);
+        if !plan.applied.is_empty() {
+            let pack_args = plan.jvm_args();
+            info!("Pack JVM rules applied {:?}: {:?}", plan.applied, pack_args);
+            let jvm_args = pack_args.into_iter().chain(launch_params.additional_jvm_args.clone()).collect();
+            launch_params = launch_params.with_additional_jvm_args(jvm_args);
+        }
     }
 
     // Combine Game arguments from modloader (if any) and profile settings (extra_game_args)

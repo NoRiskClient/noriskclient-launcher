@@ -1,6 +1,6 @@
 [package]
 name = "noriskclient-launcher-v3"
-version = "0.6.32-beta.2"
+version = "0.6.32-beta.7"
 description = "A Tauri App"
 authors = ["NoRiskk"]
 edition = "2021"
@@ -139,7 +139,7 @@ tauri-plugin-cli = "2"
 tauri = { version = "2.9.5", features = ["macos-private-api", "protocol-asset", "tray-icon" ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-zbus = { version = "5", default-features = false, features = ["tokio"] }
+zbus = "5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 norisk-capture = { path = "crates/norisk-capture" }

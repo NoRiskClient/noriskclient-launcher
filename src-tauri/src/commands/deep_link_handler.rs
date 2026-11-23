@@ -2,7 +2,7 @@ use crate::error::AppError;
 use crate::minecraft::api::norisk_api::NoRiskApi;
 use crate::state::state_manager::State;
 use crate::utils::deep_link_utils::{
-    is_main_window, AuthBridgeResult, PendingDeepLinkEvent, PendingDeepLinks,
+    AuthBridgeResult, PendingDeepLinkEvent, PendingDeepLinks,
 };
 use log::info;
 
@@ -40,13 +40,13 @@ pub async fn confirm_auth_bridge(session_id: String) -> Result<AuthBridgeResult,
 #[tauri::command]
 pub fn take_pending_deep_links(
     app_handle: tauri::AppHandle,
-    webview: tauri::Webview,
+    window: tauri::WebviewWindow,
 ) -> Vec<PendingDeepLinkEvent> {
     use tauri::Manager;
-    if !is_main_window(&webview) {
+    if !crate::utils::main_window::is_main(window.label()) {
         log::warn!(
-            "[DeepLink] take_pending_deep_links rejected for webview '{}'",
-            webview.label()
+            "[DeepLink] take_pending_deep_links rejected for window '{}'",
+            window.label()
         );
         return Vec::new();
     }

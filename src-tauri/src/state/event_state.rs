@@ -1,10 +1,12 @@
 use crate::error::Result;
 use crate::state::process_state::ProcessMetadata;
 use log::info;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -73,6 +75,7 @@ pub struct MinecraftProcessExitedPayload {
     pub process_id: Uuid,
     pub exit_code: Option<i32>,
     pub success: bool,
+    pub was_intentionally_stopped: bool,
     pub process_metadata: Option<ProcessMetadata>,
     pub crash_report_content: Option<String>,
 }
@@ -89,6 +92,17 @@ pub struct ProcessMetricsPayload {
     pub memory_bytes: u64,
     pub cpu_percent: f32,
     pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+static PROCESS_EXITS: Lazy<broadcast::Sender<MinecraftProcessExitedPayload>> =
+    Lazy::new(|| broadcast::channel(16).0);
+
+pub fn subscribe_process_exits() -> broadcast::Receiver<MinecraftProcessExitedPayload> {
+    PROCESS_EXITS.subscribe()
+}
+
+pub fn publish_process_exit(payload: &MinecraftProcessExitedPayload) {
+    let _ = PROCESS_EXITS.send(payload.clone());
 }
 
 #[derive(Clone)]

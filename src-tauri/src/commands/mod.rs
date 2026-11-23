@@ -34,6 +34,7 @@ pub mod process_command;
 pub mod profile_command;
 pub mod share;
 pub mod skin_render_command;
+pub mod support_profile_command;
 pub mod sync_pack_command;
 pub mod twitch_command;
 pub mod vanilla_cape_command;

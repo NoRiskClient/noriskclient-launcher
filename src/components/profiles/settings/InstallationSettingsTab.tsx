@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 
-import type { ModLoader, Profile } from "../../../types/profile";
+import type { ModLoader, Profile, ProfilePatch } from "../../../types/profile";
 import type { MinecraftVersion } from "../../../types/minecraft";
 import { useResolvedLoaderVersion } from "../../../hooks/useResolvedLoaderVersion";
 import { useThemeStore } from "../../../store/useThemeStore";
@@ -19,7 +19,7 @@ import { withoutStableTag } from "../../../utils/loader-version";
 interface InstallationSettingsTabProps {
   profile: Profile;
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
+  updateProfile: (patch: ProfilePatch, delayMs?: number) => void;
   refreshTrigger?: number;
 }
 
@@ -121,7 +121,6 @@ export function InstallationSettingsTab({
   const gameVersion = editedProfile.game_version;
   const loader = editedProfile.loader || "vanilla";
   const current = loaderOf(loader);
-  const changed = gameVersion !== profile.game_version || loader !== (profile.loader || "vanilla");
   const customLoaderVersion = editedProfile.settings.use_overwrite_loader_version;
   const overwrittenVersion =
     editedProfile.settings.overwrite_loader_versions?.[loader] ?? editedProfile.settings.overwrite_loader_version ?? "";
@@ -194,7 +193,6 @@ export function InstallationSettingsTab({
   ) =>
     updateProfile({
       settings: {
-        ...editedProfile.settings,
         use_overwrite_loader_version: custom,
         overwrite_loader_version: null,
         overwrite_loader_versions: { ...editedProfile.settings.overwrite_loader_versions, [loader]: version },
@@ -242,15 +240,6 @@ export function InstallationSettingsTab({
             <span className="text-white/50">{resolvedLoaderVersion.version}</span>
           )}
         </span>
-        {changed && (
-          <span className="ml-auto flex items-center gap-2 text-xs text-white/60">
-            <Icon icon="solar:pen-bold" className="h-3.5 w-3.5" style={{ color: accent }} />
-            {t("profiles.settings.unsavedFrom", {
-              version: profile.game_version,
-              loader: loaderOf(profile.loader || "vanilla").label,
-            })}
-          </span>
-        )}
       </div>
 
       <Section title={t("profiles.settings.gameVersion")} aside={typeSwitch}>

@@ -6,6 +6,10 @@ pub fn window<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
     app.get_window(LABEL)
 }
 
+pub fn is_main(label: &str) -> bool {
+    label == LABEL
+}
+
 pub fn show<R: Runtime>(app: &AppHandle<R>) {
     match window(app) {
         Some(window) => {

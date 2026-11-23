@@ -8,8 +8,10 @@ use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
 use crate::utils::download_utils::DownloadUtils;
 use crate::utils::export_utils::{
-    relative_zip_path, select_export_files, write_export_archive, ExportEntry,
+    clearly_over_limit, is_text_file, relative_zip_path, select_export_files_sized,
+    write_export_archive, ExportEntry, ExportMode, TOO_LARGE,
 };
+use crate::utils::security_utils::mask_sensitive_data;
 use crate::utils::{datapack_utils, hash_utils, resourcepack_utils, shaderpack_utils};
 use chrono;
 use futures::future::{join_all, BoxFuture, FutureExt};
@@ -1032,6 +1034,8 @@ pub async fn export_profile_to_noriskpack(
     profile_id: Uuid,
     output_path: Option<PathBuf>,
     include_files: Option<Vec<PathBuf>>,
+    mode: ExportMode,
+    size_limit: Option<u64>,
 ) -> Result<PathBuf> {
     info!("Exporting profile {} to .noriskpack", profile_id);
 
@@ -1042,21 +1046,33 @@ pub async fn export_profile_to_noriskpack(
         .get_profile_instance_path(profile_id)
         .await?;
 
-    let entries: Vec<ExportEntry> =
-        select_export_files(&profile_instance_path, include_files.as_ref())
-            .await?
+    let selected =
+        select_export_files_sized(&profile_instance_path, include_files.as_ref(), mode).await?;
+    let estimate = selected.iter().map(|(_, size)| size).sum();
+    if clearly_over_limit(estimate, size_limit) {
+        return Err(AppError::Other(TOO_LARGE.to_string()));
+    }
+    let (masked, entries): (Vec<ExportEntry>, Vec<ExportEntry>) =
+        selected
             .into_iter()
-            .filter_map(|source_path| {
+            .filter_map(|(source_path, _)| {
                 let rel_path = relative_zip_path(&profile_instance_path, &source_path)?;
                 Some(ExportEntry {
                     zip_path: format!("overrides/{}", rel_path),
                     source_path,
                 })
             })
-            .collect();
+            .partition(|entry| mode.masks_text() && is_text_file(&entry.source_path));
 
     let export_profile = sanitize_profile_for_export(&profile);
     let profile_json = serde_json::to_vec_pretty(&export_profile)?;
+    let mut trailing_entries = Vec::with_capacity(masked.len() + 1);
+    for entry in masked {
+        let raw = fs::read(&entry.source_path).await.map_err(AppError::Io)?;
+        let text = mask_sensitive_data(&String::from_utf8_lossy(&raw));
+        trailing_entries.push((entry.zip_path, text.into_bytes()));
+    }
+    trailing_entries.push(("profile.json".to_string(), profile_json));
 
     // Determine the output file path
     let output_file = match output_path {
@@ -1083,7 +1099,7 @@ pub async fn export_profile_to_noriskpack(
         profile_id,
         &output_file,
         entries,
-        vec![("profile.json".to_string(), profile_json)],
+        trailing_entries,
     )
     .await?;
 
@@ -1120,7 +1136,8 @@ fn sanitize_profile_for_export(profile: &Profile) -> Profile {
 
     export_profile.settings.java_path = None;
     export_profile.settings.use_custom_java_path = false;
-    export_profile.settings.custom_jvm_args = None;
+    export_profile.settings.use_custom_jvm_args = false;
+    export_profile.settings.jvm_args = String::new();
     export_profile.settings.extra_game_args = Vec::new();
     export_profile.settings.quick_play_path = None;
     export_profile.preferred_account_id = None;

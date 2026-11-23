@@ -89,7 +89,8 @@ export interface ProfileSettings {
   resolution: WindowSize | null;
   fullscreen: boolean;
   extra_game_args: string[];           // Vec<String> -> string[] (Renamed from extra_args)
-  custom_jvm_args: string | null;   // Option<String> -> string | null (New)
+  use_custom_jvm_args: boolean;
+  jvm_args: string;
   quick_play_path: string | null;   // Option<String> -> string | null (Quick Play path)
 }
 
@@ -226,6 +227,7 @@ export interface Profile {
   group: string | null;
   use_shared_minecraft_folder: boolean;
   is_standard_version: boolean;
+  is_temporary?: boolean;
   description: string | null;
   banner: ProfileBanner | null;
   background: ProfileBanner | null;
@@ -262,23 +264,33 @@ export interface CreateProfileParams {
   use_shared_minecraft_folder?: boolean;
 }
 
-export interface UpdateProfileParams {
+export interface ProfileSettingsPatch {
+  java_path?: string | null;
+  use_custom_java_path?: boolean;
+  use_overwrite_loader_version?: boolean;
+  overwrite_loader_version?: string | null;
+  overwrite_loader_versions?: Record<string, string>;
+  memory?: MemorySettings;
+  resolution?: WindowSize | null;
+  fullscreen?: boolean;
+  extra_game_args?: string[];
+  use_custom_jvm_args?: boolean;
+  jvm_args?: string;
+  quick_play_path?: string | null;
+}
+
+export interface ProfilePatch {
   name?: string;
   game_version?: string;
-  loader?: string;
-  loader_version?: string;
-  settings?: ProfileSettings;
-  selected_norisk_pack_id?: string;
+  loader?: ModLoader;
+  loader_version?: string | null;
+  settings?: ProfileSettingsPatch;
+  selected_norisk_pack_id?: string | null;
   group?: string | null;
-  clear_group?: boolean;
   use_shared_minecraft_folder?: boolean;
   description?: string | null;
-  clear_selected_norisk_pack?: boolean;
-  banner?: ProfileBanner | null;
-  background?: ProfileBanner | null;
   norisk_information?: NoriskInformation | null;
   preferred_account_id?: string | null;
-  clear_preferred_account?: boolean;
 }
 
 export interface CopyProfileParams {

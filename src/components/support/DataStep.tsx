@@ -7,11 +7,11 @@ import { useClickGuard } from "../../hooks/useClickGuard";
 import { SupportRequestService } from "../../services/support-request-service";
 import type { Profile } from "../../types/profile";
 import type { PreparedItem } from "../../types/support-request";
-import { BackButton, SMALL_SPINNER, SendHeader, CollectingProgress, Status, SupportFrame, type StepFlow } from "./parts";
-import { RawPreview, getPreviewTemplate, isPartiallyShown } from "./previews/registry";
+import { BackButton, NoProfileStep, SMALL_SPINNER, SendHeader, CollectingProgress, SupportFrame, type StepFlow } from "./parts";
+import { RawPreview } from "./previews/registry";
 import type { SupportPreviewContext } from "./previews/types";
 import { SupportKidItemRow } from "./SupportRequestItems";
-import { getSupportItemDefinition, supportItemKey } from "./supportItems";
+import { getPreviewTemplate, getSupportItemDefinition, isPartiallyShown, supportItemKey } from "./supportItems";
 import { isCollectSelectable, type PreparedItems } from "./usePreparedItems";
 
 function ItemPreview({
@@ -73,13 +73,13 @@ export function DataStep({
   flow,
   items,
   profile,
-  profilesReady,
+  profileMissing,
   onSent,
 }: {
   flow: StepFlow;
   items: PreparedItems;
   profile: Profile | null;
-  profilesReady: boolean;
+  profileMissing: boolean;
   onSent: () => void;
 }) {
   const { t } = useTranslation();
@@ -105,13 +105,7 @@ export function DataStep({
     }
   };
 
-  if (!profile && profilesReady) {
-    return (
-      <SupportFrame onClose={flow.close} stepper={flow.stepper} left={<BackButton onClick={flow.back} />}>
-        <Status icon="solar:question-circle-bold" tone="info" title={t("support_request.profile.none")} />
-      </SupportFrame>
-    );
-  }
+  if (profileMissing) return <NoProfileStep flow={flow} />;
 
   if (!loading && previewItem) {
     return (

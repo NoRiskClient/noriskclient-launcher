@@ -70,6 +70,15 @@ export function BackButton({ onClick, disabled }: { onClick: () => void; disable
   );
 }
 
+export function NoProfileStep({ flow }: { flow: StepFlow }) {
+  const { t } = useTranslation();
+  return (
+    <SupportFrame onClose={flow.close} stepper={flow.stepper} left={<BackButton onClick={flow.back} />}>
+      <Status icon="solar:question-circle-bold" tone="info" title={t("support_request.profile.none")} />
+    </SupportFrame>
+  );
+}
+
 export function useAccentStyle(): CSSProperties {
   const accent = useThemeStore((s) => s.accentColor.value);
   return { borderColor: `${accent}80`, backgroundColor: `${accent}25` };
@@ -182,9 +191,20 @@ export function Stepper({ count, current }: { count: number; current: number }) 
 
 export const SMALL_SPINNER = <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />;
 
+export function ProgressBar({ percent }: { percent: number | null }) {
+  const accent = useThemeStore((s) => s.accentColor.value);
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+      <div
+        className={cn("h-full rounded-full", percent === null ? "w-1/3 animate-indeterminate" : "transition-[width] duration-300 ease-out")}
+        style={{ width: percent === null ? undefined : `${Math.max(percent, 2)}%`, backgroundColor: accent }}
+      />
+    </div>
+  );
+}
+
 export function CollectingProgress() {
   const { t } = useTranslation();
-  const accent = useThemeStore((s) => s.accentColor.value);
   const [step, setStep] = useState<PrepareStep | null>(null);
 
   useEffect(() => {
@@ -194,19 +214,14 @@ export function CollectingProgress() {
     };
   }, []);
 
-  const percent = step ? Math.round(((step.index + 0.5) / step.total) * 100) : 0;
+  const percent = step ? Math.round(((step.index + 0.5) / step.total) * 100) : null;
 
   return (
     <div className="flex flex-col items-center gap-4 py-8">
       <Icon icon="svg-spinners:ring-resize" className="w-10 h-10 text-white/80" />
       <span className="font-minecraft text-lg tracking-wide text-white/80">{t("support_request.data.collecting")}</span>
       <div className="w-full max-w-xs space-y-2">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full transition-[width] duration-300 ease-out"
-            style={{ width: `${percent}%`, backgroundColor: accent }}
-          />
-        </div>
+        <ProgressBar percent={percent} />
         <div className="flex items-center justify-between gap-3 font-minecraft text-sm tracking-wide text-white/60">
           <span className="truncate">{step ? t(supportItemKey(step.itemType, "label")) : " "}</span>
           {step && (

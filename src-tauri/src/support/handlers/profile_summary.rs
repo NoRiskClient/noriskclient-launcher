@@ -61,7 +61,10 @@ pub fn java_from_text(text: &str) -> Option<JavaRuntime> {
 }
 
 pub async fn detect_profile_java(ctx: &SupportContext) -> JavaRuntime {
-    let settings = &ctx.profile.settings;
+    let (Ok(profile), Ok(instance)) = (ctx.profile(), ctx.instance_path()) else {
+        return JavaRuntime::default();
+    };
+    let settings = &profile.settings;
     let custom_path = settings
         .java_path
         .as_deref()
@@ -75,7 +78,7 @@ pub async fn detect_profile_java(ctx: &SupportContext) -> JavaRuntime {
         }
     }
 
-    let latest = ctx.instance_path.join("logs").join("latest.log");
+    let latest = instance.join("logs").join("latest.log");
     tokio::task::spawn_blocking(move || {
         read_head_lossy(&latest, JAVA_LOG_HEAD_BYTES).and_then(|text| java_from_text(&text))
     })
@@ -96,7 +99,10 @@ impl SupportItemHandler for ProfileSummaryHandler {
     }
 
     async fn prepare(&self, ctx: &SupportContext, _params: &ItemParams) -> PreparedItem {
-        let profile = &ctx.profile;
+        let profile = match ctx.profile() {
+            Ok(p) => p,
+            Err(e) => return PreparedItem::missing(e),
+        };
         let state = match state().await {
             Ok(s) => s,
             Err(e) => return PreparedItem::failed(e),

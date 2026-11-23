@@ -411,8 +411,13 @@ pub struct LauncherConfig {
     pub close_to_tray: bool,
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
-    #[serde(default)]
+    #[deprecated(note = "replaced by `global_jvm_args` + `use_global_jvm_args`; only read to migrate old configs")]
+    #[serde(default, skip_serializing)]
     pub global_custom_jvm_args: Option<String>,
+    #[serde(default)]
+    pub use_global_jvm_args: bool,
+    #[serde(default)]
+    pub global_jvm_args: String,
     #[serde(default)]
     pub custom_game_directory: Option<PathBuf>,
     #[serde(default = "default_enable_analytics")]
@@ -508,6 +513,23 @@ fn default_pack_rollout_override() -> String {
     "auto".to_string()
 }
 
+impl LauncherConfig {
+    #[allow(deprecated)]
+    pub fn migrate_legacy_jvm_args(&mut self) {
+        if let Some(args) = self.global_custom_jvm_args.take().filter(|args| !args.trim().is_empty()) {
+            if self.global_jvm_args.is_empty() {
+                self.global_jvm_args = args;
+                self.use_global_jvm_args = true;
+            }
+        }
+    }
+
+    pub fn enabled_global_jvm_args(&self) -> Option<&str> {
+        crate::state::profile_state::enabled_jvm_args(self.use_global_jvm_args, &self.global_jvm_args)
+    }
+}
+
+#[allow(deprecated)]
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
@@ -526,6 +548,8 @@ impl Default for LauncherConfig {
             close_to_tray: false,
             global_memory_settings: default_global_memory_settings(),
             global_custom_jvm_args: None,
+            use_global_jvm_args: false,
+            global_jvm_args: String::new(),
             custom_game_directory: None,
             enable_analytics: default_enable_analytics(),
             use_browser_based_login: default_use_browser_based_login(),
@@ -579,6 +603,7 @@ impl ConfigManager {
                 debug!("Loaded config: {:?}", loaded_config);
 
                 loaded_config.clips.normalize();
+                loaded_config.migrate_legacy_jvm_args();
 
                 // Update the stored config
                 let mut config = self.config.write().await;
@@ -751,6 +776,7 @@ impl ConfigManager {
         self.config.read().await.is_experimental
     }
 
+    #[allow(deprecated)]
     pub async fn set_config(&self, new_config: LauncherConfig) -> Result<()> {
         let should_save = {
             let mut config = self.config.write().await;
@@ -854,10 +880,13 @@ impl ConfigManager {
                         new_config.global_memory_settings.min, new_config.global_memory_settings.max
                     );
                 }
-                if current.global_custom_jvm_args != new_config.global_custom_jvm_args {
+                if current.use_global_jvm_args != new_config.use_global_jvm_args
+                    || current.global_jvm_args != new_config.global_jvm_args
+                {
                     info!(
-                        "Changing global custom JVM args: {:?} -> {:?}",
-                        current.global_custom_jvm_args, new_config.global_custom_jvm_args
+                        "Changing global JVM args: {} {:?} -> {} {:?}",
+                        current.use_global_jvm_args, current.global_jvm_args,
+                        new_config.use_global_jvm_args, new_config.global_jvm_args
                     );
                 }
                 if current.custom_game_directory != new_config.custom_game_directory {
@@ -896,7 +925,9 @@ impl ConfigManager {
                     hide_on_process_start: new_config.hide_on_process_start,
                     close_to_tray: new_config.close_to_tray,
                     global_memory_settings: new_config.global_memory_settings,
-                    global_custom_jvm_args: new_config.global_custom_jvm_args.clone(),
+                    global_custom_jvm_args: None,
+                    use_global_jvm_args: new_config.use_global_jvm_args,
+                    global_jvm_args: new_config.global_jvm_args.clone(),
                     custom_game_directory: new_config.custom_game_directory.clone(),
                     enable_analytics: new_config.enable_analytics,
                     use_browser_based_login: new_config.use_browser_based_login,

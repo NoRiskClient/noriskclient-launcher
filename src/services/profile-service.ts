@@ -7,7 +7,7 @@ import type {
   CustomModInfo,
   ExportProfileParams,
   Profile,
-  UpdateProfileParams,
+  ProfilePatch,
   AllProfilesAndLastPlayed,
   BatchCheckContentParams,
   BatchContentInstallStatus,
@@ -68,11 +68,8 @@ export async function createProfile(
   return invoke<string>("create_profile", { params });
 }
 
-export async function updateProfile(
-  id: string,
-  params: UpdateProfileParams,
-): Promise<void> {
-  return invoke<void>("update_profile", { id, params });
+export async function patchProfile(id: string, patch: ProfilePatch): Promise<Profile> {
+  return invoke<Profile>("patch_profile", { id, patch });
 }
 
 export async function deleteProfile(id: string): Promise<void> {
@@ -99,6 +96,10 @@ export async function getSystemRamMb(): Promise<number> {
 
 export async function getDefaultMemoryMaxMb(): Promise<number> {
   return invoke<number>("get_default_memory_max_mb");
+}
+
+export async function getDefaultJvmArgs(profile: Profile, heapMb: number): Promise<string> {
+  return invoke<string>("get_default_jvm_args", { profile, heapMb });
 }
 
 export async function setProfileModEnabled(
@@ -209,6 +210,13 @@ export async function getProfileDirectoryStructure(
   profileId: string,
 ): Promise<FileNode> {
   return invoke<FileNode>("get_profile_directory_structure", { profileId });
+}
+
+export async function getProfileDirectoryLevel(
+  profileId: string,
+  subPath?: string,
+): Promise<FileNode> {
+  return invoke<FileNode>("get_profile_directory_level", { profileId, subPath });
 }
 
 export async function setNoriskModStatus(

@@ -5,6 +5,7 @@ import type { PreparedItem } from "../../../types/support-request";
 
 export interface SupportPreviewContext {
   profile: Profile | null;
+  params?: Record<string, string>;
 }
 
 export interface SupportPreviewProps {

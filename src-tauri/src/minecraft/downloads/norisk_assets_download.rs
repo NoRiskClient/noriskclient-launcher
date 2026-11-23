@@ -8,11 +8,10 @@ use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
 use crate::state::profile_state::Profile;
 use crate::state::State;
 use crate::utils::file_utils::{scan_object_store, write_atomic};
-use futures::stream::{iter, StreamExt};
+use futures::stream::{self, StreamExt};
 use log::{debug, error, info, trace, warn};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -84,6 +83,11 @@ impl NoriskClientAssetsDownloadService {
         let game_directory = state
             .profile_manager
             .calculate_instance_path_for_profile(profile)?;
+
+        let legacy_instance = game_directory.clone();
+        tokio::spawn(async move {
+            remove_legacy_asset_copy(&legacy_instance).await;
+        });
 
         // Use profile's effective pack as the *main* pack ID (honors rollout alias)
         let main_pack_id = match profile.effective_norisk_pack_id().await {
@@ -507,23 +511,18 @@ impl NoriskClientAssetsDownloadService {
         }
 
         let mut downloads = Vec::new();
-        let task_counter = Arc::new(AtomicUsize::new(1));
-        let completed_counter = Arc::new(AtomicUsize::new(0));
-        let total_to_download = Arc::new(AtomicUsize::new(0));
 
         trace!(
             "[NRC Assets Download '{}'] Preparing {} potential jobs...",
             asset_id,
             assets.objects.len()
         );
-        let mut job_count = 0;
 
         let state = if profile_id.is_some() {
             State::get().await.ok()
         } else {
             None
         };
-        let state_clone_for_inspect = state.clone();
 
         // Pre-scan existing objects to avoid per-file fs::try_exists calls
         let objects_dir = assets_path.join("objects");
@@ -541,15 +540,10 @@ impl NoriskClientAssetsDownloadService {
 
             let hash = &asset.hash;
             let target_path = objects_dir.join(&hash[..2]).join(hash);
-            let task_counter_clone = Arc::clone(&task_counter);
-            let completed_counter_clone = Arc::clone(&completed_counter);
-            let total_to_download_clone = Arc::clone(&total_to_download);
             let stats = self.stats.clone();
 
-            job_count += 1;
-            total_to_download_clone.fetch_add(1, Ordering::SeqCst);
+            let task_id = downloads.len() + 1;
             downloads.push(async move {
-                let task_id = task_counter_clone.fetch_add(1, Ordering::SeqCst);
                 trace!("[NRC Assets Download '{}' Task {}] Starting download for: {}", asset_id, task_id, name);
 
                 // ?v= = content hash, so Cloudflare can cache each version. No auth, the bucket is public.
@@ -602,18 +596,15 @@ impl NoriskClientAssetsDownloadService {
                      return Err(AppError::Io(e));
                 }
 
-                let completed = completed_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                let total = total_to_download_clone.load(Ordering::SeqCst);
                 if let Some(stats) = &stats {
                     stats.record_downloaded(bytes.len() as u64);
                 }
 
-                trace!("[NRC Assets Download '{}' Task {}] Finished download for: {} ({}/{})",
-                      asset_id, task_id, name, completed, total);
-                Ok((hash.clone(), bytes.len() as u64))
+                Ok((task_id, name, hash, bytes.len() as u64))
             });
         }
 
+        let job_count = downloads.len();
         info!(
             "[NRC Assets Download '{}'] Queued {} actual download tasks.",
             asset_id, job_count
@@ -642,54 +633,35 @@ impl NoriskClientAssetsDownloadService {
             asset_id, self.concurrent_downloads
         );
 
-        let completed_ref = Arc::clone(&completed_counter);
-        let asset_id_clone = asset_id.to_string();
-        let progress_throttle = Arc::new(ProgressThrottle::new(100));
-
-        let results: Vec<Result<(String, u64)>> = iter(downloads)
-            .buffer_unordered(self.concurrent_downloads)
-            .inspect({
-                let asset_id_inspect = asset_id_clone.clone();
-                 // Use the cloned state inside the closure
-                move |_| {
-                    if let (Some(state_ref), Some(profile_id_val)) = (&state_clone_for_inspect, profile_id) {
-                        let completed = completed_ref.load(Ordering::SeqCst);
-                        let total = total_to_download.load(Ordering::SeqCst);
-                        if total > 0 && progress_throttle.should_emit() {
-                            let progress_within_download = 0.1 + (completed as f64 / total as f64) * 0.7;
-                            let asset_id_for_task = asset_id_inspect.clone();
-                            tokio::spawn({
-                                let state = state_ref.clone();
-                                let message = format!("Downloading '{}' assets: {}/{} files", asset_id_for_task, completed, total);
-                                let profile_id = profile_id_val;
-                                async move {
-                                    let event_id = Uuid::new_v4();
-                                    if let Err(e) = state.emit_event(EventPayload {
-                                        event_id,
-                                        event_type: EventType::DownloadingNoRiskClientAssets,
-                                        target_id: Some(profile_id),
-                                        message,
-                                        progress: Some(progress_within_download),
-                                        error: None,
-                                    }).await {
-                                        error!("[NRC Assets Download '{}'] Failed to emit progress event: {}", asset_id_for_task, e);
-                                    }
-                                }
-                            });
-                        }
+        let throttle = ProgressThrottle::new(100);
+        let mut completed = 0;
+        let mut errors = Vec::new();
+        let mut pending = stream::iter(downloads).buffer_unordered(self.concurrent_downloads);
+        while let Some(result) = pending.next().await {
+            match result {
+                Ok((task_id, name, hash, size)) => {
+                    completed += 1;
+                    trace!(
+                        "[NRC Assets Download '{}' Task {}] Finished download for: {} ({}/{})",
+                        asset_id, task_id, name, completed, job_count
+                    );
+                    cached_objects.insert(hash.clone(), size);
+                }
+                Err(error) => errors.push(error),
+            }
+            if let (Some(state), Some(profile_id)) = (&state, profile_id) {
+                if throttle.should_emit() {
+                    let message = format!(
+                        "Downloading '{}' assets: {}/{} files", asset_id, completed, job_count
+                    );
+                    let progress = 0.1 + (completed as f64 / job_count as f64) * 0.7;
+                    if let Err(e) = self
+                        .emit_progress_event(state, profile_id, &message, progress, None)
+                        .await
+                    {
+                        error!("[NRC Assets Download '{}'] Failed to emit progress event: {}", asset_id, e);
                     }
                 }
-            })
-            .collect()
-            .await;
-
-        let mut errors = Vec::new();
-        for result in results {
-            match result {
-                Ok((hash, size)) => {
-                    cached_objects.insert(hash, size);
-                }
-                Err(e) => errors.push(e),
             }
         }
         if let Some(stats) = &self.stats {
@@ -707,7 +679,7 @@ impl NoriskClientAssetsDownloadService {
             for error_item in &errors {
                 error!("  - {}", error_item);
             }
-            // Use original state here, as it wasn't moved by the inspect closure
+
             if let (Some(state_ref), Some(profile_id_val)) = (&state, profile_id) {
                 self.emit_progress_event(
                     state_ref,
@@ -728,7 +700,7 @@ impl NoriskClientAssetsDownloadService {
                 "[NRC Assets Download '{}'] All asset downloads completed successfully.",
                 asset_id
             );
-            // Use original state here
+
             if let (Some(state_ref), Some(profile_id_val)) = (&state, profile_id) {
                 self.emit_progress_event(
                     state_ref,
@@ -853,5 +825,22 @@ impl NoriskClientAssetsDownloadService {
             })
             .await?;
         Ok(event_id)
+    }
+}
+
+pub async fn remove_legacy_asset_copy(instance: &Path) -> bool {
+    let legacy = instance.join("NoRiskClient").join(ASSETS_DIR);
+    if !fs::try_exists(&legacy).await.unwrap_or(false) {
+        return false;
+    }
+    match fs::remove_dir_all(&legacy).await {
+        Ok(()) => {
+            info!("[NRC Assets] Removed old asset copy {}", legacy.display());
+            true
+        }
+        Err(e) => {
+            warn!("Could not remove old NRC asset copy {}: {}", legacy.display(), e);
+            false
+        }
     }
 }

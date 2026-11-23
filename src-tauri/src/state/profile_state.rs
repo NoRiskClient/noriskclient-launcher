@@ -344,6 +344,7 @@ impl ModLoader {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(from = "StoredProfileSettings")]
 pub struct ProfileSettings {
     pub java_path: Option<String>, // Java Pfad
     #[serde(default)]
@@ -369,10 +370,75 @@ pub struct ProfileSettings {
     pub fullscreen: bool, // Vollbild
     #[serde(default)]
     pub extra_game_args: Vec<String>, // Zusätzliche Argumente für das Spiel
-    #[serde(default)] // Für Abwärtskompatibilität
-    pub custom_jvm_args: Option<String>, // Zusätzliche JVM-Argumente als String
+    #[serde(default)]
+    pub use_custom_jvm_args: bool,
+    #[serde(default)]
+    pub jvm_args: String,
     #[serde(default)]
     pub quick_play_path: Option<String>, // Quick Play Pfad für direkten Welt-/Server-Start
+}
+
+impl ProfileSettings {
+    pub fn enabled_jvm_args(&self) -> Option<&str> {
+        enabled_jvm_args(self.use_custom_jvm_args, &self.jvm_args)
+    }
+}
+
+pub fn enabled_jvm_args(enabled: bool, args: &str) -> Option<&str> {
+    (enabled && !args.trim().is_empty()).then_some(args)
+}
+
+#[derive(Deserialize, Default)]
+struct StoredProfileSettings {
+    #[serde(default)]
+    java_path: Option<String>,
+    #[serde(default)]
+    use_custom_java_path: bool,
+    #[serde(default)]
+    use_overwrite_loader_version: bool,
+    #[serde(default)]
+    overwrite_loader_version: Option<String>,
+    #[serde(default)]
+    overwrite_loader_versions: HashMap<String, String>,
+    #[serde(default)]
+    memory: Option<MemorySettings>,
+    #[serde(default)]
+    resolution: Option<WindowSize>,
+    #[serde(default)]
+    fullscreen: bool,
+    #[serde(default)]
+    extra_game_args: Vec<String>,
+    #[serde(default)]
+    use_custom_jvm_args: Option<bool>,
+    #[serde(default)]
+    jvm_args: Option<String>,
+    #[deprecated(note = "replaced by `jvm_args` + `use_custom_jvm_args`; only read to migrate old profiles")]
+    #[serde(default)]
+    custom_jvm_args: Option<String>,
+    #[serde(default)]
+    quick_play_path: Option<String>,
+}
+impl From<StoredProfileSettings> for ProfileSettings {
+    #[allow(deprecated)]
+    fn from(stored: StoredProfileSettings) -> Self {
+        let legacy_args = stored.custom_jvm_args.filter(|args| !args.trim().is_empty());
+        let use_custom_jvm_args = stored.use_custom_jvm_args.unwrap_or(legacy_args.is_some());
+        let jvm_args = stored.jvm_args.or(legacy_args).unwrap_or_default();
+        ProfileSettings {
+            java_path: stored.java_path,
+            use_custom_java_path: stored.use_custom_java_path,
+            use_overwrite_loader_version: stored.use_overwrite_loader_version,
+            overwrite_loader_version: stored.overwrite_loader_version,
+            overwrite_loader_versions: stored.overwrite_loader_versions,
+            memory: stored.memory.unwrap_or_default(),
+            resolution: stored.resolution,
+            fullscreen: stored.fullscreen,
+            extra_game_args: stored.extra_game_args,
+            use_custom_jvm_args,
+            jvm_args,
+            quick_play_path: stored.quick_play_path,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -912,6 +978,36 @@ impl ProfileManager {
             profiles.insert(id, profile);
         }
         self.save_profile(id).await?;
+        Ok(())
+    }
+
+    pub async fn patch_profile(
+        &self,
+        id: Uuid,
+        patch: crate::state::profile_patch::ProfilePatch,
+    ) -> Result<Profile> {
+        let current = self.get_profile(id).await?;
+        let profile = {
+            let mut profiles = self.profiles.write().await;
+            let profile = profiles.entry(id).or_insert(current);
+            patch.apply(profile);
+            profile.clone()
+        };
+        self.save_profile_fields(id).await?;
+        Ok(profile)
+    }
+
+    async fn save_profile_fields(&self, id: Uuid) -> Result<()> {
+        let _guard = self.save_lock.lock().await;
+
+        let transient = self.transient.read().await.clone();
+        let profile = match self.profiles.read().await.get(&id) {
+            Some(profile) if should_persist(profile, &transient) => profile.clone(),
+            _ => return Ok(()),
+        };
+
+        self.store.upsert_profile_fields(&profile).await?;
+        self.persisted.lock().await.remove(&id);
         Ok(())
     }
 
@@ -3891,7 +3987,8 @@ impl Default for ProfileSettings {
             resolution: None,
             fullscreen: false,
             extra_game_args: Vec::new(),
-            custom_jvm_args: None, // Standardmäßig keine benutzerdefinierten JVM-Args
+            use_custom_jvm_args: false,
+            jvm_args: String::new(),
             quick_play_path: None,
         }
     }

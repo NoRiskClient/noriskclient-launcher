@@ -1,6 +1,7 @@
+use crate::commands::permission_commands::has_permission_internal;
 use crate::error::{AppError, Result};
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
-use crate::state::profile_state::ProfileState;
+use crate::state::profile_state::{Profile, ProfileState};
 use crate::state::state_manager::State;
 use async_zip::tokio::read::seek::ZipFileReader;
 use chrono::Utc;
@@ -77,6 +78,8 @@ pub struct NoriskPackDefinition {
     /// Optional: StartUpHelper configuration for this pack.
     #[serde(rename = "startupHelper", default)]
     pub startup_helper: Option<StartUpHelper>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jvm: Option<serde_json::Value>,
 }
 
 /// Configuration for copying additional files from the noriskclient/new directory
@@ -962,6 +965,35 @@ impl NoriskModpacksConfig {
         Ok(merged)
     }
 
+    fn resolve_jvm_rules_for_pack(
+        &self,
+        pack_id: &str,
+        visited: &mut HashSet<String>,
+    ) -> Result<Vec<serde_json::Value>> {
+        if !visited.insert(pack_id.to_string()) {
+            return Err(AppError::Other(format!(
+                "Circular inheritance detected while resolving JVM rules for pack ID: {}",
+                pack_id
+            )));
+        }
+        let base_definition = self.packs.get(pack_id).ok_or_else(|| {
+            AppError::Other(format!("Pack ID '{}' not found", pack_id))
+        })?;
+        let mut rules = Vec::new();
+        for parent_id in base_definition.inherits_from.iter().flatten() {
+            rules.extend(self.resolve_jvm_rules_for_pack(parent_id, visited)?);
+        }
+        match &base_definition.jvm {
+            Some(serde_json::Value::Array(own)) => rules.extend(own.iter().cloned()),
+            Some(other) if !other.is_null() => {
+                warn!("Pack '{}': JVM rules are not a list, ignoring them", pack_id)
+            }
+            _ => {}
+        }
+        visited.remove(pack_id);
+        Ok(rules)
+    }
+
     // Helper function to get a fully resolved pack definition (including mods)
     // This combines the base definition with the resolved mods.
     pub fn get_resolved_pack_definition(&self, pack_id: &str) -> Result<NoriskPackDefinition> {
@@ -977,6 +1009,8 @@ impl NoriskModpacksConfig {
         let resolved_loader_policy =
             self.resolve_loader_policy_for_pack(pack_id, &mut visited_lp)?;
 
+        let resolved_jvm_rules = self.resolve_jvm_rules_for_pack(pack_id, &mut HashSet::new())?;
+
         Ok(NoriskPackDefinition {
             display_name: base_definition.display_name.clone(),
             description: base_definition.description.clone(),
@@ -988,7 +1022,60 @@ impl NoriskModpacksConfig {
             listing: base_definition.listing.clone(),
             loader_policy: resolved_loader_policy, // RESOLVED loader policy
             startup_helper: base_definition.startup_helper.clone(), // Added missing field
+            jvm: (!resolved_jvm_rules.is_empty()).then(|| serde_json::Value::Array(resolved_jvm_rules)),
         })
     }
 
+}
+
+const DEV_PACK_PREFIX: &str = "dev-";
+const STAFF_PERMISSION: &str = "norisk.staff";
+const DEV_PACK_PERMISSION_PREFIX: &str = "norisk.pack.dev.";
+
+pub fn is_valid_pack_id(id: &str) -> bool {
+    let mut chars = id.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit())
+        && (2..=64).contains(&id.len())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+pub async fn may_view_pack(id: &str) -> bool {
+    match id.strip_prefix(DEV_PACK_PREFIX) {
+        None => true,
+        Some(rest) => {
+            has_permission_internal(STAFF_PERMISSION).await
+                || has_permission_internal(&format!("{}{}", DEV_PACK_PERMISSION_PREFIX, rest)).await
+        }
+    }
+}
+
+pub async fn validate_pack_target(
+    config: &NoriskModpacksConfig,
+    profile: &Profile,
+    pack: &str,
+) -> std::result::Result<(), String> {
+    if !is_valid_pack_id(pack) {
+        return Err(format!("unknown_pack: \"{}\" is not a valid pack id", pack));
+    }
+    if !config.packs.contains_key(pack) || !may_view_pack(pack).await {
+        return Err(format!("unknown_pack: {} is not available", pack));
+    }
+    let resolved = config
+        .get_resolved_pack_definition(pack)
+        .map_err(|e| format!("unknown_pack: {} cannot be resolved: {}", pack, e))?;
+    let supports_profile = resolved.mods.is_empty()
+        || resolved.mods.iter().any(|m| {
+            m.compatibility
+                .get(&profile.game_version)
+                .is_some_and(|by_loader| by_loader.contains_key(profile.loader.as_str()))
+        });
+    if !supports_profile {
+        return Err(format!(
+            "unsupported_version: {} has no mods for Minecraft {} with {}",
+            pack,
+            profile.game_version,
+            profile.loader.as_str()
+        ));
+    }
+    Ok(())
 }

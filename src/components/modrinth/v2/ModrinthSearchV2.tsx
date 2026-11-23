@@ -2544,7 +2544,7 @@ export function ModrinthSearchV2({
 
         // If the source profile is a standard version, update the new profile to be custom
         if (sourceProfile?.is_standard_version) {
-          await ProfileService.updateProfile(newProfileId, {
+          await ProfileService.patchProfile(newProfileId, {
             group: "CUSTOM",
           });
         }

@@ -1,4 +1,4 @@
-import { LoaderUpdatePreview, SwitchPackPreview } from "./ActionPreviews";
+import { LoaderUpdatePreview, SwitchPackPreview, TempProfilePreview } from "./ActionPreviews";
 import { CrashReportPreview, JvmCrashPreview } from "./CrashPreviews";
 import {
   ModListPreview,
@@ -8,7 +8,6 @@ import {
 } from "./DataPreviews";
 import { LogPreview } from "./LogPreview";
 import {
-  LOG_RENDER_CAP,
   analyzeLog,
   formatMb,
   itemData,
@@ -24,7 +23,6 @@ import {
   str,
 } from "./parse";
 import type { SupportPreviewTemplate } from "./types";
-import type { PreparedItem } from "../../../types/support-request";
 
 type Summarize = NonNullable<SupportPreviewTemplate["summarize"]>;
 
@@ -38,7 +36,7 @@ const safe =
     }
   };
 
-const logTemplate: SupportPreviewTemplate = {
+export const logTemplate: SupportPreviewTemplate = {
   Preview: LogPreview,
   summarize: safe((item, t) => {
     const { errors } = analyzeLog(item);
@@ -48,11 +46,7 @@ const logTemplate: SupportPreviewTemplate = {
   }),
 };
 
-const PREVIEW_TEMPLATES: Readonly<Record<string, SupportPreviewTemplate>> = {
-  MC_LATEST_LOG: logTemplate,
-  MC_DEBUG_LOG: logTemplate,
-  LAUNCHER_LOG: logTemplate,
-  LAST_SESSION_LOG: logTemplate,
+export const templates = {
   MC_LATEST_CRASH: {
     Preview: CrashReportPreview,
     summarize: safe((item, t) => {
@@ -108,15 +102,7 @@ const PREVIEW_TEMPLATES: Readonly<Record<string, SupportPreviewTemplate>> = {
   },
   UPDATE_LOADER: { Preview: LoaderUpdatePreview },
   SWITCH_PACK: { Preview: SwitchPackPreview },
-};
-
-export function getPreviewTemplate(type: string): SupportPreviewTemplate {
-  return Object.prototype.hasOwnProperty.call(PREVIEW_TEMPLATES, type) ? PREVIEW_TEMPLATES[type] : {};
-}
-
-export function isPartiallyShown(item: PreparedItem): boolean {
-  if (item.previewIsExcerpt) return true;
-  return getPreviewTemplate(item.type) === logTemplate && analyzeLog(item).lines.length > LOG_RENDER_CAP;
-}
+  START_TEMP_PROFILE: { Preview: TempProfilePreview },
+} satisfies Record<string, SupportPreviewTemplate>;
 
 export { RawPreview };

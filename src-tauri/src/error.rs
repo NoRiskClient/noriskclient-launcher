@@ -152,6 +152,9 @@ pub enum AppError {
         args: Vec<String>,
     },
 
+    #[error("HTTP {status}: {message}")]
+    HttpStatus { status: u16, message: String },
+
     #[error("Parse error: {0}")]
     ParseError(String),
 

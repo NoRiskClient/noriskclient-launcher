@@ -38,7 +38,7 @@ impl<'a> Progress<'a> {
     }
 }
 
-pub(super) fn file_body(file: tokio::fs::File, size: u64, sent: Arc<AtomicU64>) -> reqwest::Body {
+pub(crate) fn file_body(file: tokio::fs::File, size: u64, sent: Arc<AtomicU64>) -> reqwest::Body {
     let stream = futures::stream::try_unfold(file.take(size), move |mut file| {
         let sent = sent.clone();
         async move {
@@ -55,12 +55,12 @@ pub(super) fn file_body(file: tokio::fs::File, size: u64, sent: Arc<AtomicU64>) 
     reqwest::Body::wrap_stream(stream)
 }
 
-pub(super) async fn watch_upload(
-    put: impl Future<Output = crate::error::Result<()>>,
+pub(crate) async fn watch_upload<E: From<AppError>>(
+    put: impl Future<Output = Result<(), E>>,
     sent: &AtomicU64,
     size: u64,
     report: impl Fn(u64),
-) -> crate::error::Result<()> {
+) -> Result<(), E> {
     tokio::pin!(put);
     let mut tick = tokio::time::interval(PROGRESS_EVERY);
     let mut last = 0;
@@ -75,7 +75,7 @@ pub(super) async fn watch_upload(
                     moved = Instant::now();
                     report(now);
                 } else if now < size && moved.elapsed() > STALL_AFTER {
-                    return Err(AppError::RequestError("the upload stalled".into()));
+                    return Err(AppError::RequestError("the upload stalled".into()).into());
                 }
             }
         }

@@ -1,8 +1,9 @@
 use super::{
     check_editable, clean_loader_version, editable_profile, from_to_data,
-    is_valid_loader_version, resolved_loader_version, save_profile, state,
+    resolved_loader_version, save_profile, state,
 };
 use crate::minecraft::modloader::ModloaderFactory;
+use crate::minecraft::temp_profile::is_valid_loader_version;
 use crate::state::profile_state::{ModLoader, Profile};
 use crate::state::state_manager::State;
 use crate::support::handler::{ActionOutcome, PreparedItem, SupportContext, SupportItemHandler};
@@ -91,7 +92,7 @@ fn change_line(profile: &Profile, from: Option<&str>, to: &str) -> String {
 }
 
 async fn plan(ctx: &SupportContext, params: &ItemParams) -> Result<PreparedItem, String> {
-    let profile = &ctx.profile;
+    let profile = ctx.profile()?;
     check_editable(profile, VANILLA_REASON)?;
     if let Some(loader) = params.get("loader").and_then(|v| v.as_str()) {
         if !loader.eq_ignore_ascii_case(profile.loader.as_str()) {

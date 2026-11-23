@@ -134,7 +134,8 @@ fn neutralises_the_disclosed_noriskpack_payload() {
 
     assert_eq!(profile.settings.java_path, None);
     assert!(!profile.settings.use_custom_java_path);
-    assert_eq!(profile.settings.custom_jvm_args, None);
+    assert!(!profile.settings.use_custom_jvm_args);
+    assert_eq!(profile.settings.jvm_args, "");
 
     assert!(profile.mods.is_empty());
 

@@ -1,6 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::support::files::{self, Redact, MAX_CRASH_AGE};
-use crate::support::handler::{PreparedItem, SupportContext, SupportItemHandler};
+use crate::support::handler::{PreparedItem, SupportContext, SupportItemHandler, NO_PROFILE};
 use crate::support::types::{ItemCategory, ItemParams};
 use crate::utils::log_archive;
 use crate::utils::security_utils::{mask_sensitive_data, redact_hs_err};
@@ -24,6 +24,7 @@ pub struct FileItemHandler {
     pub locate: fn(&SupportContext) -> Located,
     pub redact: Redact,
     pub summarize: Option<Summarize>,
+    pub needs_profile: bool,
 }
 
 fn mask_text(text: &str) -> Result<String, String> {
@@ -41,6 +42,7 @@ impl FileItemHandler {
             locate,
             redact: mask_text,
             summarize: None,
+            needs_profile: true,
         }
     }
 
@@ -88,6 +90,10 @@ impl SupportItemHandler for FileItemHandler {
         ItemCategory::Collect
     }
 
+    fn needs_profile(&self) -> bool {
+        self.needs_profile
+    }
+
     async fn prepare(&self, ctx: &SupportContext, _params: &ItemParams) -> PreparedItem {
         let handler = *self;
         let ctx = ctx.clone();
@@ -111,12 +117,16 @@ fn found_or(root: &Path, relative: Option<PathBuf>, missing: &str) -> Located {
     }
 }
 
+pub(crate) fn in_instance(ctx: &SupportContext, locate: impl FnOnce(&Path) -> Located) -> Located {
+    ctx.instance_path().map_or_else(Located::Missing, locate)
+}
+
 pub fn locate_mc_latest_log(ctx: &SupportContext) -> Located {
-    found(&ctx.instance_path, "logs/latest.log")
+    in_instance(ctx, |root| found(root, "logs/latest.log"))
 }
 
 pub fn locate_mc_debug_log(ctx: &SupportContext) -> Located {
-    found(&ctx.instance_path, "logs/debug.log")
+    in_instance(ctx, |root| found(root, "logs/debug.log"))
 }
 
 pub fn locate_launcher_log(_ctx: &SupportContext) -> Located {
@@ -124,24 +134,29 @@ pub fn locate_launcher_log(_ctx: &SupportContext) -> Located {
 }
 
 pub fn locate_mc_latest_crash(ctx: &SupportContext) -> Located {
-    found_or(
-        &ctx.instance_path,
-        files::newest_matching(
-            &ctx.instance_path,
-            Path::new("crash-reports"),
-            |n| n.starts_with("crash-") && n.ends_with(".txt"),
-            Some(MAX_CRASH_AGE),
-        ),
-        "no crash report from the last 14 days",
-    )
+    in_instance(ctx, |root| {
+        found_or(
+            root,
+            files::newest_matching(
+                root,
+                Path::new("crash-reports"),
+                |n| n.starts_with("crash-") && n.ends_with(".txt"),
+                Some(MAX_CRASH_AGE),
+            ),
+            "no crash report from the last 14 days",
+        )
+    })
 }
 
 pub fn locate_last_session_log(ctx: &SupportContext) -> Located {
-    found_or(
-        &log_archive::archive_root(),
-        log_archive::newest_session_log_for_profile(ctx.profile.id),
-        "no recorded game session for this profile",
-    )
+    match ctx.profile() {
+        Ok(profile) => found_or(
+            &log_archive::archive_root(),
+            log_archive::newest_session_log_for_profile(profile.id),
+            "no recorded game session for this profile",
+        ),
+        Err(e) => Located::Missing(e),
+    }
 }
 
 static HS_ERR_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"^hs_err_pid\d+\.log$").unwrap());
@@ -156,33 +171,38 @@ fn referenced_hs_err_pid(text: &str) -> Option<String> {
         .map(|c| c[1].to_string())
 }
 
-fn referenced_hs_err(ctx: &SupportContext) -> Option<PathBuf> {
-    let session_log = log_archive::newest_session_log_for_profile(ctx.profile.id)
+fn referenced_hs_err(profile_id: uuid::Uuid, instance: &Path) -> Option<PathBuf> {
+    let session_log = log_archive::newest_session_log_for_profile(profile_id)
         .map(|relative| log_archive::archive_root().join(relative));
-    let latest_log = ctx.instance_path.join("logs").join("latest.log");
+    let latest_log = instance.join("logs").join("latest.log");
     session_log
         .into_iter()
         .chain(std::iter::once(latest_log))
         .filter_map(|log| files::read_tail_lossy(&log, JVM_BANNER_TAIL_BYTES))
         .filter_map(|tail| referenced_hs_err_pid(&tail))
         .map(|pid| PathBuf::from(format!("hs_err_pid{}.log", pid)))
-        .find(|name| ctx.instance_path.join(name).is_file())
+        .find(|name| instance.join(name).is_file())
 }
 
 pub fn locate_jvm_crash(ctx: &SupportContext) -> Located {
-    let relative = referenced_hs_err(ctx).or_else(|| {
-        files::newest_matching(
-            &ctx.instance_path,
-            Path::new(""),
-            |n| HS_ERR_NAME.is_match(n),
-            Some(MAX_CRASH_AGE),
+    let Some(profile_id) = ctx.profile_id() else {
+        return Located::Missing(NO_PROFILE.to_string());
+    };
+    in_instance(ctx, |root| {
+        let relative = referenced_hs_err(profile_id, root).or_else(|| {
+            files::newest_matching(
+                root,
+                Path::new(""),
+                |n| HS_ERR_NAME.is_match(n),
+                Some(MAX_CRASH_AGE),
+            )
+        });
+        found_or(
+            root,
+            relative,
+            "no JVM crash log (hs_err_pid*.log) from the last 14 days",
         )
-    });
-    found_or(
-        &ctx.instance_path,
-        relative,
-        "no JVM crash log (hs_err_pid*.log) from the last 14 days",
-    )
+    })
 }
 
 pub fn summarize_hs_err(content: &str) -> Option<String> {
@@ -223,7 +243,10 @@ pub fn handlers() -> Vec<FileItemHandler> {
             summarize: Some(summarize_hs_err),
             ..FileItemHandler::plain("JVM_CRASH", locate_jvm_crash)
         },
-        FileItemHandler::plain("LAUNCHER_LOG", locate_launcher_log),
+        FileItemHandler {
+            needs_profile: false,
+            ..FileItemHandler::plain("LAUNCHER_LOG", locate_launcher_log)
+        },
         FileItemHandler::plain("LAST_SESSION_LOG", locate_last_session_log),
     ]
 }

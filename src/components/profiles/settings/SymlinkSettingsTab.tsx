@@ -22,13 +22,11 @@ import { IconAction, Section, SectionButton } from "./SettingsSection";
 
 interface SymlinkSettingsTabProps {
   editedProfile: Profile;
-  updateProfile: (updates: Partial<Profile>) => void;
   allProfiles: Profile[];
 }
 
 export function SymlinkSettingsTab({
   editedProfile,
-  updateProfile,
   allProfiles,
 }: SymlinkSettingsTabProps) {
   const { t } = useTranslation();
