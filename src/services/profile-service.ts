@@ -212,6 +212,13 @@ export async function getProfileDirectoryStructure(
   return invoke<FileNode>("get_profile_directory_structure", { profileId });
 }
 
+export async function getProfileDirectoryLevel(
+  profileId: string,
+  subPath?: string,
+): Promise<FileNode> {
+  return invoke<FileNode>("get_profile_directory_level", { profileId, subPath });
+}
+
 export async function setNoriskModStatus(
   profileId: string,
   packId: string,

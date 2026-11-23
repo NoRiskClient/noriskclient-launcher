@@ -11,6 +11,10 @@ import {
 
 export const DEEP_LINK_SUPPORT_REQUEST_EVENT = "deep-link-support-request";
 
+export interface ShareChoice {
+  paths: string[];
+}
+
 export interface SupportRequestErrorInfo {
   kind: SupportErrorKind;
   raw: string;
@@ -35,6 +39,8 @@ export const SupportRequestService = {
     invoke<SupportActionResult>("support_request_execute_action", { code, index }),
   submit: (code: string, selection: number[]) =>
     invoke<SupportSubmitResult>("support_request_submit", { code, selection }),
+  shareProfile: (code: string, index: number, choice: ShareChoice) =>
+    invoke<SupportActionResult>("support_request_share_profile", { code, index, choice }),
   decline: (code: string) => invoke<void>("support_request_decline", { code }),
   close: (code: string): Promise<void> => invoke<void>("support_request_close", { code }).catch(() => {}),
 };

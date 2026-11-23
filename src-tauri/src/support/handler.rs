@@ -1,6 +1,6 @@
 use crate::state::profile_state::Profile;
 use crate::support::files::preview_excerpt;
-use crate::support::types::{ActionPlanView, ItemCategory, ItemParams, ItemStatus};
+use crate::support::types::{ActionPlanView, ItemCategory, ItemParams, ItemStatus, ProfileLimits};
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
@@ -15,6 +15,7 @@ pub struct SessionRef {
     pub code: String,
     pub account_id: Uuid,
     pub is_experimental: bool,
+    pub profile_limits: Option<ProfileLimits>,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub struct SupportContext {
     pub instance_path: Option<PathBuf>,
     pub file_byte_budget: u64,
     pub session: Option<SessionRef>,
+    pub choice: Option<Value>,
 }
 
 impl SupportContext {
@@ -176,6 +178,10 @@ pub trait SupportItemHandler: Send + Sync {
 
     fn needs_profile(&self) -> bool {
         true
+    }
+
+    fn runs_on_confirm(&self) -> bool {
+        self.category() == ItemCategory::Action
     }
 
     async fn prepare(&self, ctx: &SupportContext, params: &ItemParams) -> PreparedItem;

@@ -1,7 +1,7 @@
 use crate::support::handler::SupportItemHandler;
 use crate::support::handlers::{
-    logs, mc_settings, mod_list, nrc_profile, profile_summary, switch_pack, system_info,
-    temp_profile, update_loader,
+    logs, mc_settings, mod_list, nrc_profile, profile_snapshot, profile_summary, switch_pack,
+    system_info, temp_profile, update_loader,
 };
 use once_cell::sync::Lazy;
 
@@ -43,6 +43,7 @@ pub static REGISTRY: Lazy<Registry> = Lazy::new(|| {
         Box::new(update_loader::UpdateLoaderHandler),
         Box::new(switch_pack::SwitchPackHandler),
         Box::new(temp_profile::TempProfileHandler),
+        Box::new(profile_snapshot::ProfileSnapshotHandler),
     ];
     Registry::new(file_handlers.chain(other_handlers).collect())
 });

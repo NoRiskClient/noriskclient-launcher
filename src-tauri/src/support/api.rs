@@ -11,6 +11,7 @@ use serde::de::DeserializeOwned;
 use std::time::Duration;
 
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(180);
+const PROFILE_PACK_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const LOGGED_ERROR_BODY_BYTES: usize = 300;
 
 pub struct UploadFile {
@@ -104,6 +105,22 @@ pub async fn submit(
 pub async fn decline(token: &str, code: &str, is_experimental: bool) -> SupportResult<()> {
     let request = nrc_post(endpoint(is_experimental, code, "/decline"));
     send(request, token, "Support request decline").await?;
+    Ok(())
+}
+
+pub async fn upload_profile_pack(
+    token: &str,
+    code: &str,
+    is_experimental: bool,
+    size: u64,
+    body: reqwest::Body,
+) -> SupportResult<()> {
+    let request = nrc_post(endpoint(is_experimental, code, "/profile-pack"))
+        .header("Content-Type", "application/octet-stream")
+        .header("Content-Length", size.to_string())
+        .timeout(PROFILE_PACK_TIMEOUT)
+        .body(body);
+    send(request, token, "Support profile pack upload").await?;
     Ok(())
 }
 

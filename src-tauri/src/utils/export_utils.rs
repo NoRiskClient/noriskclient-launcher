@@ -28,6 +28,85 @@ const NEVER_EXPORTABLE_PREFIXES: &[&str] = &[
     "__MACOSX/",
 ];
 const NEVER_EXPORTABLE_SUFFIXES: &[&str] = &[".DS_Store"];
+const TEXT_EXTENSIONS: &[&str] = &["json", "txt", "toml", "cfg", "properties", "yml", "yaml"];
+const SIZE_ESTIMATE_HEADROOM: u64 = 2;
+pub const TOO_LARGE: &str = "too_large";
+
+pub fn clearly_over_limit(estimate: u64, limit: Option<u64>) -> bool {
+    limit.is_some_and(|max| max > 0 && estimate > max.saturating_mul(SIZE_ESTIMATE_HEADROOM))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportPhase {
+    Collecting,
+    Uploading,
+    Checking,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ExportStep {
+    pub phase: ExportPhase,
+    pub done: u64,
+    pub total: u64,
+    pub file: Option<String>,
+}
+
+impl ExportStep {
+    pub fn collecting(done: u64, total: u64, zip_path: Option<&str>) -> Self {
+        let file = zip_path
+            .and_then(|path| path.rsplit('/').next())
+            .filter(|name| !name.is_empty())
+            .map(str::to_string);
+        Self { phase: ExportPhase::Collecting, done, total, file }
+    }
+
+    pub fn uploading(sent: u64, total: u64) -> Self {
+        Self { phase: ExportPhase::Uploading, done: sent, total, file: None }
+    }
+
+    pub fn checking() -> Self {
+        Self { phase: ExportPhase::Checking, done: 0, total: 0, file: None }
+    }
+
+    pub fn progress(&self) -> Option<f64> {
+        (self.phase != ExportPhase::Checking && self.total > 0)
+            .then(|| self.done.min(self.total) as f64 / self.total as f64)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExportMode {
+    #[default]
+    Normal,
+    Support,
+}
+
+impl ExportMode {
+    fn skips_links_and_hidden(self) -> bool {
+        self == ExportMode::Support
+    }
+
+    pub fn masks_text(self) -> bool {
+        self == ExportMode::Support
+    }
+
+    fn ships_managed_mods(self) -> bool {
+        self != ExportMode::Support
+    }
+}
+
+fn is_in_managed_mod_dir(rel_path: &str) -> bool {
+    rel_path
+        .strip_prefix("mods/nrc-")
+        .is_some_and(|rest| rest.contains('/'))
+}
+
+pub fn is_text_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| TEXT_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+}
 
 /// Determines the optimal compression type for a file based on its extension and size.
 /// Already-compressed files and large files use Stored (no compression) for speed.
@@ -45,10 +124,6 @@ pub(crate) fn determine_compression(file_path: &Path, file_size: u64) -> Compres
             // Already compressed formats
             "png" | "jpg" | "jpeg" | "gif" | "zip" | "jar" | "gz" | "mca" | "dat" | "dat_old" | "dat_mcr" => {
                 return Compression::Stored;
-            }
-            // Text files benefit from compression
-            "json" | "txt" | "toml" | "cfg" | "properties" | "yml" | "yaml" => {
-                return Compression::Deflate;
             }
             _ => {}
         }
@@ -119,22 +194,36 @@ pub fn relative_zip_path(base: &Path, path: &Path) -> Option<String> {
 pub async fn select_export_files(
     instance_path: &Path,
     include_files: Option<&Vec<PathBuf>>,
+    mode: ExportMode,
 ) -> Result<Vec<PathBuf>> {
+    Ok(select_export_files_sized(instance_path, include_files, mode)
+        .await?
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect())
+}
+
+pub async fn select_export_files_sized(
+    instance_path: &Path,
+    include_files: Option<&Vec<PathBuf>>,
+    mode: ExportMode,
+) -> Result<Vec<(PathBuf, u64)>> {
     let Some(include_paths) = include_files else {
         return Ok(Vec::new());
     };
 
     let mut all_files = Vec::new();
-    collect_all_files_recursive(instance_path, &mut all_files).await?;
+    collect_sized_files(instance_path, &mut all_files, mode).await?;
 
     let include_paths_str: Vec<String> = include_paths
         .iter()
         .filter_map(|p| relative_zip_path(instance_path, p))
         .collect();
 
-    all_files.retain(|file_path| {
+    all_files.retain(|(file_path, _)| {
         relative_zip_path(instance_path, file_path).is_some_and(|rel_path| {
-            include_paths_str
+            (mode.ships_managed_mods() || !is_in_managed_mod_dir(&rel_path))
+                && include_paths_str
                 .iter()
                 .any(|include_str| rel_path.starts_with(include_str))
         })
@@ -173,8 +262,7 @@ pub(crate) async fn write_export_archive(
         state,
         export_event_id,
         profile_id,
-        format!("Starting export of {} files...", total_files),
-        0.0,
+        ExportStep::collecting(0, total_files as u64, None),
     )
     .await?;
 
@@ -200,6 +288,7 @@ pub(crate) async fn write_export_archive(
                 .map_err(AppError::Io)?;
             let compression = determine_compression(&entry.source_path, metadata.len());
             let data = fs::read(&entry.source_path).await.map_err(AppError::Io)?;
+            let step_path = entry.zip_path.clone();
 
             tx_clone
                 .send((entry.zip_path, data, compression))
@@ -215,8 +304,7 @@ pub(crate) async fn write_export_archive(
                     &state_clone,
                     export_event_id,
                     profile_id,
-                    format!("Exporting files... {}/{}", completed, total),
-                    progress,
+                    ExportStep::collecting(completed as u64, total as u64, Some(&step_path)),
                 )
                 .await;
             }
@@ -271,20 +359,18 @@ pub(crate) async fn write_export_archive(
         state,
         export_event_id,
         profile_id,
-        format!("Export completed! {} files exported.", total_files),
-        1.0,
+        ExportStep::collecting(total_files as u64, total_files as u64, None),
     )
     .await?;
 
     Ok(())
 }
 
-async fn emit_export_progress(
+pub(crate) async fn emit_export_progress(
     state: &Arc<crate::state::state_manager::State>,
     event_id: Uuid,
     profile_id: Uuid,
-    message: String,
-    progress: f64,
+    step: ExportStep,
 ) -> Result<()> {
     state
         .event_state
@@ -292,8 +378,8 @@ async fn emit_export_progress(
             event_id,
             event_type: crate::state::event_state::EventType::ExportingProfile,
             target_id: Some(profile_id),
-            message,
-            progress: Some(progress),
+            message: serde_json::to_string(&step).unwrap_or_default(),
+            progress: step.progress(),
             error: None,
         })
         .await
@@ -303,26 +389,50 @@ async fn emit_export_progress(
 pub fn collect_all_files_recursive<'a>(
     dir_path: &'a Path,
     file_list: &'a mut Vec<PathBuf>,
+    mode: ExportMode,
 ) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
-        let mut visited = HashSet::new();
-        if let Ok(root) = fs::canonicalize(dir_path).await {
-            visited.insert(root);
-        }
-        collect_files_guarded(dir_path, file_list, &mut visited).await
+        let mut sized = Vec::new();
+        collect_sized_files(dir_path, &mut sized, mode).await?;
+        file_list.extend(sized.into_iter().map(|(path, _)| path));
+        Ok(())
     })
+}
+
+async fn collect_sized_files(
+    dir_path: &Path,
+    file_list: &mut Vec<(PathBuf, u64)>,
+    mode: ExportMode,
+) -> Result<()> {
+    let mut visited = HashSet::new();
+    if let Ok(root) = fs::canonicalize(dir_path).await {
+        visited.insert(root);
+    }
+    collect_files_guarded(dir_path, file_list, &mut visited, mode).await
+}
+
+async fn is_link_or_hidden(path: &Path) -> bool {
+    let hidden = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_none_or(|n| n.starts_with('.'));
+    hidden || fs::symlink_metadata(path).await.map_or(true, |m| crate::utils::symlink_utils::is_link(&m))
 }
 
 fn collect_files_guarded<'a>(
     dir_path: &'a Path,
-    file_list: &'a mut Vec<PathBuf>,
+    file_list: &'a mut Vec<(PathBuf, u64)>,
     visited: &'a mut HashSet<PathBuf>,
+    mode: ExportMode,
 ) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         let mut entries = fs::read_dir(dir_path).await.map_err(|e| AppError::Io(e))?;
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| AppError::Io(e))? {
             let path = entry.path();
+            if mode.skips_links_and_hidden() && is_link_or_hidden(&path).await {
+                continue;
+            }
 
             // Resolves through symlinks, so linked-in content is still exported.
             let metadata = match fs::metadata(&path).await {
@@ -343,10 +453,10 @@ fn collect_files_guarded<'a>(
                     continue;
                 }
                 // Recurse into directories
-                collect_files_guarded(&path, file_list, visited).await?;
+                collect_files_guarded(&path, file_list, visited, mode).await?;
             } else if metadata.is_file() {
                 // Add files to the list
-                file_list.push(path);
+                file_list.push((path, metadata.len()));
             }
         }
 
@@ -429,7 +539,7 @@ pub(crate) async fn collect_export_entries(
     let mut claimed_zip_paths: HashSet<String> = HashSet::new();
     let mut entries: Vec<ExportEntry> = Vec::new();
 
-    for source_path in select_export_files(instance_path, include_files).await? {
+    for source_path in select_export_files(instance_path, include_files, ExportMode::Normal).await? {
         let Some(rel_path) = relative_zip_path(instance_path, &source_path) else {
             continue;
         };

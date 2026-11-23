@@ -197,7 +197,7 @@ fn remote_request() -> RemoteSupportRequest {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn opening_the_link_again_while_an_action_runs_is_busy_and_keeps_its_result() {
-    let code = "BUSYTEST-01";
+    let code = "BUSYTEST0123456789ABCDEFGH";
     let account = uuid::Uuid::new_v4();
     let action: &'static GatedAction = Box::leak(Box::new(GatedAction {
         started: Notify::new(),

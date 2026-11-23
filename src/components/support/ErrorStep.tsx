@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/buttons/Button";
 import { useClickGuard } from "../../hooks/useClickGuard";
-import { useSocialsModalStore } from "../../store/socials-modal-store";
 import { LoginButton, Status, SupportFrame, TextLink } from "./parts";
 import type { ErrorState } from "./useSupportRequest";
 
@@ -32,11 +31,6 @@ export function ErrorStep({
   if (error.kind === "not_logged_in") {
     left = <TextLink onClick={reload}>{t("support_request.retry")}</TextLink>;
     right = <LoginButton />;
-  } else if (error.kind === "discord_not_linked") {
-    right = bigButton(t("support_request.error.discord_button"), () => {
-      close();
-      useSocialsModalStore.getState().openModal();
-    });
   } else if (error.otherAccounts) {
     left = <TextLink onClick={close}>{t("support_request.close")}</TextLink>;
     right = bigButton(t("support_request.error.other_account_button"), tryOtherAccounts, !armed);

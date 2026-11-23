@@ -73,6 +73,7 @@ export function usePreparedItems({
       missingItems: data.filter((i) => getSupportItemDefinition(i.type) && i.supported && !i.available),
       unsupportedCount: all.filter((i) => !getSupportItemDefinition(i.type) || !i.supported).length,
       runnableActions: all.filter((i) => isUsable(i, "action")),
+      shareItem: all.find((i) => getSupportItemDefinition(i.type)?.group === "share") ?? null,
     };
   }, [prepared]);
 

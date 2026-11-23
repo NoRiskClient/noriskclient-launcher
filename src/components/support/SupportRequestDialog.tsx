@@ -9,6 +9,7 @@ import { FixStep } from "./FixStep";
 import { HelloStep } from "./HelloStep";
 import { Spinner, SupportFrame, type StepFlow } from "./parts";
 import { ProfileStep } from "./ProfileStep";
+import { ShareProfileStep } from "./ShareProfileStep";
 import { getSupportItemDefinition, requestNeedsProfile, type SupportItemGroup } from "./supportItems";
 import { usePreparedItems } from "./usePreparedItems";
 import { useSupportProfiles } from "./useSupportProfiles";
@@ -29,7 +30,7 @@ export function openSupportRequestDialog(code: string | undefined) {
   );
 }
 
-type Step = "hello" | "profile" | "fix" | "data" | "done";
+type Step = "hello" | "profile" | "fix" | "data" | "share" | "done";
 
 const LOADING_DELAY_MS = 300;
 
@@ -63,7 +64,7 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
   const hasFixStep =
     (!profileNeeded || !!profiles.profileId) && (items.prepared ? items.runnableActions.length > 0 : requested("action"));
   const hasDataStep = items.prepared ? items.dataItems.length > 0 : requested("data");
-  const lastStep: Step = hasDataStep ? "data" : "done";
+  const lastStep: Step = requested("share") ? "share" : hasDataStep ? "data" : "done";
   const steps: Step[] = [
     "hello",
     ...(pickProfile ? ["profile" as const] : []),
@@ -159,6 +160,16 @@ function SupportRequestDialog({ code, onClose }: { code: string; onClose: () => 
     case "data":
       return (
         <DataStep
+          flow={flow(() => {}, beforeLast)}
+          items={items}
+          profile={profiles.profile}
+          profileMissing={profileMissing}
+          onSent={onSent}
+        />
+      );
+    case "share":
+      return (
+        <ShareProfileStep
           flow={flow(() => {}, beforeLast)}
           items={items}
           profile={profiles.profile}

@@ -61,8 +61,8 @@ impl PreparedEntry {
         self.handler.map(|h| h.category())
     }
 
-    fn is_action(&self) -> bool {
-        self.category() == Some(ItemCategory::Action)
+    fn runs_on_confirm(&self) -> bool {
+        self.handler.is_some_and(|h| h.runs_on_confirm())
     }
 
     fn file_len(&self) -> Option<u64> {
@@ -271,7 +271,6 @@ pub async fn fetch(raw_code: &str, try_other_accounts: bool) -> SupportResult<Su
     let others_available = all_accounts.iter().any(|a| Some(a.id) != active_id);
 
     let mut tried_any = false;
-    let mut discord_not_linked = false;
     for account_id in candidates {
         let result = with_account_token(account_id, experimental, |token| {
             let code = code.clone();
@@ -298,10 +297,6 @@ pub async fn fetch(raw_code: &str, try_other_accounts: bool) -> SupportResult<Su
                 return Ok(info);
             }
             Err(e) if e.kind == SupportErrorKind::NotFound => tried_any = true,
-            Err(e) if e.kind == SupportErrorKind::DiscordNotLinked => {
-                tried_any = true;
-                discord_not_linked = true;
-            }
             Err(e) if e.kind == SupportErrorKind::NotLoggedIn => {
                 warn!(
                     "[Support] Account {} has no valid NoRisk session",
@@ -321,11 +316,7 @@ pub async fn fetch(raw_code: &str, try_other_accounts: bool) -> SupportResult<Su
             OTHER_ACCOUNTS_AVAILABLE,
         ));
     }
-    if discord_not_linked {
-        Err(SupportError::new(SupportErrorKind::DiscordNotLinked))
-    } else {
-        Err(SupportError::new(SupportErrorKind::NotFound))
-    }
+    Err(SupportError::new(SupportErrorKind::NotFound))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -447,7 +438,9 @@ pub async fn prepare(
             code: code.clone(),
             account_id,
             is_experimental: session.is_experimental,
+            profile_limits: session.request.profile_limits.clone(),
         }),
+        choice: None,
     };
 
     let mut entries = Vec::with_capacity(session.request.items.len());
@@ -529,6 +522,14 @@ async fn run_action(ctx: SupportContext, mut entry: PreparedEntry) -> ActionOutc
 }
 
 pub async fn execute_action(raw_code: &str, index: usize) -> SupportResult<ActionOutcome> {
+    execute_action_with(raw_code, index, None).await
+}
+
+pub async fn execute_action_with(
+    raw_code: &str,
+    index: usize,
+    choice: Option<serde_json::Value>,
+) -> SupportResult<ActionOutcome> {
     let code = require_code(raw_code)?;
 
     let (ctx, entry) = {
@@ -539,12 +540,15 @@ pub async fn execute_action(raw_code: &str, index: usize) -> SupportResult<Actio
             .prepared
             .as_mut()
             .ok_or_else(SupportError::not_prepared)?;
-        let ctx = set.ctx.clone();
+        let ctx = SupportContext {
+            choice,
+            ..set.ctx.clone()
+        };
         let entry = set
             .entries
             .get_mut(index)
             .ok_or_else(|| SupportError::unknown("no such item"))?;
-        if !entry.is_action() {
+        if !entry.runs_on_confirm() {
             return Err(SupportError::unknown("item is not an action"));
         }
         if entry.running {
@@ -614,6 +618,7 @@ fn item_result(
     }
     let status = match category {
         ItemCategory::Action => ItemStatus::Declined,
+        _ if entry.runs_on_confirm() => ItemStatus::Declined,
         ItemCategory::Collect if !prepared.available => ItemStatus::Missing,
         ItemCategory::Collect if !selection.contains(&index) => ItemStatus::Declined,
         ItemCategory::Collect => ItemStatus::Done,
@@ -728,7 +733,7 @@ async fn refresh_action_results(code: &str, items: &mut [SubmitItemResult]) -> S
         return Err(SupportError::new(SupportErrorKind::Busy));
     }
     for (index, entry) in set.entries.iter().enumerate() {
-        if entry.is_action() {
+        if entry.runs_on_confirm() {
             if let Some(item) = items.get_mut(index) {
                 *item = item_result(index, entry, &[]).0;
             }

@@ -7,7 +7,6 @@ export const FATAL_ERRORS: ReadonlySet<SupportErrorKind> = new Set([
   "not_found",
   "gone",
   "invalid_code",
-  "discord_not_linked",
 ]);
 
 export interface ErrorState {

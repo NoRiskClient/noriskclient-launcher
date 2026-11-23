@@ -61,6 +61,46 @@ pub struct ImportPackPreview {
     pub provenance: ProvenanceReport,
     pub norisk_pack: NoriskPackOffer,
     pub executable_content: ExecutableContentReport,
+    #[serde(default)]
+    pub origin: Option<PackOrigin>,
+}
+
+pub const ORIGIN_ENTRY: &str = "support-snapshot.json";
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PackOrigin {
+    pub ticket_number: i64,
+    pub owner: String,
+    #[serde(default)]
+    pub owner_uuid: Option<String>,
+    pub profile_name: String,
+    #[serde(default)]
+    pub not_transferred: Vec<OriginDroppedFile>,
+    #[serde(default)]
+    pub local_mods: Vec<OriginLocalMod>,
+    #[serde(default)]
+    pub added_by_player: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OriginDroppedFile {
+    pub path: String,
+    pub reason: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct OriginLocalMod {
+    pub file_name: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+pub async fn read_origin(pack_path: &Path) -> Option<PackOrigin> {
+    let raw = read_pack_entry(pack_path, ORIGIN_ENTRY).await.ok()?;
+    serde_json::from_str(&raw).ok()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -153,6 +193,10 @@ pub async fn preview_pack(pack_path: &Path) -> Result<ImportPackPreview> {
             preselected: details.declared_norisk_pack.is_some(),
         },
         executable_content: details.executable_content,
+        origin: match pack_type {
+            PackFormat::Noriskpack => read_origin(pack_path).await,
+            _ => None,
+        },
     };
 
     info!(
@@ -487,6 +531,11 @@ async fn open_archive(pack_path: &Path) -> Result<PackZip> {
     ZipFileReader::with_tokio(BufReader::new(file))
         .await
         .map_err(|e| AppError::Other(format!("Failed to read modpack archive: {}", e)))
+}
+
+async fn read_pack_entry(pack_path: &Path, name: &str) -> Result<String> {
+    let mut zip = open_archive(pack_path).await?;
+    read_zip_entry(&mut zip, &[name]).await
 }
 
 async fn read_zip_entry(zip: &mut PackZip, candidates: &[&str]) -> Result<String> {

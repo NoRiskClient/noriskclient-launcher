@@ -3,7 +3,7 @@ import { LOG_RENDER_CAP, analyzeLog } from "./previews/parse";
 import { logTemplate, templates } from "./previews/registry";
 import type { SupportPreviewTemplate } from "./previews/types";
 
-export type SupportItemGroup = "data" | "action";
+export type SupportItemGroup = "data" | "action" | "share";
 
 export interface SupportItemDefinition {
   icon: string;
@@ -27,6 +27,7 @@ const SUPPORT_ITEMS: Readonly<Record<string, SupportItemDefinition>> = {
   UPDATE_LOADER: { icon: "solar:refresh-circle-bold", group: "action", preview: templates.UPDATE_LOADER },
   SWITCH_PACK: { icon: "solar:widget-4-bold", group: "action", preview: templates.SWITCH_PACK },
   START_TEMP_PROFILE: { icon: "solar:test-tube-bold", group: "action", preview: templates.START_TEMP_PROFILE, needsProfile: false },
+  PROFILE_SNAPSHOT: { icon: "solar:folder-with-files-bold", group: "share" },
 };
 
 export function getSupportItemDefinition(type: string): SupportItemDefinition | undefined {

@@ -48,6 +48,13 @@ export enum EventType {
   TaskProgress = "task_progress",
 }
 
+export interface ExportStep {
+  phase: "collecting" | "uploading" | "checking";
+  done: number;
+  total: number;
+  file: string | null;
+}
+
 export interface EventPayload {
   event_id: string;
   event_type: EventType;

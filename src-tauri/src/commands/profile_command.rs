@@ -1307,16 +1307,7 @@ pub async fn add_modrinth_content_to_profile(
         .map_err(CommandError::from)
 }
 
-/// Command to get the directory structure of a profile
-#[tauri::command]
-pub async fn get_profile_directory_structure(
-    profile_id: Uuid,
-) -> Result<path_utils::FileNode, CommandError> {
-    log::info!(
-        "Executing get_profile_directory_structure command for profile {}",
-        profile_id
-    );
-
+async fn profile_directory(profile_id: Uuid) -> Result<PathBuf, CommandError> {
     let state = State::get().await?;
 
     // Profil abrufen - versuche reguläres Profil oder Standard-Version
@@ -1351,17 +1342,29 @@ pub async fn get_profile_directory_structure(
         }
     };
 
-    // Calculate the full profile path
-    let profile_path = state
+    Ok(state
         .profile_manager
-        .calculate_instance_path_for_profile(&profile)?;
+        .calculate_instance_path_for_profile(&profile)?)
+}
 
-    // Get the directory structure using path_utils
-    let structure = path_utils::get_directory_structure(&profile_path, false)
-        .await
-        .map_err(|e| CommandError::from(e))?;
+#[tauri::command]
+pub async fn get_profile_directory_structure(
+    profile_id: Uuid,
+) -> Result<path_utils::FileNode, CommandError> {
+    let profile_path = profile_directory(profile_id).await?;
+    Ok(path_utils::get_directory_structure(&profile_path, false).await?)
+}
 
-    Ok(structure)
+#[tauri::command]
+pub async fn get_profile_directory_level(
+    profile_id: Uuid,
+    sub_path: Option<String>,
+) -> Result<path_utils::FileNode, CommandError> {
+    let mut path = profile_directory(profile_id).await?;
+    if let Some(sub_path) = sub_path.filter(|p| !p.is_empty()) {
+        path.push(crate::utils::import_safety::safe_relative_path(&sub_path)?);
+    }
+    Ok(path_utils::get_directory_level(&path, false).await?)
 }
 
 /// Kopiert ein bestehendes Profil und erstellt ein neues mit den gleichen Eigenschaften,
@@ -1590,6 +1593,8 @@ pub async fn export_profile(
                 params.profile_id,
                 Some(export_path.clone()),
                 params.include_files,
+                crate::utils::export_utils::ExportMode::Normal,
+                None,
             )
             .await?
         }

@@ -2,6 +2,7 @@ pub mod logs;
 pub mod mc_settings;
 pub mod mod_list;
 pub mod nrc_profile;
+pub mod profile_snapshot;
 pub mod profile_summary;
 pub mod switch_pack;
 pub mod system_info;

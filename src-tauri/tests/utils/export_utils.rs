@@ -6,6 +6,15 @@ use std::path::Path;
 use tokio::fs;
 use tokio::io::BufReader;
 
+#[test]
+fn only_a_selection_far_over_the_limit_stops_the_export_early() {
+    assert!(!clearly_over_limit(150, Some(100)));
+    assert!(!clearly_over_limit(200, Some(100)));
+    assert!(clearly_over_limit(201, Some(100)));
+    assert!(!clearly_over_limit(u64::MAX, None));
+    assert!(!clearly_over_limit(u64::MAX, Some(0)));
+}
+
 #[tokio::test]
 async fn trailing_manifest_is_found_by_name() {
     let dir = tempfile::tempdir().unwrap();
@@ -66,7 +75,7 @@ async fn no_selection_exports_no_files() {
         .await
         .unwrap();
 
-    let selected = select_export_files(dir.path(), None).await.unwrap();
+    let selected = select_export_files(dir.path(), None, ExportMode::Normal).await.unwrap();
     assert!(selected.is_empty());
 }
 
@@ -89,7 +98,7 @@ async fn selection_covers_ticked_subtrees_only() {
         .unwrap();
 
     let include = vec![instance.join("config"), instance.join("options.txt")];
-    let mut selected = select_export_files(instance, Some(&include))
+    let mut selected = select_export_files(instance, Some(&include), ExportMode::Normal)
         .await
         .unwrap()
         .iter()
@@ -98,6 +107,30 @@ async fn selection_covers_ticked_subtrees_only() {
     selected.sort();
 
     assert_eq!(selected, vec!["config/sodium/opts.json", "options.txt"]);
+}
+
+#[tokio::test]
+async fn a_support_export_of_mods_leaves_our_own_nrc_jars_at_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let instance = dir.path();
+    fs::create_dir_all(instance.join("mods/nrc-1.21.4-fabric")).await.unwrap();
+    fs::write(instance.join("mods/mine.jar"), "x").await.unwrap();
+    fs::write(instance.join("mods/off.jar.disabled"), "x").await.unwrap();
+    fs::write(instance.join("mods/nrc-1.21.4-fabric/nrc-client.jar"), "x").await.unwrap();
+
+    let include = &vec![instance.join("mods")];
+    let pick = |mode| async move {
+        let mut picked = select_export_files_sized(instance, Some(include), mode)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter_map(|(path, _)| relative_zip_path(instance, &path))
+            .collect::<Vec<_>>();
+        picked.sort();
+        picked
+    };
+    assert_eq!(pick(ExportMode::Support).await, vec!["mods/mine.jar", "mods/off.jar.disabled"]);
+    assert!(pick(ExportMode::Normal).await.contains(&"mods/nrc-1.21.4-fabric/nrc-client.jar".to_string()));
 }
 
 #[cfg(unix)]
@@ -127,7 +160,7 @@ async fn linked_in_content_is_still_collected() {
     }
 
     let mut files = Vec::new();
-    collect_all_files_recursive(&instance, &mut files)
+    collect_all_files_recursive(&instance, &mut files, ExportMode::Normal)
         .await
         .unwrap();
 
@@ -151,7 +184,7 @@ async fn symlink_loop_terminates() {
     }
 
     let mut files = Vec::new();
-    collect_all_files_recursive(&instance, &mut files)
+    collect_all_files_recursive(&instance, &mut files, ExportMode::Normal)
         .await
         .unwrap();
 
@@ -263,4 +296,70 @@ fn nested_mod_folders_still_resolve_to_the_bare_filename() {
     let zip_path = override_zip_path("mods/1.21.1/sodium.jar").unwrap();
     let rest = zip_path.strip_prefix(OVERRIDES_MODS_PREFIX).unwrap();
     assert_eq!(rest.rsplit('/').next().unwrap(), "sodium.jar");
+}
+
+#[tokio::test]
+async fn a_support_export_skips_links_and_hidden_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let instance = dir.path().join("instance");
+    let shared = dir.path().join("shared");
+    fs::create_dir_all(instance.join(".git")).await.unwrap();
+    fs::create_dir_all(&shared).await.unwrap();
+    fs::write(shared.join("secret.txt"), "s").await.unwrap();
+    fs::write(instance.join(".git/config"), "c").await.unwrap();
+    fs::write(instance.join(".hidden.json"), "{}").await.unwrap();
+    fs::write(instance.join("options.txt"), "opts").await.unwrap();
+    let linked = link_dir(&shared, &instance.join("linked")).is_ok();
+
+    let mut files = Vec::new();
+    collect_all_files_recursive(&instance, &mut files, ExportMode::Support)
+        .await
+        .unwrap();
+    let collected: Vec<String> = files
+        .iter()
+        .filter_map(|path| relative_zip_path(&instance, path))
+        .collect();
+    assert_eq!(collected, vec!["options.txt"]);
+
+    if linked {
+        let mut normal = Vec::new();
+        collect_all_files_recursive(&instance, &mut normal, ExportMode::Normal)
+            .await
+            .unwrap();
+        assert!(normal.iter().any(|p| p.ends_with("secret.txt")));
+    }
+}
+
+#[test]
+fn only_text_files_are_masked() {
+    assert!(is_text_file(Path::new("config/sodium.JSON")));
+    assert!(is_text_file(Path::new("options.txt")));
+    assert!(!is_text_file(Path::new("servers.dat")));
+    assert!(!is_text_file(Path::new("mods/sodium.jar")));
+}
+
+#[test]
+fn collecting_shows_files_done_and_only_the_file_name() {
+    let step = ExportStep::collecting(3, 12, Some("overrides/config/sodium/options.json"));
+    assert_eq!(step.phase, ExportPhase::Collecting);
+    assert_eq!(step.file.as_deref(), Some("options.json"));
+    assert_eq!(step.progress(), Some(0.25));
+    assert_eq!(ExportStep::collecting(0, 0, None).progress(), None);
+}
+
+#[test]
+fn uploading_reports_the_share_of_bytes_sent() {
+    assert_eq!(ExportStep::uploading(512, 2048).progress(), Some(0.25));
+    assert_eq!(ExportStep::uploading(4096, 2048).progress(), Some(1.0));
+}
+
+#[test]
+fn checking_has_no_percent_so_the_bar_animates() {
+    assert_eq!(ExportStep::checking().progress(), None);
+}
+
+#[test]
+fn steps_travel_as_json_the_ui_can_read() {
+    let json = serde_json::to_value(ExportStep::uploading(1, 2)).unwrap();
+    assert_eq!(json, serde_json::json!({ "phase": "uploading", "done": 1, "total": 2, "file": null }));
 }

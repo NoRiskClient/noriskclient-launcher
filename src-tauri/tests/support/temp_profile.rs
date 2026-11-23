@@ -78,6 +78,7 @@ fn session() -> SessionRef {
         code: "ABC123".into(),
         account_id: Uuid::new_v4(),
         is_experimental: false,
+        profile_limits: None,
     }
 }
 

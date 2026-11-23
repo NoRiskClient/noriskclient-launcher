@@ -1,6 +1,6 @@
 pub mod convert;
 pub mod logfile;
-mod upload;
+pub(crate) mod upload;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
