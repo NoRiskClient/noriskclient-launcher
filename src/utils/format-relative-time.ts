@@ -34,7 +34,7 @@ export function formatRelativeTime(iso: string | null | undefined): string {
 
   const month = Math.floor(day / 30);
   if (month === 1) return t("profiles.v3.time.monthAgo");
-  if (month < 12) return t("profiles.v3.time.monthsAgo", { count: month });
+  if (day < 365) return t("profiles.v3.time.monthsAgo", { count: month });
 
   const year = Math.floor(day / 365);
   return year === 1
@@ -82,4 +82,13 @@ export function formatBytes(bytes: number | null | undefined): string {
   }
   const rounded = value >= 100 ? Math.round(value) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
   return `${rounded} ${units[idx]}`;
+}
+
+const AGE_UNITS: [string, number][] = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+
+export function formatShortAge(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (!Number.isFinite(seconds)) return "";
+  const [unit, size] = AGE_UNITS.find(([, s]) => seconds >= s) ?? ["minute", 60];
+  return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "narrow" }).format(Math.floor(seconds / size));
 }

@@ -13,8 +13,7 @@ import { useProfileStore } from "../../../store/profile-store";
 import { ProfilePickerGrid } from "../../profiles/ProfilePickerGrid";
 import { useProfileInstallStatus } from "../../../hooks/useProfileInstallStatus";
 import { cn } from "../../../lib/utils";
-
-const PLAIN_TEXT = "font-minecraft normal-case tracking-normal";
+import { PLAIN_TEXT } from "../../ui/typography";
 
 interface ModrinthQuickInstallProfilesModalProps {
   project: ModrinthSearchHit;

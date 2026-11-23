@@ -6,23 +6,9 @@ import { Tooltip } from "../ui/Tooltip";
 import { openExternalUrl } from "../../services/tauri-service";
 import { loaderIconSrc } from "../../lib/loader-icons";
 import { formatCompactNumber } from "../../utils/format-number";
-
-const CHANNEL_STYLE: Record<string, { letter: string; className: string }> = {
-  release: { letter: "R", className: "bg-emerald-500/15 text-emerald-300" },
-  beta: { letter: "B", className: "bg-amber-500/15 text-amber-300" },
-  alpha: { letter: "A", className: "bg-rose-500/15 text-rose-300" },
-};
-
-function shortAge(iso: string) {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  const units: [string, number][] = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
-  for (const [unit, size] of units) {
-    if (seconds >= size) {
-      return new Intl.NumberFormat(undefined, { style: "unit", unit, unitDisplay: "narrow" }).format(Math.floor(seconds / size));
-    }
-  }
-  return new Intl.NumberFormat(undefined, { style: "unit", unit: "minute", unitDisplay: "narrow" }).format(0);
-}
+import { formatShortAge } from "../../utils/format-relative-time";
+import { ChannelBadge } from "./ChannelBadge";
+import { GameVersionPill } from "./GameVersionPill";
 
 const OPTIMISTIC_INSTALL_MS = 1500;
 const TOOLTIP_DELAY_MS = 600;
@@ -95,11 +81,9 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
         <span />
       </div>
       {versions.map((version) => {
-        const channel = CHANNEL_STYLE[version.release_type] ?? CHANNEL_STYLE.release;
         const state = stateFor?.(version) ?? null;
         const installing = !!installingIds[version.id] || (!!clicked[version.id] && !state?.installed);
         const blocked = version.isBlocked || state?.blocked;
-        const gameVersions = version.game_versions;
         const loaders = version.loaders.map((loader) => loader.charAt(0).toUpperCase() + loader.slice(1));
         return (
           <div
@@ -107,9 +91,7 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
             className={`${cols} px-4 py-2.5 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition-colors`}
           >
             <span className="min-w-0 flex items-center gap-2">
-              <span className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center font-minecraft text-xs ${channel.className}`}>
-                {channel.letter}
-              </span>
+              <ChannelBadge releaseType={version.release_type} />
               {blocked && (
                 <Tooltip position="top" delay={TOOLTIP_DELAY_MS} content={t("modrinth.blocked_mod_tooltip")}>
                   <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 shrink-0 text-red-500" />
@@ -132,12 +114,7 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
                 </Tooltip>
               )}
             </span>
-            <Tooltip position="top" delay={TOOLTIP_DELAY_MS} content={gameVersions.length > 1 || (gameVersions[0]?.length ?? 0) > 14 ? gameVersions.join(", ") : null}>
-              <span className="min-w-0 flex items-center gap-1 font-minecraft text-xs normal-case">
-                <span className="truncate px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-white/75">{gameVersions[0]}</span>
-                {gameVersions.length > 1 && <span className="shrink-0 text-white/35">+{gameVersions.length - 1}</span>}
-              </span>
-            </Tooltip>
+            <GameVersionPill versions={version.game_versions} />
             <span className="min-w-0 flex items-center gap-1" title={loaders.join(", ")}>
               {version.loaders[0] && (
                 <span className="min-w-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 font-minecraft text-xs text-white/75">
@@ -147,7 +124,7 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
               )}
               {loaders.length > 1 && <span className="shrink-0 font-minecraft text-xs text-white/35">+{loaders.length - 1}</span>}
             </span>
-            <span className="truncate font-minecraft text-xs text-white/45" title={new Date(version.date_published).toLocaleString()}>{shortAge(version.date_published)}</span>
+            <span className="truncate font-minecraft text-xs text-white/45" title={new Date(version.date_published).toLocaleString()}>{formatShortAge(version.date_published)}</span>
             <span className="font-minecraft text-xs text-white/45 tabular-nums">{formatCompactNumber(version.downloads)}</span>
             <span className="flex items-center justify-end gap-0.5">
               {version.url && (
