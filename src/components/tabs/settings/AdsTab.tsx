@@ -7,6 +7,7 @@ import { getAdStatus, onAdConsentMode, onAdStatusChanged } from "../../../servic
 import { useLauncherAdsStore } from "../../../store/launcher-ads-store";
 import { useSettingsKeywords } from "./settings-context";
 import { useOpenAdPause } from "../../ads/AdPauseDialog";
+import { trackEvent } from "../../../services/analytics-service";
 
 const BUTTON_CLASS = "px-4 py-3 border border-[#ffffff20] hover:bg-white/5 transition-colors";
 
@@ -39,8 +40,12 @@ export function AdsTab() {
   const { launcherAds, available } = useAdSettings();
   const openConsent = useLauncherAdsStore((state) => state.openConsent);
   const pausedUntil = useLauncherAdsStore((state) => state.pausedUntil);
-  const resume = useLauncherAdsStore((state) => state.resume);
-  const openPause = useOpenAdPause();
+  const resumeAds = useLauncherAdsStore((state) => state.resume);
+  const resume = () => {
+    resumeAds();
+    void trackEvent("ads_pause_resumed");
+  };
+  const openPause = useOpenAdPause("settings");
   const personalized = usePersonalizedAds(launcherAds);
   const personalizedLabel =
     personalized === null

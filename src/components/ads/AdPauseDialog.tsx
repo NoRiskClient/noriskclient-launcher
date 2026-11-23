@@ -12,6 +12,7 @@ import { useLauncherAdsStore } from "../../store/launcher-ads-store";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { useActiveSkinTexture } from "../../hooks/useActiveSkinTexture";
+import { trackEvent } from "../../services/analytics-service";
 
 const NORISK_PLUS_URL = "https://norisk.gg/shop";
 type PauseOption = "today" | "threeDays";
@@ -31,9 +32,14 @@ const CUDDLE_EMOTE: EmoteAssetUrls = {
   particles: [{ jsonUrl: `${CUDDLE_DIR}heart.particle.json`, resolveTexture: () => `${CUDDLE_DIR}heart.png` }],
 };
 
-export function useOpenAdPause() {
+export type AdPauseSource = "rail" | "settings";
+
+export function useOpenAdPause(source: AdPauseSource) {
   const { showModal, hideModal } = useGlobalModal();
-  return () => showModal(MODAL_ID, <AdPauseDialog onClose={() => hideModal(MODAL_ID)} />);
+  return () => {
+    void trackEvent("ads_pause_opened", { source });
+    showModal(MODAL_ID, <AdPauseDialog onClose={() => hideModal(MODAL_ID)} />);
+  };
 }
 
 function AdPauseDialog({ onClose }: { onClose: () => void }) {
@@ -53,7 +59,10 @@ function AdPauseDialog({ onClose }: { onClose: () => void }) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => void openExternalUrl(NORISK_PLUS_URL).catch(() => {})}
+            onClick={() => {
+              void trackEvent("ads_pause_plus_clicked");
+              void openExternalUrl(NORISK_PLUS_URL).catch(() => {});
+            }}
             className="flex items-center gap-1.5 font-minecraft text-sm text-amber-300 hover:text-amber-200 transition-colors"
           >
             <Icon icon="solar:crown-bold" className="w-4 h-4" />
@@ -64,6 +73,7 @@ function AdPauseDialog({ onClose }: { onClose: () => void }) {
             className={`ml-auto ${PLAIN_TEXT}`}
             onClick={() => {
               pause(pauseEnd(option));
+              void trackEvent("ads_paused", { option });
               onClose();
             }}
           >

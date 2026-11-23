@@ -16,7 +16,7 @@ export function useAdSize(slot: string): AdSize | null {
 
 export function AdCaption() {
   const { t } = useTranslation();
-  const openPause = useOpenAdPause();
+  const openPause = useOpenAdPause("rail");
   return (
     <div className="flex items-center justify-between gap-2 px-0.5 font-minecraft text-[10px] uppercase tracking-wider text-white/35">
       <span>{t("ads.label")}</span>
