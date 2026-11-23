@@ -3193,6 +3193,5 @@
   "profiles.v3.chips.group.empty": "grup yok",
   "profiles.v3.chips.group.placeholder": "Grupsuz",
   "profiles.v3.chips.loaderVersion.latest": "en yeni",
-  "profiles.v3.chips.loaderVersion.notSupported": "desteklenmiyor",
-  "profiles.v3.chips.modpack.loading": "Modpack sürümleri yükleniyor…"
+  "profiles.v3.chips.loaderVersion.notSupported": "desteklenmiyor"
 }

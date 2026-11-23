@@ -84,12 +84,10 @@ interface ProfileDetailViewV3Props {
 
 // ─── Atoms ─────────────────────────────────────────────────────────────────
 const Stat: React.FC<{ icon: string; label: string; value: string }> = ({ icon, label, value }) => (
-  <Tooltip content={label}>
-    <span className="inline-flex items-center gap-1.5">
-      <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />
-      {value}
-    </span>
-  </Tooltip>
+  <span aria-label={label} className="inline-flex items-center gap-1.5">
+    <Icon icon={icon} className="w-3.5 h-3.5 flex-shrink-0" />
+    {value}
+  </span>
 );
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -559,34 +557,29 @@ export function ProfileDetailViewV3({
               </EditableChipV3>
               {hasModpack && (() => {
                 const versionsReady = !!modpackVersions;
-                const tooltip = !versionsReady
-                  ? t("profiles.v3.chips.modpack.loading")
-                  : installedModpackVersion?.name ?? modpackLabel;
                 return (
-                  <Tooltip content={tooltip}>
-                    <button
-                      type="button"
-                      disabled={!versionsReady}
-                      onClick={() => versionsReady && handleOpenModpackVersionsModal()}
-                      className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors max-w-[280px] ${
-                        !versionsReady
-                          ? "bg-black/20 border-white/5 text-white/30 cursor-wait"
-                          : "bg-black/30 border-white/10 text-white/75 hover:bg-black/40 hover:border-white/20 hover:text-white cursor-pointer"
-                      }`}
-                    >
-                      <Icon icon="solar:widget-bold" className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{modpackLabel}</span>
-                      {modpackVersions?.updates_available && (
-                        <span title={t("modpack_versions.updates_available")} className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                      )}
-                      {versionsReady && (
-                        <Icon
-                          icon="solar:pen-linear"
-                          className="w-3.5 h-3.5 ml-0.5 flex-shrink-0 opacity-40 group-hover:opacity-80 transition-opacity"
-                        />
-                      )}
-                    </button>
-                  </Tooltip>
+                  <button
+                    type="button"
+                    disabled={!versionsReady}
+                    onClick={() => versionsReady && handleOpenModpackVersionsModal()}
+                    className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-minecraft transition-colors max-w-[280px] ${
+                      !versionsReady
+                        ? "bg-black/20 border-white/5 text-white/30 cursor-wait"
+                        : "bg-black/30 border-white/10 text-white/75 hover:bg-black/40 hover:border-white/20 hover:text-white cursor-pointer"
+                    }`}
+                  >
+                    <Icon icon="solar:widget-bold" className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{modpackLabel}</span>
+                    {modpackVersions?.updates_available && (
+                      <span title={t("modpack_versions.updates_available")} className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                    )}
+                    {versionsReady && (
+                      <Icon
+                        icon="solar:pen-linear"
+                        className="w-3.5 h-3.5 ml-0.5 flex-shrink-0 opacity-40 group-hover:opacity-80 transition-opacity"
+                      />
+                    )}
+                  </button>
                 );
               })()}
               {preferredAccount && (

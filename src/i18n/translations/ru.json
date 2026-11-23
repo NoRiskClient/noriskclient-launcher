@@ -3221,6 +3221,5 @@
   "profiles.v3.chips.group.empty": "без группы",
   "profiles.v3.chips.group.placeholder": "Без группы",
   "profiles.v3.chips.loaderVersion.latest": "последняя",
-  "profiles.v3.chips.loaderVersion.notSupported": "не поддерживается",
-  "profiles.v3.chips.modpack.loading": "Загрузка версий модпака…"
+  "profiles.v3.chips.loaderVersion.notSupported": "не поддерживается"
 }

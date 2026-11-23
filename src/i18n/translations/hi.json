@@ -3205,6 +3205,5 @@
   "profiles.v3.chips.group.empty": "कोई समूह नहीं",
   "profiles.v3.chips.group.placeholder": "बिना समूह",
   "profiles.v3.chips.loaderVersion.latest": "नवीनतम",
-  "profiles.v3.chips.loaderVersion.notSupported": "समर्थित नहीं",
-  "profiles.v3.chips.modpack.loading": "मॉडपैक संस्करण लोड हो रहे हैं…"
+  "profiles.v3.chips.loaderVersion.notSupported": "समर्थित नहीं"
 }

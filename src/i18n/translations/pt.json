@@ -3193,6 +3193,5 @@
   "profiles.v3.chips.group.empty": "sem grupo",
   "profiles.v3.chips.group.placeholder": "Sem grupo",
   "profiles.v3.chips.loaderVersion.latest": "mais recente",
-  "profiles.v3.chips.loaderVersion.notSupported": "não suportado",
-  "profiles.v3.chips.modpack.loading": "Carregando versões do modpack…"
+  "profiles.v3.chips.loaderVersion.notSupported": "não suportado"
 }

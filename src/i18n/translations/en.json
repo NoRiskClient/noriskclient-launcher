@@ -3226,6 +3226,5 @@
   "profiles.settings.olderVersions": "Older",
   "profiles.settings.loaderLatest": "Always the latest",
   "profiles.settings.memoryTooHigh": "That leaves little memory for your system and other apps.",
-  "nrc.info_short": "Mods and features that come with the profile.",
-  "profiles.v3.chips.modpack.loading": "Loading modpack versions…"
+  "nrc.info_short": "Mods and features that come with the profile."
 }
