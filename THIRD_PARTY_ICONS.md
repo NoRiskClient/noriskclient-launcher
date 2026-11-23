@@ -8,7 +8,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Solar (`solar`)
 
-- 255 icons used of 7401
+- 256 icons used of 7401
 - Author: [480 Design](https://www.figma.com/community/file/1166831539721848736)
 - Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`CC-BY-4.0`)
 
@@ -38,7 +38,7 @@ GENERATED — run `yarn icons` to refresh.
 
 ## Phosphor (`ph`)
 
-- 7 icons used of 9072
+- 6 icons used of 9072
 - Author: [Phosphor Icons](https://github.com/phosphor-icons/core)
 - Licence: [MIT](https://github.com/phosphor-icons/core/blob/main/LICENSE) (`MIT`)
 
