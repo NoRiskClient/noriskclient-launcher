@@ -10,6 +10,14 @@ export function compareByLastPlayed(a: Profile, b: Profile): number {
   );
 }
 
+export function sortRecentFirst(profiles: Profile[], lastPlayedProfileId: string | null): Profile[] {
+  return [...profiles].sort((a, b) => {
+    if (a.id === lastPlayedProfileId) return -1;
+    if (b.id === lastPlayedProfileId) return 1;
+    return compareByLastPlayed(a, b);
+  });
+}
+
 export function compareByRecentActivity(a: Profile, b: Profile): number {
   const activity = (p: Profile) => Math.max(timeOf(p.last_played), timeOf(p.created));
   return activity(b) - activity(a) || a.name.localeCompare(b.name);

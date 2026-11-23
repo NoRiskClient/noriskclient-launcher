@@ -13,9 +13,6 @@ export interface VersionFilters {
   loaders?: string[] | null;
 }
 
-export const paint = (): Promise<void> =>
-  new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-
 export const hasFiles = (version?: UnifiedVersion | null): boolean =>
   !!version && Array.isArray(version.files) && version.files.length > 0;
 
