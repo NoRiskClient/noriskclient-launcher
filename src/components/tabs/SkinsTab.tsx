@@ -224,9 +224,7 @@ const SkinPreview = memo(
             )}
           </div>
 
-          {/* Skin Info */}
           <div className="flex-grow min-w-0 w-full text-center">
-            {/* Skin Name */}
             <h3
               className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={skin.name}
@@ -309,7 +307,6 @@ const AddSkinCard = memo(
               className="rounded-sm block opacity-70 hover:opacity-100 transition-opacity"
             />
 
-            {/* Plus icon overlay */}
             <div className="absolute inset-0 flex items-center justify-center">
               <Icon
                 icon="solar:add-circle-bold"
@@ -319,9 +316,7 @@ const AddSkinCard = memo(
             </div>
           </div>
 
-          {/* Skin Info */}
           <div className="flex-grow min-w-0 w-full text-center">
-            {/* Skin Name */}
             <h3
               className="font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case mb-1"
               title={t('skins.addNewSkin')}
@@ -329,16 +324,9 @@ const AddSkinCard = memo(
               {t('skins.addNewSkin')}
             </h3>
 
-            {/* Description */}
-            <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
-              <div className="text-white/60 flex items-center gap-1">
-                <Icon
-                  icon="solar:upload-bold"
-                  className="w-3 h-3 text-white/50"
-                />
-                <span>{t('skins.uploadOrImport')}</span>
-              </div>
-            </div>
+            <p className="truncate text-xs font-minecraft text-white/60" title={t('skins.uploadOrImport')}>
+              {t('skins.uploadOrImport')}
+            </p>
           </div>
         </div>
       </div>
