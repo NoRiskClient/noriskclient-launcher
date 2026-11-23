@@ -1,4 +1,6 @@
 import { createHashRouter, Navigate } from "react-router-dom";
+import { isMobile } from "./platform";
+import { McRealTab } from "../components/tabs/McRealTab";
 import { App } from "../App";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { PlayTab } from "../components/tabs/PlayTab";
@@ -68,11 +70,19 @@ export const router = createHashRouter([
         }),
       },
       {
-        path: "clips",
-        lazy: async () => ({
-          Component: (await import("../components/tabs/ClipsPage")).ClipsPage,
-        }),
+        path: "mcreal",
+        element: <McRealTab />,
       },
+      ...(isMobile
+        ? []
+        : [
+            {
+              path: "clips",
+              lazy: async () => ({
+                Component: (await import("../components/tabs/ClipsPage")).ClipsPage,
+              }),
+            },
+          ]),
       // DISABLED: Advent Calendar (seasonal feature)
       // {
       //   path: "advent-calendar",

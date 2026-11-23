@@ -4,6 +4,9 @@ import { toast as hotToast, Toaster as HotToaster } from "react-hot-toast";
 import { gsap } from "gsap";
 import { useThemeStore } from "../../store/useThemeStore";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
+import { isMobile } from "../../lib/platform";
+import { isNetworkError } from "../../lib/network";
+import i18n from "../../i18n/i18n";
 import {
   getBorderRadiusClass,
   createRadiusStyle,
@@ -11,6 +14,14 @@ import {
   getToastBaseStyles,
   TOAST_BASE_CLASSES
 } from "./design-system";
+
+if (isMobile) {
+  const showError = hotToast.error;
+  hotToast.error = (message, options) =>
+    isNetworkError(message)
+      ? showError(i18n.t("common.offline_title"), { ...options, id: "offline" })
+      : showError(message, options);
+}
 
 function PlayerToastContent({ message, uuid }: { message: string; uuid: string }) {
   const avatarUrl = usePlayerAvatar({ uuid, size: 32 });
@@ -83,12 +94,13 @@ function animateToast(id: string) {
       gsap.fromTo(
         toastElement,
         {
-          x: 50,
+          ...(isMobile ? { y: -20 } : { x: 50 }),
           opacity: 0,
           scale: 0.95,
         },
         {
           x: 0,
+          y: 0,
           opacity: 1,
           scale: 1,
           duration: 0.4,
@@ -129,9 +141,10 @@ export function GlobalToaster() {
   return (
     <div ref={toasterRef}>
       <HotToaster
-        position="bottom-right"
+        position={isMobile ? "top-center" : "bottom-right"}
+        containerStyle={isMobile ? { top: "calc(env(safe-area-inset-top) + 8px)" } : undefined}
         toastOptions={{
-          className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}`,
+          className: `${TOAST_BASE_CLASSES} ${borderRadiusClass}${isMobile ? " !pointer-events-none" : ""}`,
           style: baseStyles,
           success: {
             style: {

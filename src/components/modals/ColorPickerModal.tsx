@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
 import { useThemeStore } from "../../store/useThemeStore";
 import { toast } from "react-hot-toast";
+import { isMobile } from "../../lib/platform";
+import { cn } from "../../lib/utils";
 
 interface ColorPickerModalProps {
   onClose: () => void;
@@ -96,11 +100,6 @@ export function ColorPickerModal({
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
   });
   const [hex, setHex] = useState(seed);
-  const [isDraggingSaturation, setIsDraggingSaturation] = useState(false);
-  const [isDraggingHue, setIsDraggingHue] = useState(false);
-
-  const saturationRef = useRef<HTMLDivElement>(null);
-  const hueRef = useRef<HTMLDivElement>(null);
 
   // Update HSV when accent color changes
   useEffect(() => {
@@ -117,38 +116,28 @@ export function ColorPickerModal({
     setHex(newHex);
   }, [hsv]);
 
-  // Handle mouse events for dragging
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDraggingSaturation && saturationRef.current) {
-        const rect = saturationRef.current.getBoundingClientRect();
-        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        setHsv(prev => ({ ...prev, s: x, v: 1 - y }));
-      } else if (isDraggingHue && hueRef.current) {
-        const rect = hueRef.current.getBoundingClientRect();
-        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-        const hue = y * 359.99; // Keep hue between 0-359.99 to avoid wrapping issues
-        setHsv(prev => ({ ...prev, h: hue }));
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingSaturation(false);
-      setIsDraggingHue(false);
-    };
-
-    if (isDraggingSaturation || isDraggingHue) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingSaturation, isDraggingHue]);
-
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+  const pickSaturation = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = clamp01((e.clientX - rect.left) / rect.width);
+    const y = clamp01((e.clientY - rect.top) / rect.height);
+    setHsv(prev => ({ ...prev, s: x, v: 1 - y }));
+  };
+  const pickHue = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = clamp01((e.clientY - rect.top) / rect.height);
+    setHsv(prev => ({ ...prev, h: y * 359.99 })); // Keep hue between 0-359.99 to avoid wrapping issues
+  };
+  const dragHandlers = (pick: (e: React.PointerEvent<HTMLDivElement>) => void) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      pick(e);
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) pick(e);
+    },
+  });
 
   const handleHexChange = useCallback((value: string) => {
     setHex(value);
@@ -179,27 +168,17 @@ export function ColorPickerModal({
       onClose={onClose}
       width="lg"
     >
-      <div className="p-6 space-y-6">
+      <div className={isMobile ? "p-4 space-y-5" : "p-6 space-y-6"}>
         {/* Color Picker Interface */}
-        <div className="flex gap-6">
+        <div className={isMobile ? "flex gap-4" : "flex gap-6"}>
           {/* Saturation/Value Picker */}
           <div className="flex-1">
             <div
-              ref={saturationRef}
-              className="relative w-full h-48 rounded-lg cursor-crosshair border border-white/20"
+              className={cn("relative w-full rounded-lg cursor-crosshair border border-white/20 touch-none select-none", isMobile ? "h-64" : "h-48")}
               style={{
                 background: `hsl(${hsv.h}, 100%, 50%)`
               }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setIsDraggingSaturation(true);
-                if (saturationRef.current) {
-                  const rect = saturationRef.current.getBoundingClientRect();
-                  const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                  const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-                  setHsv(prev => ({ ...prev, s: x, v: 1 - y }));
-                }
-              }}
+              {...dragHandlers(pickSaturation)}
             >
               {/* Saturation gradient overlay */}
               <div
@@ -212,7 +191,7 @@ export function ColorPickerModal({
               />
               {/* Color indicator */}
               <div
-                className="absolute w-4 h-4 border-2 border-white rounded-full shadow-lg transform -translate-x-1/2 -translate-y-1/2"
+                className={cn("absolute border-2 border-white rounded-full shadow-lg transform -translate-x-1/2 -translate-y-1/2 pointer-events-none", isMobile ? "w-7 h-7" : "w-4 h-4")}
                 style={{
                   left: `${hsv.s * 100}%`,
                   top: `${(1 - hsv.v) * 100}%`,
@@ -223,27 +202,17 @@ export function ColorPickerModal({
           </div>
 
           {/* Hue Slider */}
-          <div className="w-8">
+          <div className={isMobile ? "w-12" : "w-8"}>
             <div
-              ref={hueRef}
-              className="relative h-48 rounded-lg cursor-pointer border border-white/20"
+              className={cn("relative rounded-lg cursor-pointer border border-white/20 touch-none select-none", isMobile ? "h-64" : "h-48")}
               style={{
                 background: 'linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)'
               }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setIsDraggingHue(true);
-                if (hueRef.current) {
-                  const rect = hueRef.current.getBoundingClientRect();
-                  const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-                  const hue = y * 359.99; // Keep hue between 0-359.99 to avoid wrapping issues
-                  setHsv(prev => ({ ...prev, h: hue }));
-                }
-              }}
+              {...dragHandlers(pickHue)}
             >
               {/* Hue indicator */}
               <div
-                className="absolute left-0 w-full h-1 bg-white border border-black transform -translate-y-1/2"
+                className={cn("absolute left-0 w-full bg-white border border-black transform -translate-y-1/2 pointer-events-none", isMobile ? "h-2" : "h-1")}
                 style={{
                   top: `${(hsv.h / 359.99) * 100}%`
                 }}
@@ -253,11 +222,14 @@ export function ColorPickerModal({
         </div>
 
         {/* Color Values */}
-        <div className="grid grid-cols-4 gap-4">
-          <div>
+        <div className={isMobile ? "grid grid-cols-3 gap-3" : "grid grid-cols-4 gap-4"}>
+          <div className={isMobile ? "col-span-3" : undefined}>
             <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.hex')}</label>
             <input
               type="text"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               value={hex}
               onChange={(e) => handleHexChange(e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-md text-white font-minecraft focus:outline-none focus:ring-2 focus:ring-white/30"
@@ -268,6 +240,7 @@ export function ColorPickerModal({
             <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.r')}</label>
             <input
               type="number"
+              inputMode="numeric"
               value={rgb.r}
               onChange={(e) => {
                 const newRgb = { ...rgb, r: parseInt(e.target.value) || 0 };
@@ -282,6 +255,7 @@ export function ColorPickerModal({
             <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.g')}</label>
             <input
               type="number"
+              inputMode="numeric"
               value={rgb.g}
               onChange={(e) => {
                 const newRgb = { ...rgb, g: parseInt(e.target.value) || 0 };
@@ -296,6 +270,7 @@ export function ColorPickerModal({
             <label className="block text-sm font-minecraft text-white/70 mb-1">{t('color_picker.b')}</label>
             <input
               type="number"
+              inputMode="numeric"
               value={rgb.b}
               onChange={(e) => {
                 const newRgb = { ...rgb, b: parseInt(e.target.value) || 0 };
@@ -309,7 +284,7 @@ export function ColorPickerModal({
         </div>
 
         {/* Current Color Display */}
-        <div className="flex items-center justify-between p-4 rounded-lg border border-[#ffffff20] bg-black/20">
+        <div className={cn("flex p-4 rounded-lg border border-[#ffffff20] bg-black/20", isMobile ? "flex-col gap-4" : "items-center justify-between")}>
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-lg border-2 border-white/20 shadow-lg"
@@ -329,6 +304,7 @@ export function ColorPickerModal({
             <Button
               onClick={onClose}
               variant="ghost"
+              className={isMobile ? "flex-1" : undefined}
             >
               {t('common.cancel')}
             </Button>
@@ -336,6 +312,7 @@ export function ColorPickerModal({
               onClick={handleApply}
               variant="3d"
               icon={<Icon icon="solar:check-circle-bold" />}
+              className={isMobile ? "flex-1" : undefined}
             >
               {t('color_picker.button.apply')}
             </Button>

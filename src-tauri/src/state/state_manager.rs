@@ -5,15 +5,21 @@ use crate::state::active_skin_state::{default_active_skins_path, ActiveSkinManag
 use crate::state::config_state::ConfigManager;
 use crate::state::content_cache_state::ContentCacheManager;
 use crate::state::cosmetic_pack_state::CosmeticPackManager;
+#[cfg(desktop)]
 use crate::state::discord_state::DiscordManager;
 use crate::state::event_state::{EventPayload, EventState};
 use crate::state::friends_state::FriendsState;
+#[cfg(desktop)]
 use crate::state::norisk_packs_state::{default_norisk_packs_path, NoriskPackManager};
+#[cfg(desktop)]
 use crate::state::norisk_versions_state::{default_norisk_versions_path, NoriskVersionManager};
 use crate::state::post_init::PostInitializationHandler;
+#[cfg(desktop)]
 use crate::state::process_state::{default_processes_path, ProcessManager};
+#[cfg(desktop)]
 use crate::state::profile_state::ProfileManager;
 use crate::state::skin_state::{default_skins_path, SkinManager};
+#[cfg(desktop)]
 use crate::state::sync_pack_state::SyncPackManager;
 use crate::utils::referral_utils;
 use std::sync::Arc;
@@ -25,20 +31,27 @@ static LAUNCHER_STATE: OnceCell<Arc<State>> = OnceCell::const_new();
 
 pub struct State {
     pub initialized: bool,
+    #[cfg(desktop)]
     pub profile_manager: ProfileManager,
     pub event_state: EventState,
+    #[cfg(desktop)]
     pub process_manager: ProcessManager,
     pub minecraft_account_manager_v2: MinecraftAuthStore,
+    #[cfg(desktop)]
     pub norisk_pack_manager: NoriskPackManager,
+    #[cfg(desktop)]
     pub norisk_version_manager: NoriskVersionManager,
     pub config_manager: ConfigManager,
     pub skin_manager: SkinManager,
     pub active_skin_manager: ActiveSkinManager,
+    #[cfg(desktop)]
     pub discord_manager: DiscordManager,
     pub cosmetic_pack_manager: CosmeticPackManager,
     pub friends_state: FriendsState,
     pub content_cache: ContentCacheManager,
+    #[cfg(desktop)]
     pub capture_supervisor: Arc<crate::state::capture_state::CaptureSupervisor>,
+    #[cfg(desktop)]
     pub sync_pack_manager: SyncPackManager,
     pub db: crate::state::db::DbHandle,
     pub io_semaphore: Arc<Semaphore>,
@@ -63,44 +76,57 @@ impl State {
             .get_or_try_init(|| async {
                 log::trace!("State::init - Starting primary initialization of managers (Phase 1 - Lightweight Instantiation)...");
                 let config_manager = ConfigManager::new()?;
+                #[cfg(desktop)]
                 let discord_manager = DiscordManager::new(false).await?;
                 let io_semaphore = Arc::new(Semaphore::new(10));
                 let event_state = EventState::new(Some(app.clone()));
                 let minecraft_account_manager_v2 = MinecraftAuthStore::new().await?;
+                #[cfg(desktop)]
                 let norisk_pack_manager = NoriskPackManager::new(default_norisk_packs_path())?;
+                #[cfg(desktop)]
                 let norisk_version_manager = NoriskVersionManager::new(default_norisk_versions_path())?;
                 let skin_manager = SkinManager::new(default_skins_path())?;
                 let active_skin_manager = ActiveSkinManager::new(default_active_skins_path())?;
                 let db = crate::state::db::new_handle();
+                #[cfg(desktop)]
                 let profile_manager = ProfileManager::new(
                     LAUNCHER_DIRECTORY.root_dir().join("profiles.json"),
                     db.clone(),
                 )?;
+                #[cfg(desktop)]
                 let process_manager = ProcessManager::new(default_processes_path(), app.clone()).await?;
 
                 log::trace!("State::init - Primary initialization of managers complete (Phase 1). Constructing State struct with initialized: false.");
                 let friends_state = FriendsState::new();
                 let cosmetic_pack_manager = CosmeticPackManager::new();
                 let content_cache = ContentCacheManager::new(db.clone())?;
+                #[cfg(desktop)]
                 let sync_pack_manager = SyncPackManager::new(db.clone())?;
                 Ok::<Arc<State>, AppError>(Arc::new(Self {
                     initialized: true,
+                    #[cfg(desktop)]
                     profile_manager,
                     event_state,
+                    #[cfg(desktop)]
                     process_manager,
                     minecraft_account_manager_v2,
+                    #[cfg(desktop)]
                     norisk_pack_manager,
+                    #[cfg(desktop)]
                     norisk_version_manager,
                     config_manager,
                     skin_manager,
                     active_skin_manager,
+                    #[cfg(desktop)]
                     discord_manager,
                     cosmetic_pack_manager,
                     friends_state,
                     content_cache,
+                    #[cfg(desktop)]
                     capture_supervisor: Arc::new(
                         crate::state::capture_state::CaptureSupervisor::new(),
                     ),
+                    #[cfg(desktop)]
                     sync_pack_manager,
                     db,
                     io_semaphore,
@@ -128,6 +154,7 @@ impl State {
             );
         }
 
+        #[cfg(desktop)]
         initial_state_arc
             .discord_manager
             .set_enabled(loaded_config.enable_discord_presence)
@@ -137,10 +164,15 @@ impl State {
             loaded_config.enable_discord_presence
         );
 
+        #[cfg(desktop)]
         ready_step("NoriskVersionManager", initial_state_arc.norisk_version_manager.on_state_ready(app.clone())).await?;
+        #[cfg(desktop)]
         ready_step("NoriskPackManager", initial_state_arc.norisk_pack_manager.on_state_ready(app.clone())).await?;
+        #[cfg(desktop)]
         ready_step("ProfileManager", initial_state_arc.profile_manager.on_state_ready(app.clone())).await?;
+        #[cfg(desktop)]
         ready_step("SyncPackManager", initial_state_arc.sync_pack_manager.on_state_ready(app.clone())).await?;
+        #[cfg(desktop)]
         ready_step("ProcessManager", initial_state_arc.process_manager.on_state_ready(app.clone())).await?;
 
         // Apply any token handbacks the in-game client dropped while we were closed, then keep

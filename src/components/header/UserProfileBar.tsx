@@ -12,6 +12,8 @@ import { useSocialsModalStore } from "../../store/socials-modal-store";
 import { useFriendsStore } from "../../store/friends-store";
 import { Icon } from "@iconify/react";
 import { NotificationBell } from "./NotificationBell";
+import { isMobile } from "../../lib/platform";
+import { useSettingsModalStore } from "../../store/settings-modal-store";
 
 interface UserProfileBarProps {
   className?: string;
@@ -68,15 +70,27 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
     <div className={cn("relative flex items-center gap-3", className)}>
       <div className="profile-bar-container flex items-center gap-2">
         <NotificationBell />
-        <RunningInstancesIndicator />
+        {!isMobile && <RunningInstancesIndicator />}
+        {isMobile && (
+          <IconButton
+            icon={<Icon icon="solar:settings-bold" className="w-5 h-5" />}
+            onClick={() => useSettingsModalStore.getState().open()}
+            variant="flat"
+            size="sm"
+            aria-label={t('nav.settings')}
+            className="text-white/70 hover:text-white h-10 w-10"
+          />
+        )}
 
         <div ref={profileButtonRef}>
           <CurrentAccountDisplay
             onClick={toggleAccountDropdown}
             className="h-10"
+            compact={isMobile}
           />
         </div>
 
+        {!isMobile && (<>
         <IconButton
           icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
           onClick={toggleFriendsSidebar}
@@ -94,6 +108,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
           aria-label={t('header.open_socials')}
           className="text-white/70 hover:text-white h-10 w-10"
         />
+        </>)}
       </div>
 
   

@@ -578,6 +578,7 @@ impl ProcessManager {
                     "Notifying Discord manager about game process {} start.",
                     process_id
                 );
+                #[cfg(desktop)]
                 state.discord_manager.notify_game_start(process_id, metadata.profile_name.clone(), metadata.minecraft_version.clone()).await;
             }
             Err(e) => {
@@ -587,6 +588,7 @@ impl ProcessManager {
         }
         // --- END Discord State Update ---
 
+        #[cfg(desktop)]
         if let Ok(state) = State::get().await {
             let clips = state.config_manager.get_config().await.clips;
             if clips.enabled {
@@ -609,6 +611,7 @@ impl ProcessManager {
         }
 
         // Hide main window if configured to do so
+        #[cfg(desktop)]
         if let Ok(global_state) = State::get().await {
             let launcher_config = global_state.config_manager.get_config().await;
             if launcher_config.hide_on_process_start {
@@ -628,6 +631,8 @@ impl ProcessManager {
         } else {
             log::error!("Could not get global state to check hide_on_process_start setting");
         }
+
+        #[cfg(desktop)]
 
         self.schedule_auto_open_log_window(process_id);
 
@@ -835,6 +840,7 @@ impl ProcessManager {
                 );
             }
 
+            #[cfg(desktop)]
             if let Ok(global_state) = State::get().await {
                 if global_state.config_manager.get_config().await.clips.enabled {
                     let _ = global_state
@@ -844,6 +850,7 @@ impl ProcessManager {
             }
 
             // Show main window again if it was hidden (hide_on_process_start setting)
+            #[cfg(desktop)]
             if let Ok(global_state) = State::get().await {
                 let launcher_config = global_state.config_manager.get_config().await;
                 if launcher_config.hide_on_process_start {
@@ -888,6 +895,7 @@ impl ProcessManager {
                 .await;
 
                 // Notify Discord that game has stopped
+                #[cfg(desktop)]
                 state.discord_manager.notify_game_stop(process_id).await;
             } else {
                 log::error!("Monitor task for process {} could not get state to save processes.", process_id);
@@ -1428,6 +1436,7 @@ impl ProcessManager {
     }
 
     // Private helper to schedule the auto-opening of the log window
+    #[cfg(desktop)]
     fn schedule_auto_open_log_window(&self, process_id: Uuid) {
         let app_handle_clone = Arc::clone(&self.app_handle);
 

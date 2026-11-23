@@ -1,7 +1,10 @@
+#[cfg(desktop)]
 use crate::integrations::norisk_packs::NoriskModpacksConfig;
+#[cfg(desktop)]
 use crate::integrations::norisk_versions::NoriskVersionsConfig;
 use crate::minecraft::auth::minecraft_auth::NoRiskToken;
 use crate::minecraft::dto::norisk_meta::NoriskAssets;
+#[cfg(desktop)]
 use crate::state::process_state::ProcessMetadata;
 use crate::{
     error::{AppError, Result},
@@ -15,6 +18,7 @@ use serde_json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[cfg(desktop)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CrashlogDto {
@@ -344,6 +348,7 @@ impl NoRiskApi {
             .await
     }
 
+    #[cfg(desktop)]
     /// Fetches the complete modpack configuration from the NoRisk API.
     /// Uses v3 endpoint with Git-based config storage.
     pub async fn get_modpacks(
@@ -358,6 +363,7 @@ impl NoRiskApi {
             .await
     }
 
+    #[cfg(desktop)]
     /// Fetches the standard version profiles from the NoRisk API.
     pub async fn get_standard_versions(
         norisk_token: &str,
@@ -453,6 +459,7 @@ impl NoRiskApi {
             .await
     }
 
+    #[cfg(desktop)]
     /// Analyze a crash log; returns the launcher verdict (CrashCheckResult JSON). Served by the
     /// discord-bot API (same route also lives in core-backend; base can be switched later).
     pub async fn check_crash_log(

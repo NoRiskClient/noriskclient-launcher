@@ -1,11 +1,14 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::norisk_api::{AdventCalendarDay, CrashlogDto, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
+#[cfg(desktop)]
+use crate::minecraft::api::norisk_api::CrashlogDto;
+use crate::minecraft::api::norisk_api::{AdventCalendarDay, NoRiskApi, ReferralInfo, UniquePlayersResponse, UserNotification};
 use crate::minecraft::api::launcher_news_api::{LauncherNewsApi, LauncherNewsPage};
 use crate::state::state_manager::State;
 use chrono::{Duration as ChronoDuration, Utc};
 use log::info;
 use log::{debug, error};
 use tauri::{AppHandle, Manager, Url, UserAttentionType, WebviewUrl, WebviewWindowBuilder};
+#[cfg(desktop)]
 use crate::utils::updater_utils;
 
 #[tauri::command]
@@ -16,6 +19,7 @@ pub async fn get_launcher_news_command(page: u32, limit: u32) -> Result<Launcher
     Ok(LauncherNewsApi::get_page_cached(&state.content_cache, is_experimental, page, limit).await?)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn discord_auth_link(app: AppHandle) -> Result<(), CommandError> {
     debug!("Executing discord_auth_link command");
@@ -187,6 +191,7 @@ pub async fn discord_auth_unlink() -> Result<(), CommandError> {
     Ok(())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn github_auth_link(app: AppHandle) -> Result<(), CommandError> {
     debug!("Executing github_auth_link command");
@@ -358,6 +363,7 @@ pub async fn github_auth_unlink() -> Result<(), CommandError> {
     Ok(())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn check_crash_log_command(
     payload: CrashlogDto,
@@ -454,6 +460,7 @@ pub async fn reset_mobile_app_token() -> Result<String, CommandError> {
     Ok(NoRiskApi::reset_mcreal_app_token(&token, &account_id_str, is_experimental).await?)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn check_update_available_command(app: AppHandle) -> Result<Option<crate::utils::updater_utils::UpdateInfo>, CommandError> {
     debug!("Executing check_update_available_command");
@@ -466,11 +473,13 @@ pub async fn check_update_available_command(app: AppHandle) -> Result<Option<cra
     Ok(updater_utils::check_update_available(&app, is_beta_channel).await?)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn get_launcher_update_command() -> Option<crate::utils::background_updater::LauncherUpdate> {
     crate::utils::background_updater::ready_update()
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn download_and_install_update_command(app: AppHandle) -> Result<(), CommandError> {
     debug!("Executing download_and_install_update_command");

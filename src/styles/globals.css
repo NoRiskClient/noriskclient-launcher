@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+.platform-android,
+.platform-ios {
+  background: #000;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  button:not(:disabled):active,
+  [role="button"]:active {
+    filter: brightness(0.8);
+  }
+}
+
 @font-face {
     font-family: "SmallCaps";
     src: url("/fonts/smallcaps.ttf") format("truetype");

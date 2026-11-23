@@ -714,7 +714,7 @@
   resolved "https://registry.npmjs.org/@sfirew/minecraft-motd-parser/-/minecraft-motd-parser-1.1.4.tgz"
   integrity sha512-Hm3Gr8LLrhxk0sSZEFmtwgfJaFFje/SXaZsELwS4mYYS2sJrvdPXnSFLy6/qk1RFrTJMFPCcwKNdOFHyMJameQ==
 
-"@tauri-apps/api@^2.12.5":
+"@tauri-apps/api@^2.12.0", "@tauri-apps/api@^2.12.5":
   version "2.12.5"
   resolved "https://registry.yarnpkg.com/@tauri-apps/api/-/api-2.12.5.tgz#e7484e38aede505c74ec258b10b703262dcda787"
   integrity sha512-G9QIMt5fzED+aS4QhVK3w1HWLKpLIwH/MnpCr9z1ugGEHnS2ORmqrLkc0uALOjRK4qXJy+4Yiw8LDl/KicC1Hg==
@@ -809,6 +809,13 @@
   integrity sha512-q4Uq3eY87TdcYzXACiYSPhmpBA76shgmQswGkSVio4C82Sz2W4iehe9TnKYwbq7weHiL88Yw19XZm7v28+Micg==
   dependencies:
     "@tauri-apps/api" "^2.8.0"
+
+"@tauri-apps/plugin-haptics@^2.3.3":
+  version "2.4.2"
+  resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-haptics/-/plugin-haptics-2.4.2.tgz#b063e457ab8bb1e43f7a075fac1cc6c8c885ddf2"
+  integrity sha512-ddoEZuUWxJORcZE6AzeRUEHx4WljV9X4gXU+r08pTfX5YTwGMTIoJcLzMV9WHZIWJVWthktKAolLVaedbZ4dhA==
+  dependencies:
+    "@tauri-apps/api" "^2.12.0"
 
 "@tauri-apps/plugin-opener@^2.5.3":
   version "2.5.3"

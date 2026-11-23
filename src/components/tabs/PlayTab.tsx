@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+"use client";
+
+import { useEffect, useRef } from "react";
 import { NewsSection } from "../news/NewsSection";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
@@ -20,6 +22,11 @@ import { isWebGLAvailable } from "@noriskclient/nrc-skin-renderer";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import { setDiscordState } from "../../utils/discordRpc";
 import { useTranslation } from "react-i18next";
+import { PlayerRig } from "../launcher/PlayerRig";
+import { isMobile } from "../../lib/platform";
+import { usePullToRefresh, PullToRefreshIndicator } from "../../hooks/usePullToRefresh";
+import { fetchLauncherNews } from "../../services/nrc-service";
+import { NEWS_PAGE_SIZE, useNewsStore } from "../../store/useNewsStore";
 
 export function PlayTab() {
   const { t } = useTranslation();
@@ -60,8 +67,28 @@ export function PlayTab() {
     profileId: profile.id,
   }));
 
+  const homeRef = useRef<HTMLDivElement>(null);
+  const homePull = usePullToRefresh(homeRef, () =>
+    fetchLauncherNews(1, NEWS_PAGE_SIZE).then((page) => useNewsStore.getState().setFirstPage(page)),
+  );
+
   // promo-outline shader settings for the 3D player preview
   const outline = { strength: 4, thickness: 3, sensitivity: 0.1 };
+
+  if (isMobile) {
+    return (
+      <div ref={homeRef} className="h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <PullToRefreshIndicator {...homePull} />
+        <div className="relative flex flex-col items-center overflow-hidden pt-2">
+          <PlayerRig
+            playerName={activeAccount?.minecraft_username || activeAccount?.username}
+            outline={outline}
+          />
+        </div>
+        <NewsSection className="h-auto border-t-2 border-white/40 bg-black/10 backdrop-blur-lg flex flex-col relative z-10" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full relative">

@@ -37,6 +37,10 @@ import { CapeGuidelinesModal } from "./CapeGuidelinesModal";
 import { isCapeInReview } from "../../utils/cape-error-translations";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { getLauncherConfig } from "../../services/launcher-config-service";
+import { isMobile } from "../../lib/platform";
+import { isNetworkError } from "../../lib/network";
+import { parseErrorMessage } from "../../utils/error-utils";
+import { OfflineState } from "../ui/OfflineState";
 
 const PAGE_SIZE = 20;
 
@@ -194,6 +198,7 @@ export function CapeBrowser(): JSX.Element {
     { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
   ];
 
+  const [offline, setOffline] = useState(false);
 
 
   // Helper function to format and translate error messages
@@ -239,8 +244,10 @@ export function CapeBrowser(): JSX.Element {
         nextCursorRef.current = response.nextCursor;
         setAllCapes(response.capes);
         setAllPagination(pageOf(0, response));
+        setOffline(false);
       } catch (error) {
         console.error("Failed to load ALL capes:", error);
+        if (isMobile) setOffline(isNetworkError(parseErrorMessage(error)));
       } finally {
         setIsLoadingAll(false);
       }
@@ -282,6 +289,7 @@ export function CapeBrowser(): JSX.Element {
           });
         } catch (fallbackError) {
           console.error("Fallback also failed:", fallbackError);
+          if (isMobile && isNetworkError(parseErrorMessage(fallbackError))) setOffline(true);
         }
       } finally {
         setIsLoadingMy(false);
@@ -414,11 +422,14 @@ export function CapeBrowser(): JSX.Element {
           });
           setPagination(pageOf(pageToFetch, response));
         }
+        if (!append) setOffline(false);
       } catch (err: any) {
         console.error("Error fetching capes:", err);
+        const noConnection = isMobile && isNetworkError(parseErrorMessage(err));
+        if (!append) setOffline(noConnection);
         const errorMessage =
           err?.message || t('capes.failedToLoadCapes');
-        toast.error(errorMessage);
+        if (!noConnection) toast.error(errorMessage);
         if (!append) {
           const setCapes = getCapesSetter(currentFilters.showOwnedOnly);
           const setPagination = getPaginationSetter(currentFilters.showOwnedOnly);
@@ -802,7 +813,7 @@ export function CapeBrowser(): JSX.Element {
             empty list. */}
         {activeAccount && (<>
         <div className="mb-4">
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className={isMobile ? "grid grid-cols-2 gap-2 [&>*]:w-full [&>*]:justify-center" : "flex items-center gap-2 flex-wrap"}>
                 <button
                   onClick={() => {
                     const newFilters = { ...filters, showOwnedOnly: false, showFavoritesOnly: false, showVanillaOnly: false };
@@ -904,11 +915,11 @@ export function CapeBrowser(): JSX.Element {
             </div>
             {/* Search & Filters */}
             <div className="mb-6 pb-4 border-b border-white/10">
-              <div className="flex items-center gap-4">
+              <div className={isMobile ? "flex flex-col gap-3" : "flex items-center gap-4"}>
                 <div className="flex-1">
                   {!filters.showVanillaOnly ? (
                     <SearchWithFilters
-                      placeholder={t('capes.searchPlayerPlaceholder')}
+                      placeholder={t(isMobile ? 'capes.searchPlayerPlaceholderShort' : 'capes.searchPlayerPlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
                       onSearchEnter={handleSearchEnter}
@@ -921,7 +932,7 @@ export function CapeBrowser(): JSX.Element {
                     />
                   ) : (
                     <SearchWithFilters
-                      placeholder={t('capes.searchVanillaCapePlaceholder')}
+                      placeholder={t(isMobile ? 'common.search' : 'capes.searchVanillaCapePlaceholder')}
                       searchValue={searchQuery}
                       onSearchChange={handleSearchChange}
                       onSearchEnter={handleSearchEnter}
@@ -936,9 +947,10 @@ export function CapeBrowser(): JSX.Element {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3">
+                <div className={isMobile ? "flex [&>*]:flex-1 [&>*]:justify-center" : "flex items-center gap-3"}>
                   {activeAccount && (
                     <>
+                      {!isMobile && (
                       <div className="relative" ref={templateMenuRef}>
                         <button
                           onClick={() => setShowTemplateMenu(!showTemplateMenu)}
@@ -971,6 +983,7 @@ export function CapeBrowser(): JSX.Element {
                         )}
                       </div>
 
+                      )}
                       <button
                         onClick={handleUploadClick}
                         className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
@@ -989,6 +1002,9 @@ export function CapeBrowser(): JSX.Element {
             </>)}
 
             {/* Cape List */}
+            {offline ? (
+              <OfflineState onRetry={() => fetchCapesData(0, filters, searchQuery, false)} />
+            ) : (
             <CapeList
               capes={capesForList}
               onEquipCape={handleEquipCape}
@@ -1011,6 +1027,7 @@ export function CapeBrowser(): JSX.Element {
               isModerator={isModerator && !filters.showOwnedOnly && !filters.showVanillaOnly}
               onModeratorDeleteCape={isModerator && !filters.showVanillaOnly && !filters.showOwnedOnly ? handleModeratorDeleteCapeClick : undefined}
             />
+            )}
       </div>
     </div>
   );

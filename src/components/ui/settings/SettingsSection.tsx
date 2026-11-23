@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { cn } from "../../../lib/utils";
 import { useThemeStore } from "../../../store/useThemeStore";
 import { fuzzyMatch, useSettingsSearch } from "./SettingsSearchContext";
+import { isMobile } from "../../../lib/platform";
 
 interface SettingsSectionProps {
   id?: string;
@@ -15,6 +16,10 @@ interface SettingsSectionProps {
   className?: string;
   bodyClassName?: string;
 }
+
+export const MOBILE_SETTINGS_SECTIONS = new Set([
+  "language", "accent", "theme", "font", "background", "custom-background",
+]);
 
 export function SettingsSection({
   id,
@@ -29,6 +34,8 @@ export function SettingsSection({
 }: SettingsSectionProps) {
   const accentColor = useThemeStore((s) => s.accentColor);
   const query = useSettingsSearch();
+
+  if (isMobile && !MOBILE_SETTINGS_SECTIONS.has(id.replace("settings-section-", ""))) return null;
 
   let body: ReactNode = children;
 
@@ -53,7 +60,11 @@ export function SettingsSection({
   }
 
   return (
-    <section id={id} className={cn("scroll-mt-4", className)}>
+    <section
+      id={id}
+      className={cn("scroll-mt-4", isMobile && "rounded-xl border p-4", className)}
+      style={isMobile ? { backgroundColor: `${accentColor.value}12`, borderColor: `${accentColor.value}30` } : undefined}
+    >
       <div className="flex items-center justify-between gap-3 pb-2 border-b border-white/10">
         <div className="flex items-center gap-2 min-w-0">
           {icon && (

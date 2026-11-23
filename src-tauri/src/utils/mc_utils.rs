@@ -36,6 +36,7 @@ use crate::minecraft::dto::skin_payloads::{
     SkinModelVariant, SkinSource,
 }; // Added imports for SkinSource and related types
 use crate::utils::hash_utils::calculate_sha1_from_bytes;
+#[cfg(desktop)]
 use crate::utils::path_utils;
 
 // --- End New Helper Imports ---
@@ -608,6 +609,7 @@ pub async fn emit_copy_progress(
     Ok(())
 }
 
+#[cfg(desktop)]
 /// Copies StartUpHelper data from the noriskclient/new directory to a new profile's directory.
 /// This runs only if the profile is a standard version and its directory is empty.
 /// This method is called BEFORE the standard Minecraft data copy.
@@ -652,6 +654,7 @@ pub async fn copy_startup_helper_data(
     Ok(())
 }
 
+#[cfg(desktop)]
 /// Copies initial user data (saves, options, etc.) from the default .minecraft directory
 /// to a new profile's directory.
 /// This runs only if the profile is a standard version and its directory is empty.
@@ -850,6 +853,7 @@ pub async fn copy_initial_data_from_default_minecraft(
     Ok(())
 }
 
+#[cfg(desktop)]
 /// Copies additional files specified in StartUpHelper from noriskclient/new/ directory
 /// to the profile directory. Only copies files that don't already exist.
 /// This runs BEFORE the standard Minecraft data copy to allow StartUpHelper files
@@ -1038,6 +1042,7 @@ pub async fn copy_startup_helper_files(
 }
 
 // --- New Function to Get Profile Worlds ---
+#[cfg(desktop)]
 /// Lists the singleplayer worlds found in the profile's saves directory.
 /// Currently only returns the folder name.
 pub async fn get_profile_worlds(profile_id: Uuid) -> Result<Vec<WorldInfo>> {
@@ -1319,6 +1324,7 @@ fn parse_minecraft_address(address: &str) -> std::result::Result<(String, u16), 
     Ok((host_part.to_string(), port))
 }
 
+#[cfg(desktop)]
 /// Lists the multiplayer servers found in the profile's servers.dat file.
 pub async fn get_profile_servers(profile_id: Uuid) -> Result<Vec<ServerInfo>> {
     info!("[Servers] Getting servers for profile {}", profile_id);

@@ -33,6 +33,7 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import type { CapeReviewState } from "../../types/noriskCapes";
 import { ConfirmUnequipModal } from "./ConfirmUnequipModal";
 import { NO_CAPE_ID } from "./noCape";
+import { isMobile } from "../../lib/platform";
 
 function getCapeReviewState(cape: CosmeticCape): CapeReviewState {
   if (cape.accepted) return 'ACCEPTED';
@@ -346,7 +347,8 @@ function CapeItemDisplay({
         <div className="flex-grow min-w-0 w-full text-center">
           <h3
             className={cn(
-              "font-minecraft text-white text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-full normal-case",
+              "font-minecraft text-white text-base max-w-full normal-case",
+              isMobile ? "[overflow-wrap:anywhere]" : "whitespace-nowrap overflow-hidden text-ellipsis",
               isNoCape && !isVanilla ? "mt-2.5" : "mb-1"
             )}
             title={
@@ -722,7 +724,7 @@ export function CapeList({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fill, minmax(170px, 1fr))",
               gap: "16px",
               padding: "16px",
             }}
@@ -759,7 +761,7 @@ export function CapeList({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fill, minmax(170px, 1fr))",
               gap: "16px",
               padding: "16px",
           }}

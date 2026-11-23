@@ -105,6 +105,7 @@ pub async fn afk_shop_purchase(
         .await?)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn applixir_show_ad(
     app: AppHandle,

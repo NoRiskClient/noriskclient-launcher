@@ -1,6 +1,13 @@
 use crate::config::HTTP_CLIENT;
 use crate::error::{AppError, Result};
+#[cfg(desktop)]
 use crate::minecraft::launch::launch_summary::DownloadStats;
+#[cfg(mobile)]
+#[allow(dead_code)]
+#[path = "../minecraft/launch/launch_summary.rs"]
+mod launch_summary;
+#[cfg(mobile)]
+use launch_summary::DownloadStats;
 use crate::utils::api_utils::api_error_from_body;
 use crate::utils::hash_utils;
 use crate::utils::verified_files;

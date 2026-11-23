@@ -1,6 +1,8 @@
 use crate::error::{AppError, CommandError};
+#[cfg(desktop)]
 use crate::integrations::norisk_packs::NoriskModEntryDefinition;
 use crate::utils::file_utils;
+#[cfg(desktop)]
 use crate::utils::path_utils;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use image::ImageEncoder;
@@ -148,6 +150,7 @@ pub async fn set_file_enabled(file_path: String, enabled: bool) -> Result<(), Co
     Ok(())
 }
 
+#[cfg(desktop)]
 /// Deletes a file from the filesystem. Handles cases where the input path might or might not
 /// already have a .disabled extension, and will attempt to delete the corresponding file.
 #[tauri::command]
@@ -322,6 +325,7 @@ pub async fn get_icons_for_archives(
     Ok(results_map)
 }
 
+#[cfg(desktop)]
 /// Fetches the first PNG icon found within Norisk Pack mods as Base64 strings.
 ///
 /// # Arguments
@@ -786,6 +790,7 @@ pub async fn list_launcher_logs() -> Result<Vec<FileInfo>, CommandError> {
     Ok(files)
 }
 
+#[cfg(desktop)]
 /// Lists crash report files from all profiles, returns the 20 most recent
 #[tauri::command]
 pub async fn list_crash_reports() -> Result<Vec<FileInfo>, CommandError> {
@@ -851,6 +856,7 @@ pub async fn list_crash_reports() -> Result<Vec<FileInfo>, CommandError> {
     Ok(all_files)
 }
 
+#[cfg(desktop)]
 /// Lists MC log files from all profiles, returns the 20 most recent
 #[tauri::command]
 pub async fn list_all_mc_logs() -> Result<Vec<FileInfo>, CommandError> {
@@ -916,6 +922,7 @@ pub async fn list_all_mc_logs() -> Result<Vec<FileInfo>, CommandError> {
     Ok(all_files)
 }
 
+#[cfg(desktop)]
 /// Lists archived game-session process logs from {launcher_root}/logs/game/
 #[tauri::command]
 pub async fn list_process_logs() -> Result<Vec<FileInfo>, CommandError> {

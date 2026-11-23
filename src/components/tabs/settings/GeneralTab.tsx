@@ -19,6 +19,7 @@ import { LANGUAGE_OPTIONS, type SupportedLanguage } from "../../../i18n";
 import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { supportsClips } from "../../../utils/platform";
 import { useCapturePermissionsReady } from "../../../store/capture-permissions-store";
+import { isMobile } from "../../../lib/platform";
 
 export function GeneralTab() {
   const { t } = useTranslation();
@@ -62,6 +63,20 @@ export function GeneralTab() {
     if (tempConfig) setTempConfig({ ...tempConfig, concurrent_io_limit: value });
   };
 
+  const languageSelect = (
+    <Select
+      value={language}
+      onChange={(value) => setLanguage(value as SupportedLanguage)}
+      options={LANGUAGE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+        icon: <Icon icon={opt.flag} className="w-5 h-5" />,
+      }))}
+      size="sm"
+      variant="flat"
+    />
+  );
+
   return (
     <div className="space-y-6">
       {confirmDialog}
@@ -72,21 +87,13 @@ export function GeneralTab() {
         keywords={kw("settings.language", "sprache", "language", "locale")}
         description={t("settings.language.description")}
       >
+        {isMobile ? (
+          <div className="pt-3">{languageSelect}</div>
+        ) : (
         <SettingRow label={t("settings.language")} searchKeywords={kw("settings.language", "sprache", "locale")}>
-          <div className="w-56">
-            <Select
-              value={language}
-              onChange={(value) => setLanguage(value as SupportedLanguage)}
-              options={LANGUAGE_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: opt.label,
-                icon: <Icon icon={opt.flag} className="w-5 h-5" />,
-              }))}
-              size="sm"
-              variant="flat"
-            />
-          </div>
+          <div className="w-56">{languageSelect}</div>
         </SettingRow>
+        )}
       </SettingsSection>
 
       <SettingsSection
@@ -103,7 +110,7 @@ export function GeneralTab() {
           </>
         }
       >
-        <div className="flex items-center gap-6 py-3">
+        <div className={cn("flex gap-6 py-3", isMobile ? "flex-col gap-4" : "items-center")}>
           <div className="flex-1">
             <ColorPicker shape="square" size="md" showCustomOption={false} disabled={isAccentColorDisabled} />
           </div>

@@ -12,6 +12,7 @@ import { NebulaGrid } from "./effects/NebulaGrid";
 import { NebulaVoxels } from "./effects/NebulaVoxels";
 import { NebulaLightning } from "./effects/NebulaLightning";
 import { NebulaLiquidChrome } from "./effects/NebulaLiquidChrome";
+import { isMobile } from "../lib/platform";
 
 interface EffectPreviewCardProps {
   effectId: string;
@@ -144,7 +145,7 @@ export default function EffectPreviewCard({
         </div>
 
         <div className="mt-auto text-center">
-          <h5 className="font-smallcaps text-sm text-white">
+          <h5 className={isMobile ? "font-smallcaps text-xs leading-tight text-white [overflow-wrap:anywhere]" : "font-smallcaps text-sm text-white"}>
             {name}
           </h5>
         </div>

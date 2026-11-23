@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, HTTP_CLIENT, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, CommandError};
+#[cfg(desktop)]
 use crate::state::profile_state::{ImageSource, ProfileBanner};
 use crate::state::state_manager::State;
 use log::{debug, error, info, warn};
@@ -28,6 +29,7 @@ pub async fn get_launcher_directory() -> Result<String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+#[cfg(desktop)]
 /// Resolves an image path from various source types to an absolute file:// URL
 /// This handles different ImageSource types and returns a format suitable for web display
 #[command]
@@ -135,6 +137,7 @@ pub async fn resolve_image_path(
     }
 }
 
+#[cfg(desktop)]
 /// Uploads an image as a profile icon, copying it to a standard location within the profile's directory.
 /// Returns the relative path to the icon within the profile directory.
 #[command]

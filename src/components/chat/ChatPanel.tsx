@@ -8,6 +8,7 @@ import { ChatInput } from "./ChatInput";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { usePlayerAvatar } from "../../hooks/usePlayerAvatar";
+import { isMobile } from "../../lib/platform";
 
 function getDateLabel(timestamp: number, t: (key: string) => string): string {
   const date = new Date(timestamp);
@@ -178,6 +179,42 @@ export function ChatPanel({ friend }: ChatPanelProps) {
     return () => {
       unlistenMessage.then((fn) => fn());
       unlistenMessageUpdated.then((fn) => fn());
+    };
+  }, [chat?._id]);
+
+  useEffect(() => {
+    if (!isMobile || !chat?._id) return;
+    const chatId = chat._id;
+
+    const refresh = async () => {
+      if (document.hidden) return;
+      try {
+        const latest = await invoke<Message[]>("get_chat_messages", { chatId, page: 1 });
+        let added = false;
+        setMessages((prev) => {
+          const known = new Set(prev.map((m) => m._id));
+          const fresh = latest.filter((m) => !known.has(m._id));
+          if (fresh.length === 0) return prev;
+          added = true;
+          return [...prev, ...fresh].sort((a, b) => {
+            const timeA = a.createdAt || a.sentAt || a.timestamp || 0;
+            const timeB = b.createdAt || b.sentAt || b.timestamp || 0;
+            return timeA - timeB;
+          });
+        });
+        if (added) {
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        }
+      } catch (e) {
+        console.error("Failed to refresh chat:", e);
+      }
+    };
+
+    const timer = setInterval(refresh, 5000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [chat?._id]);
 

@@ -14,6 +14,7 @@ import { useSettingsConfig, useSettingsKeywords } from "./settings-context";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "../../ui/buttons/Button";
 import { Icon } from "@iconify/react";
+import { isMobile } from "../../../lib/platform";
 
 export function AppearanceTab() {
   const { t } = useTranslation();
@@ -122,7 +123,7 @@ export function AppearanceTab() {
           </div>
         </SettingRow>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+        <div className={isMobile ? "grid grid-cols-3 gap-2 py-3" : "grid grid-cols-2 md:grid-cols-4 gap-4 py-4"}>
           {backgroundOptions.map((option) => (
             <EffectPreviewCard
               key={option.id}

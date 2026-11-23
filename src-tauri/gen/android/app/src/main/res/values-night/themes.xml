@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.noriskclient_launcher_v3" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">#0B0F19</item>
+        <item name="android:navigationBarColor">#0B0F19</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@android:color/black</item>
+    </style>
+</resources>

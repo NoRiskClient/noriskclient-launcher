@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../../../lib/utils";
 import { SimpleTooltip } from "../Tooltip";
+import { isMobile } from "../../../lib/platform";
 
 interface SettingRowProps {
   label: ReactNode;
@@ -31,6 +32,7 @@ export function SettingRow({
       className={cn(
         "flex gap-4 py-3 border-b border-white/10 last:border-b-0",
         vertical ? "flex-col" : "items-center justify-between",
+        isMobile && !vertical && "flex-wrap gap-y-2",
         disabled && "opacity-50",
         className,
       )}

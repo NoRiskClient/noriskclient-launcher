@@ -20,6 +20,7 @@ import { AddSkinModal } from "../modals/AddSkinModal";
 import { cn } from "../../lib/utils";
 import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { parseErrorMessage } from "../../utils/error-utils";
+import { isMobile } from "../../lib/platform";
 
 function useDelayedFlag(active: boolean, delayMs: number): boolean {
   const [shown, setShown] = useState(false);
@@ -572,7 +573,7 @@ export function SkinsTab() {
   const addSkinButton = (
     <button
       onClick={() => startEditSkin(null)}
-      className="flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200"
+      className={`flex items-center gap-2 px-4 py-2 bg-black/30 hover:bg-black/40 text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg font-smallcaps text-base transition-all duration-200`}
       title={t('skins.addSkin')}
       disabled={!activeAccount}
     >
@@ -591,7 +592,7 @@ export function SkinsTab() {
             above an empty page. */}
         {activeAccount && (
           <div className="mb-6 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-4">
+            <div className={isMobile ? "flex flex-col gap-3" : "flex items-center gap-4"}>
               <div className="flex-1">
                 <SearchWithFilters
                   placeholder={t('skins.searchPlaceholder')}
@@ -602,7 +603,7 @@ export function SkinsTab() {
               </div>
 
               {/* Action Button */}
-              <div className="flex items-center gap-3">
+              <div className={isMobile ? "flex [&>*]:flex-1 [&>*]:justify-center" : "flex items-center gap-3"}>
                 {addSkinButton}
               </div>
             </div>

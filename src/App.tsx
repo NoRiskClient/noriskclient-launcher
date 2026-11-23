@@ -28,6 +28,10 @@ import { GlobalModalPortal } from "./components/ui/GlobalModalPortal";
 import { useCrashModalStore } from "./store/crash-modal-store";
 import { useLegalStore } from "./store/legal-store";
 import { useThemeStore } from "./store/useThemeStore";
+import { useFriendsStore } from "./store/friends-store";
+import { isMobile } from "./lib/platform";
+import { onBackButtonPress } from "@tauri-apps/api/app";
+import { exit } from "@tauri-apps/plugin-process";
 import { useLaunchStateStore } from "./store/launch-state-store";
 import { useGlobalModal } from "./hooks/useGlobalModal";
 import { Modal } from "./components/ui/Modal";
@@ -306,11 +310,11 @@ export function App() {
   useTwitchDeepLinkRequests();
 
   useEffect(() => {
-    drainPendingDeepLinks();
+    if (!isMobile) drainPendingDeepLinks();
   }, []);
 
   useEffect(() => {
-    refreshNrcDataOnMount();
+    if (!isMobile) refreshNrcDataOnMount();
   }, []);
 
   useEffect(() => {
@@ -320,7 +324,7 @@ export function App() {
     (async () => {
       try {
         const launcherVersion = await invoke<string>('get_app_version').catch(() => 'unknown');
-        const javaInfo: any = await invoke('get_java_info_command').catch(() => null);
+        const javaInfo: any = isMobile ? null : await invoke('get_java_info_command').catch(() => null);
         const osInfo = await invoke<{ os: string; os_version: string; arch: string }>(
           'get_system_os_info',
         ).catch(() => ({ os: 'unknown', os_version: 'unknown', arch: 'unknown' }));
@@ -493,7 +497,28 @@ export function App() {
     incrementLaunchCount();
   }, [incrementLaunchCount]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    const listener = onBackButtonPress(() => {
+      const settings = useSettingsModalStore.getState();
+      const friends = useFriendsStore.getState();
+      if (settings.isOpen) return settings.close();
+      if (friends.activeChatFriend) return friends.closeChat();
+      if (friends.isSettingsOpen) return friends.closeSettings();
+      if (friends.isSidebarOpen) return friends.closeSidebar();
+      if (window.location.hash !== "#/play") return navigate("/play");
+      void exit(0);
+    });
+    return () => {
+      void listener.then((l) => l.unregister());
+    };
+  }, [navigate]);
+
   const handleNavChange = async (tabId: string) => {
+    if (tabId === "friends") {
+      useFriendsStore.getState().toggleSidebar();
+      return;
+    }
     if (tabId === "settings") {
       useSettingsModalStore.getState().open();
       if (analyticsConsent.decision === 'accepted') {
@@ -513,7 +538,7 @@ export function App() {
   useGlobalDragAndDrop();
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
+    <div className={`flex flex-col ${isMobile ? "h-[100dvh]" : "h-screen"} w-screen overflow-hidden`}>
       <ThemeInitializer />
       <ScrollbarProvider />
       <GlobalToaster />
@@ -524,7 +549,7 @@ export function App() {
       <LegalAcceptanceModal />
       {showWelcome && <WelcomeScreen />}
       <GlobalModalPortal />
-      <MacCapturePermissionMonitor />
+      {!isMobile && <MacCapturePermissionMonitor />}
       <ChildProtectionModal />
       <NotificationModal />
       {ready && (

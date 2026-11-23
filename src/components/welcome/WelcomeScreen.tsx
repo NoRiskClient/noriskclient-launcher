@@ -5,6 +5,7 @@ import { useThemeStore } from "../../store/useThemeStore";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useWelcomeStore } from "../../store/welcome-store";
 import { useAddMinecraftAccount } from "../../hooks/useAddMinecraftAccount";
+import { isMobile } from "../../lib/platform";
 
 /** Selling points on the hero half. Icons come from the offline bundle. */
 const HIGHLIGHTS = [
@@ -72,7 +73,7 @@ export function WelcomeScreen() {
     <div
       ref={rootRef}
       onMouseMove={onPointerMove}
-      className="welcome-screen fixed inset-0 z-[900] flex bg-[#08060d] select-none"
+      className={`welcome-screen fixed inset-0 z-[900] flex bg-[#08060d] select-none${isMobile ? " pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" : ""}`}
       style={{ ["--px" as string]: 0, ["--py" as string]: 0 }}
     >
       <style>{`
@@ -105,6 +106,7 @@ export function WelcomeScreen() {
       `}</style>
 
       {/* Titlebar strip: drag region + controls, floating over both halves. */}
+      {!isMobile && (
       <div
         data-tauri-drag-region
         className="absolute top-0 inset-x-0 h-10 z-30 flex items-center justify-end px-4 gap-3"
@@ -126,6 +128,7 @@ export function WelcomeScreen() {
           </button>
         ))}
       </div>
+      )}
 
       {/* ── Hero half ──────────────────────────────────────────────────── */}
       <div className="relative hidden md:flex flex-col justify-between flex-1 min-w-0 overflow-hidden p-12">
@@ -235,7 +238,7 @@ export function WelcomeScreen() {
             {t("welcome.panel.title")}
           </h2>
           <p className="mt-3 text-sm font-minecraft text-white/55 leading-relaxed" style={rise(220)}>
-            {t("welcome.panel.subtitle")}
+            {t(isMobile ? "welcome.mobile.subtitle" : "welcome.panel.subtitle")}
           </p>
 
           <div className="w-full mt-9" style={rise(300)}>
@@ -259,7 +262,7 @@ export function WelcomeScreen() {
             className="mt-8 pt-5 border-t border-white/[0.07] w-full text-[11px] font-minecraft text-white/30 leading-relaxed"
             style={rise(380)}
           >
-            {t("welcome.panel.footnote")}
+            {t(isMobile ? "welcome.mobile.footnote" : "welcome.panel.footnote")}
           </p>
         </div>
       </div>

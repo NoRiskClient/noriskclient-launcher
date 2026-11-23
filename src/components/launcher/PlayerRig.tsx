@@ -16,6 +16,7 @@ import { useWindowFocus } from '../../hooks/useWindowFocus';
 import { useMinecraftAuthStore } from '../../store/minecraft-auth-store';
 import { useQualitySettingsStore } from '../../store/quality-settings-store';
 import { useThemeStore } from '../../store/useThemeStore';
+import { isMobile } from '../../lib/platform';
 
 const NO_ACCOUNT_SKIN_URL = "/skins/steve.png";
 const RIG_SHADOW = 'drop-shadow(5px 10px 5px rgba(0,0,0,0.75))';
@@ -26,13 +27,14 @@ export const PLAYER_RIG_HEIGHT = 450;
 
 const CANVAS_WIDTH = 1040;
 const CANVAS_HEIGHT = 860;
+const RIG_CANVAS_WIDTH = isMobile ? Math.min(CANVAS_WIDTH, window.innerWidth) : CANVAS_WIDTH;
 
 const canvasStyle: React.CSSProperties = {
   position: "absolute",
   left: "50%",
   top: "50%",
   transform: "translate(-50%, -50%)",
-  width: `${CANVAS_WIDTH}px`,
+  width: `${RIG_CANVAS_WIDTH}px`,
   height: `${CANVAS_HEIGHT}px`,
   maxWidth: "none",
   pointerEvents: "none",
@@ -124,7 +126,7 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
     nametag: rigNametag,
     fit: false,
     crop: false,
-    width: CANVAS_WIDTH,
+    width: RIG_CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     dpr: 1.5,
     fallbackUrl: null,
@@ -134,7 +136,7 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
     <SkinViewer
       skinUrl={stillUrl}
       playerName={playerName?.toString()}
-      width={webglOk ? CANVAS_WIDTH : PLAYER_RIG_WIDTH}
+      width={webglOk ? RIG_CANVAS_WIDTH : PLAYER_RIG_WIDTH}
       height={webglOk ? CANVAS_HEIGHT : PLAYER_RIG_HEIGHT}
       className="bg-transparent"
       style={webglOk ? canvasStyle : flatStyle}
@@ -163,7 +165,7 @@ export function PlayerRig({ playerName, outline }: PlayerRigProps) {
           nametag={rigNametag}
           loading={loading}
           paused={!isWindowFocused}
-          fps={60}
+          fps={isMobile ? 30 : 60}
           maxDpr={1.5}
           skeletonColor={accentColor.value}
           className="bg-transparent"

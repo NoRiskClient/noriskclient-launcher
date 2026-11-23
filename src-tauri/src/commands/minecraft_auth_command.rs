@@ -5,12 +5,15 @@ use crate::minecraft::minecraft_auth::Credentials;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::state_manager::State;
 use crate::utils::referral_utils;
+#[cfg(desktop)]
 use crate::utils::updater_utils;
 use chrono::{Duration, Utc};
 use log::{error, info, warn};
 use tauri::plugin::TauriPlugin;
 use tauri::Manager;
-use tauri::{Runtime, UserAttentionType};
+use tauri::Runtime;
+#[cfg(desktop)]
+use tauri::UserAttentionType;
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
 
@@ -37,9 +40,14 @@ pub async fn begin_login<R: Runtime>(
 ) -> Result<Option<Credentials>, CommandError> {
     let state = State::get().await?;
     let config = state.config_manager.get_config().await;
-    let use_browser_based_login = updater_utils::is_flatpak() || config.use_browser_based_login;
+    #[cfg(desktop)]
+    if !(updater_utils::is_flatpak() || config.use_browser_based_login) {
+        return begin_webview_login(app).await;
+    }
+    #[cfg(mobile)]
+    let _ = config;
 
-    if use_browser_based_login {
+    {
         // Flatpak: Use external browser with local HTTP server
         info!("[Login] Using external browser flow (Flatpak detected)");
 
@@ -231,7 +239,14 @@ pub async fn begin_login<R: Runtime>(
 
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-    } else {
+    }
+}
+
+#[cfg(desktop)]
+async fn begin_webview_login<R: Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Option<Credentials>, CommandError> {
+    {
         // Non-Flatpak: Use Tauri webview window (existing behavior)
         info!("[Login] Using Tauri webview flow (non-Flatpak)");
 
@@ -354,7 +369,10 @@ pub async fn cancel_login() -> Result<(), CommandError> {
 /// Check if the application is running in a Flatpak environment
 #[tauri::command]
 pub fn is_flatpak() -> bool {
-    updater_utils::is_flatpak()
+    #[cfg(desktop)]
+    return updater_utils::is_flatpak();
+    #[cfg(mobile)]
+    false
 }
 
 /// Get the currently active Minecraft account

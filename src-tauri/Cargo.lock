@@ -4019,6 +4019,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
+ "tauri-plugin-haptics",
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
@@ -7152,6 +7153,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-haptics"
+version = "2.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4ab6c843ce8255031547e6332c348ad8f2fbcb703f17b52a1a0dfacc5ad0e00"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "tauri-plugin-opener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9753,3 +9768,7 @@ dependencies = [
  "syn 2.0.100",
  "winnow 0.7.14",
 ]
+
+[[patch.unused]]
+name = "tao"
+version = "0.35.3"

@@ -16,6 +16,7 @@ interface ImportMetaEnv {
   readonly DEV: boolean;
   readonly PROD: boolean;
   readonly SSR: boolean;
+  readonly TAURI_ENV_PLATFORM?: string;
 }
 
 interface ImportMeta {

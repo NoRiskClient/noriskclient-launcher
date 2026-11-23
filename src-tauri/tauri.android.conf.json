@@ -1,0 +1,9 @@
+{
+  "build": {
+    "beforeDevCommand": "yarn icons && yarn vite",
+    "beforeBuildCommand": "yarn icons && yarn tsc && yarn vite build"
+  },
+  "bundle": {
+    "fileAssociations": null
+  }
+}

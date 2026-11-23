@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { useFriendsStore, FriendsFriendUser } from "../../store/friends-store";
@@ -18,6 +18,9 @@ type FriendListRow =
   | { type: "friend"; friend: FriendsFriendUser };
 
 type TabType = "friends" | "requests";
+import { isMobile } from "../../lib/platform";
+import { OfflineState } from "../ui/OfflineState";
+import { usePullToRefresh, PullToRefreshIndicator } from "../../hooks/usePullToRefresh";
 
 export function FriendsSidebar() {
   const { t } = useTranslation();
@@ -26,6 +29,7 @@ export function FriendsSidebar() {
     pendingRequests,
     currentUser,
     isLoading,
+    error,
     isSidebarOpen,
     isSettingsOpen,
     activeChatFriend,
@@ -42,6 +46,8 @@ export function FriendsSidebar() {
   const { accentColor } = useThemeStore();
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+  const listPull = usePullToRefresh(listRef, () => Promise.all([loadFriends(true), loadPendingRequests()]));
 
   useEffect(() => {
     if (isSidebarOpen) {
@@ -87,13 +93,15 @@ export function FriendsSidebar() {
       <div
         className={cn(
           "fixed top-0 right-0 h-full z-50 flex transition-transform duration-300 ease-out",
-          isSidebarOpen ? "translate-x-0" : "translate-x-full"
+          isMobile && "w-full",
+          isSidebarOpen ? "translate-x-0" : isMobile ? "translate-x-[calc(100%+32px)]" : "translate-x-full"
         )}
       >
         <div
           className={cn(
             "glass-panel h-full flex flex-col transition-all duration-300 ease-out overflow-hidden backdrop-blur-md",
-            (activeChatFriend || isSettingsOpen) ? "w-[380px] opacity-100" : "w-0 opacity-0"
+            (activeChatFriend || isSettingsOpen) ? (isMobile ? "w-full opacity-100" : "w-[380px] opacity-100") : "w-0 opacity-0",
+            isMobile && "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
           )}
           style={{
             background: `linear-gradient(135deg, ${accentColor.value}40 0%, ${accentColor.value}30 50%, ${accentColor.value}35 100%)`,
@@ -106,7 +114,10 @@ export function FriendsSidebar() {
         </div>
 
         <div
-          className="glass-panel w-96 h-full flex flex-col backdrop-blur-md"
+          className={cn(
+            "glass-panel h-full flex flex-col backdrop-blur-md",
+            !isMobile ? "w-96" : (activeChatFriend || isSettingsOpen) ? "hidden" : "w-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+          )}
           style={{
             background: `linear-gradient(180deg, ${accentColor.value}45 0%, ${accentColor.value}35 30%, ${accentColor.value}40 100%)`,
             borderLeft: `2px solid ${accentColor.value}60`,
@@ -231,13 +242,16 @@ export function FriendsSidebar() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div ref={listRef} className="flex-1 overflow-y-auto custom-scrollbar">
+            <PullToRefreshIndicator {...listPull} />
             {activeTab === "friends" ? (
               <FriendsTab
                 currentUser={currentUser}
                 onlineFriends={onlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
                 offlineFriends={offlineFriends.filter(f => f.username.toLowerCase().includes(searchQuery.toLowerCase()))}
                 isLoading={isLoading}
+                loadFailed={isMobile && !!error}
+                onRetry={() => { loadFriends(true); loadPendingRequests(); }}
                 accentColor={accentColor.value}
               />
             ) : (
@@ -259,12 +273,16 @@ function FriendsTab({
   onlineFriends,
   offlineFriends,
   isLoading,
+  loadFailed,
+  onRetry,
   accentColor,
 }: {
   currentUser: ReturnType<typeof useFriendsStore.getState>["currentUser"];
   onlineFriends: ReturnType<typeof useFriendsStore.getState>["friends"];
   offlineFriends: ReturnType<typeof useFriendsStore.getState>["friends"];
   isLoading: boolean;
+  loadFailed: boolean;
+  onRetry: () => void;
   accentColor: string;
 }) {
   const { t } = useTranslation();
@@ -296,6 +314,16 @@ function FriendsTab({
           <FriendSkeleton key={i} accentColor={accentColor} />
         ))}
       </div>
+    );
+  }
+
+  if (loadFailed && onlineFriends.length === 0 && offlineFriends.length === 0) {
+    return (
+      <OfflineState
+        onRetry={onRetry}
+        title={t('friends.load_error_title')}
+        description={t('friends.load_error_desc')}
+      />
     );
   }
 

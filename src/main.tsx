@@ -6,6 +6,9 @@ import { I18nextProvider } from "react-i18next";
 import { router } from "./lib/router";
 import i18n, { i18nReady } from "./i18n/i18n";
 import "./styles/globals.css";
+import { isMobile } from "./lib/platform";
+
+if (isMobile) document.addEventListener("touchstart", () => {}, { passive: true });
 
 disableBackdropBlurOnLinux();
 

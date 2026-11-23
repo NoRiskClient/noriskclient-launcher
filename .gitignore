@@ -35,4 +35,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .idea
 examples
-/src-tauri/gen
+/src-tauri/gen/*
+!/src-tauri/gen/android
+!/src-tauri/gen/apple

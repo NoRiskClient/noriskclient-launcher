@@ -1,4 +1,5 @@
 use crate::error::Result;
+#[cfg(desktop)]
 use crate::state::process_state::ProcessMetadata;
 use log::info;
 use once_cell::sync::Lazy;
@@ -69,6 +70,7 @@ pub struct EventPayload {
     pub error: Option<String>,
 }
 
+#[cfg(desktop)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MinecraftProcessExitedPayload {
     pub profile_id: Uuid,
@@ -94,13 +96,16 @@ pub struct ProcessMetricsPayload {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+#[cfg(desktop)]
 static PROCESS_EXITS: Lazy<broadcast::Sender<MinecraftProcessExitedPayload>> =
     Lazy::new(|| broadcast::channel(16).0);
 
+#[cfg(desktop)]
 pub fn subscribe_process_exits() -> broadcast::Receiver<MinecraftProcessExitedPayload> {
     PROCESS_EXITS.subscribe()
 }
 
+#[cfg(desktop)]
 pub fn publish_process_exit(payload: &MinecraftProcessExitedPayload) {
     let _ = PROCESS_EXITS.send(payload.clone());
 }

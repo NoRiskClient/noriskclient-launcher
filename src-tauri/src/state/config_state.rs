@@ -1,6 +1,7 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY, update_custom_game_dir};
 use crate::error::Result;
 use crate::state::post_init::PostInitializationHandler;
+#[cfg(desktop)]
 use crate::state::profile_state::MemorySettings;
 use async_trait::async_trait;
 use log::{debug, error, info, trace, warn};
@@ -409,6 +410,7 @@ pub struct LauncherConfig {
     pub hide_on_process_start: bool,
     #[serde(default)]
     pub close_to_tray: bool,
+    #[cfg(desktop)]
     #[serde(default = "default_global_memory_settings")]
     pub global_memory_settings: MemorySettings,
     #[deprecated(note = "replaced by `global_jvm_args` + `use_global_jvm_args`; only read to migrate old configs")]
@@ -489,6 +491,7 @@ fn default_hide_on_process_start() -> bool {
     false
 }
 
+#[cfg(desktop)]
 fn default_global_memory_settings() -> MemorySettings {
     const PREVIOUS_DEFAULT_MB: u32 = 3072;
     MemorySettings {
@@ -524,6 +527,7 @@ impl LauncherConfig {
         }
     }
 
+    #[cfg(desktop)]
     pub fn enabled_global_jvm_args(&self) -> Option<&str> {
         crate::state::profile_state::enabled_jvm_args(self.use_global_jvm_args, &self.global_jvm_args)
     }
@@ -546,6 +550,7 @@ impl Default for LauncherConfig {
             hooks: Hooks::default(),
             hide_on_process_start: default_hide_on_process_start(),
             close_to_tray: false,
+            #[cfg(desktop)]
             global_memory_settings: default_global_memory_settings(),
             global_custom_jvm_args: None,
             use_global_jvm_args: false,
@@ -872,6 +877,7 @@ impl ConfigManager {
                         current.close_to_tray, new_config.close_to_tray
                     );
                 }
+                #[cfg(desktop)]
                 if current.global_memory_settings.min != new_config.global_memory_settings.min
                     || current.global_memory_settings.max != new_config.global_memory_settings.max {
                     info!(
@@ -924,6 +930,7 @@ impl ConfigManager {
                     hooks: new_config.hooks,
                     hide_on_process_start: new_config.hide_on_process_start,
                     close_to_tray: new_config.close_to_tray,
+                    #[cfg(desktop)]
                     global_memory_settings: new_config.global_memory_settings,
                     global_custom_jvm_args: None,
                     use_global_jvm_args: new_config.use_global_jvm_args,
@@ -955,6 +962,7 @@ impl ConfigManager {
             update_custom_game_dir(new_config.custom_game_directory.clone());
 
             // Update Discord status if it changed
+            #[cfg(desktop)]
             if let Ok(state) = crate::state::State::get().await {
                 // Check if Discord status changed
                 let discord_enabled = new_config.enable_discord_presence;
