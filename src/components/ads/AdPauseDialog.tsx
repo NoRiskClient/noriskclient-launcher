@@ -73,7 +73,7 @@ function AdPauseDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="p-6 flex gap-7 font-minecraft normal-case select-none">
-        <div className="w-64 min-h-[18rem] self-stretch shrink-0">
+        <div className="w-64 h-72 shrink-0">
           {skin.textureUrl && (
             <WebGLBoundary label="ad-pause preview" fallback={null}>
               <SkinRenderer
