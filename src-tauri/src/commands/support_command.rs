@@ -1,23 +1,9 @@
 use crate::error::CommandError;
-use crate::support::error::{SupportError, SupportErrorKind};
 use crate::support::handler::ActionOutcome;
-use crate::support::service;
+use crate::support::{require_main_window, service};
 use crate::support::types::{PrepareResult, SubmitResponse, SupportRequestInfo};
-use crate::utils::deep_link_utils::is_main_window;
 use tauri::{AppHandle, Emitter, WebviewWindow};
 use uuid::Uuid;
-
-fn require_main_window(window: &WebviewWindow) -> Result<(), CommandError> {
-    if is_main_window(window) {
-        Ok(())
-    } else {
-        log::warn!(
-            "[Support] Rejected support command from window '{}'",
-            window.label()
-        );
-        Err(SupportError::new(SupportErrorKind::Forbidden).into())
-    }
-}
 
 #[tauri::command]
 pub async fn support_request_fetch(
@@ -25,7 +11,7 @@ pub async fn support_request_fetch(
     code: String,
     try_other_accounts: Option<bool>,
 ) -> Result<SupportRequestInfo, CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     Ok(service::fetch(&code, try_other_accounts.unwrap_or(false)).await?)
 }
 
@@ -37,7 +23,7 @@ pub async fn support_request_prepare(
     profile_id: Option<Uuid>,
     account_id: Uuid,
 ) -> Result<PrepareResult, CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     let step = |step| {
         let _ = app.emit("support:prepare_step", step);
     };
@@ -50,7 +36,7 @@ pub async fn support_request_execute_action(
     code: String,
     index: usize,
 ) -> Result<ActionOutcome, CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     Ok(service::execute_action(&code, index).await?)
 }
 
@@ -61,7 +47,7 @@ pub async fn support_request_submit(
     code: String,
     selection: Vec<usize>,
 ) -> Result<SubmitResponse, CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     let launcher_version = app.package_info().version.to_string();
     Ok(service::submit(&code, selection, launcher_version).await?)
 }
@@ -71,7 +57,7 @@ pub async fn support_request_decline(
     window: WebviewWindow,
     code: String,
 ) -> Result<(), CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     Ok(service::decline(&code).await?)
 }
 
@@ -80,6 +66,6 @@ pub async fn support_request_close(
     window: WebviewWindow,
     code: String,
 ) -> Result<(), CommandError> {
-    require_main_window(&window)?;
+    require_main_window(window.label())?;
     Ok(service::close(&code).await?)
 }

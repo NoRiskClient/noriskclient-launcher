@@ -8,6 +8,14 @@ pub mod registry;
 pub mod service;
 pub mod types;
 
+pub fn require_main_window(label: &str) -> Result<(), crate::error::CommandError> {
+    if crate::utils::main_window::is_main(label) {
+        return Ok(());
+    }
+    log::warn!("[Support] Rejected support command from window '{}'", label);
+    Err(error::SupportError::new(error::SupportErrorKind::Forbidden).into())
+}
+
 pub fn normalize_code(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     let len = trimmed.len();

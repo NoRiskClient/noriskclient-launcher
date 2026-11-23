@@ -12,9 +12,9 @@ use crate::minecraft::api::share_api::ShareApi;
 use crate::state::capture_state::ExportWatch;
 use crate::state::config_state::ClipConfig;
 use crate::state::State;
+use crate::utils::file_utils::{remove_older_than, ONE_DAY};
 
 const CONVERT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-const LEFTOVERS_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
 const SIZE_HEADROOM: f64 = 0.85;
 const AUDIO_KBPS: f64 = 256.0;
 const MIN_VIDEO_KBPS: u32 = 1_000;
@@ -73,7 +73,7 @@ pub(super) async fn convert(
 
     let dir = LAUNCHER_DIRECTORY.cache_dir().join("share");
     tokio::fs::create_dir_all(&dir).await.map_err(AppError::Io)?;
-    remove_leftovers(&dir);
+    remove_older_than(&dir, ONE_DAY).await;
     let converted = Converted(dir.join(format!("{}.mp4", Uuid::new_v4())));
 
     let supervisor = &state.capture_supervisor;
@@ -146,19 +146,3 @@ pub fn fitted_kbps(wanted: u32, seconds: Option<f64>, max_bytes: Option<u64>) ->
     wanted.min((fits as u32).max(MIN_VIDEO_KBPS))
 }
 
-fn remove_leftovers(dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let stale = entry
-            .metadata()
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|at| at.elapsed().ok())
-            .is_some_and(|age| age > LEFTOVERS_AFTER);
-        if stale {
-            let _ = std::fs::remove_file(entry.path());
-        }
-    }
-}

@@ -3,10 +3,8 @@ use log::{error, info, warn};
 use serde::Serialize;
 use std::sync::Mutex;
 use crate::utils::window_focus::bring_to_front;
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
-
-pub const MAIN_WINDOW_LABEL: &str = "main";
 
 #[derive(Clone, Serialize)]
 pub struct AuthBridgeRequest {
@@ -175,12 +173,8 @@ pub fn is_deep_link_launch(argv: &[String]) -> bool {
         .any(|arg| url::Url::parse(arg).is_ok_and(|u| u.scheme() == "norisk"))
 }
 
-pub fn is_main_window(window: &WebviewWindow) -> bool {
-    window.label() == MAIN_WINDOW_LABEL
-}
-
 fn focus_main_window(app_handle: &AppHandle) {
-    let Some(window) = app_handle.get_webview_window(MAIN_WINDOW_LABEL) else {
+    let Some(window) = app_handle.get_webview_window(crate::utils::main_window::LABEL) else {
         return;
     };
     if let Err(error) = bring_to_front(&window) {

@@ -2,6 +2,10 @@ use tauri::{AppHandle, CloseRequestApi, Emitter, Manager, Runtime, Window};
 
 pub const LABEL: &str = "main";
 
+pub fn is_main(label: &str) -> bool {
+    label == LABEL
+}
+
 pub fn show<R: Runtime>(app: &AppHandle<R>) {
     match app.get_webview_window(LABEL) {
         Some(window) => {

@@ -8,6 +8,38 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 
+pub const ONE_DAY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+pub async fn remove_older_than(dir: &Path, max_age: std::time::Duration) -> u32 {
+    let mut removed = 0;
+    let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
+        return removed;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let Ok(meta) = entry.metadata().await else {
+            continue;
+        };
+        let stale = meta
+            .modified()
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age >= max_age);
+        if !stale {
+            continue;
+        }
+        let outcome = if meta.is_dir() {
+            tokio::fs::remove_dir_all(entry.path()).await
+        } else {
+            tokio::fs::remove_file(entry.path()).await
+        };
+        match outcome {
+            Ok(()) => removed += 1,
+            Err(e) => warn!("Could not remove stale {}: {}", entry.path().display(), e),
+        }
+    }
+    removed
+}
+
 /// Writes `contents` to `path` atomically: readers see either the previous file or the
 /// complete new one, never a half-written mix.
 ///
