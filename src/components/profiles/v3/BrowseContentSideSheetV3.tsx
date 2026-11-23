@@ -4,8 +4,7 @@
  * Deliberately NOT styled like the shared `Modal`: a sheet is a docked
  * surface that extends the parent view, not a floating card demanding
  * focus. So the header uses the V3 profile-detail top-bar vocabulary
- * (h-11 toolbar, font-minecraft uppercase breadcrumb, thin accent
- * indicator on the docked edge) and the backdrop is lighter, signalling
+ * (h-11 toolbar, font-minecraft uppercase breadcrumb) and the backdrop is lighter, signalling
  * "non-blocking side task" instead of "stop everything".
  *
  * Mod detail is pushed onto a stacked layer inside the sheet (see the
@@ -125,14 +124,13 @@ export function BrowseContentSideSheetV3({
       <div
         onClick={onClose}
         aria-hidden="true"
-        className="glass-scrim fixed inset-0 bg-black/40 backdrop-blur-sm z-[1000] animate-in fade-in duration-150"
+        className="glass-scrim fixed inset-0 bg-black/50 z-[1000] animate-in fade-in duration-150"
       />
 
       {/* Sheet: docked to the right edge. Frosted-glass treatment — lower
           opacity + heavy blur + saturation boost so the app's gradient and
           particle layers shine through instead of being walled off. A subtle
-          left-to-right gradient gives the surface depth (slightly lighter on
-          the docked edge where the accent stripe sits). */}
+          left-to-right gradient gives the surface depth. */}
       <aside
         role="dialog"
         aria-modal="true"
@@ -164,17 +162,6 @@ export function BrowseContentSideSheetV3({
         <div
           aria-hidden="true"
           className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent pointer-events-none"
-        />
-
-        {/* Accent stripe on the docked edge — thin, luminous, signals which
-            surface the sheet belongs to without screaming for attention. */}
-        <div
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-[2px] pointer-events-none"
-          style={{
-            background: `linear-gradient(to bottom, transparent, ${accent}cc, ${accent}, ${accent}cc, transparent)`,
-            boxShadow: `0 0 18px ${accent}80`,
-          }}
         />
 
         {/* Header uses the V3 detail-view top-bar spec (h-11, px-5, border-

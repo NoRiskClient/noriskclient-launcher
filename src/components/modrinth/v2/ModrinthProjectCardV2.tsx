@@ -9,7 +9,6 @@ import type { ContentInstallStatus } from "../../../types/profile";
 import { ActionButton } from "../../ui/ActionButton";
 import { Icon } from "@iconify/react";
 import { TagBadge } from "../../ui/TagBadge";
-import { cn } from "../../../lib/utils";
 import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
@@ -206,18 +205,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
         {/* Main Card */}
         <div
           onClick={handleTitleClick}
-          className={cn(
-            "relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer",
-          installStatus?.is_installed &&
-            !installStatus?.is_included_in_norisk_pack &&
-            "border-l-green-500",
-          !installStatus?.is_installed &&
-            installStatus?.is_included_in_norisk_pack &&
-            "border-l-blue-500",
-          installStatus?.is_installed &&
-            installStatus?.is_included_in_norisk_pack &&
-            "border-l-blue-500",
-        )}
+          className="relative flex items-center gap-4 p-3 rounded-lg bg-black/20 border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
       >
         {/* Blocked Mod Warning Icon - Top Left */}
         {projectNoRiskStatus === 'blocked' && (
