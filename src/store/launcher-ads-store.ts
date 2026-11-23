@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import {
-  hideAd,
   onAdConsentMode,
   refreshAds,
   showAdConsent,
@@ -14,26 +13,14 @@ interface LauncherAdsState {
   active: boolean;
   slots: Record<string, AdSize>;
   consent: AdConsentMode;
-  epoch: number;
-  release: () => Promise<void>;
   refresh: () => Promise<void>;
   openConsent: () => void;
 }
 
-const RELEASE_TIMEOUT_MS = 150;
-
-export const useLauncherAdsStore = create<LauncherAdsState>((set, get) => ({
+export const useLauncherAdsStore = create<LauncherAdsState>((set) => ({
   active: false,
   slots: {},
   consent: "closed",
-  epoch: 0,
-  release: async () => {
-    const { active, slots } = get();
-    if (!active) return;
-    const hidden = Promise.all(Object.keys(slots).map((slot) => hideAd(slot))).catch(() => {});
-    await Promise.race([hidden, new Promise((resolve) => setTimeout(resolve, RELEASE_TIMEOUT_MS))]);
-    set((state) => ({ epoch: state.epoch + 1 }));
-  },
   refresh: async () => {
     try {
       const slots = await refreshAds();

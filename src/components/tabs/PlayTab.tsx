@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { NewsRail } from "../news/NewsRail";
+import { NewsSection } from "../news/NewsSection";
+import { RailPanel } from "../ads/AdRail";
 import { ErrorMessage } from "../ui/ErrorMessage";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
 import { useProfileStore } from "../../store/profile-store";
@@ -69,11 +70,13 @@ export function PlayTab() {
       <div className="flex-grow flex flex-col items-center justify-center p-8 relative z-15">
         {/* Only show RetroGrid effect if no theme background is active and effects are not hidden */}
         {currentEffect === BACKGROUND_EFFECTS.RETRO_GRID && shouldShowEffects && !(isThemeActive && selectedTheme?.backgroundImage) && (
-          <RetroGridEffect
-            renderMode="both"
-            isAnimationEnabled={!staticBackground}
-            customGridLineColor={`${accentColor.value}80`}
-          />
+          <div className="absolute inset-y-0 left-0 pointer-events-none" style={{ right: "calc(-1 * var(--ad-rail-width, 0px))" }}>
+            <RetroGridEffect
+              renderMode="both"
+              isAnimationEnabled={!staticBackground}
+              customGridLineColor={`${accentColor.value}80`}
+            />
+          </div>
         )}
 
         {/* Referral Banner - Top Left */}
@@ -123,7 +126,9 @@ export function PlayTab() {
         </div>
       </div>
 
-      <NewsRail />
+      <RailPanel>
+        <NewsSection />
+      </RailPanel>
     </div>
   );
 }

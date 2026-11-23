@@ -28,6 +28,7 @@ import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
 import { FriendsSidebar } from "../friends/FriendsSidebar";
+import { AdRailLayout } from "../ads/AdRail";
 import { AdConsentOverlay } from "../ads/AdConsentOverlay";
 import { useLauncherAdsStore } from "../../store/launcher-ads-store";
 import { useMinecraftAuthStore } from "../../store/minecraft-auth-store";
@@ -61,6 +62,7 @@ interface AppLayoutProps {
   activeTab: string;
   onNavChange: (tabId: string) => void;
 }
+
 
 export function AppLayout({
   children,
@@ -387,7 +389,7 @@ export function AppLayout({
           {shouldShowEffects && isSnowEnabled && <Snowfall />}
 
           <div className="relative z-10 h-full overflow-hidden custom-scrollbar">
-            {children}
+            <AdRailLayout>{children}</AdRailLayout>
           </div>
         </div>
       </div>

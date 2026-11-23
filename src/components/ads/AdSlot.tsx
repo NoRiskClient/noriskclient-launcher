@@ -17,7 +17,7 @@ const visibleRect = (element: HTMLElement): AdRect | null => {
   const uncovered = SAMPLE_POINTS.every((fx) =>
     SAMPLE_POINTS.every((fy) => {
       const hit = document.elementFromPoint(rect.left + rect.width * fx, rect.top + rect.height * fy);
-      return hit !== null && element.contains(hit);
+      return hit !== null && (element.contains(hit) || hit.closest("[data-ad-passthrough]") !== null);
     }),
   );
   if (!uncovered) return null;
@@ -37,7 +37,6 @@ interface AdSlotProps {
 export function AdSlot({ slot, className }: AdSlotProps) {
   const active = useLauncherAdsStore((state) => state.active);
   const size = useLauncherAdsStore((state) => state.slots[slot]);
-  const epoch = useLauncherAdsStore((state) => state.epoch);
   const shown = active && !!size;
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -88,7 +87,7 @@ export function AdSlot({ slot, className }: AdSlotProps) {
       window.removeEventListener("scroll", schedule, true);
       document.removeEventListener("visibilitychange", schedule);
     };
-  }, [shown, slot, epoch]);
+  }, [shown, slot]);
 
   useLayoutEffect(() => {
     if (!shown) return;
