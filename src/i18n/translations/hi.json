@@ -2170,6 +2170,8 @@
   "ads.pause.confirm.today": "आज के लिए रोकें",
   "ads.pause.confirm.threeDays": "3 दिन के लिए रोकें",
   "ads.pause.forever": "NoRisk+ के साथ विज्ञापन-मुक्त",
+  "ads.fallback.tagline": "NRC का साथ दें और फिर कभी विज्ञापन न देखें।",
+  "ads.fallback.cta": "NoRisk+ पाएं",
   "ads.consent.title": "आपकी गोपनीयता और विज्ञापन NoRisk का साथ कैसे देते हैं",
   "ads.consent.text": "विज्ञापन NoRisk Client को मुफ़्त रखते हैं और हमारे सर्वर व अपडेट का खर्च उठाते हैं। हमारे भागीदार विज्ञापन व्यक्तिगत बनाने और प्रदर्शन मापने के लिए लॉन्चर में कुकीज़ सहेज या पढ़ सकते हैं।",
   "ads.consent.accept": "सभी स्वीकार करें",

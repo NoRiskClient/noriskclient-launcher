@@ -14,7 +14,7 @@ import { useGlobalModal } from "../../hooks/useGlobalModal";
 import { useActiveSkinTexture } from "../../hooks/useActiveSkinTexture";
 import { trackEvent } from "../../services/analytics-service";
 
-const NORISK_PLUS_URL = "https://norisk.gg/shop";
+export const NORISK_PLUS_URL = "https://norisk.gg/shop";
 type PauseOption = "today" | "threeDays";
 
 function pauseEnd(option: PauseOption): number {

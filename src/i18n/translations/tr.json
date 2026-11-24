@@ -2155,6 +2155,8 @@
   "ads.pause.confirm.today": "Bugünlük duraklat",
   "ads.pause.confirm.threeDays": "3 gün duraklat",
   "ads.pause.forever": "NoRisk+ ile reklamsız",
+  "ads.fallback.tagline": "NRC'i destekle ve bir daha asla reklam görme.",
+  "ads.fallback.cta": "NoRisk+ al",
   "ads.consent.title": "Gizliliğin ve reklamların NoRisk'i nasıl desteklediği",
   "ads.consent.text": "Reklamlar NoRisk Client'ı ücretsiz tutar, sunucularımızı ve güncellemelerimizi finanse eder. Ortaklarımız reklamları kişiselleştirmek ve performansı ölçmek için launcher'da çerez saklayabilir veya okuyabilir.",
   "ads.consent.accept": "Tümünü kabul et",

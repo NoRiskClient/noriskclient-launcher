@@ -19,6 +19,9 @@ export interface SkinPreviewInput {
   cosmetics?: SnapshotCosmetic[];
   nametag?: NametagOptions | null;
   emote?: SkinSnapshotRequest["emote"];
+  emoteTime?: number;
+  bones?: SkinSnapshotRequest["bones"];
+  rotation?: number;
   fit?: boolean | number;
   crop?: boolean | number;
   width?: number;
@@ -43,6 +46,9 @@ export function useSkinPreview(
     cosmetics = NO_COSMETICS,
     nametag = null,
     emote,
+    emoteTime,
+    bones,
+    rotation,
     fit,
     crop,
     width,
@@ -64,7 +70,7 @@ export function useSkinPreview(
     active
       ? () =>
           getSkinPreview(
-            { textureUrl, variant, cosmetics, nametag, emote, fit, crop },
+            { textureUrl, variant, cosmetics, nametag, emote, emoteTime, bones, rotation, fit, crop },
             width && height
               ? { width: Math.round(width * dpr), height: Math.round(height * dpr) }
               : undefined,
@@ -77,6 +83,9 @@ export function useSkinPreview(
       cosmeticIds,
       nametagKey,
       emote?.animation ?? "",
+      emoteTime,
+      bones ? JSON.stringify(bones) : "",
+      rotation,
       fit,
       crop,
       width,

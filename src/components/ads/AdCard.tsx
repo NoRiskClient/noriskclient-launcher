@@ -3,6 +3,7 @@ import { useLauncherAdsStore } from "../../store/launcher-ads-store";
 import { useFriendsStore } from "../../store/friends-store";
 import type { AdSize } from "../../services/ads-service";
 import { AdSlot } from "./AdSlot";
+import { AdFallback } from "./AdFallback";
 import { useOpenAdPause } from "./AdPauseDialog";
 
 export const MAIN_AD_SLOT = "play-news";
@@ -35,10 +36,11 @@ export function AdFrame({ slot, size }: { slot: string; size: AdSize }) {
   const coveredByFriends = useFriendsStore((state) => state.isSidebarOpen);
   return (
     <div
-      className="shrink-0 rounded-md overflow-hidden bg-black/40 ring-1 ring-white/10"
+      className="relative shrink-0 rounded-md overflow-hidden bg-black/40 ring-1 ring-white/10"
       style={{ width: size.width, height: size.height }}
     >
-      {!coveredByFriends && <AdSlot slot={slot} />}
+      <AdFallback />
+      {!coveredByFriends && <AdSlot slot={slot} className="relative" />}
     </div>
   );
 }

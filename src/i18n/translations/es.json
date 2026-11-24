@@ -2155,6 +2155,8 @@
   "ads.pause.confirm.today": "Pausar por hoy",
   "ads.pause.confirm.threeDays": "Pausar 3 días",
   "ads.pause.forever": "Sin anuncios con NoRisk+",
+  "ads.fallback.tagline": "Apoya a NRC y no vuelvas a ver anuncios.",
+  "ads.fallback.cta": "Consigue NoRisk+",
   "ads.consent.title": "Tu privacidad y cómo los anuncios apoyan a NoRisk",
   "ads.consent.text": "Los anuncios mantienen NoRisk Client gratis y pagan nuestros servidores y actualizaciones. Nuestros socios pueden guardar o leer cookies en el launcher para personalizar anuncios y medir su rendimiento.",
   "ads.consent.accept": "Aceptar todo",

@@ -1,0 +1,81 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation.model.new": {
+			"animation_length": 3.0833,
+			"disableOnHit": false,
+			"disableOnMove": true,
+			"firstPerson": true,
+			"stayInFirstPerson": true,
+			"bones": {
+				"bipedRig": {
+					"position": {
+						"0.0417": [0, 0, 0],
+						"0.2083": [0, 1.5, 0],
+						"0.375": [0, -0.5, 0]
+					}
+				},
+				"bipedHead": {
+					"rotation": [-40, 25, 0]
+				},
+				"bipedRightArm": {
+					"rotation": {
+						"0.0": [0, 0, 0],
+						"0.5417": [-150, 25, 0]
+					}
+				},
+				"armorRightArm": {
+					"rotation": {
+						"0.0": [0, 0, 0],
+						"0.5417": [0, 0, 0]
+					}
+				},
+				"bipedLeftArm": {
+					"rotation": {
+						"0.0": [0, 0, 0],
+						"0.5417": [33.7424, 14.6914, 9.61518]
+					}
+				},
+				"bipedLeftLeg": {
+					"rotation": {
+						"0.1667": [0, 0, 0],
+						"0.4583": [17.48436, 0.75155, -2.38443]
+					}
+				},
+				"bipedRightLeg": {
+					"rotation": {
+						"0.1667": [0, 0, 0],
+						"0.4583": [-9.99067, 0.43399, 2.46207]
+					}
+				},
+				"locator": {
+					"rotation": {
+						"0.5": [0, 0, 0],
+						"3.0833": [0, -360, 0]
+					},
+					"position": {
+						"0.0": [0, 0, 0],
+						"0.5": [-1, 18, 1]
+					},
+					"scale": {
+						"0.0": [0, 0, 0],
+						"0.25": [0, 0, 0],
+						"0.5": [1, 1, 1]
+					}
+				}
+			},
+			"sound_effects": {
+				"0.5": {
+					"effect": "noriskclient-cosmetics:emotes/winner/winner"
+				}
+			},
+			"particle_effects": {
+				"0.5": {
+					"effect": "noriskclient-cosmetics:winner",
+					"locator": "locator"
+				}
+			}
+		}
+	},
+	"geckolib_format_version": 2
+}
