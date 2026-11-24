@@ -304,9 +304,9 @@ fn the_ad_page_cannot_open_the_full_window_dialog_on_its_own() {
 }
 
 #[test]
-fn only_the_first_privacy_answer_reloads_the_ad_page() {
+fn closing_the_privacy_prompt_or_dialog_reloads_the_ad_page() {
     assert!(reload_after_consent(ConsentMode::Prompt, ConsentMode::Closed));
-    assert!(!reload_after_consent(ConsentMode::Dialog, ConsentMode::Closed));
+    assert!(reload_after_consent(ConsentMode::Dialog, ConsentMode::Closed));
     assert!(!reload_after_consent(ConsentMode::Closed, ConsentMode::Closed));
     assert!(!reload_after_consent(ConsentMode::Prompt, ConsentMode::Dialog));
 }

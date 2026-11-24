@@ -230,7 +230,7 @@ pub fn accepts_page_mode(current: ConsentMode, launcher_opened_dialog: bool, nex
 }
 
 pub fn reload_after_consent(previous: ConsentMode, next: ConsentMode) -> bool {
-    previous == ConsentMode::Prompt && next == ConsentMode::Closed
+    previous != ConsentMode::Closed && next == ConsentMode::Closed
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
