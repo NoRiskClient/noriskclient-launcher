@@ -74,6 +74,7 @@ struct Ads {
 #[serde(rename_all = "camelCase")]
 pub struct AdsStatus {
     pub personalized: Option<bool>,
+    pub consent: ConsentMode,
 }
 
 impl Ads {
@@ -391,8 +392,10 @@ pub fn record_privacy<R: Runtime>(app: &AppHandle<R>, consented_purposes: &[u32]
 }
 
 pub fn status() -> AdsStatus {
+    let state = ads();
     AdsStatus {
-        personalized: ads().personalized,
+        personalized: state.personalized,
+        consent: state.consent,
     }
 }
 

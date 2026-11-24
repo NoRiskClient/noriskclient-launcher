@@ -26,6 +26,7 @@ export const showAdConsent = () => invoke<void>("ads_show_consent");
 
 export interface AdStatus {
   personalized: boolean | null;
+  consent: AdConsentMode;
 }
 
 export const getAdStatus = () => invoke<AdStatus>("ads_status");

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   onAdConsentMode,
+  getAdStatus,
   refreshAds,
   showAdConsent,
   type AdConsentMode,
@@ -10,24 +11,51 @@ import { onFeatureFlagsUpdated } from "../services/feature-flags-service";
 import { log } from "../utils/logging-utils";
 
 const PAUSE_KEY = "nrc.ads.pausedUntil";
+const SLOTS_KEY = "nrc.ads.lastSlots";
 
-function readPausedUntil(): number | null {
+function readStored<T>(key: string, parse: (raw: string | null) => T, fallback: T): T {
   try {
-    const value = Number(localStorage.getItem(PAUSE_KEY));
-    return value > Date.now() ? value : null;
+    return parse(localStorage.getItem(key));
   } catch {
-    return null;
+    return fallback;
   }
 }
 
-function writePausedUntil(value: number | null) {
+function writeStored(key: string, value: string | null) {
   try {
-    if (value) localStorage.setItem(PAUSE_KEY, String(value));
-    else localStorage.removeItem(PAUSE_KEY);
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
   } catch {
     return;
   }
 }
+
+const readLastSlots = (): Record<string, AdSize> =>
+  readStored(
+    SLOTS_KEY,
+    (raw) => {
+      const value = JSON.parse(raw ?? "{}");
+      return value && typeof value === "object" ? value : {};
+    },
+    {},
+  );
+
+const writeLastSlots = (slots: Record<string, AdSize>) =>
+  writeStored(SLOTS_KEY, Object.keys(slots).length > 0 ? JSON.stringify(slots) : null);
+
+const readPausedUntil = () =>
+  readStored(
+    PAUSE_KEY,
+    (raw) => {
+      const value = Number(raw);
+      return value > Date.now() ? value : null;
+    },
+    null,
+  );
+
+const writePausedUntil = (value: number | null) => writeStored(PAUSE_KEY, value ? String(value) : null);
+
+const lastSlots = readLastSlots();
 
 let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -43,7 +71,7 @@ interface LauncherAdsState {
 }
 
 export const useLauncherAdsStore = create<LauncherAdsState>((set) => ({
-  active: false,
+  active: Object.keys(lastSlots).length > 0,
   pausedUntil: readPausedUntil(),
   pause: (until) => {
     writePausedUntil(until);
@@ -55,15 +83,18 @@ export const useLauncherAdsStore = create<LauncherAdsState>((set) => ({
     clearTimeout(resumeTimer);
     set({ pausedUntil: null });
   },
-  slots: {},
+  slots: lastSlots,
   consent: "closed",
   refresh: async () => {
     try {
       const slots = await refreshAds();
       const active = Object.keys(slots).length > 0;
-      set(active ? { active, slots } : { active, slots, consent: "closed" });
+      const consent = active ? (await getAdStatus()).consent : "closed";
+      writeLastSlots(slots);
+      set({ active, slots, consent });
     } catch (error) {
       log("error", `Failed to update launcher ads: ${error}`);
+      writeLastSlots({});
       set({ active: false, slots: {}, consent: "closed" });
     }
   },
