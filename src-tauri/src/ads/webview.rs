@@ -29,7 +29,7 @@ fn try_execute<R: Runtime>(app: &AppHandle<R>, plan: Plan) -> tauri::Result<()> 
                 park(&webview)?;
             }
         }
-        Plan::Show { url, rect, load, from_hidden } => {
+        Plan::Show { url, rect, load, from_hidden, offscreen } => {
             let stale_frame = from_hidden && existing.is_some();
             let webview = match existing {
                 Some(webview) => {
@@ -41,7 +41,10 @@ fn try_execute<R: Runtime>(app: &AppHandle<R>, plan: Plan) -> tauri::Result<()> 
                 None => create(app, rect, url)?,
             };
             webview.set_size(LogicalSize::new(rect.width, rect.height))?;
-            if stale_frame {
+            if offscreen {
+                webview.set_position(OFFSCREEN)?;
+                webview.show()?;
+            } else if stale_frame {
                 webview.set_position(OFFSCREEN)?;
                 webview.show()?;
                 let target = webview.clone();
@@ -87,7 +90,7 @@ pub(super) fn eval_consent<R: Runtime>(app: &AppHandle<R>, action: Option<super:
 
 fn page_loaded<R: Runtime>(webview: &Webview<R>, url: &Url) {
     if policy::is_ad_origin(url) {
-        if super::page_ready() {
+        if super::page_ready(webview.app_handle()) {
             eval_consent(webview.app_handle(), None);
         }
         return;

@@ -229,8 +229,13 @@ pub fn accepts_page_mode(current: ConsentMode, launcher_opened_dialog: bool, nex
     next != ConsentMode::Dialog || launcher_opened_dialog || current != ConsentMode::Closed
 }
 
-pub fn reload_after_consent(previous: ConsentMode, next: ConsentMode) -> bool {
-    previous != ConsentMode::Closed && next == ConsentMode::Closed
+pub fn dialog_lost_on_load(current: ConsentMode, launcher_reopening: bool) -> bool {
+    current == ConsentMode::Dialog && !launcher_reopening
+}
+
+pub fn reload_after_consent(previous: ConsentMode, next: ConsentMode, managed_from_prompt: bool) -> bool {
+    next == ConsentMode::Closed
+        && (previous == ConsentMode::Prompt || (previous == ConsentMode::Dialog && managed_from_prompt))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

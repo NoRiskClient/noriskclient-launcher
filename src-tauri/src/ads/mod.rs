@@ -40,6 +40,7 @@ enum Plan {
         rect: AdRect,
         load: bool,
         from_hidden: bool,
+        offscreen: bool,
     },
 }
 
@@ -66,6 +67,8 @@ struct Ads {
     clicks: ClickGate,
     consent: ConsentMode,
     launcher_opened_dialog: bool,
+    managed_from_prompt: bool,
+    dialog_loading: bool,
     personalized: Option<bool>,
     hidden: bool,
 }
@@ -134,7 +137,7 @@ impl Ads {
             return Plan::Hide;
         };
         if self.loaded_url.as_ref() == Some(&url) && !self.fresh_load {
-            return Plan::Show { url, rect, load: false, from_hidden: false };
+            return Plan::Show { url, rect, load: false, from_hidden: false, offscreen: self.dialog_loading };
         }
         let delay = if self.consent != ConsentMode::Closed || self.pending_consent || self.fresh_load {
             Duration::ZERO
@@ -146,7 +149,9 @@ impl Ads {
             self.last_load = Some(now);
             self.fresh_load = false;
             self.page_ready = false;
-            return Plan::Show { url, rect, load: true, from_hidden: false };
+            self.dialog_loading = self.consent == ConsentMode::Dialog;
+            self.pending_consent |= self.dialog_loading;
+            return Plan::Show { url, rect, load: true, from_hidden: false, offscreen: self.dialog_loading };
         }
         self.reload_waiting = true;
         Plan::Hide
@@ -345,6 +350,7 @@ pub fn consent_action<R: Runtime>(app: &AppHandle<R>, action: ConsentAction) {
         let mut state = ads();
         let prompting = state.consent == ConsentMode::Prompt;
         state.launcher_opened_dialog |= prompting && action == ConsentAction::Customize;
+        state.managed_from_prompt |= prompting && action == ConsentAction::Customize;
         prompting
     };
     if answer {
@@ -353,7 +359,7 @@ pub fn consent_action<R: Runtime>(app: &AppHandle<R>, action: ConsentAction) {
 }
 
 pub fn page_consent_mode<R: Runtime>(app: &AppHandle<R>, mode: ConsentMode) {
-    let changed = {
+    let (changed, revealed) = {
         let mut state = ads();
         if !policy::accepts_page_mode(state.consent, state.launcher_opened_dialog, mode) {
             log::warn!("[Ads] Ignored a privacy dialog the launcher did not open");
@@ -362,10 +368,17 @@ pub fn page_consent_mode<R: Runtime>(app: &AppHandle<R>, mode: ConsentMode) {
         if mode != ConsentMode::Dialog {
             state.launcher_opened_dialog = false;
         }
+        let revealed = std::mem::take(&mut state.dialog_loading);
         let previous = std::mem::replace(&mut state.consent, mode);
-        state.fresh_load |= policy::reload_after_consent(previous, mode);
-        previous != mode
+        state.fresh_load |= policy::reload_after_consent(previous, mode, state.managed_from_prompt);
+        if mode == ConsentMode::Closed {
+            state.managed_from_prompt = false;
+        }
+        (previous != mode, revealed)
     };
+    if revealed && !changed {
+        apply_later(app);
+    }
     if changed {
         if let Err(e) = app.emit_to(crate::utils::main_window::LABEL, "ads_consent_mode", mode) {
             log::warn!("[Ads] Could not tell the launcher about the privacy dialog: {}", e);
@@ -411,10 +424,26 @@ pub fn admit_link<R: Runtime>(app: &AppHandle<R>, url: &str) -> Option<Url> {
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-fn page_ready() -> bool {
-    let mut state = ads();
-    state.page_ready = true;
-    std::mem::take(&mut state.pending_consent)
+fn page_ready<R: Runtime>(app: &AppHandle<R>) -> bool {
+    let (reopen, lost) = {
+        let mut state = ads();
+        state.page_ready = true;
+        let reopen = std::mem::take(&mut state.pending_consent);
+        let lost = policy::dialog_lost_on_load(state.consent, reopen);
+        if lost {
+            state.dialog_loading = false;
+            state.consent = ConsentMode::Closed;
+            state.launcher_opened_dialog = false;
+        }
+        (reopen, lost)
+    };
+    if lost {
+        if let Err(e) = app.emit_to(crate::utils::main_window::LABEL, "ads_consent_mode", ConsentMode::Closed) {
+            log::warn!("[Ads] Could not tell the launcher about the privacy dialog: {}", e);
+        }
+        apply_later(app);
+    }
+    reopen
 }
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]

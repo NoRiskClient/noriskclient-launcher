@@ -304,11 +304,12 @@ fn the_ad_page_cannot_open_the_full_window_dialog_on_its_own() {
 }
 
 #[test]
-fn closing_the_privacy_prompt_or_dialog_reloads_the_ad_page() {
-    assert!(reload_after_consent(ConsentMode::Prompt, ConsentMode::Closed));
-    assert!(reload_after_consent(ConsentMode::Dialog, ConsentMode::Closed));
-    assert!(!reload_after_consent(ConsentMode::Closed, ConsentMode::Closed));
-    assert!(!reload_after_consent(ConsentMode::Prompt, ConsentMode::Dialog));
+fn only_the_first_privacy_answer_reloads_the_ad_page() {
+    assert!(reload_after_consent(ConsentMode::Prompt, ConsentMode::Closed, false));
+    assert!(reload_after_consent(ConsentMode::Dialog, ConsentMode::Closed, true));
+    assert!(!reload_after_consent(ConsentMode::Dialog, ConsentMode::Closed, false));
+    assert!(!reload_after_consent(ConsentMode::Closed, ConsentMode::Closed, true));
+    assert!(!reload_after_consent(ConsentMode::Prompt, ConsentMode::Dialog, false));
 }
 
 #[test]
@@ -370,4 +371,12 @@ fn ads_count_as_personalized_only_with_both_profile_purposes() {
 fn an_oversized_purpose_list_from_the_page_is_ignored() {
     let flood: Vec<u32> = (0..10_000).collect();
     assert!(!personalized_ads(&flood));
+}
+
+#[test]
+fn a_reloaded_ad_page_closes_a_privacy_dialog_it_no_longer_shows() {
+    assert!(dialog_lost_on_load(ConsentMode::Dialog, false));
+    assert!(!dialog_lost_on_load(ConsentMode::Dialog, true));
+    assert!(!dialog_lost_on_load(ConsentMode::Prompt, false));
+    assert!(!dialog_lost_on_load(ConsentMode::Closed, false));
 }
