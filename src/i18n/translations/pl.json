@@ -1941,8 +1941,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "Usunąć {{count}} zaznaczonych zrzutów? Tego nie można cofnąć.",
   "profiles.v3.screenshots.batchDeleteSuccess": "Usunięto {{count}} zrzutów.",
   "profiles.v3.logs.searchPlaceholder": "Szukaj w logu…",
-  "profiles.v3.logs.showLevel": "Pokaż {{level}}",
-  "profiles.v3.logs.hideLevel": "Ukryj {{level}}",
   "profiles.v3.logs.noFile": "Brak pliku logu",
   "profiles.v3.logs.emptyFiles": "Brak plików logów",
   "profiles.v3.logs.emptyFilesHint": "Uruchom profil raz — plik logu pojawi się po pierwszej sesji.",

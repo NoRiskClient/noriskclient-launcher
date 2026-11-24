@@ -1941,8 +1941,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "Удалить {{count}} выбранных скриншотов? Это действие нельзя отменить.",
   "profiles.v3.screenshots.batchDeleteSuccess": "Удалено скриншотов: {{count}}.",
   "profiles.v3.logs.searchPlaceholder": "Поиск в логе…",
-  "profiles.v3.logs.showLevel": "Показать {{level}}",
-  "profiles.v3.logs.hideLevel": "Скрыть {{level}}",
   "profiles.v3.logs.noFile": "Нет файла логов",
   "profiles.v3.logs.emptyFiles": "Пока нет файлов логов",
   "profiles.v3.logs.emptyFilesHint": "Запусти профиль один раз — файл логов появится после первой сессии.",

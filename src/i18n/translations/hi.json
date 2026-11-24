@@ -1954,8 +1954,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "{{count}} चयनित स्क्रीनशॉट हटाएं? यह रद्द नहीं किया जा सकता।",
   "profiles.v3.screenshots.batchDeleteSuccess": "{{count}} स्क्रीनशॉट हटा दिए गए।",
   "profiles.v3.logs.searchPlaceholder": "लॉग में खोजें…",
-  "profiles.v3.logs.showLevel": "{{level}} दिखाएं",
-  "profiles.v3.logs.hideLevel": "{{level}} छिपाएं",
   "profiles.v3.logs.noFile": "कोई लॉग फ़ाइल नहीं",
   "profiles.v3.logs.emptyFiles": "अभी तक कोई लॉग फ़ाइल नहीं",
   "profiles.v3.logs.emptyFilesHint": "प्रोफ़ाइल एक बार चलाएं — पहले सत्र के बाद एक लॉग फ़ाइल दिखेगी।",

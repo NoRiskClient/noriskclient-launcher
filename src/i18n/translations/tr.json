@@ -1939,8 +1939,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "Seçili {{count}} ekran görüntüsü silinsin mi? Bu geri alınamaz.",
   "profiles.v3.screenshots.batchDeleteSuccess": "{{count}} görüntü silindi.",
   "profiles.v3.logs.searchPlaceholder": "Log'da ara…",
-  "profiles.v3.logs.showLevel": "{{level}} göster",
-  "profiles.v3.logs.hideLevel": "{{level}} gizle",
   "profiles.v3.logs.noFile": "Log dosyası yok",
   "profiles.v3.logs.emptyFiles": "Henüz log dosyası yok",
   "profiles.v3.logs.emptyFilesHint": "Profili bir kez çalıştır — ilk seansın ardından bir log dosyası oluşur.",

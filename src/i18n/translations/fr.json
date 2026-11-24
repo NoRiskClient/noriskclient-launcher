@@ -1939,8 +1939,6 @@
   "worlds.difficulty_locked": "Difficulté verrouillée",
   "worlds.open_folder_failed": "Échec de l'ouverture du dossier : {{error}}",
   "profiles.v3.logs.searchPlaceholder": "Rechercher dans le log…",
-  "profiles.v3.logs.showLevel": "Afficher {{level}}",
-  "profiles.v3.logs.hideLevel": "Masquer {{level}}",
   "profiles.v3.logs.noFile": "Aucun fichier de log",
   "profiles.v3.logs.emptyFiles": "Aucun fichier de log",
   "profiles.v3.logs.emptyFilesHint": "Lance le profil une fois — un fichier de log apparaîtra après la première session.",

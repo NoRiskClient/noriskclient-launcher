@@ -1959,8 +1959,6 @@
   "profiles.v3.time.placeholder": "—",
   "profiles.v3.time.lessThanMinute": "< 1m",
   "profiles.v3.logs.searchPlaceholder": "Im Log suchen…",
-  "profiles.v3.logs.showLevel": "{{level}} anzeigen",
-  "profiles.v3.logs.hideLevel": "{{level}} ausblenden",
   "profiles.v3.logs.noFile": "Keine Log-Datei",
   "profiles.v3.logs.emptyFiles": "Noch keine Log-Dateien",
   "profiles.v3.logs.emptyFilesHint": "Starte das Profil einmal — eine Log-Datei erscheint nach der ersten Session.",

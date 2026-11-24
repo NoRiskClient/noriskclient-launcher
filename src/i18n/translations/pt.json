@@ -1939,8 +1939,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "Excluir {{count}} capturas selecionadas? Isso não pode ser desfeito.",
   "profiles.v3.screenshots.batchDeleteSuccess": "{{count}} capturas excluídas.",
   "profiles.v3.logs.searchPlaceholder": "Buscar no log…",
-  "profiles.v3.logs.showLevel": "Mostrar {{level}}",
-  "profiles.v3.logs.hideLevel": "Ocultar {{level}}",
   "profiles.v3.logs.noFile": "Sem arquivo de log",
   "profiles.v3.logs.emptyFiles": "Ainda sem arquivos de log",
   "profiles.v3.logs.emptyFilesHint": "Inicie o perfil uma vez — um arquivo de log aparecerá após a primeira sessão.",

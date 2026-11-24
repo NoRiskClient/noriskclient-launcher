@@ -1939,8 +1939,6 @@
   "profiles.v3.screenshots.batchDeleteConfirm": "Eliminare {{count}} screenshot selezionati? Questa azione non può essere annullata.",
   "profiles.v3.screenshots.batchDeleteSuccess": "{{count}} screenshot eliminati.",
   "profiles.v3.logs.searchPlaceholder": "Cerca nel log…",
-  "profiles.v3.logs.showLevel": "Mostra {{level}}",
-  "profiles.v3.logs.hideLevel": "Nascondi {{level}}",
   "profiles.v3.logs.noFile": "Nessun file di log",
   "profiles.v3.logs.emptyFiles": "Ancora nessun file di log",
   "profiles.v3.logs.emptyFilesHint": "Avvia il profilo una volta — un file di log apparirà dopo la prima sessione.",

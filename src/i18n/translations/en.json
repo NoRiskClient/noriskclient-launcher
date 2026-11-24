@@ -1921,8 +1921,6 @@
   "profiles.v3.time.placeholder": "—",
   "profiles.v3.time.lessThanMinute": "< 1m",
   "profiles.v3.logs.searchPlaceholder": "Search in log…",
-  "profiles.v3.logs.showLevel": "Show {{level}}",
-  "profiles.v3.logs.hideLevel": "Hide {{level}}",
   "profiles.v3.logs.noFile": "No log file",
   "profiles.v3.logs.emptyFiles": "No log files yet",
   "profiles.v3.logs.emptyFilesHint": "Start the profile once — a log file will appear after the first session.",
