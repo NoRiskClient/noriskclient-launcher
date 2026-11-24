@@ -23,7 +23,7 @@ function AdConsentPrompt() {
       className="fixed bottom-6 right-6 z-[10000] w-[440px] max-w-[calc(100vw-48px)] rounded-lg border-2 p-4 backdrop-blur-lg font-minecraft normal-case select-none"
       style={{
         borderColor: `${accent}66`,
-        background: `linear-gradient(180deg, ${accent}26, ${accent}0d), rgba(12, 10, 20, 0.92)`,
+        background: `linear-gradient(180deg, ${accent}26, ${accent}0d), rgba(0, 0, 0, 0.85)`,
       }}
     >
       <div className="flex items-center gap-2">
