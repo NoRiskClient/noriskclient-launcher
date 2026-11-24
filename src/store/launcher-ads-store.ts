@@ -61,6 +61,7 @@ let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 
 interface LauncherAdsState {
   active: boolean;
+  synced: boolean;
   pausedUntil: number | null;
   pause: (until: number) => void;
   resume: () => void;
@@ -72,6 +73,7 @@ interface LauncherAdsState {
 
 export const useLauncherAdsStore = create<LauncherAdsState>((set) => ({
   active: Object.keys(lastSlots).length > 0,
+  synced: false,
   pausedUntil: readPausedUntil(),
   pause: (until) => {
     writePausedUntil(until);
@@ -91,11 +93,11 @@ export const useLauncherAdsStore = create<LauncherAdsState>((set) => ({
       const active = Object.keys(slots).length > 0;
       const consent = active ? (await getAdStatus()).consent : "closed";
       writeLastSlots(slots);
-      set({ active, slots, consent });
+      set({ active, slots, consent, synced: true });
     } catch (error) {
       log("error", `Failed to update launcher ads: ${error}`);
       writeLastSlots({});
-      set({ active: false, slots: {}, consent: "closed" });
+      set({ active: false, slots: {}, consent: "closed", synced: true });
     }
   },
   openConsent: () => {

@@ -37,7 +37,8 @@ interface AdSlotProps {
 export function AdSlot({ slot, className }: AdSlotProps) {
   const active = useLauncherAdsStore((state) => state.active);
   const size = useLauncherAdsStore((state) => state.slots[slot]);
-  const shown = active && !!size;
+  const synced = useLauncherAdsStore((state) => state.synced);
+  const shown = active && synced && !!size;
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
