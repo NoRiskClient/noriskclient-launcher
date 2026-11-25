@@ -2,29 +2,13 @@ use crate::error::{AppError, CommandError};
 use crate::integrations::norisk_packs::NoriskModEntryDefinition;
 use crate::utils::file_utils;
 use crate::utils::path_utils;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use image::ImageEncoder;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs;
 
-// Imports for image processing
-use fast_image_resize::images::Image as FirImage;
-use fast_image_resize::{
-    FilterType,
-    PixelType as FirPixelType, ResizeAlg, Resizer,
-};
-use image::{
-    codecs::{jpeg::JpegEncoder, png::PngEncoder},
-    ColorType,
-    DynamicImage,
-    ImageFormat,
-};
-use std::io::Cursor; // For writing encoded image to a byte vector
 
 /// File information for log/crash report listings
 #[derive(Debug, Serialize, Deserialize)]
@@ -461,271 +445,25 @@ pub async fn read_file_bytes(file_path: String) -> Result<Vec<u8>, CommandError>
     })
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ImagePreviewPayload {
-    path: String,
-    width: Option<u32>,  // Target width for the preview
-    height: Option<u32>, // Target height for the preview
-    quality: Option<u8>, // Target quality (e.g., 1-100 for JPEG)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ImagePreviewResponse {
-    base64_image: String,
-    original_width: u32,
-    original_height: u32,
-    preview_width: u32,
-    preview_height: u32,
-}
-
 #[tauri::command]
-pub async fn get_image_preview(
-    payload: ImagePreviewPayload,
-) -> Result<ImagePreviewResponse, CommandError> {
-    info!(
-        "Received request to generate image preview for path: '{}', target_width: {:?}, target_height: {:?}, target_quality: {:?}",
-        payload.path, payload.width, payload.height, payload.quality
-    );
-
-    let image_path = PathBuf::from(&payload.path);
-
-    if !image_path.exists() {
-        let error_msg = format!("Image file not found: {}", image_path.display());
-        error!("{}", error_msg);
-        return Err(CommandError::from(AppError::FileNotFound(image_path)));
+pub async fn get_image_thumbnail(path: String, size: u32) -> Result<String, CommandError> {
+    let source = PathBuf::from(&path);
+    if !source.is_file() {
+        return Err(CommandError::from(AppError::FileNotFound(source)));
     }
-    if !image_path.is_file() {
-        let error_msg = format!("Path is not a file: {}", image_path.display());
-        error!("{}", error_msg);
-        return Err(CommandError::from(AppError::Other(error_msg)));
+    let size = size.clamp(32, 1024);
+    let target = crate::utils::preview_cache::thumbnail_path(&source, size)
+        .await
+        .ok_or_else(|| CommandError::from(AppError::Other(format!("Could not read {}", path))))?;
+    if target.is_file() {
+        return Ok(target.to_string_lossy().into_owned());
     }
-
-    // Read the original image bytes
-    let image_bytes = match fs::read(&image_path).await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            let error_msg = format!("Failed to read image file {}: {}", image_path.display(), e);
-            error!("{}", error_msg);
-            return Err(CommandError::from(AppError::Io(e)));
-        }
-    };
-
-    // Load image using the 'image' crate for broad format support and metadata
-    let img: DynamicImage = match image::load_from_memory(&image_bytes) {
-        Ok(img) => img,
-        Err(e) => {
-            let error_msg = format!(
-                "Failed to decode image from memory (path: '{}'): {}",
-                payload.path, e
-            );
-            error!("{}", error_msg);
-            return Err(CommandError::from(AppError::Other(error_msg)));
-        }
-    };
-
-    let original_width = img.width();
-    let original_height = img.height();
-
-    // Manually construct FirImageView from DynamicImage parts
-    let (image_buffer_vec, fir_pixel_type, original_width_nz, original_height_nz) = match &img {
-        // Match on reference to DynamicImage
-        DynamicImage::ImageRgba8(rgba_img_buf) => (
-            rgba_img_buf.to_vec(), // Get owned Vec<u8>
-            FirPixelType::U8x4,
-            NonZeroU32::new(rgba_img_buf.width()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Width cannot be zero for RGBA8".to_string(),
-                ))
-            })?,
-            NonZeroU32::new(rgba_img_buf.height()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Height cannot be zero for RGBA8".to_string(),
-                ))
-            })?,
-        ),
-        DynamicImage::ImageRgb8(rgb_img_buf) => (
-            rgb_img_buf.to_vec(),
-            FirPixelType::U8x3,
-            NonZeroU32::new(rgb_img_buf.width()).ok_or_else(|| {
-                CommandError::from(AppError::Other("Width cannot be zero for RGB8".to_string()))
-            })?,
-            NonZeroU32::new(rgb_img_buf.height()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Height cannot be zero for RGB8".to_string(),
-                ))
-            })?,
-        ),
-        DynamicImage::ImageLuma8(luma_img_buf) => (
-            luma_img_buf.to_vec(),
-            FirPixelType::U8,
-            NonZeroU32::new(luma_img_buf.width()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Width cannot be zero for Luma8".to_string(),
-                ))
-            })?,
-            NonZeroU32::new(luma_img_buf.height()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Height cannot be zero for Luma8".to_string(),
-                ))
-            })?,
-        ),
-        DynamicImage::ImageLumaA8(luma_alpha_img_buf) => (
-            luma_alpha_img_buf.to_vec(),
-            FirPixelType::U8x2,
-            NonZeroU32::new(luma_alpha_img_buf.width()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Width cannot be zero for LumaA8".to_string(),
-                ))
-            })?,
-            NonZeroU32::new(luma_alpha_img_buf.height()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Height cannot be zero for LumaA8".to_string(),
-                ))
-            })?,
-        ),
-        _ => {
-            // Fallback for other formats: convert to RGBA8
-            let rgba_img_buf = img.to_rgba8(); // This creates an owned ImageBuffer
-            let w = NonZeroU32::new(rgba_img_buf.width()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Width cannot be zero for fallback RGBA8".to_string(),
-                ))
-            })?;
-            let h = NonZeroU32::new(rgba_img_buf.height()).ok_or_else(|| {
-                CommandError::from(AppError::Other(
-                    "Height cannot be zero for fallback RGBA8".to_string(),
-                ))
-            })?;
-            (rgba_img_buf.into_raw(), FirPixelType::U8x4, w, h)
-        }
-    };
-
-    let src_fir_view = fast_image_resize::images::Image::from_vec_u8(
-        original_width_nz.get(),
-        original_height_nz.get(),
-        image_buffer_vec, // Pass a slice of the owned Vec
-        fir_pixel_type,
-    )
-    .map_err(|e| {
-        CommandError::from(AppError::Other(format!(
-            "Failed to create source ImageView: {}",
-            e
-        )))
-    })?;
-
-    // Determine target dimensions for preview
-    let target_w = payload.width.unwrap_or(200); // Default preview width
-    let target_h = payload.height.unwrap_or(200); // Default preview height
-
-    // Create destination image for fast_image_resize
-    let mut dst_fir_image = FirImage::new(target_w, target_h, src_fir_view.pixel_type());
-
-    // Create a resizer
-    let mut resizer = Resizer::new();
-    // Optional: Configure CPU extensions if needed, though default should be fine.
-    // resizer.set_cpu_extensions(CpuExtensions::Sse4_1);
-
-    // Select resize algorithm - Lanczos3 offers good quality
-    // For higher performance with slightly less quality, one could use Bilinear or even Box.
-    // E.g., ResizeAlg::Bilinear or ResizeAlg::Convolution(FilterType::Box)
-    let _algorithm = ResizeAlg::Convolution(FilterType::Lanczos3);
-
-    let resize_options = fast_image_resize::ResizeOptions::default(); // Create an owned instance
-    match resizer.resize(&src_fir_view, &mut dst_fir_image, Some(&resize_options)) {
-        // Pass a reference to it
-        Ok(_) => {}
-        Err(e) => {
-            let error_msg = format!(
-                "Failed to resize image from '{}' using fast_image_resize: {}",
-                payload.path, e
-            );
-            error!("{}", error_msg);
-            return Err(CommandError::from(AppError::Other(error_msg)));
-        }
-    }
-
-    let preview_width = dst_fir_image.width();
-    let preview_height = dst_fir_image.height();
-
-    // Encode the resized image (dst_fir_image.buffer()) into PNG or JPEG format
-    let mut encoded_image_bytes = Vec::new();
-    let cursor = Cursor::new(&mut encoded_image_bytes);
-
-    // Use original image's color type for encoding the resized buffer.
-    // Note: fast_image_resize might change pixel type (e.g. to U8x4 for RGBA).
-    // We should use the dst_fir_image.pixel_type() and map it to image::ColorType.
-    let output_color_type = match dst_fir_image.pixel_type() {
-        FirPixelType::U8 => ColorType::L8,
-        FirPixelType::U8x2 => ColorType::La8,
-        FirPixelType::U8x3 => ColorType::Rgb8,
-        FirPixelType::U8x4 => ColorType::Rgba8,
-        FirPixelType::U16 => ColorType::L16,
-        FirPixelType::U16x2 => ColorType::La16,
-        FirPixelType::U16x3 => ColorType::Rgb16,
-        FirPixelType::U16x4 => ColorType::Rgba16,
-        // Add other mappings as necessary if you support more pixel types
-        _ => {
-            let error_msg = format!(
-                "Unsupported pixel type after resize: {:?}",
-                dst_fir_image.pixel_type()
-            );
-            error!("{}", error_msg);
-            return Err(CommandError::from(AppError::Other(error_msg)));
-        }
-    };
-
-    // Guess original format for choosing encoder, or default to PNG
-    let original_format = image::guess_format(&image_bytes).unwrap_or(ImageFormat::Png);
-
-    match original_format {
-        ImageFormat::Jpeg => {
-            let quality = payload.quality.unwrap_or(75).clamp(1, 100); // Default quality 75 for JPEG
-            let encoder = JpegEncoder::new_with_quality(cursor, quality);
-            if let Err(e) = encoder.write_image(
-                dst_fir_image.buffer(),
-                preview_width,
-                preview_height,
-                output_color_type.into(),
-            ) {
-                let error_msg = format!(
-                    "Failed to encode JPEG preview for '{}': {}",
-                    payload.path, e
-                );
-                error!("{}", error_msg);
-                return Err(CommandError::from(AppError::Other(error_msg)));
-            }
-        }
-        ImageFormat::Png | _ => {
-            // Default to PNG for other formats or if guessing failed
-            let encoder = PngEncoder::new(cursor);
-            if let Err(e) = encoder.write_image(
-                dst_fir_image.buffer(),
-                preview_width,
-                preview_height,
-                output_color_type.into(),
-            ) {
-                let error_msg =
-                    format!("Failed to encode PNG preview for '{}': {}", payload.path, e);
-                error!("{}", error_msg);
-                return Err(CommandError::from(AppError::Other(error_msg)));
-            }
-        }
-    }
-
-    let base64_image = STANDARD.encode(&encoded_image_bytes);
-
-    info!(
-        "Successfully generated preview for: '{}' (original: {}x{}, preview: {}x{})",
-        payload.path, original_width, original_height, preview_width, preview_height
-    );
-
-    Ok(ImagePreviewResponse {
-        base64_image,
-        original_width,
-        original_height,
-        preview_width,
-        preview_height,
-    })
+    let output = target.clone();
+    tokio::task::spawn_blocking(move || crate::utils::preview_cache::create_thumbnail(&source, &output, size))
+        .await
+        .map_err(|e| CommandError::from(AppError::Other(format!("Thumbnail task failed: {e}"))))?
+        .map_err(|e| CommandError::from(AppError::Other(format!("Could not create a thumbnail for {}: {}", path, e))))?;
+    Ok(target.to_string_lossy().into_owned())
 }
 
 /// Lists all launcher log files from the logs directory

@@ -15,6 +15,7 @@ pub mod datapack_utils; // DataPack-Utils für das Scannen und Verwalten von Dat
 pub mod disk_space_utils; // Disk space utility for checking available space before downloads
 pub mod download_utils; // Central download utility for robust file downloads
 pub mod mod_cache_cleanup; // mod_cache keep-set + debounced startup orphan cleanup (trash)
+pub mod file_names;
 pub mod file_utils; // Utilities for file operations like reading archives
 pub mod export_utils;
 pub mod hash_utils;
@@ -45,6 +46,7 @@ pub mod metered_network;
 pub mod mc_utils; // Utilities for Minecraft-related operations
 pub mod migration_utils; // Migration utilities for profile and config updates
 pub mod perf_utils;
+pub mod preview_cache;
 pub mod path_utils; // Deklariert das neue Modul und macht seinen Inhalt (wenn `pub`) nutzbar
 pub mod profile_utils; // Utility-Funktionen für Profilinhalte wie das Installieren von Modrinth-Content
 pub mod repair_utils; // Repair utilities for fixing profile issues

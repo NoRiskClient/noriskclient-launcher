@@ -2109,6 +2109,17 @@ pub async fn list_profile_screenshots(
     Ok(profile_utils::get_screenshots_for_profile(profile_id).await?)
 }
 
+#[tauri::command]
+pub async fn rename_profile_screenshot(
+    profile_id: Uuid,
+    path: PathBuf,
+    name: String,
+) -> Result<String, CommandError> {
+    let root = profile_utils::screenshots_dir(profile_id).await?;
+    let renamed = crate::utils::file_names::rename_beside(&root, &path, &name)?;
+    Ok(renamed.to_string_lossy().into_owned())
+}
+
 // --- New DTO and Command for All Profiles and Last Played ---
 // List entry with `mods` stripped: the mods arrays make up ~95% of the serialized
 // profile list and blocked the WebView main thread on JSON.parse. The frontend

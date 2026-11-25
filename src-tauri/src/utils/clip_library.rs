@@ -447,40 +447,7 @@ pub fn set_favourite(dir: &Path, path: &Path, favourite: bool) -> Result<()> {
     write_details(&path, &details)
 }
 
-const MAX_NAME: usize = 80;
-
-fn sanitise_name(name: &str) -> Result<String> {
-    let name = name.trim().trim_end_matches('.').trim();
-
-    if name.is_empty() {
-        return Err(AppError::Other("a clip needs a name".into()));
-    }
-    if name.chars().count() > MAX_NAME {
-        return Err(AppError::Other(format!(
-            "that name is longer than {MAX_NAME} characters"
-        )));
-    }
-    if let Some(bad) = name
-        .chars()
-        .find(|c| matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || c.is_control())
-    {
-        return Err(AppError::Other(match bad.is_control() {
-            true => "a name cannot contain control characters".into(),
-            false => format!("a name cannot contain {bad}"),
-        }));
-    }
-
-    let stem = name.split('.').next().unwrap_or(name);
-    const RESERVED: [&str; 22] = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-    ];
-    if RESERVED.iter().any(|r| stem.eq_ignore_ascii_case(r)) {
-        return Err(AppError::Other(format!("{name} is a name Windows reserves")));
-    }
-
-    Ok(name.to_string())
-}
+use crate::utils::file_names::sanitise_name;
 
 pub fn rename(dir: &Path, path: &Path, name: &str) -> Result<PathBuf> {
     let source = guard_inside(dir, path)?;
@@ -707,6 +674,7 @@ pub fn release_all_destinations() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::file_names::MAX_NAME;
 
     mod naming {
         use super::*;

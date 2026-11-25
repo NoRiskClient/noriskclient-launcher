@@ -1219,13 +1219,17 @@ pub fn find_screenshots_recursive<'a>(
 
 /// Lists screenshot files found in the profile's `screenshots` directory and its subdirectories.
 /// Only includes files ending in `.png`.
-pub async fn get_screenshots_for_profile(profile_id: Uuid) -> Result<Vec<ScreenshotInfo>> {
+pub async fn screenshots_dir(profile_id: Uuid) -> Result<PathBuf> {
     let state = State::get().await?;
     let instance_path = state
         .profile_manager
         .get_profile_instance_path(profile_id)
         .await?;
-    let screenshots_path = instance_path.join("screenshots");
+    Ok(instance_path.join("screenshots"))
+}
+
+pub async fn get_screenshots_for_profile(profile_id: Uuid) -> Result<Vec<ScreenshotInfo>> {
+    let screenshots_path = screenshots_dir(profile_id).await?;
     let mut screenshots = Vec::new();
 
     // Call the recursive helper function starting from the main screenshots directory

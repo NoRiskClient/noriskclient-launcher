@@ -15,6 +15,60 @@ opt-level = 3
 [profile.dev.package.norisk-capture]
 opt-level = 3
 
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.png]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.zune-core]
+opt-level = 3
+
+[profile.dev.package.fdeflate]
+opt-level = 3
+
+[profile.release.package.image]
+opt-level = 3
+
+[profile.release.package.png]
+opt-level = 3
+
+[profile.release.package.zune-jpeg]
+opt-level = 3
+
+[profile.release.package.zune-core]
+opt-level = 3
+
+[profile.release.package.fdeflate]
+opt-level = 3
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.simd-adler32]
+opt-level = 3
+
+[profile.dev.package.crc32fast]
+opt-level = 3
+
+[profile.dev.package.adler2]
+opt-level = 3
+
+[profile.release.package.miniz_oxide]
+opt-level = 3
+
+[profile.release.package.simd-adler32]
+opt-level = 3
+
+[profile.release.package.crc32fast]
+opt-level = 3
+
+[profile.release.package.adler2]
+opt-level = 3
+
 [profile.dev.package.ab_glyph]
 opt-level = 3
 
@@ -96,7 +150,6 @@ fs_extra = "1.3.0"
 fs4 = { version = "0.8", features = ["tokio"] }
 url = "2.5.4"
 tauri-plugin-fs = "2.4.5"
-fast_image_resize = { version = "5.1.4", features = ["image"] }
 image = "0.25.1"
 futures-lite = "2.6.0"
 tauri-plugin-process = "2.3.1"
