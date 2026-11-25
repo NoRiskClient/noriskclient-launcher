@@ -18,14 +18,13 @@ import type { WorldInfo, ServerInfo, ServerPingInfo, ServerListEdit } from "../.
 import * as WorldService from "../../../../services/world-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
-import { useProfileStore } from "../../../../store/profile-store";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { useProfileLaunch } from "../../../../hooks/useProfileLaunch.tsx";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { SearchWithFilters } from "../../../ui/SearchWithFilters";
 import { ContentActionButtons } from "../../../ui/ContentActionButtons";
 import { ServerDialog } from "../../../modals/ServerDialog";
-import { FilterChip } from "../shared/FilterChip";
+import { Chip, FILTER_CHIP_CLASS } from "../../settings/SettingsSection";
 import { McServerRow, type ServerPingState } from "../shared/McServerRow";
 import { McWorldRow } from "../shared/McWorldRow";
 import { CheckboxV2 } from "../../../ui/CheckboxV2";
@@ -35,6 +34,7 @@ import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { parseErrorMessage } from "../../../../utils/error-utils";
+import { isEditableTarget, isGlobalModalOpen } from "../../../../utils/keyboard-guards";
 
 interface WorldsTabV3Props {
   profile: Profile;
@@ -62,7 +62,6 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   const accentColor = useThemeStore((s) => s.accentColor);
   const { setActiveDropContext, registerWorldsRefreshCallback, unregisterWorldsRefreshCallback } = useAppDragDropStore();
   const { showModal, hideModal } = useGlobalModal();
-  const { profiles: allProfiles, loading: isLoadingProfiles } = useProfileStore();
 
   // useProfileLaunch teilt den State ueber den Zustand-Store pro profileId
   // → `isLaunching` hier ist identisch zu dem im Parent (Hero-Play-Button).
@@ -190,13 +189,16 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   }, [profile.id, onLaunchRequest, handleQuickPlayLaunch, t]);
 
   const editServers = useCallback(async (edit: ServerListEdit, message: string) => {
+    let saved = false;
     try {
       await WorldService.editServersForProfile(profile.id, edit);
       toast.success(message);
+      saved = true;
     } catch (err) {
       toast.error(parseErrorMessage(err));
     }
     await loadData();
+    return saved;
   }, [profile.id, loadData]);
 
   const openServerDialog = useCallback((server?: ServerInfo) => {
@@ -209,14 +211,14 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         initialAddress={expectedAddress}
         onClose={() => hideModal(modalId)}
         onSave={async (name, address) => {
-          const label = name.trim() || address.trim();
-          await editServers(
+          const label = name || address;
+          const saved = await editServers(
             server
               ? { kind: "update", index, expectedAddress, name, address }
               : { kind: "add", name, address },
             t(server ? "profiles.v3.servers.saved" : "profiles.v3.servers.added", { name: label }),
           );
-          hideModal(modalId);
+          if (saved) hideModal(modalId);
         }}
       />
     ));
@@ -233,10 +235,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         itemName={label}
         onClose={() => hideModal(modalId)}
         onConfirm={async () => {
-          await editServers({ kind: "remove", index, expectedAddress }, t("profiles.v3.servers.removed", { name: label }));
-          hideModal(modalId);
+          if (await editServers({ kind: "remove", index, expectedAddress }, t("profiles.v3.servers.removed", { name: label }))) hideModal(modalId);
         }}
-        isDeleting={false}
         title={t("profiles.v3.servers.removeTitle")}
         message={<p className="text-white/80 font-minecraft">{t("profiles.v3.servers.removeConfirm", { name: label })}</p>}
       />
@@ -297,7 +297,6 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         itemName={displayName}
         onClose={() => hideModal(modalId)}
         onConfirm={doDelete}
-        isDeleting={false}
         title={t("worlds.delete_title")}
         message={<p className="text-white/80 font-minecraft">{t("worlds.delete_confirm", { name: displayName })}</p>}
       />
@@ -318,31 +317,35 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         ),
       );
       const first = copies[0];
-      try {
-        await toast.promise(Promise.all(jobs), {
-          loading: t("worlds.copying", { name: copies.length === 1 ? first.name : t("copy_world.title_many", { count: copies.length }) }),
-          success: copies.length === 1
-            ? t("worlds.copy_success", { source: first.world.display_name ?? first.world.folder_name, target: first.name })
-            : t("worlds.copy_success_many", { count: jobs.length }),
-          error: (err) => t("worlds.copy_failed", { error: parseErrorMessage(err) }),
-        });
+      const toastId = toast.loading(jobs.length === 1
+        ? t("worlds.copying", { name: first.name })
+        : t("worlds.copying_many", { count: jobs.length }));
+      const results = await Promise.allSettled(jobs);
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+      const succeeded = results.length - failures.length;
+      if (failures.length === 0) {
+        toast.success(jobs.length === 1
+          ? t("worlds.copy_success", { source: first.world.display_name ?? first.world.folder_name, target: first.name })
+          : t("worlds.copy_success_many", { count: succeeded }), { id: toastId });
+      } else if (succeeded === 0) {
+        toast.error(t("worlds.copy_failed", { error: parseErrorMessage(failures[0].reason) }), { id: toastId });
+      } else {
+        toast.error(t("worlds.copy_partial", { succeeded, failed: failures.length, error: parseErrorMessage(failures[0].reason) }), { id: toastId });
+      }
+      if (succeeded > 0) {
         hideModal(modalId);
         setSelectedIds(new Set());
         if (targetProfileIds.includes(profile.id)) await loadData();
-      } catch (err) {
-        console.error("[V3 Worlds] Copy failed:", err);
       }
     };
     showModal(modalId, (
       <CopyWorldDialog
         worlds={targets}
-        availableProfiles={allProfiles}
-        isLoadingProfiles={isLoadingProfiles}
         onClose={() => hideModal(modalId)}
         onConfirm={doCopy}
       />
     ));
-  }, [profile.id, showModal, hideModal, allProfiles, isLoadingProfiles, loadData, t]);
+  }, [profile.id, showModal, hideModal, loadData, t]);
 
   const handleImport = useCallback(async () => {
     try {
@@ -403,12 +406,11 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
         itemName={t("worlds.batch_delete_item_name", { count })}
         onClose={() => hideModal(modalId)}
         onConfirm={doBatchDelete}
-        isDeleting={isBatchDeleting}
         title={t("worlds.batch_delete_title")}
         message={<p className="text-white/80 font-minecraft">{t(serverTargets.length > 0 ? "profiles.v3.servers.batchRemoveConfirm" : "worlds.batch_delete_confirm", { count })}</p>}
       />
     ));
-  }, [selectedIds, worlds, servers, profile.id, showModal, hideModal, loadData, isBatchDeleting, t]);
+  }, [selectedIds, worlds, servers, profile.id, showModal, hideModal, loadData, t]);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
@@ -423,13 +425,15 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     });
   };
 
-  // Esc clears selection
   const clearSelectionRef = useRef(() => setSelectedIds(new Set()));
   clearSelectionRef.current = () => setSelectedIds(new Set());
   const hasSelection = selectedIds.size > 0;
   useEffect(() => {
     if (!hasSelection) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") clearSelectionRef.current(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || isEditableTarget(e.target) || isGlobalModalOpen()) return;
+      clearSelectionRef.current();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [hasSelection]);
@@ -511,15 +515,15 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <FilterChip active={kindFilter === "all"} onClick={() => setKindFilter("all")}>
+          <Chip active={kindFilter === "all"} accent={accentColor.value} className={FILTER_CHIP_CLASS} onClick={() => setKindFilter("all")}>
             {t("profiles.v3.servers.filterAll")}
-          </FilterChip>
-          <FilterChip active={kindFilter === "worlds"} onClick={() => setKindFilter("worlds")}>
+          </Chip>
+          <Chip active={kindFilter === "worlds"} accent={accentColor.value} className={FILTER_CHIP_CLASS} onClick={() => setKindFilter("worlds")}>
             {t("profiles.v3.servers.filterWorlds")}
-          </FilterChip>
-          <FilterChip active={kindFilter === "servers"} onClick={() => setKindFilter("servers")}>
+          </Chip>
+          <Chip active={kindFilter === "servers"} accent={accentColor.value} className={FILTER_CHIP_CLASS} onClick={() => setKindFilter("servers")}>
             {t("profiles.v3.servers.filter")}
-          </FilterChip>
+          </Chip>
         </div>
       </div>
 

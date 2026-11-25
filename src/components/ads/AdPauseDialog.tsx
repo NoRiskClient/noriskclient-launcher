@@ -32,7 +32,7 @@ const CUDDLE_EMOTE: EmoteAssetUrls = {
   particles: [{ jsonUrl: `${CUDDLE_DIR}heart.particle.json`, resolveTexture: () => `${CUDDLE_DIR}heart.png` }],
 };
 
-export type AdPauseSource = "rail" | "settings";
+type AdPauseSource = "rail" | "settings";
 
 export function useOpenAdPause(source: AdPauseSource) {
   const { showModal, hideModal } = useGlobalModal();

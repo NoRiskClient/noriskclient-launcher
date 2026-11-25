@@ -31,7 +31,7 @@ import { ContentActionButtons } from "../../../ui/ContentActionButtons";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
-import { FilterChip } from "../shared/FilterChip";
+import { Chip, FILTER_CHIP_CLASS } from "../../settings/SettingsSection";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface LogsTabV3Props {
@@ -282,7 +282,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         </div>
         <div className="flex items-center gap-1.5">
           {LOG_LEVELS.map((lvl) => (
-            <FilterChip key={lvl} active={enabledLevels[lvl]} onClick={() => toggleLevel(lvl)} dot={LEVEL_CONFIG[lvl].dot}>{lvl}</FilterChip>
+            <Chip key={lvl} active={enabledLevels[lvl]} accent={accentColor.value} onClick={() => toggleLevel(lvl)} dot={LEVEL_CONFIG[lvl].dot} className={FILTER_CHIP_CLASS}>{lvl}</Chip>
           ))}
         </div>
       </div>

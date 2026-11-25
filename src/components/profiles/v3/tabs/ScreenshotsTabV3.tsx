@@ -21,6 +21,7 @@ import { formatRelativeTime } from "../../../../utils/format-relative-time";
 import { ProfileScreenshotModal } from "../../ProfileScreenshotModal";
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
+import { isEditableTarget, isGlobalModalOpen } from "../../../../utils/keyboard-guards";
 import { SearchWithFilters } from "../../../ui/SearchWithFilters";
 import { ContentActionButtons } from "../../../ui/ContentActionButtons";
 import { CheckboxV2 } from "../../../ui/CheckboxV2";
@@ -149,7 +150,6 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         itemName={single.filename}
         onClose={() => hideModal(modalId)}
         onConfirm={doDelete}
-        isDeleting={isBatchDeleting}
       />
     ) : (
       <ConfirmDeleteDialog
@@ -157,12 +157,11 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         itemName={t("profiles.v3.screenshots.batchDeleteItemName", { count: paths.length })}
         onClose={() => hideModal(modalId)}
         onConfirm={doDelete}
-        isDeleting={isBatchDeleting}
         title={t("profiles.v3.screenshots.batchDeleteTitle")}
         message={<p className="text-white/80 font-minecraft">{t("profiles.v3.screenshots.batchDeleteConfirm", { count: paths.length })}</p>}
       />
     ));
-  }, [screenshots, loadData, showModal, hideModal, isBatchDeleting, t]);
+  }, [screenshots, loadData, showModal, hideModal, t]);
 
   const modalIndex = modalScreenshot ? visibleScreenshots.findIndex(s => s.path === modalScreenshot.path) : -1;
 
@@ -197,13 +196,16 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
     );
   }, [openShare, profile.id]);
 
-  // Esc clears selection
+  const screenshotModalOpen = modalScreenshot !== null;
   useEffect(() => {
-    if (selectedPaths.size === 0) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSelectedPaths(new Set()); };
+    if (selectedPaths.size === 0 || screenshotModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || isEditableTarget(e.target) || isGlobalModalOpen()) return;
+      setSelectedPaths(new Set());
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedPaths.size]);
+  }, [selectedPaths.size, screenshotModalOpen]);
 
   const shouldShowLoading = useDelayedTrue(loading && screenshots.length === 0, 500);
 

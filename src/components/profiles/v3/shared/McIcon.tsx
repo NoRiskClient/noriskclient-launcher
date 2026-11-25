@@ -1,5 +1,6 @@
 import type React from "react";
 import { Icon } from "@iconify/react";
+import { useTranslation } from "react-i18next";
 
 interface McIconProps {
   src: string | null;
@@ -10,6 +11,7 @@ interface McIconProps {
 }
 
 export function McIcon({ src, fallback, onPlay, playDisabled, children }: McIconProps) {
+  const { t } = useTranslation();
   return (
     <div className="group/icon relative w-16 h-16 shrink-0 bg-black/40 flex items-center justify-center">
       {src ? (
@@ -20,6 +22,8 @@ export function McIcon({ src, fallback, onPlay, playDisabled, children }: McIcon
       {children}
       {onPlay && (
         <button
+          type="button"
+          aria-label={t("worlds.play")}
           onClick={onPlay}
           disabled={playDisabled}
           className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 disabled:cursor-wait"

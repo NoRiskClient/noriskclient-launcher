@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../store/useThemeStore";
-import { Button } from "../ui/buttons/Button";
+import { getBorderRadiusClass, getVariantColors, createRadiusStyle } from "../ui/design-system";
 import { PLAIN_TEXT } from "../ui/typography";
 import { useSkinPreview } from "../../hooks/useSkinPreview";
 import { openExternalUrl } from "../../services/tauri-service";
@@ -66,10 +66,26 @@ function useSteve(variant: number) {
 }
 
 function Cta({ children }: { children: ReactNode }) {
+  const accentColor = useThemeStore((state) => state.accentColor);
+  const borderRadius = useThemeStore((state) => state.borderRadius);
+  const colors = getVariantColors("flat", accentColor);
   return (
-    <Button variant="flat" size="xs" className={`whitespace-nowrap ${PLAIN_TEXT}`}>
+    <span
+      className={cn(
+        "flex h-[36px] w-fit items-center justify-center whitespace-nowrap border border-b-2 px-5 py-2 text-xs backdrop-blur-md",
+        getBorderRadiusClass(borderRadius),
+        PLAIN_TEXT,
+      )}
+      style={{
+        backgroundColor: `${colors.main}30`,
+        borderColor: `${colors.main}80`,
+        borderBottomColor: colors.dark,
+        color: colors.text,
+        ...createRadiusStyle(borderRadius),
+      }}
+    >
       {children}
-    </Button>
+    </span>
   );
 }
 
@@ -91,12 +107,11 @@ export function AdFallback() {
   const accent = useThemeStore((state) => state.accentColor.value);
   const [variant, setVariant] = useState(0);
   const switched = useRef(false);
-  const next = () => {
-    switched.current = true;
-    setVariant((current) => (current + 1) % POSES.length);
-  };
   useEffect(() => {
-    const timer = window.setInterval(next, SLIDE_MS);
+    const timer = window.setInterval(() => {
+      switched.current = true;
+      setVariant((current) => (current + 1) % POSES.length);
+    }, SLIDE_MS);
     return () => window.clearInterval(timer);
   }, []);
   const steve = useSteve(variant);
@@ -177,8 +192,8 @@ export function AdFallback() {
   ];
 
   return (
-    <div
-      role="link"
+    <button
+      type="button"
       onClick={() => {
         void trackEvent("ads_fallback_plus_clicked", { variant });
         void openExternalUrl(NORISK_PLUS_URL).catch(() => {});
@@ -186,6 +201,6 @@ export function AdFallback() {
       className="absolute inset-0 isolate flex cursor-pointer overflow-hidden text-left font-minecraft normal-case select-none"
     >
       <div key={variant} className={cn("absolute inset-0 flex", switched.current && "animate-in fade-in duration-700")}>{designs[variant]}</div>
-    </div>
+    </button>
   );
 }

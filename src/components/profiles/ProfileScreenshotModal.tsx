@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isEditableTarget, isGlobalModalOpen } from "../../utils/keyboard-guards";
 import { Icon } from "@iconify/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "react-hot-toast";
@@ -72,7 +73,7 @@ export function ProfileScreenshotModal({
   useEffect(() => {
     if (!path) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
+      if (isEditableTarget(e.target) || isGlobalModalOpen()) return;
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft") onNavigate?.(-1);
       else if (e.key === "ArrowRight") onNavigate?.(1);
@@ -99,8 +100,11 @@ export function ProfileScreenshotModal({
   const copy = async () => {
     if (copying) return;
     setCopying(true);
-    await copyScreenshotImage(screenshot.path, t);
-    setCopying(false);
+    try {
+      await copyScreenshotImage(screenshot.path, t);
+    } finally {
+      setCopying(false);
+    }
   };
 
   const spinner = <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />;
