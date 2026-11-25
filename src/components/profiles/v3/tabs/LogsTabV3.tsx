@@ -31,6 +31,7 @@ import { ContentActionButtons } from "../../../ui/ContentActionButtons";
 import { ToggleSwitch } from "../../../ui/ToggleSwitch";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
+import { FilterChip } from "../shared/FilterChip";
 import { parseErrorMessage } from "../../../../utils/error-utils";
 
 interface LogsTabV3Props {
@@ -281,7 +282,7 @@ export function LogsTabV3({ profile, isActive = true, onRefresh }: LogsTabV3Prop
         </div>
         <div className="flex items-center gap-1.5">
           {LOG_LEVELS.map((lvl) => (
-            <LevelChip key={lvl} level={lvl} active={enabledLevels[lvl]} onClick={() => toggleLevel(lvl)} />
+            <FilterChip key={lvl} active={enabledLevels[lvl]} onClick={() => toggleLevel(lvl)} dot={LEVEL_CONFIG[lvl].dot}>{lvl}</FilterChip>
           ))}
         </div>
       </div>
@@ -392,22 +393,6 @@ const LogLine: React.FC<LogLineProps> = ({ line, showThreadPrefix, wordWrap }) =
       )}
       <span className={`flex-1 min-w-0 ${wrapClass} ${messageColor}`}>{line.text}</span>
     </div>
-  );
-};
-
-const LevelChip: React.FC<{ level: LogLevel; active: boolean; onClick: () => void }> = ({ level, active, onClick }) => {
-  const accent = useThemeStore((s) => s.accentColor.value);
-  return (
-    <button
-      onClick={onClick}
-      className={`h-7 px-3 rounded-full border text-[11px] font-minecraft flex items-center gap-1.5 transition-colors ${
-        active ? "text-white" : "bg-black/30 border-white/10 text-white/50 hover:text-white/80 hover:border-white/20"
-      }`}
-      style={active ? { backgroundColor: `${accent}33`, borderColor: `${accent}99` } : undefined}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${LEVEL_CONFIG[level].dot}`} />
-      {level}
-    </button>
   );
 };
 
