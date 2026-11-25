@@ -4,6 +4,23 @@ import { sanitizeMotdHtml } from "./html-sanitize";
 const EMPTY_MOTD_HTML = '<span class="text-white/50">No description</span>';
 const INVALID_MOTD_HTML = '<span class="text-red-400">Invalid MOTD format</span>';
 
+const SMALL_CAPS: Record<string, string> = {
+  ᴀ: "a", ʙ: "b", ᴄ: "c", ᴅ: "d", ᴇ: "e", ꜰ: "f", ɢ: "g", ʜ: "h", ɪ: "i", ᴊ: "j", ᴋ: "k", ʟ: "l", ᴍ: "m",
+  ɴ: "n", ᴏ: "o", ᴘ: "p", ǫ: "q", ʀ: "r", ꜱ: "s", ѕ: "s", ᴛ: "t", ᴜ: "u", ᴠ: "v", ᴡ: "w", ʏ: "y", ᴢ: "z",
+};
+const SMALL_CAPS_RUN = new RegExp(`[${Object.keys(SMALL_CAPS).join("")}]+`, "g");
+
+function renderSmallCaps(html: string): string {
+  return html
+    .split(/(<[^>]*>)/)
+    .map((part) =>
+      part.startsWith("<")
+        ? part
+        : part.replace(SMALL_CAPS_RUN, (run) => `<span class="font-smallcaps">${[...run].map((c) => SMALL_CAPS[c]).join("")}</span>`),
+    )
+    .join("");
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -79,7 +96,7 @@ export function parseMotdToHtml(motd: any): string {
   try {
     const html = motdParser.autoToHTML(normalized as string | object);
     if (!html) return EMPTY_MOTD_HTML;
-    return sanitizeMotdHtml(html);
+    return renderSmallCaps(sanitizeMotdHtml(html));
   } catch (err) {
     console.error("Failed to parse MOTD:", err);
     return renderPlainTextFallback(motd, normalized) ?? INVALID_MOTD_HTML;
