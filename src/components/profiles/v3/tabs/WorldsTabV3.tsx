@@ -1,7 +1,6 @@
 /**
- * WorldsTabV3 — funktionale Version (worlds only).
+ * WorldsTabV3 — Welten und Server eines Profils.
  *
- * Servers bekommen spaeter einen eigenen Left-Rail-Entry + ServersTabV3.
  * Props-Shape gleich wie V2 WorldsTab damit der Parent (ProfileDetailViewV3)
  * 1:1 switchen kann.
  */
@@ -11,24 +10,27 @@ import type React from "react";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 import type { Profile } from "../../../../types/profile";
-import type { WorldInfo, ServerInfo, ServerPingInfo } from "../../../../types/minecraft";
+import type { WorldInfo, ServerInfo, ServerPingInfo, ServerListEdit } from "../../../../types/minecraft";
 import * as WorldService from "../../../../services/world-service";
-import { parseMotdToHtml } from "../../../../utils/motd-utils";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useAppDragDropStore } from "../../../../store/appStore";
 import { useProfileStore } from "../../../../store/profile-store";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
 import { useProfileLaunch } from "../../../../hooks/useProfileLaunch.tsx";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
-import { formatRelativeTime } from "../../../../utils/format-relative-time";
-import { Tooltip } from "../../../ui/Tooltip";
+import { SearchWithFilters } from "../../../ui/SearchWithFilters";
+import { ContentActionButtons } from "../../../ui/ContentActionButtons";
+import { ServerDialog } from "../../../modals/ServerDialog";
+import { FilterChip } from "../shared/FilterChip";
+import { McServerRow, type ServerPingState } from "../shared/McServerRow";
+import { McWorldRow } from "../shared/McWorldRow";
+import { CheckboxV2 } from "../../../ui/CheckboxV2";
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
-import { CopyWorldDialog } from "../../../modals/CopyWorldDialog";
+import { CopyWorldDialog, type WorldCopy } from "../../../modals/CopyWorldDialog";
 import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
@@ -46,18 +48,14 @@ interface WorldsTabV3Props {
 }
 
 type SortKey = "lastPlayed" | "name";
+type KindFilter = "all" | "worlds" | "servers";
+
+const serverKey = (index: number) => `server:${index}`;
 
 const SORT_OPTIONS: { value: SortKey; labelKey: string; icon: string }[] = [
   { value: "lastPlayed", labelKey: "worlds.sort.last_played", icon: "solar:clock-circle-bold" },
   { value: "name",       labelKey: "worlds.sort.name",        icon: "solar:sort-from-top-to-bottom-bold" },
 ];
-
-const GAME_MODE_ICONS = [
-  "solar:bolt-bold",        // 0 Survival
-  "solar:pallete-2-bold",     // 1 Creative
-  "solar:compass-big-bold",   // 2 Adventure
-  "solar:eye-bold",           // 3 Spectator
-] as const;
 
 export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchRequest }: WorldsTabV3Props) {
   const { t } = useTranslation();
@@ -84,7 +82,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   // ── UI state ──────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("lastPlayed");
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hoverMenuId, setHoverMenuId] = useState<string | null>(null);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
@@ -110,6 +108,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       if (!mountedRef.current) return;
       setWorlds(ws);
       setServers(svs);
+      setSelectedIds(prev => new Set([...prev].filter(id => !id.startsWith("server:"))));
 
       // Ping-Status initial auf "pending" setzen und alle parallel pingen.
       // Ergebnisse kommen asynchron rein — UI zeigt Spinner bis dahin.
@@ -176,7 +175,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     return servers.filter(s => (s.name ?? "").toLowerCase().includes(q) || (s.address ?? "").toLowerCase().includes(q));
   }, [servers, searchQuery]);
 
-  const activeSortLabel = t(SORT_OPTIONS.find(o => o.value === sortBy)?.labelKey ?? "worlds.sort.last_played");
+  const shownWorlds = kindFilter === "servers" ? [] : visibleWorlds;
+  const shownServers = kindFilter === "worlds" ? [] : visibleServers;
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleJoin = useCallback((server: ServerInfo) => {
@@ -188,6 +188,60 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       handleQuickPlayLaunch(undefined, server.address);
     }
   }, [profile.id, onLaunchRequest, handleQuickPlayLaunch, t]);
+
+  const editServers = useCallback(async (edit: ServerListEdit, message: string) => {
+    try {
+      await WorldService.editServersForProfile(profile.id, edit);
+      toast.success(message);
+    } catch (err) {
+      toast.error(parseErrorMessage(err));
+    }
+    await loadData();
+  }, [profile.id, loadData]);
+
+  const openServerDialog = useCallback((server?: ServerInfo) => {
+    const modalId = "server-dialog";
+    const index = server ? servers.indexOf(server) : -1;
+    const expectedAddress = server?.address ?? "";
+    showModal(modalId, (
+      <ServerDialog
+        initialName={server ? server.name ?? "" : undefined}
+        initialAddress={expectedAddress}
+        onClose={() => hideModal(modalId)}
+        onSave={async (name, address) => {
+          const label = name.trim() || address.trim();
+          await editServers(
+            server
+              ? { kind: "update", index, expectedAddress, name, address }
+              : { kind: "add", name, address },
+            t(server ? "profiles.v3.servers.saved" : "profiles.v3.servers.added", { name: label }),
+          );
+          hideModal(modalId);
+        }}
+      />
+    ));
+  }, [servers, showModal, hideModal, editServers, t]);
+
+  const handleRemoveServer = useCallback((server: ServerInfo) => {
+    const modalId = "remove-server";
+    const index = servers.indexOf(server);
+    const expectedAddress = server.address ?? "";
+    const label = server.name || expectedAddress;
+    showModal(modalId, (
+      <ConfirmDeleteDialog
+        isOpen={true}
+        itemName={label}
+        onClose={() => hideModal(modalId)}
+        onConfirm={async () => {
+          await editServers({ kind: "remove", index, expectedAddress }, t("profiles.v3.servers.removed", { name: label }));
+          hideModal(modalId);
+        }}
+        isDeleting={false}
+        title={t("profiles.v3.servers.removeTitle")}
+        message={<p className="text-white/80 font-minecraft">{t("profiles.v3.servers.removeConfirm", { name: label })}</p>}
+      />
+    ));
+  }, [servers, showModal, hideModal, editServers, t]);
 
   const handleRepingServer = useCallback((address: string) => {
     setServerPings(prev => ({ ...prev, [address]: "pending" }));
@@ -250,38 +304,40 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     ));
   }, [profile.id, showModal, hideModal, loadData, t]);
 
-  const handleCopy = useCallback((world: WorldInfo) => {
-    const modalId = `copy-world-${world.folder_name}`;
-    const displayName = world.display_name ?? world.folder_name;
-    const doCopy = async (params: { targetProfileId: string; targetWorldName: string }) => {
-      try {
-        await toast.promise(
+  const handleCopy = useCallback((targets: WorldInfo[]) => {
+    const modalId = "copy-worlds";
+    const doCopy = async ({ targetProfileIds, copies }: { targetProfileIds: string[]; copies: WorldCopy[] }) => {
+      const jobs = targetProfileIds.flatMap((targetProfileId) =>
+        copies.map(({ world, name }) =>
           WorldService.copyWorld({
             source_profile_id: profile.id,
             source_world_folder: world.folder_name,
-            target_profile_id: params.targetProfileId,
-            target_world_name: params.targetWorldName,
+            target_profile_id: targetProfileId,
+            target_world_name: name,
           }),
-          {
-            loading: t("worlds.copying", { name: displayName }),
-            success: t("worlds.copy_success", { name: params.targetWorldName }),
-            error: (err) => t("worlds.copy_failed", { error: parseErrorMessage(err) }),
-          },
-        );
+        ),
+      );
+      const first = copies[0];
+      try {
+        await toast.promise(Promise.all(jobs), {
+          loading: t("worlds.copying", { name: copies.length === 1 ? first.name : t("copy_world.title_many", { count: copies.length }) }),
+          success: copies.length === 1
+            ? t("worlds.copy_success", { source: first.world.display_name ?? first.world.folder_name, target: first.name })
+            : t("worlds.copy_success_many", { count: jobs.length }),
+          error: (err) => t("worlds.copy_failed", { error: parseErrorMessage(err) }),
+        });
         hideModal(modalId);
-        if (params.targetProfileId === profile.id) await loadData();
+        setSelectedIds(new Set());
+        if (targetProfileIds.includes(profile.id)) await loadData();
       } catch (err) {
         console.error("[V3 Worlds] Copy failed:", err);
       }
     };
     showModal(modalId, (
       <CopyWorldDialog
-        isOpen={true}
-        sourceWorldName={displayName}
-        sourceProfileId={profile.id}
+        worlds={targets}
         availableProfiles={allProfiles}
         isLoadingProfiles={isLoadingProfiles}
-        isCopying={false}
         onClose={() => hideModal(modalId)}
         onConfirm={doCopy}
       />
@@ -317,6 +373,10 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
     const targets = worlds.filter(w => selectedIds.has(w.folder_name));
+    const serverTargets = servers
+      .map((server, index) => ({ index, expectedAddress: server.address ?? "" }))
+      .filter(({ index }) => selectedIds.has(serverKey(index)));
+    const count = targets.length + serverTargets.length;
     const modalId = "batch-delete-worlds";
     const doBatchDelete = async () => {
       setIsBatchDeleting(true);
@@ -325,7 +385,11 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           try { await WorldService.deleteWorld(profile.id, w.folder_name); }
           catch (err) { console.error("[V3 Worlds] Delete failed for", w.folder_name, err); }
         }
-        toast.success(t("worlds.batch_delete_success", { count: targets.length }));
+        if (serverTargets.length > 0) {
+          try { await WorldService.editServersForProfile(profile.id, { kind: "removeMany", entries: serverTargets }); }
+          catch (err) { toast.error(parseErrorMessage(err)); }
+        }
+        toast.success(t("worlds.batch_delete_success", { count }));
         setSelectedIds(new Set());
         await loadData();
       } finally {
@@ -336,15 +400,15 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     showModal(modalId, (
       <ConfirmDeleteDialog
         isOpen={true}
-        itemName={t("worlds.batch_delete_item_name", { count: targets.length })}
+        itemName={t("worlds.batch_delete_item_name", { count })}
         onClose={() => hideModal(modalId)}
         onConfirm={doBatchDelete}
         isDeleting={isBatchDeleting}
         title={t("worlds.batch_delete_title")}
-        message={<p className="text-white/80 font-minecraft">{t("worlds.batch_delete_confirm", { count: targets.length })}</p>}
+        message={<p className="text-white/80 font-minecraft">{t(serverTargets.length > 0 ? "profiles.v3.servers.batchRemoveConfirm" : "worlds.batch_delete_confirm", { count })}</p>}
       />
     ));
-  }, [selectedIds, worlds, profile.id, showModal, hideModal, loadData, isBatchDeleting, t]);
+  }, [selectedIds, worlds, servers, profile.id, showModal, hideModal, loadData, isBatchDeleting, t]);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
@@ -372,7 +436,14 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
 
   const shouldShowLoading = useDelayedTrue(loading && worlds.length === 0, 500);
 
+  const selectedWorlds = worlds.filter(w => selectedIds.has(w.folder_name));
   const fabActions: FABActionConfig[] = [
+    ...(selectedWorlds.length > 0 ? [{
+      icon: "solar:copy-bold",
+      label: t("profiles.v3.fab.copy"),
+      onClick: () => handleCopy(selectedWorlds),
+      disabled: isBatchDeleting,
+    }] : []),
     {
       icon: "solar:trash-bin-trash-bold",
       label: isBatchDeleting ? "…" : t("profiles.v3.fab.delete"),
@@ -382,69 +453,74 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
     },
   ];
 
-  const allSelected = selectedIds.size === visibleWorlds.length && visibleWorlds.length > 0;
+  const selectableIds = [
+    ...shownWorlds.map(w => w.folder_name),
+    ...shownServers.map(server => serverKey(servers.indexOf(server))),
+  ];
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
   const selectAllUndo = useSelectAllUndo(
     allSelected,
     () => new Set(selectedIds),
     setSelectedIds,
-    () => setSelectedIds(new Set(visibleWorlds.map(w => w.folder_name))),
+    () => setSelectedIds(new Set(selectableIds)),
   );
 
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
-        <div className="relative w-64 flex-shrink-0">
-          <Icon icon="solar:magnifer-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+      <div className="flex flex-col gap-2.5 px-5 py-2.5 border-b border-white/10 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <SearchWithFilters
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
             placeholder={t("worlds.search_placeholder")}
-            className="w-full h-8 pl-8 pr-3 rounded-md bg-white/5 border border-white/10 focus:border-white/25 outline-none text-sm text-white placeholder:text-white/30 font-minecraft"
+            sortOptions={SORT_OPTIONS.map((opt) => ({ value: opt.value, label: t(opt.labelKey), icon: opt.icon }))}
+            sortValue={sortBy}
+            onSortChange={(v) => setSortBy(v as SortKey)}
+            showFilter={false}
+            dropdownSize="sm"
+            compact
+            className="flex-1 min-w-0"
+          />
+          <ContentActionButtons
+            size="sm"
+            actions={[
+              {
+                id: "refresh",
+                icon: "solar:refresh-bold",
+                variant: "text",
+                tooltip: t("profiles.v3.toolbar.refresh"),
+                loading,
+                onClick: handleManualRefresh,
+              },
+              {
+                id: "add-server",
+                label: t("profiles.v3.servers.add"),
+                icon: "solar:add-circle-bold",
+                variant: "text",
+                onClick: () => openServerDialog(),
+              },
+              {
+                id: "import-world",
+                label: t("worlds.import_world"),
+                icon: "solar:import-bold",
+                variant: "text",
+                onClick: handleImport,
+              },
+            ]}
           />
         </div>
-
-        <div className="relative">
-          <button
-            onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
-          >
-            <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
-            {activeSortLabel}
-            <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 opacity-60" />
-          </button>
-          <ThemedDropdown open={sortMenuOpen} onClose={() => setSortMenuOpen(false)} width="w-48">
-            {SORT_OPTIONS.map(opt => (
-              <ThemedDropdownItem
-                key={opt.value}
-                icon={opt.icon}
-                selected={sortBy === opt.value}
-                onClick={() => { setSortBy(opt.value); setSortMenuOpen(false); }}
-              >
-                {t(opt.labelKey)}
-              </ThemedDropdownItem>
-            ))}
-          </ThemedDropdown>
+        <div className="flex items-center gap-1.5">
+          <FilterChip active={kindFilter === "all"} onClick={() => setKindFilter("all")}>
+            {t("profiles.v3.servers.filterAll")}
+          </FilterChip>
+          <FilterChip active={kindFilter === "worlds"} onClick={() => setKindFilter("worlds")}>
+            {t("profiles.v3.servers.filterWorlds")}
+          </FilterChip>
+          <FilterChip active={kindFilter === "servers"} onClick={() => setKindFilter("servers")}>
+            {t("profiles.v3.servers.filter")}
+          </FilterChip>
         </div>
-
-        <div className="flex-1" />
-
-        <button
-          onClick={handleManualRefresh}
-          disabled={loading}
-          className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
-          title={t("profiles.v3.toolbar.refresh")}
-        >
-          <Icon icon="solar:refresh-bold" className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-
-        <button
-          onClick={handleImport}
-          className="h-8 px-3 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-100 text-xs font-minecraft uppercase tracking-wider flex items-center gap-1.5"
-        >
-          <Icon icon="solar:import-bold" className="w-4 h-4" />
-          {t("worlds.import_world")}
-        </button>
       </div>
 
       {/* ── Content area ───────────────────────────────────────────────── */}
@@ -471,7 +547,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           ) : (
             <div className="h-40" />
           )
-        ) : visibleWorlds.length === 0 && visibleServers.length === 0 ? (
+        ) : shownWorlds.length === 0 && shownServers.length === 0 ? (
           <EmptyStateV3
             icon="solar:planet-bold-duotone"
             title={searchQuery ? t("worlds.no_match_search", { query: searchQuery }) : t("worlds.none_found")}
@@ -481,8 +557,8 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
           // Eine gemischte Liste: Worlds zuerst (sortiert), Servers danach
           // in servers.dat-Reihenfolge. Keine expliziten Section-Header —
           // Planet- vs Server-Icon differenzieren visuell schon.
-          <div className="flex flex-col gap-2">
-            {visibleWorlds.map((world) => (
+          <div className="flex flex-col gap-1">
+            {shownWorlds.map((world) => (
               <WorldTile
                 key={`world:${world.folder_name}`}
                 world={world}
@@ -492,14 +568,14 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
                 isLaunching={isLaunching}
                 onToggleSelection={() => toggleSelection(world.folder_name)}
                 onPlay={() => handlePlay(world)}
-                onCopy={() => handleCopy(world)}
+                onCopy={() => handleCopy([world])}
                 onOpenFolder={() => handleOpenFolder(world)}
                 onDelete={() => handleDelete(world)}
                 menuOpen={hoverMenuId === world.folder_name}
                 onMenuToggle={(open) => setHoverMenuId(open ? world.folder_name : null)}
               />
             ))}
-            {visibleServers.map((server) => {
+            {shownServers.map((server) => {
               const address = server.address ?? "";
               const pingState = address ? serverPings[address] : undefined;
               return (
@@ -512,6 +588,11 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
                   onMenuToggle={(open) => setHoverMenuId(open ? `server:${address}` : null)}
                   onJoin={() => handleJoin(server)}
                   onReping={() => address && handleRepingServer(address)}
+                  isSelected={selectedIds.has(serverKey(servers.indexOf(server)))}
+                  selectMode={selectedIds.size > 0}
+                  onToggleSelection={() => toggleSelection(serverKey(servers.indexOf(server)))}
+                  onEdit={() => openServerDialog(server)}
+                  onRemove={() => handleRemoveServer(server)}
                 />
               );
             })}
@@ -522,7 +603,7 @@ export function WorldsTabV3({ profile, isActive = true, onRefresh, onLaunchReque
       <FloatingActionBar
         visible={selectedIds.size > 0}
         count={selectedIds.size}
-        totalCount={visibleWorlds.length}
+        totalCount={selectableIds.length}
         accent={accentColor.value}
         allSelected={allSelected}
         onSelectAll={selectAllUndo.onSelectAll}
@@ -556,115 +637,12 @@ const WorldTile: React.FC<WorldTileProps> = ({
   onPlay, onCopy, onOpenFolder, onDelete, menuOpen, onMenuToggle,
 }) => {
   const { t } = useTranslation();
-  const displayName = world.display_name ?? world.folder_name;
-  const lastPlayedIso = world.last_played ? new Date(world.last_played).toISOString() : null;
-  const gameMode = world.game_mode ?? 0;
-  const gameModeLabel = WorldService.getGameModeString(gameMode);
-  const difficultyLabel = WorldService.getDifficultyString(world.difficulty ?? 0);
-  const iconUrl = world.icon_path ? convertFileSrc(world.icon_path) : null;
-
   return (
-    <div
-      style={isSelected ? { backgroundColor: `${accentColor}1a`, borderColor: `${accentColor}66` } : undefined}
-      className={`group relative flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-        isSelected
-          ? ""
-          : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
-      }`}
-    >
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleSelection(); }}
-        className={`flex-shrink-0 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-        title={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
-      >
-        <div
-          style={isSelected ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
-          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-            isSelected ? "" : "border-white/30 hover:border-white/60"
-          }`}
-        >
-          {isSelected && <Icon icon="solar:check-read-linear" className="w-3 h-3 text-black" />}
-        </div>
-      </button>
-
-      {/* World Icon */}
-      <div className="relative w-16 h-16 flex-shrink-0 rounded-md bg-white/10 ring-1 ring-white/10 overflow-hidden flex items-center justify-center">
-        {iconUrl ? (
-          <img
-            src={iconUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            style={{ imageRendering: "pixelated" }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-        ) : (
-          <Icon icon="solar:planet-bold-duotone" className="w-8 h-8 text-white/40" />
-        )}
-        {world.is_hardcore && (
-          <div className="absolute top-0.5 right-0.5 bg-rose-500/80 text-white rounded-sm p-0.5">
-            <Icon icon="solar:heart-broken-bold" className="w-3 h-3" />
-          </div>
-        )}
-      </div>
-
-      {/* Identity + meta */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <div className="text-sm text-white font-minecraft truncate normal-case" title={displayName}>
-            {displayName}
-          </div>
-          {world.difficulty_locked && (
-            <Tooltip content={t("worlds.difficulty_locked")}>
-              <Icon icon="solar:lock-bold" className="w-3 h-3 text-white/30 flex-shrink-0" />
-            </Tooltip>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 mt-1 text-[11px] font-minecraft">
-          <span className="inline-flex items-center gap-1 px-1.5 h-5 rounded text-white/70 bg-white/5">
-            <Icon icon={GAME_MODE_ICONS[gameMode]} className="w-3 h-3" />
-            {gameModeLabel}
-          </span>
-          <span className="text-white/40">·</span>
-          <span className="text-white/60">{difficultyLabel}</span>
-          {world.version_name && (
-            <>
-              <span className="text-white/40">·</span>
-              <span className="text-white/50">{world.version_name}</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 mt-1 text-xs font-minecraft text-white/40">
-          <Icon icon="solar:clock-circle-linear" className="w-3 h-3 flex-shrink-0" />
-          <span>{formatRelativeTime(lastPlayedIso)}</span>
-        </div>
-      </div>
-
-      <button
-        onClick={onPlay}
-        disabled={isLaunching}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
-          isLaunching
-            ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
-            : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
-        }`}
-      >
-        <Icon
-          icon={isLaunching ? "solar:refresh-bold" : "solar:play-bold"}
-          className={`w-4 h-4 ${isLaunching ? "animate-spin" : ""}`}
-        />
-        {t("profiles.play")}
-      </button>
-
-      <div className="relative flex-shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onMenuToggle(!menuOpen); }}
-          className="p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
-        </button>
-        <ThemedDropdown open={menuOpen} onClose={() => onMenuToggle(false)} width="w-52">
+    <McListRow selected={isSelected} accentColor={accentColor}>
+      <SelectBox selected={isSelected} selectMode={selectMode} onToggle={onToggleSelection} />
+      <McWorldRow world={world} onPlay={onPlay} playDisabled={isLaunching} />
+      <RowActions visible={menuOpen}>
+        <RowMenu open={menuOpen} onToggle={onMenuToggle}>
           <ThemedDropdownItem icon="solar:copy-bold" onClick={() => { onCopy(); onMenuToggle(false); }}>
             {t("worlds.copy")}
           </ThemedDropdownItem>
@@ -674,144 +652,93 @@ const WorldTile: React.FC<WorldTileProps> = ({
           <ThemedDropdownItem icon="solar:trash-bin-trash-linear" tone="danger" onClick={() => { onDelete(); onMenuToggle(false); }}>
             {t("profiles.v3.tile.delete")}
           </ThemedDropdownItem>
-        </ThemedDropdown>
-      </div>
+        </RowMenu>
+      </RowActions>
+    </McListRow>
+  );
+};
+
+const McListRow: React.FC<{ selected?: boolean; accentColor?: string; children: React.ReactNode }> = ({ selected, accentColor, children }) => (
+  <div
+    style={selected && accentColor ? { backgroundColor: `${accentColor}1a`, borderColor: `${accentColor}66` } : undefined}
+    className={`group relative flex items-center gap-2 p-1 rounded-lg border transition-colors ${selected ? "" : "border-transparent hover:bg-white/5"}`}
+  >
+    {children}
+  </div>
+);
+
+const SelectBox: React.FC<{ selected: boolean; selectMode: boolean; onToggle: () => void }> = ({ selected, selectMode, onToggle }) => {
+  const { t } = useTranslation();
+  return (
+    <div className={`flex-shrink-0 transition-opacity ${selectMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      <CheckboxV2
+        size="sm"
+        checked={selected}
+        onChange={onToggle}
+        tooltip={selected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
+      />
     </div>
   );
 };
 
+const RowActions: React.FC<{ visible: boolean; children: React.ReactNode }> = ({ visible, children }) => (
+  <div className={`flex items-center shrink-0 transition-opacity ${visible ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+    {children}
+  </div>
+);
+
+const RowMenu: React.FC<{ open: boolean; onToggle: (open: boolean) => void; children: React.ReactNode }> = ({ open, onToggle, children }) => (
+  <div className="relative">
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle(!open); }}
+      className="p-1.5 rounded text-white/50 hover:text-white hover:bg-white/10"
+    >
+      <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
+    </button>
+    <ThemedDropdown open={open} onClose={() => onToggle(false)} width="w-52">
+      {children}
+    </ThemedDropdown>
+  </div>
+);
+
 // ─── Server Tile ────────────────────────────────────────────────────────────
 interface ServerTileProps {
   server: ServerInfo;
-  pingState: ServerPingInfo | "pending" | "error" | undefined;
+  pingState: ServerPingState;
   isLaunching: boolean;
   menuOpen: boolean;
   onMenuToggle: (open: boolean) => void;
   onJoin: () => void;
   onReping: () => void;
+  isSelected: boolean;
+  selectMode: boolean;
+  onToggleSelection: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
 }
 
-const latencyDotColor = (ms: number): string => {
-  if (ms < 80)  return "bg-emerald-400";
-  if (ms < 150) return "bg-white/50";
-  if (ms < 250) return "bg-amber-400";
-  return "bg-rose-400";
-};
-const latencyTextColor = (ms: number): string => {
-  if (ms < 80)  return "text-emerald-400";
-  if (ms < 150) return "text-white/60";
-  if (ms < 250) return "text-amber-400";
-  return "text-rose-400";
-};
-
-const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching, menuOpen, onMenuToggle, onJoin, onReping }) => {
+const ServerTile: React.FC<ServerTileProps> = ({
+  server, pingState, isLaunching, menuOpen, onMenuToggle, onJoin, onReping,
+  isSelected, selectMode, onToggleSelection, onEdit, onRemove,
+}) => {
   const { t } = useTranslation();
+  const accentColor = useThemeStore((s) => s.accentColor.value);
   const name = server.name ?? server.address ?? "—";
   const address = server.address ?? "";
-  const isPending = pingState === "pending";
-  const isError = pingState === "error" || (pingState && typeof pingState === "object" && pingState.error);
-  const ping = (pingState && typeof pingState === "object" && !pingState.error) ? pingState : null;
-
-  // Favicon: ping liefert aktuelles (base64), fallback auf server.icon_base64 (aus servers.dat).
-  const iconBase64 = ping?.favicon_base64 ?? server.icon_base64 ?? null;
-  // MOTD: description_json hat Priority (enthaelt Chat-Component mit Farben),
-  // description ist der plain-string-Fallback (oft ohne §-Codes).
-  const motdInput = ping?.description_json ?? ping?.description ?? "";
 
   return (
-    <div
-      className={`group relative flex items-center gap-3 p-3 rounded-lg border transition-colors bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06] ${
-        isError ? "opacity-60" : ""
-      }`}
-    >
-      <div className="relative w-16 h-16 flex-shrink-0 rounded-md bg-white/10 ring-1 ring-white/10 overflow-hidden flex items-center justify-center">
-        {iconBase64 ? (
-          <img
-            src={`data:image/png;base64,${iconBase64}`}
-            alt=""
-            className="w-full h-full object-cover"
-            style={{ imageRendering: "pixelated" }}
-          />
-        ) : (
-          <Icon icon="solar:server-bold-duotone" className="w-8 h-8 text-white/40" />
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-white font-minecraft truncate normal-case" title={name}>{name}</div>
-          {address && <span className="text-xs text-white/35 font-minecraft truncate">· {address}</span>}
-        </div>
-
-        {isError ? (
-          <div className="mt-1 text-xs text-rose-300/80 font-minecraft truncate">
-            {t("profiles.v3.servers.offline")}
-          </div>
-        ) : isPending ? (
-          <div className="mt-1 text-xs text-white/35 font-minecraft flex items-center gap-1.5">
-            <Icon icon="svg-spinners:ring-resize" className="w-3 h-3" />
-            {t("profiles.v3.servers.pinging")}
-          </div>
-        ) : motdInput ? (
-          <div
-            className="mt-1 text-xs font-minecraft whitespace-pre-line line-clamp-2 leading-snug"
-            dangerouslySetInnerHTML={{ __html: parseMotdToHtml(motdInput) }}
-          />
-        ) : null}
-
-        {ping && !isError && (
-          <div className="flex items-center gap-2 mt-1 text-xs font-minecraft">
-            {ping.players_online != null && ping.players_max != null && (
-              <>
-                <span className="inline-flex items-center gap-1 text-white/60">
-                  <Icon icon="solar:users-group-rounded-bold" className="w-3 h-3" />
-                  <span className="tabular-nums">{ping.players_online}/{ping.players_max}</span>
-                </span>
-                <span className="text-white/20">·</span>
-              </>
-            )}
-            {ping.latency_ms != null && (
-              <span className={`inline-flex items-center gap-1 tabular-nums ${latencyTextColor(ping.latency_ms)}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${latencyDotColor(ping.latency_ms)}`} />
-                {ping.latency_ms}ms
-              </span>
-            )}
-            {ping.version_name && (
-              <>
-                <span className="text-white/20">·</span>
-                <span className="text-white/40 truncate">{ping.version_name}</span>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      <button
-        onClick={onJoin}
-        disabled={!!isError || isLaunching || !address}
-        className={`h-8 px-3 rounded-md border flex items-center gap-1.5 flex-shrink-0 transition-colors text-xs font-minecraft uppercase tracking-wider ${
-          isError || !address
-            ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
-            : isLaunching
-              ? "bg-emerald-500/10 border-emerald-400/20 text-emerald-200/60 cursor-wait"
-              : "bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/30 text-emerald-100"
-        }`}
-      >
-        <Icon
-          icon={isLaunching ? "solar:refresh-bold" : "solar:login-2-bold"}
-          className={`w-4 h-4 ${isLaunching ? "animate-spin" : ""}`}
-        />
-        {t("profiles.v3.servers.joinShort")}
-      </button>
-
-      <div className="relative flex-shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onMenuToggle(!menuOpen); }}
-          className="p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Icon icon="solar:menu-dots-bold" className="w-4 h-4" />
-        </button>
-        <ThemedDropdown open={menuOpen} onClose={() => onMenuToggle(false)} width="w-52">
+    <McListRow selected={isSelected} accentColor={accentColor}>
+      <SelectBox selected={isSelected} selectMode={selectMode} onToggle={onToggleSelection} />
+      <McServerRow
+        name={name}
+        pingState={pingState}
+        savedIcon={server.icon_base64}
+        className="flex-1 min-w-0"
+        onPlay={address ? onJoin : undefined}
+        playDisabled={isLaunching}
+      />
+      <RowActions visible={menuOpen}>
+        <RowMenu open={menuOpen} onToggle={onMenuToggle}>
           <ThemedDropdownItem icon="solar:refresh-linear" onClick={() => { onReping(); onMenuToggle(false); }}>
             {t("profiles.v3.servers.reping")}
           </ThemedDropdownItem>
@@ -821,8 +748,14 @@ const ServerTile: React.FC<ServerTileProps> = ({ server, pingState, isLaunching,
           >
             {t("profiles.v3.servers.copyAddress")}
           </ThemedDropdownItem>
-        </ThemedDropdown>
-      </div>
-    </div>
+          <ThemedDropdownItem icon="solar:pen-linear" onClick={() => { onEdit(); onMenuToggle(false); }}>
+            {t("profiles.v3.servers.edit")}
+          </ThemedDropdownItem>
+          <ThemedDropdownItem icon="solar:trash-bin-trash-linear" tone="danger" onClick={() => { onRemove(); onMenuToggle(false); }}>
+            {t("profiles.v3.servers.remove")}
+          </ThemedDropdownItem>
+        </RowMenu>
+      </RowActions>
+    </McListRow>
   );
 };

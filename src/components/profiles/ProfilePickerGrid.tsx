@@ -11,6 +11,7 @@ interface ProfilePickerGridProps {
   lastPlayedProfileId?: string | null;
   searchThreshold?: number;
   selectedId?: string | null;
+  selectedIds?: ReadonlySet<string>;
   onSelect?: (profile: Profile) => void;
   renderAction?: (profile: Profile) => ReactNode;
   disabled?: boolean;
@@ -22,6 +23,7 @@ export function ProfilePickerGrid({
   lastPlayedProfileId = null,
   searchThreshold = 6,
   selectedId = null,
+  selectedIds,
   onSelect,
   renderAction,
   disabled = false,
@@ -51,7 +53,7 @@ export function ProfilePickerGrid({
       )}
       <div className={cn("grid grid-cols-2 gap-2 overflow-y-auto custom-scrollbar pr-1", listClassName)}>
         {shown.map((profile) => {
-          const active = profile.id === selectedId;
+          const active = selectedIds ? selectedIds.has(profile.id) : profile.id === selectedId;
           return (
             <div
               key={profile.id}

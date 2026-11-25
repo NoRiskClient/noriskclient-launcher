@@ -1,140 +1,136 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "@iconify/react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
-import { Input }  from "../ui/Input";
-import { Select } from "../ui/Select";
-import { Icon } from "@iconify/react";
-import type { Profile } from "../../types/profile"; // Assuming this path is correct
+import { FieldLabel } from "../ui/SegmentedControl";
+import { PLAIN_TEXT } from "../ui/typography";
+import { ProfilePickerGrid } from "../profiles/ProfilePickerGrid";
+import { McWorldRow } from "../profiles/v3/shared/McWorldRow";
+import { useProfileStore } from "../../store/profile-store";
+import { sortRecentFirst } from "../../utils/profile-sort";
+import type { Profile } from "../../types/profile";
+import type { WorldInfo } from "../../types/minecraft";
 
 interface CopyWorldDialogProps {
-  isOpen: boolean;
-  sourceWorldName: string;
-  sourceProfileId: string;
+  worlds: WorldInfo[];
   availableProfiles: Profile[];
   isLoadingProfiles: boolean;
-  isCopying: boolean;
   onClose: () => void;
-  onConfirm: (params: {
-    targetProfileId: string;
-    targetWorldName: string;
-  }) => void;
-  initialError?: string | null;
+  onConfirm: (params: { targetProfileIds: string[]; copies: WorldCopy[] }) => Promise<void>;
 }
 
+export interface WorldCopy {
+  world: WorldInfo;
+  name: string;
+}
+
+const nameOf = (world: WorldInfo) => world.display_name ?? world.folder_name;
+
 export function CopyWorldDialog({
-  isOpen,
-  sourceWorldName,
-  sourceProfileId,
+  worlds,
   availableProfiles,
   isLoadingProfiles,
-  isCopying,
   onClose,
   onConfirm,
-  initialError,
 }: CopyWorldDialogProps) {
   const { t } = useTranslation();
-  const [targetProfileId, setTargetProfileId] = useState(sourceProfileId);
-  const [targetWorldName, setTargetWorldName] = useState(sourceWorldName);
-  const [internalError, setInternalError] = useState<string | null>(null);
+  const lastPlayedProfileId = useProfileStore((s) => s.lastPlayedProfileId);
+  const profiles = useMemo(
+    () => sortRecentFirst(availableProfiles, lastPlayedProfileId),
+    [availableProfiles, lastPlayedProfileId],
+  );
+  const [targetIds, setTargetIds] = useState<Set<string>>(() => new Set());
+  const [names, setNames] = useState<Record<string, string>>(() =>
+    Object.fromEntries(worlds.map((world) => [world.folder_name, nameOf(world)])),
+  );
+  const [copying, setCopying] = useState(false);
+  const copies = worlds.map((world) => ({ world, name: (names[world.folder_name] ?? "").trim() }));
+  const canCopy = targetIds.size > 0 && copies.every((copy) => copy.name !== "") && !copying && !isLoadingProfiles;
 
-  useEffect(() => {
-    if (isOpen) {
-      // Reset state when dialog opens
-      setTargetProfileId(sourceProfileId);
-      setTargetWorldName(sourceWorldName);
-      setInternalError(null); // Clear previous internal errors
-    }
-  }, [isOpen, sourceProfileId, sourceWorldName]);
-
-  const handleConfirm = () => {
-    if (!targetProfileId) {
-      setInternalError(t('copy_world.error.select_profile'));
-      return;
-    }
-    if (!targetWorldName.trim()) {
-      setInternalError(t('copy_world.error.enter_name'));
-      return;
-    }
-    setInternalError(null);
-    onConfirm({
-      targetProfileId,
-      targetWorldName: targetWorldName.trim(),
+  const toggleTarget = (id: string) =>
+    setTargetIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
+
+  const copy = async () => {
+    if (!canCopy) return;
+    setCopying(true);
+    try {
+      await onConfirm({ targetProfileIds: [...targetIds], copies });
+    } finally {
+      setCopying(false);
+    }
   };
-
-  const displayError = internalError || initialError;
-
-  if (!isOpen) {
-    return null;
-  }
-
-  const profileOptions = availableProfiles.map(p => ({
-    value: p.id,
-    label: `${p.name} (${p.game_version} ${p.loader})`
-  }));
 
   return (
     <Modal
-      title={t('copy_world.title', { name: sourceWorldName })}
-      titleIcon={<Icon icon="solar:copy-bold-duotone" className="w-6 h-6" />}
+      title={worlds.length === 1 ? t("copy_world.title", { name: nameOf(worlds[0]) }) : t("copy_world.title_many", { count: worlds.length })}
+      titleIcon={<Icon icon="solar:copy-bold" className="w-5 h-5" />}
+      titleClassName={PLAIN_TEXT}
       onClose={onClose}
       width="md"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" className={PLAIN_TEXT} onClick={onClose} disabled={copying}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="flat"
+            size="sm"
+            className={PLAIN_TEXT}
+            disabled={!canCopy}
+            onClick={copy}
+            icon={copying ? <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" /> : undefined}
+          >
+            {copying ? t("copy_world.button.copying") : t("copy_world.button.copy")}
+          </Button>
+        </div>
+      }
     >
-      <div className="p-6 flex flex-col gap-4">
-        {displayError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">{t('common.error')}: </strong>
-            <span className="block sm:inline">{displayError}</span>
-          </div>
-        )}
+      <div className="p-6 space-y-5 font-minecraft normal-case">
+        <div className="max-h-[232px] overflow-y-auto custom-scrollbar space-y-1">
+          {worlds.map((world) => (
+            <div key={world.folder_name} className="p-1 bg-black/40">
+              <McWorldRow
+                world={world}
+                nameSlot={
+                  worlds.length === 1 ? (
+                    <input
+                      value={names[world.folder_name] ?? ""}
+                      onChange={(e) => setNames((current) => ({ ...current, [world.folder_name]: e.target.value }))}
+                      placeholder={t("copy_world.enter_name_placeholder")}
+                      disabled={copying}
+                      autoFocus
+                      spellCheck={false}
+                      className="w-full -mx-1 px-1 rounded-sm bg-transparent hover:bg-white/5 focus:bg-white/10 text-white placeholder-white/30 outline-none transition-colors"
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+          ))}
+        </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="copy-dialog-target-profile" className="font-medium text-white/80">
-            {t('copy_world.copy_to_profile')}:
-          </label>
+        <div className="space-y-2">
+          <FieldLabel>{t("copy_world.copy_to_profile")}</FieldLabel>
           {isLoadingProfiles ? (
-            <div className="text-white/60">{t('copy_world.loading_profiles')}</div>
+            <div className="text-sm text-white/50">{t("copy_world.loading_profiles")}</div>
           ) : (
-            <Select
-              value={targetProfileId}
-              onChange={setTargetProfileId}
-              options={profileOptions}
-              disabled={isCopying || isLoadingProfiles}
-              placeholder={t('copy_world.select_target_placeholder')}
+            <ProfilePickerGrid
+              profiles={profiles}
+              lastPlayedProfileId={lastPlayedProfileId}
+              selectedIds={targetIds}
+              onSelect={(profile) => toggleTarget(profile.id)}
+              disabled={copying}
+              listClassName="max-h-[260px]"
             />
           )}
         </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="target-world-name" className="font-medium text-white/80">
-            {t('copy_world.new_world_name')}:
-          </label>
-          <Input
-            id="target-world-name"
-            type="text"
-            value={targetWorldName}
-            onChange={(e) => setTargetWorldName(e.target.value)}
-            placeholder={t('copy_world.enter_name_placeholder')}
-            disabled={isCopying}
-          />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 py-4 flex justify-end items-center gap-3">
-        <Button variant="secondary" onClick={onClose} disabled={isCopying}>
-          {t('common.cancel')}
-        </Button>
-        <Button
-          variant="success"
-          onClick={handleConfirm}
-          disabled={isCopying || isLoadingProfiles || !targetProfileId || !targetWorldName.trim()}
-          icon={isCopying ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : null}
-        >
-          {isCopying ? t('copy_world.button.copying') : t('copy_world.button.copy')}
-        </Button>
       </div>
     </Modal>
   );
-} 
+}
