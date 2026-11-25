@@ -1,16 +1,22 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 import { MENU_PANEL_CLASSES, menuItemClasses, menuSeparatorClasses } from "./design-system";
 import type { Profile } from "../../types/profile";
 
-export const CONTEXT_MENU_WIDTH = 176;
+const EDGE = 8;
 
-export function clampMenuPosition(x: number, y: number, height: number): { x: number; y: number } {
+function clampMenuPosition(x: number, y: number, width: number, height: number): { x: number; y: number } {
   return {
-    x: Math.max(8, Math.min(x, window.innerWidth - CONTEXT_MENU_WIDTH - 8)),
-    y: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
+    x: Math.max(EDGE, Math.min(x, window.innerWidth - width - EDGE)),
+    y: Math.max(EDGE, Math.min(y, window.innerHeight - height - EDGE)),
   };
+}
+
+export function menuBelow(anchor: Element): { x: number; y: number } {
+  const rect = anchor.getBoundingClientRect();
+  return { x: rect.left, y: rect.bottom + 4 };
 }
 
 export interface ContextMenuItem<T = Profile> {
@@ -57,6 +63,13 @@ export function SettingsContextMenu<T = Profile>({
 }: SettingsContextMenuProps<T>) {
   const accentColor = useThemeStore((state) => state.accentColor);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const [placed, setPlaced] = useState(position);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    setPlaced(clampMenuPosition(position.x, position.y, menu?.offsetWidth ?? 0, menu?.offsetHeight ?? 0));
+  }, [position.x, position.y, isOpen, items.length]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -110,13 +123,13 @@ export function SettingsContextMenu<T = Profile>({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       ref={menuRef}
-      className={`absolute ${MENU_PANEL_CLASSES}`}
+      className={`fixed z-[1100] ${MENU_PANEL_CLASSES}`}
       style={{
-        left: position.x,
-        top: position.y,
+        left: placed.x,
+        top: placed.y,
         minWidth: compact ? "176px" : "200px",
       }}
     >
@@ -168,6 +181,7 @@ export function SettingsContextMenu<T = Profile>({
           </React.Fragment>
         ))}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

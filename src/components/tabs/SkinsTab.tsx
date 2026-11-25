@@ -624,7 +624,7 @@ export function SkinsTab() {
   ];
   const { menu: skinMenu, open: openMenu, close: closeSkinMenu } = useCardContextMenu<MinecraftSkin>();
   const openSkinMenu = useCallback(
-    (skin: MinecraftSkin, event: React.MouseEvent) => openMenu(skin, event, 3),
+    (skin: MinecraftSkin, event: React.MouseEvent) => openMenu(skin, event),
     [openMenu],
   );
 

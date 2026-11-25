@@ -30,7 +30,7 @@ import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../sh
 import { parseErrorMessage } from "../../../../utils/error-utils";
 import { useShareDialog } from "../../../../hooks/useShareDialog";
 import { copyScreenshotImage, revealScreenshot } from "../../../../utils/screenshot-actions";
-import { clampMenuPosition, SettingsContextMenu, type ContextMenuItem } from "../../../ui/SettingsContextMenu";
+import { SettingsContextMenu, type ContextMenuItem } from "../../../ui/SettingsContextMenu";
 
 interface ScreenshotsTabV3Props {
   profile: Profile;
@@ -352,8 +352,6 @@ interface ScreenshotTileProps {
   onDelete: () => void;
 }
 
-const MENU_HEIGHT = 210;
-
 const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
   screenshot, accentColor, isSelected, selectMode, onToggleSelection, onOpen, onShare, onDelete,
 }) => {
@@ -399,7 +397,7 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
       ref={ref}
       onContextMenu={(e) => {
         e.preventDefault();
-        setMenuAt(clampMenuPosition(e.clientX, e.clientY, MENU_HEIGHT));
+        setMenuAt({ x: e.clientX, y: e.clientY });
       }}
       onClick={(e) => {
         // Klick in Select-Mode toggled Selection statt Modal zu oeffnen.

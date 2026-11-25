@@ -5,7 +5,7 @@ import type { Profile } from "../../types/profile";
 import { ProfileIconV2 } from "./ProfileIconV2";
 import { toast } from "react-hot-toast";
 import { ProfileActionButtons, type ProfileActionButton } from "../ui/ProfileActionButtons";
-import { SettingsContextMenu, type ContextMenuItem } from "../ui/SettingsContextMenu";
+import { SettingsContextMenu, menuBelow, type ContextMenuItem } from "../ui/SettingsContextMenu";
 import { Icon } from "@iconify/react";
 import { useProfileSettingsStore } from "../../store/profile-settings-store";
 import { useProfileDuplicateStore } from "../../store/profile-duplicate-store";
@@ -401,15 +401,7 @@ export function ProfileCardV2({
          
          // Calculate position when opening
          if (!isContextMenuOpen) {
-           const buttonRect = e.currentTarget.getBoundingClientRect();
-           const cardRect = e.currentTarget.closest('.relative')?.getBoundingClientRect();
-           
-           if (cardRect) {
-             setContextMenuPosition({
-               x: buttonRect.right - cardRect.left - 200, // Position menu to the left of the button
-               y: buttonRect.bottom - cardRect.top + 4,   // Position below the button
-             });
-           }
+           setContextMenuPosition(menuBelow(e.currentTarget));
          }
        },
     },
@@ -433,8 +425,7 @@ export function ProfileCardV2({
           if (openContextMenuId && openContextMenuId !== contextMenuId) setOpenContextMenuId(null);
           setIsContextMenuOpen(true);
           setOpenContextMenuId(contextMenuId);
-          const cardRect = e.currentTarget.getBoundingClientRect();
-          setContextMenuPosition({ x: e.clientX - cardRect.left, y: e.clientY - cardRect.top });
+          setContextMenuPosition({ x: e.clientX, y: e.clientY });
         }}
       >
         <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-black/30">
@@ -471,14 +462,12 @@ export function ProfileCardV2({
               title={t('profiles.profileOptions')}
               onClick={(e) => {
                 e.stopPropagation();
-                const cardRect = e.currentTarget.closest('.group')?.getBoundingClientRect();
-                const buttonRect = e.currentTarget.getBoundingClientRect();
                 if (openContextMenuId && openContextMenuId !== contextMenuId) setOpenContextMenuId(null);
                 const open = !isContextMenuOpen;
                 setIsContextMenuOpen(open);
                 setOpenContextMenuId(open ? contextMenuId : null);
-                if (open && cardRect) {
-                  setContextMenuPosition({ x: buttonRect.right - cardRect.left - 200, y: buttonRect.bottom - cardRect.top + 4 });
+                if (open) {
+                  setContextMenuPosition(menuBelow(e.currentTarget));
                 }
               }}
               className="relative z-10 w-7 h-7 flex items-center justify-center rounded-md bg-black/60 hover:bg-black/80 text-white/80 hover:text-white border border-white/15"
@@ -571,10 +560,9 @@ export function ProfileCardV2({
           setIsContextMenuOpen(true);
           setOpenContextMenuId(contextMenuId);
 
-          const cardRect = e.currentTarget.getBoundingClientRect();
           setContextMenuPosition({
-            x: e.clientX - cardRect.left,
-            y: e.clientY - cardRect.top,
+            x: e.clientX,
+            y: e.clientY,
           });
         }}
       >
@@ -614,15 +602,7 @@ export function ProfileCardV2({
 
                // Calculate position when opening
                if (!isContextMenuOpen) {
-                 const buttonRect = e.currentTarget.getBoundingClientRect();
-                 const cardRect = e.currentTarget.closest('.relative')?.getBoundingClientRect();
-
-                 if (cardRect) {
-                   setContextMenuPosition({
-                     x: buttonRect.right - cardRect.left - 200, // Position menu to the left of the button
-                     y: buttonRect.bottom - cardRect.top + 4,   // Position below the button
-                   });
-                 }
+                 setContextMenuPosition(menuBelow(e.currentTarget));
                }
              }}
             className={`${isCompact ? 'w-6 h-6' : 'w-8 h-8'} flex items-center justify-center rounded transition-all duration-200 bg-black/30 hover:bg-black/50 text-white/70 hover:text-white border border-white/10 hover:border-white/20`}
@@ -841,10 +821,9 @@ export function ProfileCardV2({
         setIsContextMenuOpen(true);
         setOpenContextMenuId(contextMenuId);
 
-        const cardRect = e.currentTarget.getBoundingClientRect();
         setContextMenuPosition({
-          x: e.clientX - cardRect.left,
-          y: e.clientY - cardRect.top,
+          x: e.clientX,
+          y: e.clientY,
         });
       }}
     >

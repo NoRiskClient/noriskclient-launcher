@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-hot-toast";
@@ -10,8 +9,7 @@ import { Button } from "../ui/buttons/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
 import {
-  clampMenuPosition,
-  CONTEXT_MENU_WIDTH,
+  menuBelow,
   SettingsContextMenu,
   type ContextMenuItem,
 } from "../ui/SettingsContextMenu";
@@ -457,8 +455,6 @@ function ClipCard({
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
-  const openMenu = (x: number, y: number) => setMenuAt(clampMenuPosition(x, y, MENU_HEIGHT));
-
   const menuItems: ContextMenuItem<ClipEntry>[] = [
     { id: "edit", label: t("clips.gallery.edit"), icon: "solar:scissors-bold", onClick: onEdit },
     { id: "rename", label: t("clips.gallery.rename"), icon: "solar:pen-bold", onClick: onRename },
@@ -496,7 +492,7 @@ function ClipCard({
       onMouseLeave={() => setHovered(false)}
       onContextMenu={(event) => {
         event.preventDefault();
-        openMenu(event.clientX, event.clientY);
+        setMenuAt({ x: event.clientX, y: event.clientY });
       }}
     >
       <button
@@ -555,25 +551,22 @@ function ClipCard({
               setMenuAt(null);
               return;
             }
-            const box = moreRef.current?.getBoundingClientRect();
-            if (box) openMenu(box.right - CONTEXT_MENU_WIDTH, box.bottom + 4);
+            if (moreRef.current) setMenuAt(menuBelow(moreRef.current));
           }}
         />
       </div>
 
-      {menuAt &&
-        createPortal(
-          <SettingsContextMenu
-            target={clip}
-            isOpen
-            position={menuAt}
-            items={menuItems}
-            onClose={() => setMenuAt(null)}
-            triggerButtonRef={moreRef}
-            compact
-          />,
-          document.body,
-        )}
+      {menuAt && (
+        <SettingsContextMenu
+          target={clip}
+          isOpen
+          position={menuAt}
+          items={menuItems}
+          onClose={() => setMenuAt(null)}
+          triggerButtonRef={moreRef}
+          compact
+        />
+      )}
 
       <div className="flex flex-col gap-1 px-3 py-2.5 min-w-0">
         <span className="font-minecraft text-base text-white whitespace-nowrap overflow-hidden text-ellipsis normal-case">
@@ -596,8 +589,6 @@ function ClipCard({
     </div>
   );
 }
-
-const MENU_HEIGHT = 250;
 
 function ClipPlayer({
   clip,

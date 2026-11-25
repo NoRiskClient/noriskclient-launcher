@@ -54,7 +54,7 @@ import { ProfileIconV2 } from "../ProfileIconV2";
 import { ExportProfileModal } from "../ExportProfileModal";
 import { ModpackVersionsModal } from "../../modals/ModpackVersionsModal";
 import { useDeleteProfile } from "../../../hooks/useDeleteProfile";
-import { SettingsContextMenu, type ContextMenuItem } from "../../ui/SettingsContextMenu";
+import { SettingsContextMenu, menuBelow, type ContextMenuItem } from "../../ui/SettingsContextMenu";
 import { Tooltip } from "../../ui/Tooltip";
 
 import { ProfileLeftRailV3, type NavKey, contentTabOf } from "./ProfileLeftRailV3";
@@ -275,14 +275,7 @@ export function ProfileDetailViewV3({
     setOpenContextMenuId(newState ? contextMenuId : null);
 
     if (!isContextMenuOpen && event?.currentTarget) {
-      const buttonRect = event.currentTarget.getBoundingClientRect();
-      const containerRect = event.currentTarget.closest('.relative')?.getBoundingClientRect();
-      if (containerRect) {
-        setContextMenuPosition({
-          x: buttonRect.right - containerRect.left - 200,
-          y: buttonRect.bottom - containerRect.top + 4,
-        });
-      }
+      setContextMenuPosition(menuBelow(event.currentTarget));
     }
   }, [openContextMenuId, contextMenuId, isContextMenuOpen, setOpenContextMenuId]);
 
