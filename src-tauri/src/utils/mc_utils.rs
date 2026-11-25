@@ -3,6 +3,7 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::dto::piston_meta::AssetIndex;
 use crate::state::event_state::{EventPayload, EventType, ProgressThrottle};
+use crate::state::profile_state::Profile;
 use crate::state::State;
 use async_compression::tokio::bufread::GzipDecoder;
 // Import the Engine trait for encode/decode methods
@@ -1319,9 +1320,7 @@ fn parse_minecraft_address(address: &str) -> std::result::Result<(String, u16), 
     Ok((host_part.to_string(), port))
 }
 
-/// Lists the multiplayer servers found in the profile's servers.dat file.
-pub async fn get_profile_servers(profile_id: Uuid) -> Result<Vec<ServerInfo>> {
-    info!("[Servers] Getting servers for profile {}", profile_id);
+async fn profile_servers_dat(profile_id: Uuid) -> Result<(Profile, PathBuf)> {
     let state = State::get().await?;
 
     // Try to get the user profile first, or fall back to standard profile if ID matches
@@ -1358,6 +1357,27 @@ pub async fn get_profile_servers(profile_id: Uuid) -> Result<Vec<ServerInfo>> {
         .profile_manager
         .calculate_instance_path_for_profile(&profile)?;
     let servers_dat_path = instance_path.join("servers.dat");
+    Ok((profile, servers_dat_path))
+}
+
+pub async fn edit_profile_servers(profile_id: Uuid, edit: &crate::utils::server_list::ServerListEdit) -> Result<()> {
+    let (profile, servers_dat_path) = profile_servers_dat(profile_id).await?;
+    let current = match fs::read(&servers_dat_path).await {
+        Ok(bytes) => Some(bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(AppError::Io(e)),
+    };
+    let updated = crate::utils::server_list::apply_server_list_edit(current.as_deref(), edit)
+        .map_err(|e| AppError::Other(e.to_string()))?;
+    crate::utils::file_utils::write_atomic(&servers_dat_path, &updated).await?;
+    info!("[Servers] Updated servers.dat for profile '{}'", profile.name);
+    Ok(())
+}
+
+/// Lists the multiplayer servers found in the profile's servers.dat file.
+pub async fn get_profile_servers(profile_id: Uuid) -> Result<Vec<ServerInfo>> {
+    info!("[Servers] Getting servers for profile {}", profile_id);
+    let (profile, servers_dat_path) = profile_servers_dat(profile_id).await?;
     info!(
         "[Servers] Looking for servers.dat at: {}",
         servers_dat_path.display()

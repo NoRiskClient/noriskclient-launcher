@@ -1896,6 +1896,14 @@ pub async fn get_servers_for_profile(
     Ok(mc_utils::get_profile_servers(profile_id).await?)
 }
 
+#[tauri::command]
+pub async fn edit_servers_for_profile(
+    profile_id: Uuid,
+    edit: crate::utils::server_list::ServerListEdit,
+) -> Result<(), CommandError> {
+    Ok(mc_utils::edit_profile_servers(profile_id, &edit).await?)
+}
+
 /// Copies a singleplayer world to another profile (or the same one) with a new name.
 #[tauri::command]
 pub async fn copy_world(params: CopyWorldParams) -> Result<String, CommandError> {

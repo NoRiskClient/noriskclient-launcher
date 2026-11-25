@@ -4,7 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
     WorldInfo,
     ServerInfo,
-    ServerPingInfo
+    ServerPingInfo,
+    ServerListEdit
 } from '../types/minecraft';
 import type {
     CopyWorldParams // Assuming this is defined in profile types
@@ -25,6 +26,9 @@ export const getWorldsForProfile = (profileId: string): Promise<WorldInfo[]> => 
   console.debug(`[WorldService] Fetching worlds for profile: ${profileId}`);
   return invoke('get_worlds_for_profile', { profileId });
 };
+
+export const editServersForProfile = (profileId: string, edit: ServerListEdit): Promise<void> =>
+  invoke('edit_servers_for_profile', { profileId, edit });
 
 /**
  * Pings a Minecraft server to get its status.

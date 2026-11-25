@@ -50,6 +50,7 @@ pub mod profile_utils; // Utility-Funktionen für Profilinhalte wie das Installi
 pub mod repair_utils; // Repair utilities for fixing profile issues
 pub mod resourcepack_utils; // ResourcePack-Utils für das Scannen und Verwalten von ResourcePacks
 pub mod security_utils; // Security utilities for masking sensitive data
+pub mod server_list;
 pub mod server_ping; // Server-Ping-Modul für die Kommunikation mit Minecraft-Servern
 pub mod shaderpack_utils; // ShaderPack-Utils für das Scannen und Verwalten von ShaderPacks
 pub mod system_info; // <-- Hinzufügen

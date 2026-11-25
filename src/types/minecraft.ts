@@ -114,6 +114,12 @@ export interface ServerInfo {
     previews_chat: number | null; // Seems to be boolean 0/1 (Rust u8)
 }
 
+export type ServerListEdit =
+    | { kind: "add"; name: string; address: string }
+    | { kind: "update"; index: number; expectedAddress: string; name: string; address: string }
+    | { kind: "remove"; index: number; expectedAddress: string }
+    | { kind: "removeMany"; entries: { index: number; expectedAddress: string }[] };
+
 export interface ServerPingInfo {
     description: string | null;
     description_json: object | null; // Representing serde_json::Value
