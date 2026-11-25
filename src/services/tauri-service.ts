@@ -1,6 +1,5 @@
 import { openUrl, openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
-import type { ImagePreviewPayload, ImagePreviewResponse } from '../types/fileSystem';
 
 /**
  * Opens a given URL in the default external application (usually the web browser).
@@ -22,9 +21,8 @@ export const openExternalUrl = (url: string): Promise<void> => {
  * @returns A promise that resolves with the image preview data.
  * @throws If the backend command fails.
  */
-export const getImagePreview = (payload: ImagePreviewPayload): Promise<ImagePreviewResponse> => {
-  return invoke<ImagePreviewResponse>('get_image_preview', { payload });
-};
+export const getImageThumbnail = (path: string, size: number): Promise<string> =>
+  invoke<string>('get_image_thumbnail', { path, size });
 
 /**
  * Gets the launcher directory path from the backend.

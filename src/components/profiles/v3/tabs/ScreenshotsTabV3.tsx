@@ -14,14 +14,16 @@ import { useInView } from "react-intersection-observer";
 
 import type { Profile } from "../../../../types/profile";
 import type { ScreenshotInfo } from "../../../../types/profile";
-import { getImagePreview } from "../../../../services/tauri-service";
+import { getImageThumbnail } from "../../../../services/tauri-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { formatRelativeTime } from "../../../../utils/format-relative-time";
 import { ProfileScreenshotModal } from "../../ProfileScreenshotModal";
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
 import { useGlobalModal } from "../../../../hooks/useGlobalModal";
-import { ThemedDropdown, ThemedDropdownItem } from "../shared/ThemedDropdown";
+import { SearchWithFilters } from "../../../ui/SearchWithFilters";
+import { ContentActionButtons } from "../../../ui/ContentActionButtons";
+import { CheckboxV2 } from "../../../ui/CheckboxV2";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
 import { parseErrorMessage } from "../../../../utils/error-utils";
@@ -41,12 +43,7 @@ const SORT_OPTIONS: { value: SortKey; labelKey: string; icon: string }[] = [
   { value: "oldest", labelKey: "profiles.v3.screenshots.sort.oldest", icon: "solar:sort-from-bottom-to-top-bold" },
 ];
 
-// Preview-Groesse fuer die Grid-Thumbnails. Backend resized das Bild auf
-// diese Dimensionen (mit JPEG-Quality) damit wir nicht fuer jedes Tile das
-// volle Bild ausliefern.
-const PREVIEW_WIDTH = 480;
-const PREVIEW_HEIGHT = 270;
-const PREVIEW_QUALITY = 75;
+const THUMBNAIL_SIZE = 512;
 
 export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3Props) {
   const { t } = useTranslation();
@@ -61,7 +58,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [sortBy, setSortBy] = useState<SortKey>("newest");
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [modalScreenshot, setModalScreenshot] = useState<ScreenshotInfo | null>(null);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
@@ -103,14 +100,13 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
 
   // ── Sort ──────────────────────────────────────────────────────────────────
   const visibleScreenshots = useMemo(() => {
-    const sorted = [...screenshots];
+    const q = searchQuery.trim().toLowerCase();
+    const sorted = q ? screenshots.filter(s => s.filename.toLowerCase().includes(q)) : [...screenshots];
     const toTs = (s: ScreenshotInfo) => s.modified ? new Date(s.modified).getTime() : 0;
     if (sortBy === "newest")  sorted.sort((a, b) => toTs(b) - toTs(a));
     else                      sorted.sort((a, b) => toTs(a) - toTs(b));
     return sorted;
-  }, [screenshots, sortBy]);
-
-  const activeSortLabel = t(SORT_OPTIONS.find(o => o.value === sortBy)?.labelKey ?? "profiles.v3.screenshots.sort.newest");
+  }, [screenshots, sortBy, searchQuery]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const toggleSelection = (path: string) => {
@@ -120,17 +116,6 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       return next;
     });
   };
-
-  const handleScreenshotDeleted = useCallback((deletedPath: string) => {
-    setScreenshots(prev => prev.filter(s => s.path !== deletedPath));
-    setSelectedPaths(prev => {
-      if (!prev.has(deletedPath)) return prev;
-      const next = new Set(prev);
-      next.delete(deletedPath);
-      return next;
-    });
-    setModalScreenshot(null);
-  }, []);
 
   const confirmDelete = useCallback((paths: string[]) => {
     if (paths.length === 0) return;
@@ -151,6 +136,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         if (single && successCount === 1) toast.success(t("screenshots.deleted", { name: single.filename }));
         else toast.success(t("profiles.v3.screenshots.batchDeleteSuccess", { count: successCount }));
         if (!single) setSelectedPaths(new Set());
+        setModalScreenshot(prev => (prev && paths.includes(prev.path) ? null : prev));
         await loadData();
       } finally {
         setIsBatchDeleting(false);
@@ -177,6 +163,30 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
       />
     ));
   }, [screenshots, loadData, showModal, hideModal, isBatchDeleting, t]);
+
+  const modalIndex = modalScreenshot ? visibleScreenshots.findIndex(s => s.path === modalScreenshot.path) : -1;
+
+  const navigate = useCallback((delta: -1 | 1) => {
+    const next = visibleScreenshots[modalIndex + delta];
+    if (next) setModalScreenshot(next);
+  }, [visibleScreenshots, modalIndex]);
+
+  const renameScreenshot = useCallback(async (name: string) => {
+    if (!modalScreenshot) return;
+    const oldPath = modalScreenshot.path;
+    const newPath = await invoke<string>("rename_profile_screenshot", { profileId: profile.id, path: oldPath, name });
+    const filename = newPath.split(/[\\/]/).pop() ?? newPath;
+    const renamed = { ...modalScreenshot, path: newPath, filename };
+    setScreenshots(prev => prev.map(s => (s.path === oldPath ? renamed : s)));
+    setSelectedPaths(prev => {
+      if (!prev.has(oldPath)) return prev;
+      const next = new Set(prev);
+      next.delete(oldPath);
+      next.add(newPath);
+      return next;
+    });
+    setModalScreenshot(renamed);
+  }, [modalScreenshot, profile.id]);
 
   const handleBatchDelete = useCallback(() => confirmDelete(Array.from(selectedPaths)), [confirmDelete, selectedPaths]);
 
@@ -218,44 +228,35 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
   return (
     <div className="flex flex-col min-h-0 flex-1 relative">
       {/* ── Sticky Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 h-12 border-b border-white/5 flex-shrink-0 bg-black/20 sticky top-0 z-10">
-        <div className="relative">
-          <button
-            onClick={() => setSortMenuOpen(v => !v)}
-            className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-minecraft text-white/70 flex items-center gap-1.5"
-          >
-            <Icon icon="solar:sort-vertical-bold" className="w-3.5 h-3.5" />
-            {activeSortLabel}
-            <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 opacity-60" />
-          </button>
-          <ThemedDropdown open={sortMenuOpen} onClose={() => setSortMenuOpen(false)} width="w-48">
-            {SORT_OPTIONS.map(opt => (
-              <ThemedDropdownItem
-                key={opt.value}
-                icon={opt.icon}
-                selected={sortBy === opt.value}
-                onClick={() => { setSortBy(opt.value); setSortMenuOpen(false); }}
-              >
-                {t(opt.labelKey)}
-              </ThemedDropdownItem>
-            ))}
-          </ThemedDropdown>
-        </div>
-
-        <div className="flex-1" />
-
-        <span className="text-[10px] text-white/35 font-minecraft tabular-nums">
+      <div className="flex items-center gap-3 px-5 py-2.5 border-b border-white/10 flex-shrink-0 bg-black/20 sticky top-0 z-10">
+        <SearchWithFilters
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder={t("profiles.v3.screenshots.search")}
+          sortOptions={SORT_OPTIONS.map((opt) => ({ value: opt.value, label: t(opt.labelKey), icon: opt.icon }))}
+          sortValue={sortBy}
+          onSortChange={(v) => setSortBy(v as SortKey)}
+          showFilter={false}
+          dropdownSize="sm"
+          compact
+          className="flex-1 min-w-0"
+        />
+        <span className="text-xs text-white/40 font-minecraft tabular-nums whitespace-nowrap">
           {t("profiles.v3.screenshots.count", { count: screenshots.length })}
         </span>
-
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="h-8 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white disabled:opacity-50 flex items-center transition-colors"
-          title={t("profiles.v3.toolbar.refresh")}
-        >
-          <Icon icon="solar:refresh-bold" className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
+        <ContentActionButtons
+          size="sm"
+          actions={[
+            {
+              id: "refresh",
+              icon: "solar:refresh-bold",
+              variant: "text",
+              tooltip: t("profiles.v3.toolbar.refresh"),
+              loading,
+              onClick: loadData,
+            },
+          ]}
+        />
       </div>
 
       {/* ── Content ────────────────────────────────────────────────────── */}
@@ -326,7 +327,10 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
         screenshot={modalScreenshot}
         sharing={modalScreenshot ? isSharing(modalScreenshot.path) : false}
         onShare={() => modalScreenshot && shareScreenshot(modalScreenshot)}
-        onScreenshotDeleted={handleScreenshotDeleted}
+        onDelete={() => modalScreenshot && confirmDelete([modalScreenshot.path])}
+        onRename={renameScreenshot}
+        position={modalIndex >= 0 ? { index: modalIndex, total: visibleScreenshots.length } : undefined}
+        onNavigate={navigate}
       />
 
       {shareDialog}
@@ -378,14 +382,9 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
     if (!inView || previewUrl || previewError) return;
     (async () => {
       try {
-        const res = await getImagePreview({
-          path: screenshot.path,
-          width: PREVIEW_WIDTH,
-          height: PREVIEW_HEIGHT,
-          quality: PREVIEW_QUALITY,
-        });
+        const thumbnail = await getImageThumbnail(screenshot.path, THUMBNAIL_SIZE);
         if (!mountedRef.current) return;
-        setPreviewUrl(`data:image/jpeg;base64,${res.base64_image}`);
+        setPreviewUrl(convertFileSrc(thumbnail));
       } catch (err) {
         console.error("[V3 Screenshots] Preview failed:", err);
         if (mountedRef.current) setPreviewError(true);
@@ -405,12 +404,11 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
         if (selectMode) { e.stopPropagation(); onToggleSelection(); return; }
         onOpen();
       }}
-      style={isSelected ? { borderColor: `${accentColor}aa`, boxShadow: `0 0 0 1px ${accentColor}aa` } : undefined}
+      style={isSelected ? { borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}` } : undefined}
       className={`group relative aspect-video rounded-md overflow-hidden bg-white/5 border transition-all cursor-pointer ${
         isSelected ? "" : "border-white/10 hover:border-white/30"
       }`}
     >
-      {/* Preview / Placeholder / Error */}
       {previewError ? (
         <div className="w-full h-full flex items-center justify-center text-white/25">
           <Icon icon="solar:gallery-remove-bold" className="w-6 h-6" />
@@ -424,40 +422,26 @@ const ScreenshotTile: React.FC<ScreenshotTileProps> = ({
           className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? "opacity-100" : "opacity-0"}`}
           style={{ imageRendering: "auto" }}
         />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-white/20">
-          <Icon icon="solar:gallery-bold-duotone" className="w-7 h-7" />
-        </div>
-      )}
+      ) : null}
 
-      {/* Hover overlay (dimmt Bild, zeigt Checkbox + Date) */}
       <div
         className={`absolute inset-0 pointer-events-none transition-opacity ${
           isSelected ? "bg-black/25" : "bg-gradient-to-b from-black/40 via-transparent to-black/60 opacity-0 group-hover:opacity-100"
         }`}
       />
 
-      {/* Selection-Checkbox: permanent sichtbar im Select-Mode oder bei Selected,
-          sonst erst on-hover. Eigener pointer-events-auto damit Click nicht
-          durch den Overlay blockiert wird. */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleSelection(); }}
-        className={`absolute top-2 left-2 pointer-events-auto transition-opacity ${
-          selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-        title={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`absolute top-2 left-2 transition-opacity ${selectMode || isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
       >
-        <div
-          style={isSelected ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-            isSelected ? "" : "bg-black/50 border-white/60 hover:border-white"
-          }`}
-        >
-          {isSelected && <Icon icon="solar:check-read-linear" className="w-3.5 h-3.5 text-black" />}
-        </div>
-      </button>
+        <CheckboxV2
+          size="sm"
+          checked={isSelected}
+          onChange={onToggleSelection}
+          tooltip={isSelected ? t("profiles.v3.tile.deselect") : t("profiles.v3.tile.select")}
+        />
+      </div>
 
-      {/* Date-Badge unten links — nur bei Hover sichtbar */}
       <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <span className="text-[10px] text-white font-minecraft bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
           {formatRelativeTime(screenshot.modified)}
