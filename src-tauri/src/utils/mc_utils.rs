@@ -1360,8 +1360,14 @@ async fn profile_servers_dat(profile_id: Uuid) -> Result<(Profile, PathBuf)> {
     Ok((profile, servers_dat_path))
 }
 
+static SERVERS_DAT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub async fn edit_profile_servers(profile_id: Uuid, edit: &crate::utils::server_list::ServerListEdit) -> Result<()> {
+    if edit.is_noop() {
+        return Ok(());
+    }
     let (profile, servers_dat_path) = profile_servers_dat(profile_id).await?;
+    let _guard = SERVERS_DAT_LOCK.lock().await;
     let current = match fs::read(&servers_dat_path).await {
         Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,

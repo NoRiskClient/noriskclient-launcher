@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use tauri_plugin_opener::OpenerExt;
 use tokio::fs;
 
-
 /// File information for log/crash report listings
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileInfo {

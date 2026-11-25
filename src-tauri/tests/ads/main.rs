@@ -380,3 +380,11 @@ fn a_reloaded_ad_page_closes_a_privacy_dialog_it_no_longer_shows() {
     assert!(!dialog_lost_on_load(ConsentMode::Prompt, false));
     assert!(!dialog_lost_on_load(ConsentMode::Closed, false));
 }
+
+#[test]
+fn only_the_ad_webview_label_counts_as_the_ad_webview() {
+    assert!(is_ad_webview(ADS_WEBVIEW_LABEL));
+    for label in ["ads-frame-top", "adsettings", "main", "ad"] {
+        assert!(!is_ad_webview(label), "{label}");
+    }
+}
