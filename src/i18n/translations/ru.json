@@ -3146,5 +3146,9 @@
   "profiles.v3.chips.group.empty": "без группы",
   "profiles.v3.chips.group.placeholder": "Без группы",
   "profiles.v3.chips.loaderVersion.latest": "последняя",
-  "profiles.v3.chips.loaderVersion.notSupported": "не поддерживается"
+  "profiles.v3.chips.loaderVersion.notSupported": "не поддерживается",
+  "worlds.copying_many": "Копирование миров: {{count}}…",
+  "worlds.copy_partial": "Скопировано: {{succeeded}}, ошибок: {{failed}}: {{error}}",
+  "worlds.hardcore": "Хардкор",
+  "worlds.play": "Играть"
 }

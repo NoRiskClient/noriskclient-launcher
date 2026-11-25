@@ -3118,5 +3118,9 @@
   "profiles.v3.chips.group.empty": "grup yok",
   "profiles.v3.chips.group.placeholder": "Grupsuz",
   "profiles.v3.chips.loaderVersion.latest": "en yeni",
-  "profiles.v3.chips.loaderVersion.notSupported": "desteklenmiyor"
+  "profiles.v3.chips.loaderVersion.notSupported": "desteklenmiyor",
+  "worlds.copying_many": "{{count}} dünya kopyalanıyor…",
+  "worlds.copy_partial": "{{succeeded}} kopyalandı, {{failed}} başarısız: {{error}}",
+  "worlds.hardcore": "Zorlu",
+  "worlds.play": "Oyna"
 }

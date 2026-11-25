@@ -3145,5 +3145,9 @@
   "profiles.v3.chips.group.placeholder": "Bez grupy",
   "profiles.v3.chips.loaderVersion.latest": "najnowsza",
   "profiles.v3.chips.loaderVersion.notSupported": "nieobsługiwane",
-  "settings.font.title": "Czcionka"
+  "settings.font.title": "Czcionka",
+  "worlds.copying_many": "Kopiowanie {{count}} światów…",
+  "worlds.copy_partial": "Skopiowano {{succeeded}}, nieudane: {{failed}}: {{error}}",
+  "worlds.hardcore": "Hardcore",
+  "worlds.play": "Graj"
 }

@@ -3130,5 +3130,9 @@
   "profiles.v3.chips.group.empty": "कोई समूह नहीं",
   "profiles.v3.chips.group.placeholder": "बिना समूह",
   "profiles.v3.chips.loaderVersion.latest": "नवीनतम",
-  "profiles.v3.chips.loaderVersion.notSupported": "समर्थित नहीं"
+  "profiles.v3.chips.loaderVersion.notSupported": "समर्थित नहीं",
+  "worlds.copying_many": "{{count}} वर्ल्ड कॉपी हो रहे हैं…",
+  "worlds.copy_partial": "{{succeeded}} कॉपी हुए, {{failed}} विफल: {{error}}",
+  "worlds.hardcore": "हार्डकोर",
+  "worlds.play": "खेलें"
 }

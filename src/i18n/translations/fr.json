@@ -3118,5 +3118,9 @@
   "profiles.v3.chips.group.empty": "aucun groupe",
   "profiles.v3.chips.group.placeholder": "Sans groupe",
   "profiles.v3.chips.loaderVersion.latest": "dernière",
-  "profiles.v3.chips.loaderVersion.notSupported": "non pris en charge"
+  "profiles.v3.chips.loaderVersion.notSupported": "non pris en charge",
+  "worlds.copying_many": "Copie de {{count}} mondes…",
+  "worlds.copy_partial": "{{succeeded}} copiés, {{failed}} échoués : {{error}}",
+  "worlds.hardcore": "Hardcore",
+  "worlds.play": "Jouer"
 }
