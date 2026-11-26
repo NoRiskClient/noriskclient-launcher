@@ -15,12 +15,14 @@ import { useActiveSkinTexture } from "../../hooks/useActiveSkinTexture";
 import { trackEvent } from "../../services/analytics-service";
 
 export const NORISK_PLUS_URL = "https://norisk.gg/shop";
-type PauseOption = "today" | "threeDays";
+const EXTRA_PAUSE_DAYS = { today: 0, threeDays: 2, fiveDays: 4 } as const;
+type PauseOption = keyof typeof EXTRA_PAUSE_DAYS;
+const PAUSE_OPTIONS = Object.keys(EXTRA_PAUSE_DAYS) as PauseOption[];
 
 function pauseEnd(option: PauseOption): number {
   const end = new Date();
   end.setHours(24, 0, 0, 0);
-  if (option === "threeDays") end.setDate(end.getDate() + 2);
+  end.setDate(end.getDate() + EXTRA_PAUSE_DAYS[option]);
   return end.getTime();
 }
 const MODAL_ID = "ad-pause";
@@ -111,10 +113,7 @@ function AdPauseDialog({ onClose }: { onClose: () => void }) {
               stretch
               value={option}
               onChange={setOption}
-              options={[
-                { value: "today", label: t("ads.pause.option.today") },
-                { value: "threeDays", label: t("ads.pause.option.threeDays") },
-              ]}
+              options={PAUSE_OPTIONS.map((value) => ({ value, label: t(`ads.pause.option.${value}`) }))}
             />
           </div>
         </div>
