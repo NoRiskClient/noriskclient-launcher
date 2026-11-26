@@ -1,6 +1,6 @@
 import type { Profile } from "../types/profile";
 
-const timeOf = (value: string | null | undefined) => (value ? new Date(value).getTime() || 0 : 0);
+export const timeOf = (value: string | null | undefined) => (value ? new Date(value).getTime() || 0 : 0);
 
 export function compareByLastPlayed(a: Profile, b: Profile): number {
   return (

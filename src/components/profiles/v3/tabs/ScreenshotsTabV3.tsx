@@ -14,7 +14,7 @@ import { useInView } from "react-intersection-observer";
 
 import type { Profile } from "../../../../types/profile";
 import type { ScreenshotInfo } from "../../../../types/profile";
-import { getImageThumbnail } from "../../../../services/tauri-service";
+import { getImageThumbnail, listProfileScreenshots } from "../../../../services/tauri-service";
 import { useThemeStore } from "../../../../store/useThemeStore";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { formatRelativeTime } from "../../../../utils/format-relative-time";
@@ -75,7 +75,7 @@ export function ScreenshotsTabV3({ profile, isActive = true }: ScreenshotsTabV3P
     setLoading(true);
     setError(null);
     try {
-      const list = await invoke<ScreenshotInfo[]>("list_profile_screenshots", { profileId: profile.id });
+      const list = await listProfileScreenshots(profile.id);
       if (!mountedRef.current) return;
       setScreenshots(list);
       // Stale Selektions-Eintraege dropen — wenn Files extern geloescht
