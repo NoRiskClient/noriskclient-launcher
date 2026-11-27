@@ -16,7 +16,7 @@ Do the above and share your source code with everyone; just like we do.
 ## Compile it yourself!
 
 ### Prerequisites
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/en/download)
+- **Node.js** (v20.19 or higher) - [Download here](https://nodejs.org/en/download)
 - **Rust** (latest stable) - [Install here](https://www.rust-lang.org/tools/install)
 - **Yarn** package manager - `npm install -g yarn`
 
