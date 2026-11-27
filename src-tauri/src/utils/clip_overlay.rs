@@ -59,7 +59,7 @@ pub fn create(app: &AppHandle) -> Result<()> {
 }
 
 fn position(window: &tauri::WebviewWindow) {
-    let Ok(Some(monitor)) = window.primary_monitor() else {
+    let Some(monitor) = target_monitor(window) else {
         return;
     };
 
@@ -70,6 +70,35 @@ fn position(window: &tauri::WebviewWindow) {
     let y = origin.y + TOP_MARGIN;
 
     let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+fn target_monitor(window: &tauri::WebviewWindow) -> Option<tauri::Monitor> {
+    #[cfg(windows)]
+    if let Some((x, y)) = foreground_centre() {
+        if let Ok(Some(monitor)) = window.monitor_from_point(x, y) {
+            return Some(monitor);
+        }
+    }
+    window.primary_monitor().ok().flatten()
+}
+
+#[cfg(windows)]
+fn foreground_centre() -> Option<(f64, f64)> {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect};
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return None;
+        }
+        let mut rect = RECT::default();
+        GetWindowRect(hwnd, &mut rect).ok()?;
+        Some((
+            (rect.left as f64 + rect.right as f64) / 2.0,
+            (rect.top as f64 + rect.bottom as f64) / 2.0,
+        ))
+    }
 }
 
 #[cfg(windows)]
