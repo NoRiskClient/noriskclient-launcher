@@ -70,15 +70,15 @@ impl AudioPipeline {
         std::iter::once(&self.master).chain(self.stems.iter())
     }
 
-    pub(super) fn drain_mixer(&self) {
+    pub(super) fn drain_mixer(&self, ending: bool) {
         for (mixer, sink) in &self.mixers {
-            let tail = mixer.flush();
+            let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
+            let tail = if ending { mixer.flush() } else { mixer.settle() };
             if tail.is_empty() {
                 continue;
             }
 
             let samples: usize = tail.iter().map(|block| block.samples.len()).sum();
-            let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
             for block in tail {
                 (*sink)(&block.samples, block.timestamp_100ns);
             }
@@ -217,8 +217,8 @@ impl Destination {
                 sink,
                 gain,
             } => {
+                let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
                 for block in mixer.push(*track, samples, relative, *gain) {
-                    let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
                     (*sink)(&block.samples, block.timestamp_100ns);
                 }
             }

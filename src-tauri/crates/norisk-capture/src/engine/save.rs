@@ -25,7 +25,7 @@ impl Engine {
         }
 
         if let Some(audio) = self.active.as_ref().and_then(|p| p.audio.as_ref()) {
-            audio.drain_mixer();
+            audio.drain_mixer(false);
         }
 
         let (pre, post) = (

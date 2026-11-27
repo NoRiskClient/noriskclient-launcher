@@ -535,7 +535,7 @@ impl Engine {
 
     fn detach_retaining_buffer(&mut self, spoiled: Duration) {
         if let Some(audio) = self.active.as_ref().and_then(|p| p.audio.as_ref()) {
-            audio.drain_mixer();
+            audio.drain_mixer(true);
         }
 
         let retired = self.active.as_ref().map(|pipeline| Retired {

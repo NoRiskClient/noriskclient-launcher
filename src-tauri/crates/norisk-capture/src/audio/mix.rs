@@ -77,6 +77,15 @@ impl Mixer {
         let mut state = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         state.take_all()
     }
+
+    pub fn settle(&self) -> Vec<MixedBlock> {
+        let mut state = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let frames = state.settled_frames();
+        if frames == 0 {
+            return Vec::new();
+        }
+        state.take(frames)
+    }
 }
 
 impl State {
@@ -116,18 +125,19 @@ impl State {
         self.filled[index] = self.filled[index].max(end / self.channels);
     }
 
-    fn complete_frames(&self) -> usize {
-        let settled = self
-            .expected
+    fn settled_frames(&self) -> usize {
+        self.expected
             .iter()
             .enumerate()
             .filter(|(_, expected)| **expected)
             .map(|(index, _)| self.filled[index])
             .min()
-            .unwrap_or(0);
+            .unwrap_or(0)
+    }
 
+    fn complete_frames(&self) -> usize {
         let hold = self.frames_per_100ns(HOLD_100NS).max(0) as usize;
-        settled.saturating_sub(hold)
+        self.settled_frames().saturating_sub(hold)
     }
 
     fn take_complete(&mut self) -> Vec<MixedBlock> {
@@ -387,6 +397,28 @@ mod tests {
             "flushing must hand over everything that was held"
         );
         assert!(mixer.flush().is_empty(), "and leave nothing behind");
+    }
+
+    #[test]
+    fn settling_leaves_room_for_the_track_that_lags_behind() {
+        let mixer = Mixer::new(RATE, CHANNELS, &[Track::Game, Track::Other]);
+        let half = RATE as usize / 2;
+
+        let mut released = mixer.push(Track::Game, &frames(half * 2, 0.5), 0, 1.0);
+        released.extend(mixer.push(Track::Other, &frames(half, 0.25), 0, 1.0));
+        released.extend(mixer.settle());
+
+        let settled: usize = released.iter().map(|b| b.samples.len()).sum();
+        assert_eq!(settled, half * CHANNELS as usize);
+
+        let mut tail = mixer.push(Track::Other, &frames(half, 0.25), ticks(half as i64), 1.0);
+        tail.extend(mixer.flush());
+        let mixed: Vec<f32> = tail.into_iter().flat_map(|b| b.samples).collect();
+        assert_eq!(mixed.len(), half * CHANNELS as usize);
+        assert!(
+            mixed.iter().all(|s| (s - 0.75).abs() < 1e-6),
+            "the lagging track's late half must still be mixed in"
+        );
     }
 
     #[test]
