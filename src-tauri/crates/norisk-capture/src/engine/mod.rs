@@ -263,7 +263,7 @@ impl Engine {
                 self.paused = None;
                 self.retry = None;
                 self.trouble = Trouble::default();
-                self.detach();
+                self.detach_retaining_buffer(Duration::ZERO);
             }
             LauncherToCapture::SetBufferEnabled { enabled } => {
                 if enabled == self.buffering_enabled {
