@@ -384,11 +384,27 @@ fn dense_peaks(points: &[crate::buffer::Peak], clip: &crate::buffer::Clip) -> Ve
 
 pub(super) fn start_audio(
     window_seconds: f32,
-    plan: AudioPlan,
+    mut plan: AudioPlan,
     epoch: Arc<AtomicI64>,
     denoise_microphone: bool,
 ) -> Result<AudioPipeline> {
     use crate::audio::{LoopbackCapture, Mixer, Track};
+
+    plan.sources.retain_mut(|planned| {
+        if planned.track != Track::Microphone {
+            return true;
+        }
+        match crate::audio::wasapi::probe_source(&planned.source) {
+            Ok((resolved, _)) => {
+                planned.source = resolved;
+                true
+            }
+            Err(e) => {
+                log::warn!("Recording without the microphone: {e:#}");
+                false
+            }
+        }
+    });
 
     if plan.sources.is_empty() {
         anyhow::bail!("no audio source to record");

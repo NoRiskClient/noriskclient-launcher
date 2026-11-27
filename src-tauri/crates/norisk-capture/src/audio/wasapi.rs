@@ -225,12 +225,24 @@ pub fn probe_source(source: &AudioSource) -> Result<(AudioSource, AudioFormat)> 
 
         match open_client(source) {
             Ok((_client, format)) => Ok((source.clone(), format)),
-            Err(e) if *source != AudioSource::DefaultDevice => {
-                log::warn!("{source:?} is unavailable, falling back to the default device: {e:#}");
-                let (_client, format) = open_client(&AudioSource::DefaultDevice)?;
-                Ok((AudioSource::DefaultDevice, format))
-            }
-            Err(e) => Err(e),
+            Err(e) => match fallback_for(source) {
+                Some(fallback) => {
+                    log::warn!("{source:?} is unavailable, falling back to {fallback:?}: {e:#}");
+                    let (_client, format) = open_client(&fallback)?;
+                    Ok((fallback, format))
+                }
+                None => Err(e),
+            },
+        }
+    }
+}
+
+fn fallback_for(source: &AudioSource) -> Option<AudioSource> {
+    match source {
+        AudioSource::Microphone(Some(_)) => Some(AudioSource::Microphone(None)),
+        AudioSource::Microphone(None) | AudioSource::DefaultDevice => None,
+        AudioSource::Device(_) | AudioSource::Process(_) | AudioSource::EverythingExcept(_) => {
+            Some(AudioSource::DefaultDevice)
         }
     }
 }
@@ -713,6 +725,20 @@ mod tests {
 
     const RATE: u32 = 48_000;
     const PACKET: usize = 480;
+
+    #[test]
+    fn a_missing_microphone_never_falls_back_to_desktop_audio() {
+        assert_eq!(
+            fallback_for(&AudioSource::Microphone(Some("gone".into()))),
+            Some(AudioSource::Microphone(None))
+        );
+        assert_eq!(fallback_for(&AudioSource::Microphone(None)), None);
+        assert_eq!(
+            fallback_for(&AudioSource::Device("gone".into())),
+            Some(AudioSource::DefaultDevice)
+        );
+        assert_eq!(fallback_for(&AudioSource::DefaultDevice), None);
+    }
 
     fn step() -> i64 {
         span_100ns(PACKET, RATE)
