@@ -155,6 +155,11 @@ async fn dispatch(app: &AppHandle, action: Action) {
 
     match action {
         Action::SaveClip => {
+            if !state.capture_supervisor.is_listening().await {
+                log::warn!("Clip hotkey pressed while the capture engine is not running");
+                state.capture_supervisor.report_not_listening().await;
+                return;
+            }
             let request = norisk_ipc::LauncherToCapture::SaveClip(norisk_ipc::SaveClipRequest {
                 pre_roll_seconds: clips.pre_roll_seconds,
                 post_roll_seconds: clips.post_roll_seconds,

@@ -229,6 +229,24 @@ impl CaptureSupervisor {
         *self.running.read().await
     }
 
+    pub async fn is_listening(&self) -> bool {
+        self.is_running().await && self.ready.read().await.is_some()
+    }
+
+    pub async fn report_not_listening(&self) {
+        let error = norisk_ipc::CaptureError {
+            code: norisk_ipc::ErrorCode::NotRecording,
+            message: "the capture engine is not running".into(),
+            recoverable: true,
+            source: None,
+            destination: None,
+        };
+        if let Some(app) = self.app.read().await.as_ref() {
+            use tauri::Emitter;
+            let _ = app.emit("clip_error", &error);
+        }
+    }
+
     pub fn send(&self, command: LauncherToCapture) -> Result<()> {
         if self.incompatible.load(std::sync::atomic::Ordering::Acquire) {
             return Err(AppError::Other(
