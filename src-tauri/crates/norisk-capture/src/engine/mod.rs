@@ -53,6 +53,7 @@ pub struct Engine {
     empty_warned: bool,
     excluded: std::cell::Cell<Option<Option<u32>>>,
     excluded_checked: Instant,
+    saves: Vec<std::thread::JoinHandle<()>>,
 }
 
 #[derive(Clone, Copy)]
@@ -77,6 +78,7 @@ struct Retired {
 }
 
 const RETAIN_FOR: Duration = Duration::from_secs(MAX_CLIP_SECONDS_RETAINED);
+const SAVE_GRACE: Duration = Duration::from_millis(2500);
 const EXCLUDED_CHECK_EVERY: Duration = Duration::from_secs(5);
 const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 
@@ -114,6 +116,7 @@ impl Engine {
             empty_warned: false,
             excluded: std::cell::Cell::new(None),
             excluded_checked: Instant::now(),
+            saves: Vec::new(),
         }
     }
 
@@ -152,7 +155,19 @@ impl Engine {
         }
 
         log::info!("Engine shutting down");
+        self.finish_saves(SAVE_GRACE);
         self.detach();
+    }
+
+    fn finish_saves(&mut self, budget: Duration) {
+        let deadline = Instant::now() + budget;
+        while self.saves.iter().any(|save| !save.is_finished()) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let unfinished = self.saves.iter().filter(|save| !save.is_finished()).count();
+        if unfinished > 0 {
+            log::warn!("Shutting down with {unfinished} clip(s) still being written");
+        }
     }
 
     fn announce_ready(&self) {
@@ -218,6 +233,9 @@ impl Engine {
             LauncherToCapture::Configure(config) => {
                 self.trouble = Trouble::default();
                 let restart = self.active.is_some() && needs_restart(&self.config, &config);
+                if self.saves.is_empty() {
+                    crate::writer::sweep_parts(&config.output_dir);
+                }
                 self.config = config;
                 if restart {
                     log::info!("Configuration changed materially; restarting the pipeline");

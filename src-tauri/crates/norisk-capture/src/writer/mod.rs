@@ -59,6 +59,21 @@ pub(crate) fn part_path(destination: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
+pub(crate) fn sweep_parts(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_lowercase();
+        if name.ends_with(".mp4.part") || name.ends_with(".gif.part") {
+            match std::fs::remove_file(entry.path()) {
+                Ok(()) => log::info!("Removed the unfinished clip {}", entry.path().display()),
+                Err(e) => log::debug!("Could not remove {}: {e}", entry.path().display()),
+            }
+        }
+    }
+}
+
 struct PartGuard(Option<PathBuf>);
 
 impl Drop for PartGuard {
@@ -433,6 +448,26 @@ mod tests {
     const STEP: i64 = 90_000 / FPS;
     const WIDTH: usize = 320;
     const HEIGHT: usize = 240;
+
+    #[test]
+    fn sweeping_removes_only_unfinished_clips() {
+        let dir = std::env::temp_dir().join(format!("nrc-sweep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["kept.mp4", "cut.mp4.part", "loop.gif.part", "notes.txt.part"] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+
+        sweep_parts(&dir);
+
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(left, ["kept.mp4", "notes.txt.part"]);
+    }
 
     fn encode_with_b_frames(frames: usize) -> Option<(Vec<Packet>, Vec<u8>)> {
         unsafe {
