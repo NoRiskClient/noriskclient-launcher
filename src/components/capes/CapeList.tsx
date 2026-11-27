@@ -498,10 +498,8 @@ export function CapeList({
         ]
       : []),
   ];
-  const latestCount = useRef(capeMenuItems.length);
-  latestCount.current = capeMenuItems.length;
   const openCapeMenu = useCallback(
-    (cape: CosmeticCape | VanillaCape, event: React.MouseEvent) => openMenu(cape, event, latestCount.current),
+    (cape: CosmeticCape | VanillaCape, event: React.MouseEvent) => openMenu(cape, event),
     [openMenu],
   );
 

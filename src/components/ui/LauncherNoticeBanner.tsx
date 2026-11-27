@@ -8,7 +8,7 @@ import {
 } from "../../services/feature-flags-service";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useThemeStore } from "../../store/useThemeStore";
-import { BannerCard } from "./BannerCard";
+import { BannerCard, CORNER_BANNER_CLASS } from "./BannerCard";
 
 const SEVERITY_COLORS: Record<LauncherNoticeSeverity, string> = {
   info: "#3b82f6",
@@ -41,7 +41,7 @@ export function LauncherNoticeBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] flex flex-col gap-3">
+    <div className={`${CORNER_BANNER_CLASS} flex flex-col gap-3`}>
       {visible.map((notice) => {
         const severity: LauncherNoticeSeverity = notice.severity ?? "warning";
         const color =

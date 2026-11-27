@@ -8,9 +8,6 @@ pub const ADS_WEBVIEW_LABEL: &str = "ads";
 
 pub fn is_ad_webview(label: &str) -> bool {
     label == ADS_WEBVIEW_LABEL
-        || label
-            .strip_prefix(ADS_WEBVIEW_LABEL)
-            .is_some_and(|rest| rest.starts_with('-'))
 }
 pub const AD_SLOTS: &[&str] = &["play-news", FRIENDS_AD_SLOT];
 
@@ -194,7 +191,8 @@ pub fn is_ad_origin(url: &Url) -> bool {
 }
 
 pub fn shows_ads(config: Option<&AdsConfig>, norisk_plus: Option<bool>, os: &str) -> bool {
-    config.is_some_and(|config| config.plus_sees_ads || norisk_plus == Some(false)) && os == "windows"
+    config.is_some_and(|config| config.plus_sees_ads || norisk_plus == Some(false))
+        && os == "windows"
 }
 
 pub fn navigation_allowed(url: &Url) -> bool {
@@ -206,7 +204,7 @@ pub fn navigation_allowed(url: &Url) -> bool {
 }
 
 pub fn ad_page_ipc_allowed(webview_label: &str, page: Option<&Url>) -> bool {
-    webview_label == ADS_WEBVIEW_LABEL && page.is_some_and(is_ad_origin)
+    is_ad_webview(webview_label) && page.is_some_and(is_ad_origin)
 }
 
 pub fn reload_delay(last_load: Option<Instant>, now: Instant) -> Duration {
@@ -268,7 +266,11 @@ impl ConsentMode {
     }
 }
 
-pub fn accepts_page_mode(current: ConsentMode, launcher_opened_dialog: bool, next: ConsentMode) -> bool {
+pub fn accepts_page_mode(
+    current: ConsentMode,
+    launcher_opened_dialog: bool,
+    next: ConsentMode,
+) -> bool {
     next != ConsentMode::Dialog || launcher_opened_dialog || current != ConsentMode::Closed
 }
 
@@ -276,9 +278,14 @@ pub fn dialog_lost_on_load(current: ConsentMode, launcher_reopening: bool) -> bo
     current == ConsentMode::Dialog && !launcher_reopening
 }
 
-pub fn reload_after_consent(previous: ConsentMode, next: ConsentMode, managed_from_prompt: bool) -> bool {
+pub fn reload_after_consent(
+    previous: ConsentMode,
+    next: ConsentMode,
+    managed_from_prompt: bool,
+) -> bool {
     next == ConsentMode::Closed
-        && (previous == ConsentMode::Prompt || (previous == ConsentMode::Dialog && managed_from_prompt))
+        && (previous == ConsentMode::Prompt
+            || (previous == ConsentMode::Dialog && managed_from_prompt))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -337,7 +344,10 @@ pub struct ScreenRect {
 
 impl ScreenRect {
     fn contains(&self, x: f64, y: f64) -> bool {
-        f64::from(self.left) <= x && x < f64::from(self.right) && f64::from(self.top) <= y && y < f64::from(self.bottom)
+        f64::from(self.left) <= x
+            && x < f64::from(self.right)
+            && f64::from(self.top) <= y
+            && y < f64::from(self.bottom)
     }
 }
 
@@ -364,5 +374,7 @@ const MAX_PURPOSES: usize = 64;
 
 pub fn personalized_ads(consented_purposes: &[u32]) -> bool {
     consented_purposes.len() <= MAX_PURPOSES
-        && PROFILE_PURPOSES.iter().all(|purpose| consented_purposes.contains(purpose))
+        && PROFILE_PURPOSES
+            .iter()
+            .all(|purpose| consented_purposes.contains(purpose))
 }

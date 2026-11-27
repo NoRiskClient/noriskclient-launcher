@@ -1,8 +1,5 @@
 import { useCallback, useState, type MouseEvent } from "react";
-import { createPortal } from "react-dom";
-import { SettingsContextMenu, clampMenuPosition, type ContextMenuItem } from "./SettingsContextMenu";
-
-const ITEM_HEIGHT = 36;
+import { SettingsContextMenu, type ContextMenuItem } from "./SettingsContextMenu";
 
 interface OpenMenu<T> {
   target: T;
@@ -12,10 +9,10 @@ interface OpenMenu<T> {
 export function useCardContextMenu<T>() {
   const [menu, setMenu] = useState<OpenMenu<T> | null>(null);
 
-  const open = useCallback((target: T, event: MouseEvent, itemCount: number) => {
+  const open = useCallback((target: T, event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    setMenu({ target, position: clampMenuPosition(event.clientX, event.clientY, itemCount * ITEM_HEIGHT + 16) });
+    setMenu({ target, position: { x: event.clientX, y: event.clientY } });
   }, []);
 
   const close = useCallback(() => setMenu(null), []);
@@ -31,8 +28,5 @@ interface CardContextMenuProps<T> {
 
 export function CardContextMenu<T>({ menu, items, onClose }: CardContextMenuProps<T>) {
   if (!menu) return null;
-  return createPortal(
-    <SettingsContextMenu target={menu.target} isOpen position={menu.position} items={items} onClose={onClose} compact />,
-    document.body,
-  );
+  return <SettingsContextMenu target={menu.target} isOpen position={menu.position} items={items} onClose={onClose} compact />;
 }

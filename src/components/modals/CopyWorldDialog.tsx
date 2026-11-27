@@ -9,13 +9,10 @@ import { ProfilePickerGrid } from "../profiles/ProfilePickerGrid";
 import { McWorldRow } from "../profiles/v3/shared/McWorldRow";
 import { useProfileStore } from "../../store/profile-store";
 import { sortRecentFirst } from "../../utils/profile-sort";
-import type { Profile } from "../../types/profile";
 import type { WorldInfo } from "../../types/minecraft";
 
 interface CopyWorldDialogProps {
   worlds: WorldInfo[];
-  availableProfiles: Profile[];
-  isLoadingProfiles: boolean;
   onClose: () => void;
   onConfirm: (params: { targetProfileIds: string[]; copies: WorldCopy[] }) => Promise<void>;
 }
@@ -29,13 +26,13 @@ const nameOf = (world: WorldInfo) => world.display_name ?? world.folder_name;
 
 export function CopyWorldDialog({
   worlds,
-  availableProfiles,
-  isLoadingProfiles,
   onClose,
   onConfirm,
 }: CopyWorldDialogProps) {
   const { t } = useTranslation();
   const lastPlayedProfileId = useProfileStore((s) => s.lastPlayedProfileId);
+  const availableProfiles = useProfileStore((s) => s.profiles);
+  const isLoadingProfiles = useProfileStore((s) => s.loading);
   const profiles = useMemo(
     () => sortRecentFirst(availableProfiles, lastPlayedProfileId),
     [availableProfiles, lastPlayedProfileId],

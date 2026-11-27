@@ -13,12 +13,12 @@ interface McWorldRowProps {
 }
 
 export function McWorldRow({ world, onPlay, playDisabled, nameSlot }: McWorldRowProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const name = world.display_name ?? world.folder_name;
   const date = world.last_played
     ? new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" }).format(world.last_played)
     : null;
-  const mode = world.is_hardcore ? "Hardcore" : WorldService.getGameModeString(world.game_mode ?? 0);
+  const mode = world.is_hardcore ? t("worlds.hardcore") : WorldService.getGameModeString(world.game_mode ?? 0);
   const info = [mode, world.version_name].filter(Boolean).join(", ");
 
   return (

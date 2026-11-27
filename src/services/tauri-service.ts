@@ -1,5 +1,6 @@
 import { openUrl, openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
+import type { ScreenshotInfo } from '../types/profile';
 
 /**
  * Opens a given URL in the default external application (usually the web browser).
@@ -23,6 +24,9 @@ export const openExternalUrl = (url: string): Promise<void> => {
  */
 export const getImageThumbnail = (path: string, size: number): Promise<string> =>
   invoke<string>('get_image_thumbnail', { path, size });
+
+export const listProfileScreenshots = (profileId: string): Promise<ScreenshotInfo[]> =>
+  invoke<ScreenshotInfo[]>('list_profile_screenshots', { profileId });
 
 /**
  * Gets the launcher directory path from the backend.

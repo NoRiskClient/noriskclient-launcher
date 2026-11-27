@@ -61,7 +61,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         : null)
     : null;
 
-  const { available: adSettingsAvailable } = useAdSettings();
+  const adSettingsAvailable = useAdSettings();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");

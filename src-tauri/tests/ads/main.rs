@@ -418,3 +418,11 @@ fn a_page_stands_in_only_for_a_slot_of_the_same_size() {
     assert!(!same_ad_size(&rail, &tall));
     assert!(!same_ad_size(&url(PAGE), &url(PAGE)));
 }
+
+#[test]
+fn only_the_ad_webview_label_counts_as_the_ad_webview() {
+    assert!(is_ad_webview(ADS_WEBVIEW_LABEL));
+    for label in ["ads-frame-top", "adsettings", "main", "ad"] {
+        assert!(!is_ad_webview(label), "{label}");
+    }
+}

@@ -61,7 +61,7 @@ export function ProfilePickerGrid({
               tabIndex={onSelect && !disabled ? 0 : undefined}
               onClick={() => !disabled && onSelect?.(profile)}
               onKeyDown={(e) => {
-                if (onSelect && !disabled && (e.key === "Enter" || e.key === " ")) {
+                if (e.target === e.currentTarget && onSelect && !disabled && (e.key === "Enter" || e.key === " ")) {
                   e.preventDefault();
                   onSelect(profile);
                 }
@@ -86,7 +86,11 @@ export function ProfilePickerGrid({
                   </span>
                 )}
               </div>
-              {renderAction?.(profile)}
+              {renderAction && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  {renderAction(profile)}
+                </div>
+              )}
             </div>
           );
         })}

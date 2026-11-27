@@ -8,10 +8,8 @@ fn remote_sign_in_windows_cannot_call_any_launcher_command() {
 }
 
 #[test]
-fn every_ad_webview_cannot_call_any_launcher_command() {
-    for label in ["ads", "ads-frame-top", "ads-frame-left"] {
-        assert!(!allows(label), "{label} must be refused");
-    }
+fn the_ad_webview_cannot_call_any_launcher_command() {
+    assert!(!allows("ads"));
 }
 
 #[test]

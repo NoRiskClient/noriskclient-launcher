@@ -3,11 +3,13 @@ import { createPortal } from "react-dom";
 import { useThemeStore } from "../../store/useThemeStore";
 import { AdCaption, AdFrame, MAIN_AD_SLOT, useAdSize } from "./AdCard";
 import { NewsSection } from "../news/NewsSection";
+import { RailWidgetSlot } from "./widgets/RailWidgetSlot";
 
 const RAIL_BORDER = 2;
 const AD_PADDING = 12;
 const RAIL_GAP = 12;
-const AD_RAIL_WIDTH = 300 + AD_PADDING * 2 + RAIL_BORDER * 2;
+const RAIL_SLOT = { width: 300, height: 250 };
+const AD_RAIL_WIDTH = RAIL_SLOT.width + AD_PADDING * 2 + RAIL_BORDER * 2;
 
 interface RailSlot {
   target: HTMLElement | null;
@@ -23,7 +25,6 @@ export function AdRailLayout({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [headerTarget, setHeaderTarget] = useState<HTMLElement | null>(null);
   const [panels, setPanels] = useState(0);
-  const visible = !!railAd || panels > 0;
 
   return (
     <RailContext.Provider value={{ target, headerTarget, setPanels }}>
@@ -32,14 +33,14 @@ export function AdRailLayout({ children }: { children: ReactNode }) {
         <div
           data-page-area
           className="relative flex-1 min-h-0"
-          style={{ ["--ad-rail-width" as string]: visible ? `${AD_RAIL_WIDTH + RAIL_GAP}px` : "0px" }}
+          style={{ ["--ad-rail-width" as string]: `${AD_RAIL_WIDTH + RAIL_GAP}px` }}
         >
           <div className="absolute inset-0 overflow-hidden" style={{ paddingRight: "var(--ad-rail-width)" }}>
             {children}
           </div>
           <aside
             className="absolute top-0 right-0 bottom-0 z-20 py-3"
-            style={{ display: visible ? undefined : "none", paddingRight: RAIL_GAP }}
+            style={{ paddingRight: RAIL_GAP }}
           >
             <div
               className="h-full flex flex-col rounded-lg overflow-hidden backdrop-blur-lg"
@@ -52,12 +53,16 @@ export function AdRailLayout({ children }: { children: ReactNode }) {
               <div ref={setTarget} className="flex-1 min-h-0 flex flex-col gap-2 p-2.5 overflow-y-auto custom-scrollbar">
                 {panels === 0 && <NewsSection />}
               </div>
-              {railAd && (
-                <div className="shrink-0 flex flex-col gap-2 p-3 pt-0">
-                  <AdFrame slot={MAIN_AD_SLOT} size={railAd} />
-                  <AdCaption />
-                </div>
-              )}
+              <div className="shrink-0 flex flex-col gap-2 p-3 pt-0">
+                {railAd ? (
+                  <>
+                    <AdFrame slot={MAIN_AD_SLOT} size={railAd} />
+                    <AdCaption />
+                  </>
+                ) : (
+                  <RailWidgetSlot {...RAIL_SLOT} />
+                )}
+              </div>
             </div>
           </aside>
         </div>

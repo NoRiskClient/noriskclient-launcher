@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(test))]
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::utils::file_names::{plain, rename_beside};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,19 +127,6 @@ impl ClipDetails {
                 }]
             },
         }
-    }
-}
-
-fn plain(path: PathBuf) -> PathBuf {
-    let Some(text) = path.to_str() else {
-        return path;
-    };
-    match text.strip_prefix("\\\\?\\") {
-        Some(rest) => match rest.strip_prefix("UNC\\") {
-            Some(share) => PathBuf::from(format!("\\\\{share}")),
-            None => PathBuf::from(rest),
-        },
-        None => path,
     }
 }
 
@@ -447,27 +435,12 @@ pub fn set_favourite(dir: &Path, path: &Path, favourite: bool) -> Result<()> {
     write_details(&path, &details)
 }
 
-use crate::utils::file_names::sanitise_name;
-
 pub fn rename(dir: &Path, path: &Path, name: &str) -> Result<PathBuf> {
     let source = guard_inside(dir, path)?;
-    let dir = dir
-        .canonicalize()
-        .map_err(|e| AppError::Other(format!("clip folder is unreadable: {e}")))?;
-
-    let name = sanitise_name(name)?;
-    let destination = dir.join(format!("{name}.mp4"));
-
-    if destination == source {
-        return Ok(plain(source));
+    let destination = rename_beside(dir, &source, name)?;
+    if plain(source.clone()) == destination {
+        return Ok(destination);
     }
-    if destination.exists() {
-        return Err(AppError::Other(format!("a clip called {name} already exists")));
-    }
-
-    std::fs::rename(&source, &destination).map_err(|e| {
-        AppError::Other(format!("could not rename {}: {e}", source.display()))
-    })?;
 
     for beside in [details_path, thumbnail_path] {
         let from = beside(&source);
@@ -479,7 +452,7 @@ pub fn rename(dir: &Path, path: &Path, name: &str) -> Result<PathBuf> {
         }
     }
 
-    Ok(plain(destination))
+    Ok(destination)
 }
 
 fn gif_bytes(dir: &Path) -> u64 {
@@ -674,64 +647,6 @@ pub fn release_all_destinations() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::file_names::MAX_NAME;
-
-    mod naming {
-        use super::*;
-
-        #[test]
-        fn an_ordinary_name_is_kept_exactly() {
-            assert_eq!(sanitise_name("insane clutch").unwrap(), "insane clutch");
-            assert_eq!(sanitise_name("  bed rush  ").unwrap(), "bed rush");
-        }
-
-        #[test]
-        fn names_people_actually_type_are_allowed() {
-            for name in ["1v5 ace!", "clip #3", "wtf... how", "Räuber & Gendarm", "近距離"] {
-                assert!(sanitise_name(name).is_ok(), "{name} should be allowed");
-            }
-        }
-
-        #[test]
-        fn an_empty_name_is_refused() {
-            assert!(sanitise_name("").is_err());
-            assert!(sanitise_name("   ").is_err());
-            assert!(sanitise_name("...").is_err());
-        }
-
-        #[test]
-        fn characters_windows_cannot_store_are_refused() {
-            for name in ["a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b"] {
-                assert!(sanitise_name(name).is_err(), "{name} should be refused");
-            }
-            assert!(sanitise_name("line\nbreak").is_err());
-        }
-
-        #[test]
-        fn a_path_cannot_be_smuggled_in_as_a_name() {
-            assert!(sanitise_name("../../Windows/System32/evil").is_err());
-            assert!(sanitise_name("..").is_err());
-        }
-
-        #[test]
-        fn device_names_are_refused_however_they_are_written() {
-            for name in ["CON", "con", "NUL", "com1", "LPT9", "aux.mp4"] {
-                assert!(sanitise_name(name).is_err(), "{name} should be refused");
-            }
-            assert!(sanitise_name("console wars").is_ok());
-        }
-
-        #[test]
-        fn a_name_longer_than_the_limit_is_refused() {
-            assert!(sanitise_name(&"a".repeat(MAX_NAME)).is_ok());
-            assert!(sanitise_name(&"a".repeat(MAX_NAME + 1)).is_err());
-        }
-
-        #[test]
-        fn a_trailing_dot_is_dropped_because_windows_drops_it_anyway() {
-            assert_eq!(sanitise_name("clip.").unwrap(), "clip");
-        }
-    }
 
     fn write_clip(dir: &Path, name: &str, bytes: usize) -> PathBuf {
         let path = dir.join(name);

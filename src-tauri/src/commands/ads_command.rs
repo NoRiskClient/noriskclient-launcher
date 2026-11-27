@@ -1,7 +1,7 @@
-use crate::ads::policy::AdSize;
+use crate::ads::policy::{AdSize, ConsentAction, ConsentMode};
 use crate::ads::{self, AdRect};
-use std::collections::BTreeMap;
 use crate::error::{AppError, CommandError};
+use std::collections::BTreeMap;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
@@ -20,7 +20,12 @@ fn from_host(window: &tauri::Window, slot: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn ads_set_bounds(app: AppHandle, window: tauri::Window, slot: String, rect: AdRect) -> Result<(), CommandError> {
+pub async fn ads_set_bounds(
+    app: AppHandle,
+    window: tauri::Window,
+    slot: String,
+    rect: AdRect,
+) -> Result<(), CommandError> {
     if from_host(&window, &slot) {
         ads::set_slot(&app, slot, rect).await;
     }
@@ -51,7 +56,7 @@ pub async fn ads_show_consent(app: AppHandle) -> Result<(), CommandError> {
 
 #[tauri::command]
 pub async fn ads_consent_action(app: AppHandle, action: String) -> Result<(), CommandError> {
-    let action = crate::ads::policy::ConsentAction::parse(&action)
+    let action = ConsentAction::parse(&action)
         .ok_or_else(|| CommandError::from(AppError::Other("Unknown privacy answer".to_string())))?;
     ads::consent_action(&app, action);
     Ok(())
@@ -74,7 +79,7 @@ pub fn ad_clicked() {
 
 #[tauri::command]
 pub fn ad_consent_mode(app: AppHandle, mode: String) {
-    if let Some(mode) = crate::ads::policy::ConsentMode::parse(&mode) {
+    if let Some(mode) = ConsentMode::parse(&mode) {
         ads::page_consent_mode(&app, mode);
     }
 }

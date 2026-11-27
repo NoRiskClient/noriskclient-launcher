@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/buttons/Button";
@@ -8,8 +8,8 @@ interface ConfirmDeleteDialogProps {
   isOpen: boolean;
   itemName: string;
   onClose: () => void;
-  onConfirm: () => void;
-  isDeleting: boolean;
+  onConfirm: () => void | Promise<unknown>;
+  isDeleting?: boolean;
   title?: string;
   message?: React.ReactNode;
 }
@@ -19,11 +19,23 @@ export function ConfirmDeleteDialog({
   itemName,
   onClose,
   onConfirm,
-  isDeleting,
+  isDeleting = false,
   title,
   message,
 }: ConfirmDeleteDialogProps) {
   const { t } = useTranslation();
+  const [pending, setPending] = useState(false);
+  const busy = isDeleting || pending;
+
+  const confirm = async () => {
+    if (busy) return;
+    setPending(true);
+    try {
+      await onConfirm();
+    } finally {
+      setPending(false);
+    }
+  };
 
   if (!isOpen) {
     return null;
@@ -40,16 +52,16 @@ export function ConfirmDeleteDialog({
 
   const dialogFooter = (
     <div className="flex justify-end items-center gap-3">
-      <Button variant="secondary" onClick={onClose} disabled={isDeleting}>
+      <Button variant="secondary" onClick={onClose} disabled={busy}>
         {t('common.cancel')}
       </Button>
       <Button
         variant="destructive"
-        onClick={onConfirm}
-        disabled={isDeleting}
-        icon={isDeleting ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : null}
+        onClick={confirm}
+        disabled={busy}
+        icon={busy ? <Icon icon="svg-spinners:ring-resize" className="h-4 w-4" /> : null}
       >
-        {isDeleting ? t('confirm_delete.button.deleting') : t('confirm_delete.button.delete')}
+        {busy ? t('confirm_delete.button.deleting') : t('confirm_delete.button.delete')}
       </Button>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/buttons/Button';
 import { Icon } from '@iconify/react';
-import { BannerCard } from '../ui/BannerCard';
+import { BannerCard, CORNER_BANNER_CLASS } from '../ui/BannerCard';
 import { openExternalUrl } from '../../services/tauri-service';
 import { LEGAL_DOCUMENT_URLS, legalLocale } from '../../config/legal';
 
@@ -14,7 +14,7 @@ interface AnalyticsConsentBannerProps {
 export function AnalyticsConsentBanner({ onAccept, onDecline, onDismiss }: AnalyticsConsentBannerProps) {
   const { t, i18n } = useTranslation();
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
+    <div className={CORNER_BANNER_CLASS}>
       <BannerCard onDismiss={onDismiss} dismissTitle={t('analytics.banner.dismiss')}>
         <div className="flex items-start gap-3 pr-8">
           <Icon icon="solar:chart-square-bold" className="w-6 h-6 text-accent flex-shrink-0 mt-1" />

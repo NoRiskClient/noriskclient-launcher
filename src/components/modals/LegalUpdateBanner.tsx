@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
-import { BannerCard } from "../ui/BannerCard";
+import { BannerCard, CORNER_BANNER_CLASS } from "../ui/BannerCard";
 import { Button } from "../ui/buttons/Button";
 import { openExternalUrl } from "../../services/tauri-service";
 import { useLegalStore } from "../../store/legal-store";
@@ -19,7 +19,7 @@ export function LegalUpdateBanner() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)]">
+    <div className={CORNER_BANNER_CLASS}>
       <BannerCard onDismiss={dismiss} dismissTitle={t("legal.notice.dismiss")}>
         <div className="flex items-start gap-3 pr-8">
           <Icon icon="solar:shield-check-bold" className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />

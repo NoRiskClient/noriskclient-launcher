@@ -16,6 +16,8 @@ const TONE_CLASSES: Record<Tone, string> = {
   danger: "border-red-500/30 bg-red-500/10 text-red-300 enabled:hover:border-red-400/60 enabled:hover:text-red-200",
 };
 
+export const FILTER_CHIP_CLASS = "h-7 px-3 rounded-full text-[11px] flex items-center gap-1.5";
+
 export function Chip({
   active,
   marked,
@@ -24,6 +26,7 @@ export function Chip({
   onClick,
   title,
   className,
+  dot,
   children,
 }: {
   active: boolean;
@@ -33,6 +36,7 @@ export function Chip({
   onClick: () => void;
   title?: string;
   className?: string;
+  dot?: string;
   children: ReactNode;
 }) {
   const style: CSSProperties | undefined = active
@@ -55,6 +59,7 @@ export function Chip({
       )}
       style={style}
     >
+      {dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}
       {children}
     </button>
   );

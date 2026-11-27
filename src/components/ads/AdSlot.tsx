@@ -32,14 +32,17 @@ const visibleRect = (element: HTMLElement): AdRect | null => {
 interface AdSlotProps {
   slot: string;
   className?: string;
+  onShownChange?: (shown: boolean) => void;
 }
 
-export function AdSlot({ slot, className }: AdSlotProps) {
+export function AdSlot({ slot, className, onShownChange }: AdSlotProps) {
   const active = useLauncherAdsStore((state) => state.active);
   const size = useLauncherAdsStore((state) => state.slots[slot]);
   const synced = useLauncherAdsStore((state) => state.synced);
   const shown = active && synced && !!size;
   const boxRef = useRef<HTMLDivElement>(null);
+  const shownChange = useRef(onShownChange);
+  shownChange.current = onShownChange;
 
   useEffect(() => {
     const box = boxRef.current;
@@ -57,6 +60,7 @@ export function AdSlot({ slot, className }: AdSlotProps) {
       if (!rect) {
         shownAt = null;
         measuredAt = null;
+        shownChange.current?.(false);
         coverAd(slot).catch(() => {});
         return;
       }
@@ -66,6 +70,7 @@ export function AdSlot({ slot, className }: AdSlotProps) {
         return;
       }
       shownAt = key;
+      shownChange.current?.(true);
       setAdBounds(slot, rect).catch(() => {});
     };
     const schedule = () => {
@@ -87,6 +92,7 @@ export function AdSlot({ slot, className }: AdSlotProps) {
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
       document.removeEventListener("visibilitychange", schedule);
+      shownChange.current?.(false);
     };
   }, [shown, slot]);
 

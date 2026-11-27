@@ -149,3 +149,21 @@ fn removing_the_same_server_twice_in_one_batch_is_refused() {
     let edit = ServerListEdit::RemoveMany { entries: vec![entry_ref(1, "b.net"), entry_ref(1, "b.net")] };
     assert!(matches!(apply_server_list_edit(Some(&before), &edit), Err(ServerListError::Stale)));
 }
+
+#[test]
+fn removing_nothing_leaves_the_file_alone() {
+    assert!(ServerListEdit::RemoveMany { entries: Vec::new() }.is_noop());
+    assert!(!ServerListEdit::RemoveMany { entries: vec![entry_ref(0, "a.net")] }.is_noop());
+    assert!(!add("A", "a.net").is_noop());
+}
+
+#[test]
+fn whitespace_around_a_stored_address_does_not_drop_the_icon() {
+    let before = file(vec![entry("A", " a.net ", &[("icon", Value::String("AAAA".into()))])]);
+    let after = apply_server_list_edit(
+        Some(&before),
+        &ServerListEdit::Update { index: 0, expected_address: " a.net ".into(), name: "A".into(), address: "a.net".into() },
+    )
+    .unwrap();
+    assert_eq!(text(&servers(&after)[0], "icon").as_deref(), Some("AAAA"));
+}

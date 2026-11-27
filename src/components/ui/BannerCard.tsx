@@ -2,6 +2,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { useThemeStore } from "../../store/useThemeStore";
 
+export const CORNER_BANNER_CLASS = "fixed top-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)]";
+
 interface BannerCardProps {
   children: ReactNode;
   /** Accent color for the bottom border / inner-glow. Defaults to theme accent. */
@@ -34,8 +36,8 @@ export function BannerCard({
       className={`relative rounded-lg p-4 cursor-default transition-all duration-200 ${className ?? ""}`}
       style={{
         backgroundColor: "rgba(0,0,0,0.2)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         border: "1px solid rgba(255,255,255,0.1)",
         borderBottom: `2px solid ${c}80`,
         boxShadow: `0 4px 0 rgba(0,0,0,0.3), 0 6px 12px rgba(0,0,0,0.35), inset 0 1px 0 ${c}1A`,

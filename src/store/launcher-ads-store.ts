@@ -9,26 +9,10 @@ import {
 } from "../services/ads-service";
 import { onFeatureFlagsUpdated } from "../services/feature-flags-service";
 import { log } from "../utils/logging-utils";
+import { readStored, writeStored } from "../utils/local-storage";
 
 const PAUSE_KEY = "nrc.ads.pausedUntil";
 const SLOTS_KEY = "nrc.ads.lastSlots";
-
-function readStored<T>(key: string, parse: (raw: string | null) => T, fallback: T): T {
-  try {
-    return parse(localStorage.getItem(key));
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStored(key: string, value: string | null) {
-  try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    return;
-  }
-}
 
 const readLastSlots = (): Record<string, AdSize> =>
   readStored(

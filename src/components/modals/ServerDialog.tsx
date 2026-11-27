@@ -55,7 +55,7 @@ export function ServerDialog({
     if (!canSave) return;
     setSaving(true);
     try {
-      await onSave(name, address);
+      await onSave(name.trim(), address.trim());
     } finally {
       setSaving(false);
     }

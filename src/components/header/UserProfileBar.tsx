@@ -12,12 +12,12 @@ import { useSocialsModalStore } from "../../store/socials-modal-store";
 import { useFriendsStore } from "../../store/friends-store";
 import { useChatStore, visibleUnread } from "../../store/chat-store";
 import { Icon } from "@iconify/react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { NotificationBadge } from "../ui/NotificationBadge";
 import { toast } from "../ui/GlobalToaster";
 import { translateApiError } from "../../utils/nrc-error-translations";
 import { NotificationBell } from "./NotificationBell";
+import { openFriendsWindow } from "../../services/friends-window-service";
 
 interface UserProfileBarProps {
   className?: string;
@@ -86,7 +86,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
         <span className="relative">
           <IconButton
             icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
-            onClick={openFriendsWindow}
+            onClick={onOpenFriends}
             variant="flat"
             size="sm"
             aria-label={t('header.open_friends')}
@@ -120,8 +120,8 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
   );
 }
 
-function openFriendsWindow() {
-  invoke("open_friends_window").catch((e) => toast.error(translateApiError(e)));
+function onOpenFriends() {
+  openFriendsWindow().catch((e) => toast.error(translateApiError(e)));
 }
 
 /** Unread chats plus incoming requests, refreshed when the launcher regains focus. */
