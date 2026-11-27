@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 pub use policy::AdRect;
 use policy::{
     AdSize, AdsConfig, ClickGate, ConsentAction, ConsentMode, ADS_FLAG, ADS_WEBVIEW_LABEL,
-    CONSENT_SLOT,
+    CONSENT_SLOT, FRIENDS_WINDOW, MAIN_WINDOW,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,6 +41,8 @@ enum Plan {
         load: bool,
         from_hidden: bool,
         offscreen: bool,
+        /// Window the ad view has to sit in.
+        host: &'static str,
     },
 }
 
@@ -49,7 +51,11 @@ struct WindowState {
     visible: bool,
     size: Option<(f64, f64)>,
     occluded: bool,
+    focused: bool,
 }
+
+/// What the watcher last saw of each window that can host a slot.
+type Windows = BTreeMap<&'static str, WindowState>;
 
 #[derive(Default)]
 struct Ads {
@@ -57,7 +63,9 @@ struct Ads {
     norisk_plus: Option<bool>,
     slots: BTreeMap<String, AdRect>,
     covered: BTreeSet<String>,
-    window: WindowState,
+    windows: Windows,
+    /// See [`policy::pick_slot`].
+    active_slot: Option<String>,
     loaded_url: Option<Url>,
     page_ready: bool,
     last_load: Option<Instant>,
@@ -85,31 +93,63 @@ impl Ads {
         policy::shows_ads(self.config.as_ref(), self.norisk_plus, std::env::consts::OS)
     }
 
-    fn shown_rect(&self) -> Option<AdRect> {
+    fn window(&self, label: &str) -> WindowState {
+        self.windows.get(label).copied().unwrap_or_default()
+    }
+
+    fn choose(&self, windows: &Windows) -> Option<String> {
+        let on_screen = |slot: &&str| {
+            windows
+                .get(policy::slot_window(slot))
+                .is_some_and(|window| window.visible)
+        };
+        let candidates: Vec<&str> = self.slots.keys().map(String::as_str).filter(on_screen).collect();
+        let focused = windows.iter().find(|(_, window)| window.focused).map(|(label, _)| *label);
+        policy::pick_slot(&candidates, focused, self.active_slot.as_deref()).map(str::to_string)
+    }
+
+    fn pick(&mut self) -> bool {
+        let picked = self.choose(&self.windows);
+        std::mem::replace(&mut self.active_slot, picked) != self.active_slot
+    }
+
+    /// The privacy dialog always opens over the launcher.
+    fn host(&self) -> &'static str {
         if self.consent == ConsentMode::Dialog {
-            let (width, height) = self.window.size?;
-            return Some(policy::consent_rect(width, height));
+            return MAIN_WINDOW;
         }
-        self.slots.values().next().copied()
+        self.active_slot.as_deref().map(policy::slot_window).unwrap_or(MAIN_WINDOW)
+    }
+
+    /// Where the ad view would sit, for the occlusion check.
+    fn probe(&self, windows: &Windows) -> Option<(&'static str, AdRect)> {
+        if self.consent == ConsentMode::Dialog {
+            return Some((MAIN_WINDOW, consent_spot(windows)?));
+        }
+        let slot = self.choose(windows)?;
+        let rect = *self.slots.get(&slot)?;
+        Some((policy::slot_window(&slot), rect))
     }
 
     fn slot_covered(&self) -> bool {
-        self.slots.keys().next().is_some_and(|slot| self.covered.contains(slot))
+        self.active_slot.as_ref().is_some_and(|slot| self.covered.contains(slot))
     }
 
     fn target(&self, config: &AdsConfig) -> Option<(Url, AdRect)> {
-        if !self.window.visible {
+        if !self.window(self.host()).visible {
             return None;
         }
         if self.consent == ConsentMode::Dialog {
-            let (width, height) = self.window.size?;
-            return config.ad_url(CONSENT_SLOT).map(|url| (url, policy::consent_rect(width, height)));
+            let rect = consent_spot(&self.windows)?;
+            return config.ad_url(CONSENT_SLOT).map(|url| (url, rect));
         }
-        let (name, rect) = self.slots.iter().next()?;
+        let name = self.active_slot.as_ref()?;
+        let rect = self.slots.get(name)?;
         config.ad_url(name).map(|url| (url, *rect))
     }
 
     fn plan(&mut self, now: Instant) -> Plan {
+        self.pick();
         let mut plan = self.next_plan(now);
         let was_hidden = std::mem::replace(&mut self.hidden, !matches!(plan, Plan::Show { .. }));
         if let Plan::Show { from_hidden, .. } = &mut plan {
@@ -127,7 +167,7 @@ impl Ads {
         let hidden = match self.consent {
             ConsentMode::Prompt => true,
             ConsentMode::Dialog => false,
-            ConsentMode::Closed => self.window.occluded || self.slot_covered(),
+            ConsentMode::Closed => self.window(self.host()).occluded || self.slot_covered(),
         };
         if hidden {
             return Plan::Hide;
@@ -136,8 +176,9 @@ impl Ads {
             self.pending_consent = false;
             return Plan::Hide;
         };
+        let host = self.host();
         if self.loaded_url.as_ref() == Some(&url) && !self.fresh_load {
-            return Plan::Show { url, rect, load: false, from_hidden: false, offscreen: self.dialog_loading };
+            return Plan::Show { url, rect, load: false, from_hidden: false, offscreen: self.dialog_loading, host };
         }
         let delay = if self.consent != ConsentMode::Closed || self.pending_consent || self.fresh_load {
             Duration::ZERO
@@ -151,24 +192,48 @@ impl Ads {
             self.page_ready = false;
             self.dialog_loading = self.consent == ConsentMode::Dialog;
             self.pending_consent |= self.dialog_loading;
-            return Plan::Show { url, rect, load: true, from_hidden: false, offscreen: self.dialog_loading };
+            return Plan::Show { url, rect, load: true, from_hidden: false, offscreen: self.dialog_loading, host };
         }
         self.reload_waiting = true;
+        let stand_in = self
+            .loaded_url
+            .clone()
+            .filter(|loaded| self.page_ready && !self.fresh_load && policy::same_ad_size(loaded, &url));
+        if let Some(loaded) = stand_in {
+            // Moved to a same-size slot before the reload interval is over: the loaded page
+            // stands in until the right placement may load.
+            return Plan::Show { url: loaded, rect, load: false, from_hidden: false, offscreen: false, host };
+        }
         Plan::Hide
     }
 
-    fn needs_apply(&mut self, window: WindowState, now: Instant) -> bool {
-        let changed = self.window != window;
-        self.window = window;
+    fn needs_apply(&mut self, windows: Windows, now: Instant) -> bool {
+        let changed = self.windows != windows;
+        self.windows = windows;
+        let moved = self.pick();
         let reload_due =
             self.reload_waiting && policy::reload_delay(self.last_load, now).is_zero();
-        changed || reload_due
+        changed || moved || reload_due
     }
 
     fn unload(&mut self) {
         self.loaded_url = None;
         self.page_ready = false;
     }
+
+    /// Returns whether the window had any slots.
+    fn forget_slots_of(&mut self, window: &str) -> bool {
+        let before = self.slots.len();
+        self.slots.retain(|slot, _| policy::slot_window(slot) != window);
+        self.covered.retain(|slot| policy::slot_window(slot) != window);
+        self.slots.len() != before
+    }
+}
+
+/// The privacy dialog opens centred over the launcher.
+fn consent_spot(windows: &Windows) -> Option<AdRect> {
+    let (width, height) = windows.get(MAIN_WINDOW)?.size?;
+    Some(policy::consent_rect(width, height))
 }
 
 static ADS: Lazy<Mutex<Ads>> = Lazy::new(Mutex::default);
@@ -205,11 +270,19 @@ async fn own_norisk_plus() -> Option<bool> {
     minimal_user(&me).await.ok().map(|user| user.is_norisk_plus())
 }
 
-fn main_window_state<R: Runtime>(app: &AppHandle<R>) -> WindowState {
-    let Some(window) = app.get_window(crate::utils::main_window::LABEL) else {
+fn window_states<R: Runtime>(app: &AppHandle<R>) -> Windows {
+    [MAIN_WINDOW, FRIENDS_WINDOW]
+        .into_iter()
+        .map(|label| (label, window_state(app, label)))
+        .collect()
+}
+
+fn window_state<R: Runtime>(app: &AppHandle<R>, label: &str) -> WindowState {
+    let Some(window) = app.get_window(label) else {
         return WindowState::default();
     };
     let visible = window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(true);
+    let focused = window.is_focused().unwrap_or(false);
     let size = window
         .inner_size()
         .ok()
@@ -218,12 +291,12 @@ fn main_window_state<R: Runtime>(app: &AppHandle<R>) -> WindowState {
             let logical = size.to_logical::<f64>(scale);
             (logical.width, logical.height)
         });
-    WindowState { visible, size, occluded: false }
+    WindowState { visible, size, occluded: false, focused }
 }
 
 #[cfg(target_os = "windows")]
-fn ad_occluded<R: Runtime>(app: &AppHandle<R>, rect: AdRect) -> bool {
-    let Some(window) = app.get_window(crate::utils::main_window::LABEL) else {
+fn ad_occluded<R: Runtime>(app: &AppHandle<R>, label: &str, rect: AdRect) -> bool {
+    let Some(window) = app.get_window(label) else {
         return false;
     };
     let (Ok(origin), Ok(scale), Ok(hwnd)) = (window.inner_position(), window.scale_factor(), window.hwnd()) else {
@@ -240,7 +313,7 @@ fn ad_occluded<R: Runtime>(app: &AppHandle<R>, rect: AdRect) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn ad_occluded<R: Runtime>(_app: &AppHandle<R>, _rect: AdRect) -> bool {
+fn ad_occluded<R: Runtime>(_app: &AppHandle<R>, _label: &str, _rect: AdRect) -> bool {
     false
 }
 
@@ -253,7 +326,7 @@ pub async fn configure<R: Runtime>(app: &AppHandle<R>) -> BTreeMap<String, AdSiz
         Some(_) => own_norisk_plus().await,
         None => None,
     };
-    let window = main_window_state(app);
+    let windows = window_states(app);
     let (active, changed, slots) = {
         let mut state = ads();
         let changed = state.config != config;
@@ -262,7 +335,7 @@ pub async fn configure<R: Runtime>(app: &AppHandle<R>) -> BTreeMap<String, AdSiz
         }
         state.config = config;
         state.norisk_plus = norisk_plus;
-        state.window = window;
+        state.windows = windows;
         let active = state.active();
         let slots = match (&state.config, active) {
             (Some(config), true) => config.sizes(),
@@ -319,11 +392,33 @@ pub async fn clear_slot<R: Runtime>(app: &AppHandle<R>, slot: &str) {
 }
 
 pub fn launcher_page_reloaded<R: Runtime>(app: &AppHandle<R>) {
+    host_page_reloaded(app, MAIN_WINDOW);
+}
+
+/// A reloading page drops its slots until it reports them again.
+pub fn host_page_reloaded<R: Runtime>(app: &AppHandle<R>, window: &str) {
+    if ads().forget_slots_of(window) {
+        apply_later(app);
+    }
+}
+
+/// The friends window is closing: its slots go, and the ad view moves back to the launcher
+/// first so it is not torn down with it. Other windows never host the ad view.
+pub fn host_closing<R: Runtime>(app: &AppHandle<R>, window: &str) {
+    if window != FRIENDS_WINDOW {
+        return;
+    }
     let had_slots = {
         let mut state = ads();
-        state.covered.clear();
-        !std::mem::take(&mut state.slots).is_empty()
+        state.windows.remove(window);
+        state.forget_slots_of(window)
     };
+    #[cfg(target_os = "windows")]
+    {
+        if !webview::rescue(app, window) {
+            ads().unload();
+        }
+    }
     if had_slots {
         apply_later(app);
     }
@@ -417,8 +512,9 @@ pub fn record_click() {
 }
 
 pub fn admit_link<R: Runtime>(app: &AppHandle<R>, url: &str) -> Option<Url> {
+    let host = ads().host();
     let focused = app
-        .get_window(crate::utils::main_window::LABEL)
+        .get_window(host)
         .is_some_and(|w| w.is_focused().unwrap_or(false));
     ads().clicks.admit(url, Instant::now(), focused)
 }
@@ -472,14 +568,14 @@ fn watch_window<R: Runtime>(app: AppHandle<R>) {
         let mut ticker = tokio::time::interval(WINDOW_POLL);
         loop {
             ticker.tick().await;
-            let mut window = main_window_state(&app);
-            let rect = {
-                let mut state = ads();
-                state.window.size = window.size;
-                state.shown_rect()
-            };
-            window.occluded = window.visible && rect.is_some_and(|rect| ad_occluded(&app, rect));
-            let due = ads().needs_apply(window, Instant::now());
+            let mut windows = window_states(&app);
+            let probe = ads().probe(&windows);
+            if let Some((host, rect)) = probe {
+                if let Some(window) = windows.get_mut(host) {
+                    window.occluded = window.visible && ad_occluded(&app, host, rect);
+                }
+            }
+            let due = ads().needs_apply(windows, Instant::now());
             if due {
                 apply(&app).await;
             }

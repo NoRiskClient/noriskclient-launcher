@@ -261,6 +261,9 @@ interface ThemeState {
   shouldShowAnalyticsBanner: () => boolean;
 }
 
+/** Other windows listen for this key to follow theme changes. */
+export const THEME_STORAGE_KEY = "norisk-theme-storage";
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
@@ -501,7 +504,7 @@ export const useThemeStore = create<ThemeState>()(
         return true;
       },
     }),    {
-      name: "norisk-theme-storage",
+      name: THEME_STORAGE_KEY,
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.applyAccentColorToDOM();

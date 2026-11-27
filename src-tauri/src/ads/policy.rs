@@ -12,7 +12,50 @@ pub fn is_ad_webview(label: &str) -> bool {
             .strip_prefix(ADS_WEBVIEW_LABEL)
             .is_some_and(|rest| rest.starts_with('-'))
 }
-pub const AD_SLOTS: &[&str] = &["play-news"];
+pub const AD_SLOTS: &[&str] = &["play-news", FRIENDS_AD_SLOT];
+
+/// The friends window's rail. Every other slot is in the main window.
+pub const FRIENDS_AD_SLOT: &str = "friends-rail";
+
+pub const MAIN_WINDOW: &str = crate::utils::main_window::LABEL;
+pub const FRIENDS_WINDOW: &str = crate::utils::friends_window::LABEL;
+
+/// The window that reports the slot and hosts the ad view while it fills it.
+pub fn slot_window(slot: &str) -> &'static str {
+    if slot == FRIENDS_AD_SLOT {
+        FRIENDS_WINDOW
+    } else {
+        MAIN_WINDOW
+    }
+}
+
+/// Picks the one slot the ad view fills, from slots whose window is on screen: the focused
+/// window wins, else the current slot stays, else the launcher's slot comes first.
+pub fn pick_slot<'a>(
+    candidates: &[&'a str],
+    focused_window: Option<&str>,
+    current: Option<&str>,
+) -> Option<&'a str> {
+    if let Some(focused) = focused_window {
+        if let Some(slot) = candidates.iter().find(|slot| slot_window(slot) == focused) {
+            return Some(slot);
+        }
+    }
+    if let Some(slot) = current.and_then(|current| candidates.iter().find(|slot| **slot == current)) {
+        return Some(slot);
+    }
+    candidates
+        .iter()
+        .find(|slot| slot_window(slot) == MAIN_WINDOW)
+        .or_else(|| candidates.first())
+        .copied()
+}
+
+/// Whether two ad page urls ask for the same size, so one can stand in for the other.
+pub fn same_ad_size(a: &Url, b: &Url) -> bool {
+    let size = |url: &Url| url.query_pairs().find(|(key, _)| key == "size").map(|(_, value)| value.into_owned());
+    size(a).is_some() && size(a) == size(b)
+}
 pub const CONSENT_SLOT: &str = "consent";
 pub const ALLOWED_AD_SIZES: &[&str] = &["300x250", "300x600", "728x90", "320x50"];
 pub const ALLOWED_AD_HOSTS: &[&str] = &["ads.norisk.gg"];

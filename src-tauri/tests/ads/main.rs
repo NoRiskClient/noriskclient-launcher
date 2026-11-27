@@ -380,3 +380,41 @@ fn a_reloaded_ad_page_closes_a_privacy_dialog_it_no_longer_shows() {
     assert!(!dialog_lost_on_load(ConsentMode::Prompt, false));
     assert!(!dialog_lost_on_load(ConsentMode::Closed, false));
 }
+
+#[test]
+fn the_friends_rail_lives_in_the_friends_window() {
+    assert_eq!(slot_window(FRIENDS_AD_SLOT), FRIENDS_WINDOW);
+    assert_eq!(slot_window("play-news"), MAIN_WINDOW);
+    assert!(AD_SLOTS.contains(&FRIENDS_AD_SLOT));
+}
+
+#[test]
+fn the_ad_follows_the_focused_window() {
+    let both = ["friends-rail", "play-news"];
+    assert_eq!(pick_slot(&both, Some(FRIENDS_WINDOW), Some("play-news")), Some("friends-rail"));
+    assert_eq!(pick_slot(&both, Some(MAIN_WINDOW), Some("friends-rail")), Some("play-news"));
+}
+
+#[test]
+fn without_a_focused_candidate_the_ad_stays_where_it_is() {
+    let both = ["friends-rail", "play-news"];
+    assert_eq!(pick_slot(&both, None, Some("friends-rail")), Some("friends-rail"));
+    assert_eq!(pick_slot(&both, Some("minecraft_log_window"), Some("friends-rail")), Some("friends-rail"));
+}
+
+#[test]
+fn the_launcher_slot_comes_first_when_nothing_decides() {
+    assert_eq!(pick_slot(&["friends-rail", "play-news"], None, None), Some("play-news"));
+    assert_eq!(pick_slot(&["friends-rail"], None, None), Some("friends-rail"));
+    assert_eq!(pick_slot(&[], Some(FRIENDS_WINDOW), None), None);
+}
+
+#[test]
+fn a_page_stands_in_only_for_a_slot_of_the_same_size() {
+    let rail = url("https://ads.norisk.gg/launcher.html?placement=right-rail-1&size=300x250");
+    let friends = url("https://ads.norisk.gg/launcher.html?placement=right-rail-2&size=300x250");
+    let tall = url("https://ads.norisk.gg/launcher.html?placement=right-rail-2&size=300x600");
+    assert!(same_ad_size(&rail, &friends));
+    assert!(!same_ad_size(&rail, &tall));
+    assert!(!same_ad_size(&url(PAGE), &url(PAGE)));
+}

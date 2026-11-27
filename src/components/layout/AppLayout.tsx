@@ -27,7 +27,6 @@ import { useSnowEffectStore } from "../../store/snow-effect-store";
 import { useLauncherTheme } from "../../hooks/useLauncherTheme";
 import * as ConfigService from "../../services/launcher-config-service";
 import { SocialsModal } from "../modals/SocialsModal";
-import { FriendsSidebar } from "../friends/FriendsSidebar";
 import { AdRailLayout } from "../ads/AdRail";
 import { AdConsentOverlay } from "../ads/AdConsentOverlay";
 import { useLauncherAdsStore } from "../../store/launcher-ads-store";
@@ -103,7 +102,7 @@ export function AppLayout({
   const { accentColor: themeAccentColor } = useThemeStore();
   const { isEnabled: isSnowEnabled } = useSnowEffectStore();
   const { selectedTheme, isThemeActive } = useLauncherTheme();
-  const { loadCurrentUser, loadFriends } = useFriendsStore();
+  const { loadCurrentUser, loadFriends, loadPendingRequests } = useFriendsStore();
   const { loadChats } = useChatStore();
   const refreshAds = useLauncherAdsStore((state) => state.refresh);
   const activeAccountId = useMinecraftAuthStore((state) => state.activeAccount?.id);
@@ -120,7 +119,7 @@ export function AppLayout({
       try {
         await loadCurrentUser();
         await loadFriends();
-        await loadChats();
+        await Promise.all([loadChats(), loadPendingRequests()]);
         // TODO: Re-enable when WebSocket is stable
         // await connectWebSocket();
       } catch (e) {
@@ -399,7 +398,6 @@ export function AppLayout({
       <ProfileSettingsModal />
       <SettingsModal />
       <ProfileDuplicateModal />
-      <FriendsSidebar />
       <AdConsentOverlay />
     </div>
   );

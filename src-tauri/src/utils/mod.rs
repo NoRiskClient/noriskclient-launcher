@@ -26,6 +26,7 @@ pub mod clip_overlay;
 #[cfg(windows)]
 pub mod hotkey_hook;
 pub mod window_finder;
+pub mod friends_window;
 pub mod main_window;
 pub mod window_focus;
 pub mod screens;

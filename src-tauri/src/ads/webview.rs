@@ -1,7 +1,7 @@
 use super::policy::{self, ADS_USER_AGENT, ADS_WEBVIEW_LABEL};
 use super::{AdRect, Plan};
 use tauri::webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder};
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl, Window};
 
 const CLICK_BRIDGE: &str = include_str!("click_bridge.js");
 
@@ -29,17 +29,25 @@ fn try_execute<R: Runtime>(app: &AppHandle<R>, plan: Plan) -> tauri::Result<()> 
                 park(&webview)?;
             }
         }
-        Plan::Show { url, rect, load, from_hidden, offscreen } => {
-            let stale_frame = from_hidden && existing.is_some();
+        Plan::Show { url, rect, load, from_hidden, offscreen, host } => {
+            let host_window = app.get_window(host).ok_or(tauri::Error::WindowNotFound)?;
+            let mut moved = false;
+            let had_view = existing.is_some();
             let webview = match existing {
                 Some(webview) => {
+                    if webview.window().label() != host {
+                        webview.reparent(&host_window)?;
+                        moved = true;
+                    }
                     if load {
                         webview.navigate(url)?;
                     }
                     webview
                 }
-                None => create(app, rect, url)?,
+                None => create(&host_window, rect, url)?,
             };
+            // A hidden or just moved view can flash its last frame: repaint off screen first.
+            let stale_frame = had_view && (from_hidden || moved);
             webview.set_size(LogicalSize::new(rect.width, rect.height))?;
             if offscreen {
                 webview.set_position(OFFSCREEN)?;
@@ -75,6 +83,28 @@ fn park<R: Runtime>(webview: &Webview<R>) -> tauri::Result<()> {
     webview.set_position(OFFSCREEN)
 }
 
+/// Parks the ad view in the launcher before its window closes. Returns whether a view is left.
+pub(super) fn rescue<R: Runtime>(app: &AppHandle<R>, closing: &str) -> bool {
+    let Some(webview) = app.get_webview(ADS_WEBVIEW_LABEL) else {
+        return false;
+    };
+    if webview.window().label() != closing {
+        return true;
+    }
+    let moved = app
+        .get_window(policy::MAIN_WINDOW)
+        .ok_or(tauri::Error::WindowNotFound)
+        .and_then(|main| webview.reparent(&main))
+        .and_then(|_| park(&webview));
+    match moved {
+        Ok(()) => true,
+        Err(e) => {
+            log::warn!("[Ads] Could not move the ad view out of a closing window: {}", e);
+            false
+        }
+    }
+}
+
 pub(super) fn eval_consent<R: Runtime>(app: &AppHandle<R>, action: Option<super::ConsentAction>) {
     let Some(webview) = app.get_webview(ADS_WEBVIEW_LABEL) else {
         return;
@@ -104,13 +134,11 @@ fn page_loaded<R: Runtime>(webview: &Webview<R>, url: &Url) {
 }
 
 fn create<R: Runtime>(
-    app: &AppHandle<R>,
+    window: &Window<R>,
     rect: AdRect,
     url: Url,
 ) -> tauri::Result<Webview<R>> {
-    let window = app
-        .get_window(crate::utils::main_window::LABEL)
-        .ok_or(tauri::Error::WindowNotFound)?;
+    let app = window.app_handle();
     let mut builder = WebviewBuilder::new(ADS_WEBVIEW_LABEL, WebviewUrl::External(blank()))
         .initialization_script_for_all_frames(CLICK_BRIDGE)
         .on_navigation(policy::navigation_allowed)

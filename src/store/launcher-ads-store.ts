@@ -114,4 +114,17 @@ const initialPause = useLauncherAdsStore.getState().pausedUntil;
 if (initialPause) scheduleResume(initialPause);
 
 void onFeatureFlagsUpdated(() => useLauncherAdsStore.getState().refresh());
+
+// Each window runs this store; a pause set in one reaches the other through localStorage.
+window.addEventListener("storage", (event) => {
+  if (event.key !== PAUSE_KEY) return;
+  const pausedUntil = readPausedUntil();
+  if (pausedUntil) {
+    useLauncherAdsStore.setState({ pausedUntil });
+    scheduleResume(pausedUntil);
+  } else {
+    clearTimeout(resumeTimer);
+    useLauncherAdsStore.setState({ pausedUntil: null });
+  }
+});
 void onAdConsentMode((consent) => useLauncherAdsStore.setState({ consent }));

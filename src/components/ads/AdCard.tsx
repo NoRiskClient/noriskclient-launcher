@@ -1,12 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useLauncherAdsStore } from "../../store/launcher-ads-store";
-import { useFriendsStore } from "../../store/friends-store";
 import type { AdSize } from "../../services/ads-service";
 import { AdSlot } from "./AdSlot";
 import { AdFallback } from "./AdFallback";
 import { useOpenAdPause } from "./AdPauseDialog";
 
 export const MAIN_AD_SLOT = "play-news";
+/** Friends window rail; the ad view moves there while that window is in front. */
+export const FRIENDS_AD_SLOT = "friends-rail";
 
 export function useAdSize(slot: string): AdSize | null {
   const active = useLauncherAdsStore((state) => state.active);
@@ -33,14 +34,13 @@ export function AdCaption() {
 }
 
 export function AdFrame({ slot, size }: { slot: string; size: AdSize }) {
-  const coveredByFriends = useFriendsStore((state) => state.isSidebarOpen);
   return (
     <div
       className="relative shrink-0 rounded-md overflow-hidden bg-black/40 ring-1 ring-white/10"
       style={{ width: size.width, height: size.height }}
     >
       <AdFallback />
-      {!coveredByFriends && <AdSlot slot={slot} className="relative" />}
+      <AdSlot slot={slot} className="relative" />
     </div>
   );
 }

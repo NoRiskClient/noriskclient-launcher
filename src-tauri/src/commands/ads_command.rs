@@ -10,21 +10,36 @@ pub async fn ads_refresh(app: AppHandle) -> Result<BTreeMap<String, AdSize>, Com
     Ok(ads::configure(&app).await)
 }
 
+/// Slot bounds are window-relative, so only the slot's own window may report them.
+fn from_host(window: &tauri::Window, slot: &str) -> bool {
+    let hosted = crate::ads::policy::slot_window(slot) == window.label();
+    if !hosted {
+        log::warn!("[Ads] Ignored slot {} reported by window {}", slot, window.label());
+    }
+    hosted
+}
+
 #[tauri::command]
-pub async fn ads_set_bounds(app: AppHandle, slot: String, rect: AdRect) -> Result<(), CommandError> {
-    ads::set_slot(&app, slot, rect).await;
+pub async fn ads_set_bounds(app: AppHandle, window: tauri::Window, slot: String, rect: AdRect) -> Result<(), CommandError> {
+    if from_host(&window, &slot) {
+        ads::set_slot(&app, slot, rect).await;
+    }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn ads_cover(app: AppHandle, slot: String) -> Result<(), CommandError> {
-    ads::cover_slot(&app, &slot).await;
+pub async fn ads_cover(app: AppHandle, window: tauri::Window, slot: String) -> Result<(), CommandError> {
+    if from_host(&window, &slot) {
+        ads::cover_slot(&app, &slot).await;
+    }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn ads_hide(app: AppHandle, slot: String) -> Result<(), CommandError> {
-    ads::clear_slot(&app, &slot).await;
+pub async fn ads_hide(app: AppHandle, window: tauri::Window, slot: String) -> Result<(), CommandError> {
+    if from_host(&window, &slot) {
+        ads::clear_slot(&app, &slot).await;
+    }
     Ok(())
 }
 
