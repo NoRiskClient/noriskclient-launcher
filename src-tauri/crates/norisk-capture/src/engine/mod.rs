@@ -486,7 +486,7 @@ impl Engine {
         }
 
         let wanted = fit_output(source, (self.config.width, self.config.height));
-        if wanted == (pipeline.settings.width, pipeline.settings.height) {
+        if !outgrows(wanted, (pipeline.settings.width, pipeline.settings.height)) {
             self.resize_settling = None;
             return;
         }
@@ -773,10 +773,23 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.buffer_seconds != next.buffer_seconds
 }
 
+fn outgrows(wanted: (u32, u32), current: (u32, u32)) -> bool {
+    wanted.0 > current.0 || wanted.1 > current.1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use norisk_ipc::EncoderPreference;
+
+    #[test]
+    fn only_a_window_that_outgrows_the_recording_rebuilds_it() {
+        assert!(!outgrows((854, 480), (1280, 672)));
+        assert!(!outgrows((1280, 672), (1280, 672)));
+        assert!(outgrows((1280, 672), (854, 480)));
+        assert!(outgrows((1280, 720), (1280, 672)));
+        assert!(outgrows((960, 720), (1280, 672)));
+    }
 
     fn base() -> CaptureConfig {
         CaptureConfig::default()
