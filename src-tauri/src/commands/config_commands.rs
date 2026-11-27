@@ -24,8 +24,17 @@ pub async fn set_launcher_config(config: LauncherConfig) -> Result<LauncherConfi
         ))));
     }
 
+    let previous_clips = state.config_manager.get_config().await.clips.resolved_output_dir();
+
     // Set the entire configuration
     state.config_manager.set_config(config.clone()).await?;
+
+    let next_clips = config.clips.resolved_output_dir();
+    if previous_clips != next_clips {
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::utils::clip_library::adopt_folder(&next_clips, &previous_clips)
+        });
+    }
 
     // Return the updated config
     Ok(config)

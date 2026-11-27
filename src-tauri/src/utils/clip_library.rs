@@ -212,6 +212,23 @@ pub fn details_path(clip: &Path) -> PathBuf {
     meta_path(&resolved(clip), "nrc.json")
 }
 
+pub fn adopt_folder(dir: &Path, previous: &Path) {
+    let Ok(entries) = std::fs::read_dir(resolved(dir)) else {
+        return;
+    };
+    let previous = resolved(previous);
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("mp4")) {
+            continue;
+        }
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        adopt_sidecars(&resolved(&path), fingerprint(&previous.join(name)));
+    }
+}
+
 fn adopt_sidecars(clip: &Path, earlier: u32) {
     if earlier == fingerprint(clip) {
         return;
@@ -1470,6 +1487,24 @@ mod tests {
 
         assert!(read_details(&clip).is_some());
         assert_eq!(details_path(&clip), details_path(&dir.join(".").join("same.mp4")));
+    }
+
+    #[test]
+    fn clips_moved_to_a_new_folder_keep_their_details() {
+        let old = temp_dir("moved-from");
+        let new = temp_dir("moved-to");
+        let clip = write_clip(&old, "kept.mp4", 32);
+        let mut details = details_with(Vec::new());
+        details.favourite = true;
+        write_details(&clip, &details).unwrap();
+        let moved = new.join("kept.mp4");
+        std::fs::rename(&clip, &moved).unwrap();
+        assert!(read_details(&moved).is_none());
+
+        adopt_folder(&new, &old);
+
+        assert!(read_details(&moved).unwrap().favourite);
+        assert!(list(&new).unwrap()[0].managed);
     }
 
     #[test]
