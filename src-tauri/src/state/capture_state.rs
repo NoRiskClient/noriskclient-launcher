@@ -128,6 +128,7 @@ pub struct CaptureSupervisor {
     last_error: Arc<RwLock<Option<norisk_ipc::CaptureError>>>,
     app: Arc<RwLock<Option<tauri::AppHandle>>>,
     running: Arc<RwLock<bool>>,
+    starting: tokio::sync::Mutex<()>,
     incompatible: std::sync::atomic::AtomicBool,
     watched: std::sync::Mutex<HashMap<PathBuf, WatchedExport>>,
 }
@@ -147,6 +148,7 @@ impl CaptureSupervisor {
             last_error: Arc::new(RwLock::new(None)),
             app: Arc::new(RwLock::new(None)),
             running: Arc::new(RwLock::new(false)),
+            starting: tokio::sync::Mutex::new(()),
             incompatible: std::sync::atomic::AtomicBool::new(false),
             watched: std::sync::Mutex::new(HashMap::new()),
         }
@@ -419,6 +421,7 @@ impl CaptureSupervisor {
         if !norisk_capture::macos::capture_supported() {
             return Err(AppError::Other("Clips require macOS 15 or newer.".into()));
         }
+        let _one_start_at_a_time = self.starting.lock().await;
         if *self.running.read().await {
             return Ok(());
         }
@@ -543,7 +546,14 @@ impl CaptureSupervisor {
 
             log::info!("Restarting the capture engine in {:.0}s", delay.as_secs_f32());
             *self.state.write().await = CaptureState::Attaching;
-            tokio::time::sleep(*delay).await;
+            let wake = tokio::time::Instant::now() + *delay;
+            while tokio::time::Instant::now() < wake {
+                if !*self.running.read().await {
+                    log::info!("Capture engine stopped while waiting to restart it");
+                    return commands;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
         }
     }
 
@@ -871,18 +881,22 @@ impl CaptureSupervisor {
                             .as_ref()
                             .and_then(crate::commands::clip_commands::editing_clip),
                     );
-                    match tokio::task::spawn_blocking(move || {
-                        crate::utils::clip_library::enforce_limit(&dir, limit, &keep)
-                    })
-                    .await
-                    {
-                        Ok(Ok(removed)) if !removed.is_empty() => {
-                            log::info!("Storage limit: removed {} old clip(s)", removed.len());
+                    tokio::spawn(async move {
+                        static CLEANUP: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+                        let _one_at_a_time = CLEANUP.lock().await;
+                        match tokio::task::spawn_blocking(move || {
+                            crate::utils::clip_library::enforce_limit(&dir, limit, &keep)
+                        })
+                        .await
+                        {
+                            Ok(Ok(removed)) if !removed.is_empty() => {
+                                log::info!("Storage limit: removed {} old clip(s)", removed.len());
+                            }
+                            Ok(Ok(_)) => {}
+                            Ok(Err(e)) => log::warn!("Could not enforce the storage limit: {e}"),
+                            Err(e) => log::warn!("Storage cleanup task failed: {e}"),
                         }
-                        Ok(Ok(_)) => {}
-                        Ok(Err(e)) => log::warn!("Could not enforce the storage limit: {e}"),
-                        Err(e) => log::warn!("Storage cleanup task failed: {e}"),
-                    }
+                    });
                 }
 
                 match self.app.read().await.as_ref() {
@@ -1130,5 +1144,6 @@ impl CaptureSupervisor {
         Some((clips.resolved_output_dir(), clips.max_storage_gb))
     }
 }
+
 
 
