@@ -184,7 +184,7 @@ export function ModrinthSearchV2({
 
   // State to control delayed display of "No results found" message
   const [showNoResultsMessage, setShowNoResultsMessage] = useState(false);
-  const noResultsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const noResultsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const sortOptions: { value: UnifiedSortType; label: string; icon?: string }[] = [
     { value: UnifiedSortType.Relevance, label: t('content.search.sort.relevance'), icon: 'solar:sort-bold' },
@@ -641,7 +641,7 @@ export function ModrinthSearchV2({
     }
   };
 
-  const scrollSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleScrollSave = useCallback(() => {
     if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
     scrollSaveTimer.current = setTimeout(() => {
