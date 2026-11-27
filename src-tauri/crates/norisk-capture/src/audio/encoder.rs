@@ -143,9 +143,19 @@ impl AudioEncoder {
             return Ok(Vec::new());
         }
 
-        let converted = self.resample(samples)?;
+        let mut converted = self.resample(samples)?;
         if self.pending.is_empty() {
-            self.pending_timestamp = Some(timestamp_100ns);
+            let mut start = timestamp_100ns;
+            if let Some(next) = self.pending_timestamp.filter(|next| start < *next) {
+                let overlap = ((next - start) * OUTPUT_SAMPLE_RATE as i64 / 10_000_000) as usize
+                    * OUTPUT_CHANNELS as usize;
+                if overlap >= converted.len() {
+                    return Ok(Vec::new());
+                }
+                converted.drain(..overlap);
+                start = next;
+            }
+            self.pending_timestamp = Some(start);
         }
         self.pending.extend_from_slice(&converted);
 
@@ -287,6 +297,47 @@ impl Drop for AudioEncoder {
             if !self.context.is_null() {
                 ff::avcodec_free_context(&mut self.context);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tone(frames: usize) -> Vec<f32> {
+        (0..frames * 2)
+            .map(|i| ((i / 2) as f32 * 0.05).sin() * 0.3)
+            .collect()
+    }
+
+    #[test]
+    fn a_clock_that_steps_back_never_makes_timestamps_go_backwards() {
+        let mut encoder = AudioEncoder::open(
+            AudioFormat {
+                sample_rate: 48_000,
+                channels: 2,
+            },
+            DEFAULT_BITRATE,
+        )
+        .unwrap();
+
+        let block = 4096;
+        let span = block as i64 * 10_000_000 / 48_000;
+        let mut packets = Vec::new();
+        packets.extend(encoder.push(&tone(block), 0).unwrap());
+        packets.extend(encoder.push(&tone(block), span - 1_000_000).unwrap());
+        packets.extend(encoder.push(&tone(block), 2 * span).unwrap());
+        packets.extend(encoder.finish().unwrap());
+
+        assert!(packets.len() > 4);
+        for pair in packets.windows(2) {
+            assert!(
+                pair[1].dts > pair[0].dts,
+                "dts went from {} to {}",
+                pair[0].dts,
+                pair[1].dts
+            );
         }
     }
 }
