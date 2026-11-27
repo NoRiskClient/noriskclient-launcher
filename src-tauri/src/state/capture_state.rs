@@ -934,6 +934,17 @@ impl CaptureSupervisor {
                         "height": exported.height,
                     }),
                 );
+                {
+                    let exported = exported.clone();
+                    let _ = tokio::task::spawn_blocking(move || {
+                        let details = crate::utils::clip_library::describe_export(&exported);
+                        if let Err(e) = crate::utils::clip_library::write_details(&exported.path, &details) {
+                            log::warn!("Could not describe the exported clip: {e}");
+                        }
+                    })
+                    .await;
+                }
+
                 crate::utils::clip_library::release_destination(&exported.path);
                 {
                     let (source, path) = (exported.source.clone(), exported.path.clone());
