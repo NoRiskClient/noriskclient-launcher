@@ -147,16 +147,52 @@ pub struct FriendsFriendUser {
     pub state: OnlineState,
     pub server: Option<String>,
     pub ping_enabled: bool,
+    /// Epoch milliseconds.
+    pub last_seen_at: Option<i64>,
+    pub rank: Option<String>,
+    pub norisk_plus: bool,
+    pub login_streak: Option<LoginStreak>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginStreak {
+    #[serde(default)]
+    pub days: u32,
+    #[serde(default)]
+    pub max_days: u32,
+    /// YYYY-MM-DD in the player's time zone.
+    #[serde(default)]
+    pub last_day: Option<String>,
+}
+
+/// `lastSeen` is UTC without a zone, with up to nine fraction digits.
+fn parse_last_seen(value: &str) -> Option<i64> {
+    if let Ok(at) = chrono::DateTime::parse_from_rfc3339(value) {
+        return Some(at.timestamp_millis());
+    }
+    value
+        .parse::<chrono::NaiveDateTime>()
+        .ok()
+        .map(|at| at.and_utc().timestamp_millis())
 }
 
 impl From<ApiFriendsFriendUser> for FriendsFriendUser {
     fn from(api: ApiFriendsFriendUser) -> Self {
+        let norisk_plus = api.norisk_user.is_norisk_plus();
         Self {
             uuid: api.norisk_user.uuid,
             username: api.norisk_user.ign,
             state: api.online_state,
             server: api.server,
             ping_enabled: api.other_user.has_ping_notification,
+            last_seen_at: api.norisk_user.last_seen.as_deref().and_then(parse_last_seen),
+            rank: api.norisk_user.rank,
+            norisk_plus,
+            login_streak: api
+                .norisk_user
+                .login_streak
+                .and_then(|value| serde_json::from_value(value).ok()),
         }
     }
 }

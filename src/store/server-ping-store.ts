@@ -11,6 +11,8 @@ interface CachedPing {
 interface ServerPingState {
   cache: Record<string, CachedPing>;
   pinging: Set<string>;
+  /** Last failed ping per server, cleared by the next success. Not persisted. */
+  failed: Record<string, number>;
   // Subscribers for updates
   subscribers: Record<string, Set<(info: ServerPingInfo) => void>>;
 
@@ -32,6 +34,7 @@ export const useServerPingStore = create<ServerPingState>()(
     (set, get) => ({
   cache: {},
   pinging: new Set(),
+  failed: {},
   subscribers: {},
 
   getPing: (address: string) => {
@@ -95,13 +98,18 @@ export const useServerPingStore = create<ServerPingState>()(
         // Only update cache if ping was successful (no error)
         if (!info.error) {
           console.log(`[ServerPingStore] Background ping successful for ${address}`);
-          set((state) => ({
-            cache: {
-              ...state.cache,
-              [address]: { info, timestamp: Date.now() }
-            },
-            pinging: new Set([...state.pinging].filter(a => a !== address))
-          }));
+          set((state) => {
+            const failed = { ...state.failed };
+            delete failed[address];
+            return {
+              cache: {
+                ...state.cache,
+                [address]: { info, timestamp: Date.now() }
+              },
+              pinging: new Set([...state.pinging].filter(a => a !== address)),
+              failed,
+            };
+          });
 
           // Notify subscribers
           const { subscribers } = get();
@@ -113,14 +121,16 @@ export const useServerPingStore = create<ServerPingState>()(
           console.log(`[ServerPingStore] Background ping failed for ${address}:`, info.error);
           // Still remove from pinging set, but don't update cache with error
           set((state) => ({
-            pinging: new Set([...state.pinging].filter(a => a !== address))
+            pinging: new Set([...state.pinging].filter(a => a !== address)),
+            failed: { ...state.failed, [address]: Date.now() },
           }));
         }
       })
       .catch((err) => {
         console.error(`[ServerPingStore] Background ping error for ${address}:`, err);
         set((state) => ({
-          pinging: new Set([...state.pinging].filter(a => a !== address))
+          pinging: new Set([...state.pinging].filter(a => a !== address)),
+          failed: { ...state.failed, [address]: Date.now() },
         }));
       });
   },

@@ -7,7 +7,7 @@ export type ServerPingState = ServerPingInfo | "pending" | "error" | undefined;
 
 const BAR_HEIGHTS = [2, 3, 4, 5, 6];
 
-function signalBars(latency: number | null | undefined): number {
+export function signalBars(latency: number | null | undefined): number {
   if (latency == null) return 0;
   if (latency < 150) return 5;
   if (latency < 300) return 4;
@@ -16,7 +16,7 @@ function signalBars(latency: number | null | undefined): number {
   return 1;
 }
 
-function PingBars({ bars, failed }: { bars: number; failed: boolean }) {
+export function PingBars({ bars, failed }: { bars: number; failed: boolean }) {
   return (
     <div className="flex items-end gap-[2px] h-3.5" style={{ imageRendering: "pixelated" }}>
       {BAR_HEIGHTS.map((height, index) => (

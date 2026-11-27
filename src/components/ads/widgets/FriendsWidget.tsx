@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useFriendsStore, type FriendsFriendUser, type OnlineState } from "../../../store/friends-store";
 import { usePlayerAvatar } from "../../../hooks/usePlayerAvatar";
+import { openFriendsWindow } from "../../../services/friends-window-service";
+import { translateApiError } from "../../../utils/nrc-error-translations";
+import { toast } from "../../ui/GlobalToaster";
 import { PixelImage, StatusDot, WidgetMessage, WidgetRow } from "./WidgetParts";
 
 const STATE_COLOR: Partial<Record<OnlineState, string>> = {
@@ -14,16 +17,19 @@ const isVisible = (friend: FriendsFriendUser) => friend.state !== "OFFLINE" && f
 export function FriendsWidget() {
   const { t } = useTranslation();
   const friends = useFriendsStore((state) => state.friends);
-  const openSidebar = useFriendsStore((state) => state.openSidebar);
   const online = friends.filter(isVisible);
   if (online.length === 0) return <WidgetMessage icon="solar:users-group-rounded-bold" text={t("rail_widgets.friends.empty")} />;
   return (
     <div className="flex flex-col gap-0.5">
       {online.map((friend) => (
-        <FriendRow key={friend.uuid} friend={friend} onClick={openSidebar} />
+        <FriendRow key={friend.uuid} friend={friend} onClick={onOpenFriends} />
       ))}
     </div>
   );
+}
+
+function onOpenFriends() {
+  openFriendsWindow().catch((e) => toast.error(translateApiError(e)));
 }
 
 function FriendRow({ friend, onClick }: { friend: FriendsFriendUser; onClick: () => void }) {

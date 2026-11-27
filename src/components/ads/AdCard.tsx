@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLauncherAdsStore } from "../../store/launcher-ads-store";
-import { useFriendsStore } from "../../store/friends-store";
 import type { AdSize } from "../../services/ads-service";
 import { AdSlot } from "./AdSlot";
 import { AdFallback } from "./AdFallback";
 import { useOpenAdPause } from "./AdPauseDialog";
 
 export const MAIN_AD_SLOT = "play-news";
+/** Friends window rail; the ad view moves there while that window is in front. */
+export const FRIENDS_AD_SLOT = "friends-rail";
 const FALLBACK_DELAY_MS = 5000;
 
 export function useAdSize(slot: string): AdSize | null {
@@ -35,7 +36,6 @@ export function AdCaption() {
 }
 
 export function AdFrame({ slot, size }: { slot: string; size: AdSize }) {
-  const coveredByFriends = useFriendsStore((state) => state.isSidebarOpen);
   const [adShown, setAdShown] = useState(false);
   const [fallbackVisible, setFallbackVisible] = useState(false);
 
@@ -57,7 +57,7 @@ export function AdFrame({ slot, size }: { slot: string; size: AdSize }) {
           <AdFallback />
         </div>
       )}
-      {!coveredByFriends && <AdSlot slot={slot} className="relative" onShownChange={setAdShown} />}
+      <AdSlot slot={slot} className="relative" onShownChange={setAdShown} />
     </div>
   );
 }

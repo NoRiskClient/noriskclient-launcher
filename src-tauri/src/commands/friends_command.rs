@@ -332,3 +332,8 @@ pub async fn remove_message_reaction(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn open_friends_window(app: tauri::AppHandle) -> Result<(), CommandError> {
+    crate::utils::friends_window::open(&app).await.map_err(CommandError::from)
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { gsap } from "gsap";
 import { cn } from "../../lib/utils";
@@ -10,8 +10,14 @@ import { MinecraftAccountManager } from "../account/MinecraftAccountManager";
 import { IconButton } from "../ui/buttons/IconButton";
 import { useSocialsModalStore } from "../../store/socials-modal-store";
 import { useFriendsStore } from "../../store/friends-store";
+import { useChatStore, visibleUnread } from "../../store/chat-store";
 import { Icon } from "@iconify/react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { NotificationBadge } from "../ui/NotificationBadge";
+import { toast } from "../ui/GlobalToaster";
+import { translateApiError } from "../../utils/nrc-error-translations";
 import { NotificationBell } from "./NotificationBell";
+import { openFriendsWindow } from "../../services/friends-window-service";
 
 interface UserProfileBarProps {
   className?: string;
@@ -26,7 +32,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
   const accountCount = useMinecraftAuthStore((s) => s.accounts.length);
   const [_, setMounted] = useState(false);
   const { openModal: openSocialsModal } = useSocialsModalStore();
-  const { toggleSidebar: toggleFriendsSidebar } = useFriendsStore();
+  const friendsUnread = useFriendsUnreadCount();
 
   useEffect(() => {
     setMounted(true);
@@ -77,14 +83,17 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
           />
         </div>
 
-        <IconButton
-          icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
-          onClick={toggleFriendsSidebar}
-          variant="flat"
-          size="sm"
-          aria-label={t('header.toggle_friends')}
-          className="text-white/70 hover:text-white h-10 w-10"
-        />
+        <span className="relative">
+          <IconButton
+            icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
+            onClick={onOpenFriends}
+            variant="flat"
+            size="sm"
+            aria-label={t('header.open_friends')}
+            className="text-white/70 hover:text-white h-10 w-10"
+          />
+          <NotificationBadge count={friendsUnread} />
+        </span>
 
         <IconButton
           icon={<Icon icon="solar:link-linear" className="w-5 h-5" />}
@@ -109,4 +118,34 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
       </Dropdown>
     </div>
   );
+}
+
+function onOpenFriends() {
+  openFriendsWindow().catch((e) => toast.error(translateApiError(e)));
+}
+
+/** Unread chats plus incoming requests, refreshed when the launcher regains focus. */
+function useFriendsUnreadCount(): number {
+  const chats = useChatStore((s) => s.chats);
+  const readUpTo = useChatStore((s) => s.readUpTo);
+  const pendingRequests = useFriendsStore((s) => s.pendingRequests);
+  const currentUserUuid = useFriendsStore((s) => s.currentUser?.uuid);
+
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused) return;
+      void useChatStore.getState().loadChats();
+      void useFriendsStore.getState().loadPendingRequests();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  return useMemo(() => {
+    const me = currentUserUuid?.toLowerCase();
+    const unread = chats.reduce((sum, c) => sum + visibleUnread(c, me, readUpTo), 0);
+    const incoming = me ? pendingRequests.filter((r) => r.receiver?.toLowerCase() === me).length : 0;
+    return unread + incoming;
+  }, [chats, readUpTo, pendingRequests, currentUserUuid]);
 }

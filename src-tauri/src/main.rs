@@ -149,7 +149,7 @@ use commands::friends_command::{
     disconnect_friends_websocket, is_friends_websocket_connected, get_or_create_chat,
     get_private_chats, get_chat_messages, send_chat_message, edit_chat_message,
     delete_chat_message, send_typing_indicator, add_message_reaction,
-    remove_message_reaction,
+    remove_message_reaction, open_friends_window,
 };
 
 #[tokio::main]
@@ -191,6 +191,9 @@ async fn main() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 utils::main_window::close_requested(window, api);
+            }
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed) {
+                noriskclient_launcher_v3_lib::ads::host_closing(window.app_handle(), window.label());
             }
         })
         .plugin(tauri_plugin_dialog::init())
@@ -798,6 +801,7 @@ async fn main() {
             send_typing_indicator,
             add_message_reaction,
             remove_message_reaction,
+            open_friends_window,
             commands::deep_link_handler::confirm_auth_bridge,
             commands::deep_link_handler::take_pending_deep_links,
             commands::support_command::support_request_fetch,

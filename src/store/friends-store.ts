@@ -10,6 +10,19 @@ export interface FriendsFriendUser {
   state: OnlineState;
   server: string | null;
   pingEnabled: boolean | null;
+  /** Epoch milliseconds. */
+  lastSeenAt?: number | null;
+  /** "DEFAULT" for players without a rank. */
+  rank?: string | null;
+  noriskPlus?: boolean;
+  loginStreak?: LoginStreak | null;
+}
+
+export interface LoginStreak {
+  days: number;
+  maxDays: number;
+  /** Last day the streak counted, as YYYY-MM-DD. */
+  lastDay?: string | null;
 }
 
 export interface FriendsUser {
@@ -29,6 +42,8 @@ export interface FriendRequestUser {
   username: string;
 }
 
+export type FriendsView = "chat" | "requests" | "settings" | null;
+
 export interface FriendRequestWithUsers {
   id: string;
   sender: string;
@@ -43,17 +58,13 @@ interface FriendsState {
   pendingRequests: FriendRequestWithUsers[];
   currentUser: FriendsUser | null;
   isLoading: boolean;
-  isSidebarOpen: boolean;
-  isSettingsOpen: boolean;
+  hasLoadedFriends: boolean;
+  activeView: FriendsView;
   wsConnected: boolean;
   notificationsEnabled: boolean;
   error: string | null;
   activeChatFriend: FriendsFriendUser | null;
   lastFetchedAt: number | null;
-
-  openSidebar: () => void;
-  closeSidebar: () => void;
-  toggleSidebar: () => void;
 
   loadFriends: (force?: boolean) => Promise<void>;
   loadPendingRequests: () => Promise<void>;
@@ -80,10 +91,7 @@ interface FriendsState {
   addPendingRequest: (request: FriendRequestWithUsers) => void;
   removePendingRequest: (id: string) => void;
   openChat: (friend: FriendsFriendUser) => void;
-  closeChat: () => void;
-  toggleNotifications: () => void;
-  openSettings: () => void;
-  closeSettings: () => void;
+  openView: (view: Exclude<FriendsView, "chat">) => void;
   updatePrivacySetting: (setting: string, value: boolean) => Promise<void>;
 }
 
@@ -92,17 +100,13 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   pendingRequests: [],
   currentUser: null,
   isLoading: false,
-  isSidebarOpen: false,
-  isSettingsOpen: false,
+  hasLoadedFriends: false,
+  activeView: null,
   wsConnected: false,
   notificationsEnabled: true,
   error: null,
   activeChatFriend: null,
   lastFetchedAt: null,
-
-  openSidebar: () => set({ isSidebarOpen: true }),
-  closeSidebar: () => set({ isSidebarOpen: false }),
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 
   loadFriends: async (force = false) => {
     const state = get();
@@ -114,10 +118,20 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       return;
     }
 
-    set({ isLoading: true, error: null });
+    // Only the first load shows skeletons; refreshes swap the list in place.
+    set({ isLoading: !state.hasLoadedFriends, error: null });
     try {
       const friends = await invoke<FriendsFriendUser[]>('get_friends');
-      set({ friends, isLoading: false, lastFetchedAt: now });
+      set((s) => ({
+        friends,
+        isLoading: false,
+        hasLoadedFriends: true,
+        lastFetchedAt: now,
+        // Keep the open chat in sync with the refreshed friend.
+        activeChatFriend: s.activeChatFriend
+          ? friends.find((f) => f.uuid === s.activeChatFriend?.uuid) ?? s.activeChatFriend
+          : null,
+      }));
     } catch (e) {
       set({ error: String(e), isLoading: false });
     }
@@ -184,6 +198,9 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
       await invoke('remove_friend', { targetName: name, targetUuid: uuid });
       set((state) => ({
         friends: state.friends.filter((f) => f.uuid !== uuid),
+        ...(state.activeChatFriend?.uuid === uuid
+          ? { activeChatFriend: null, activeView: null }
+          : {}),
       }));
     } catch (e) {
       set({ error: translateApiError(e) });
@@ -212,6 +229,10 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
         friends: state.friends.map((f) =>
           f.username === friendName ? { ...f, pingEnabled: enabled } : f
         ),
+        activeChatFriend:
+          state.activeChatFriend?.username === friendName
+            ? { ...state.activeChatFriend, pingEnabled: enabled }
+            : state.activeChatFriend,
       }));
       return enabled;
     } catch (e) {
@@ -295,11 +316,8 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
     }));
   },
 
-  openChat: (friend: FriendsFriendUser) => set({ activeChatFriend: friend, isSettingsOpen: false }),
-  closeChat: () => set({ activeChatFriend: null }),
-  toggleNotifications: () => set((s) => ({ notificationsEnabled: !s.notificationsEnabled })),
-  openSettings: () => set((s) => ({ isSettingsOpen: !s.isSettingsOpen, activeChatFriend: null })),
-  closeSettings: () => set({ isSettingsOpen: false }),
+  openChat: (friend: FriendsFriendUser) => set({ activeChatFriend: friend, activeView: "chat" }),
+  openView: (view) => set({ activeView: view, activeChatFriend: null }),
   updatePrivacySetting: async (setting: string, value: boolean) => {
     try {
       await invoke('update_privacy_setting', { setting, value });
