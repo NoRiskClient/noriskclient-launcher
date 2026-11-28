@@ -1,10 +1,21 @@
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Icon } from "@iconify/react";
 import { ModPlatform } from "../../types/unified";
 import { sanitizeRichHtml } from "../../utils/html-sanitize";
+
+const MODRINTH_SCHEMA: SanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...defaultSchema.tagNames!, "center", "iframe"],
+  strip: [...defaultSchema.strip!, "style"],
+  attributes: {
+    ...defaultSchema.attributes,
+    iframe: [["src", /^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//], "allowFullScreen"],
+  },
+};
 
 interface ModDetailDescriptionProps {
   body: string;
@@ -70,7 +81,7 @@ export function ModDetailDescription({ body, source }: ModDetailDescriptionProps
           <div className="prose prose-invert prose-sm max-w-none font-sans [overflow-wrap:anywhere]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
+              rehypePlugins={[rehypeRaw, [rehypeSanitize, MODRINTH_SCHEMA]]}
               components={{
                 h1: ({ children }) => (
                   <h1 className="text-xl font-bold text-white mb-3 mt-6 first:mt-0 font-sans normal-case tracking-normal">
