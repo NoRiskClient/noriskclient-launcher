@@ -7,11 +7,40 @@ fn preview_dir() -> PathBuf {
     std::env::temp_dir().join("nrc-clip-preview")
 }
 
+const STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
 fn fresh_preview_dir() -> Result<PathBuf> {
-    let dir = preview_dir();
-    let _ = std::fs::remove_dir_all(&dir);
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    let root = preview_dir();
+    sweep_stale(&root, STALE_AFTER);
+    let request = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = root.join(format!("{}-{request}", std::process::id()));
     std::fs::create_dir_all(&dir).with_context(|| format!("could not create {}", dir.display()))?;
     Ok(dir)
+}
+
+fn sweep_stale(root: &Path, older_than: std::time::Duration) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let stale = entry
+            .metadata()
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age > older_than);
+        if !stale {
+            continue;
+        }
+        let path = entry.path();
+        let _ = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+    }
 }
 
 pub fn prepare(source: &Path, waveform_only: bool) -> Result<Vec<norisk_ipc::PreviewTrack>> {
@@ -109,6 +138,35 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32, channels: u16) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn two_requests_never_share_or_wipe_each_others_folder() {
+        let first = fresh_preview_dir().unwrap();
+        std::fs::write(first.join("a.wav"), b"x").unwrap();
+        let second = fresh_preview_dir().unwrap();
+
+        assert_ne!(first, second);
+        assert!(first.join("a.wav").exists(), "a newer request deleted an older preview");
+
+        let _ = std::fs::remove_dir_all(&first);
+        let _ = std::fs::remove_dir_all(&second);
+    }
+
+    #[test]
+    fn only_old_previews_are_swept() {
+        let root = std::env::temp_dir().join(format!("nrc-preview-sweep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("recent")).unwrap();
+
+        sweep_stale(&root, std::time::Duration::from_secs(3600));
+        assert!(root.join("recent").exists());
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        sweep_stale(&root, std::time::Duration::from_millis(10));
+        assert!(!root.join("recent").exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     fn parse_header(bytes: &[u8]) -> (u16, u32, u16, u32) {
         let channels = u16::from_le_bytes([bytes[22], bytes[23]]);
