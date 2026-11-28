@@ -3,24 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct VersionManifest {
-    pub latest: LatestVersions,
-    pub versions: Vec<Version>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LatestVersions {
-    pub release: String,
-    pub snapshot: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Version {
-    pub id: String,
-    pub url: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct PistonMeta {
     pub id: String,
     #[serde(rename = "mainClass")]

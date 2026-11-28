@@ -84,75 +84,6 @@ export interface ModrinthSearchHit {
     versions?: string[] | null;
 }
 
-// Add the context type for frontend use
-export interface ModrinthProjectContext {
-    project_id: string;
-    loader: string;
-    game_version: string;
-}
-
-// Structure for results from get_all_modrinth_versions_for_contexts
-export interface ModrinthAllVersionsResult {
-    context: ModrinthProjectContext;
-    versions: ModrinthVersion[] | null;
-    error: string | null;
-}
-
-// Data structures matching backend
-export interface ResourcePackModrinthInfo {
-    project_id: string;
-    version_id: string;
-    name: string;
-    version_number: string;
-    download_url: string;
-}
-
-export interface ResourcePackInfo {
-    filename: string;
-    path: string;
-    sha1_hash: string | null;
-    file_size: number;
-    is_disabled: boolean;
-    modrinth_info: ResourcePackModrinthInfo | null;
-    curseforge_info?: import('./profile').GenericCurseForgeInfo | null;
-}
-
-export interface ShaderPackModrinthInfo {
-    project_id: string;
-    version_id: string;
-    name: string;
-    version_number: string;
-    download_url: string;
-}
-
-export interface ShaderPackInfo {
-    filename: string;
-    path: string;
-    sha1_hash: string | null;
-    file_size: number;
-    is_disabled: boolean;
-    modrinth_info: ShaderPackModrinthInfo | null;
-    curseforge_info?: import('./profile').GenericCurseForgeInfo | null;
-}
-
-export interface DataPackModrinthInfo {
-    project_id: string;
-    version_id: string;
-    name: string;
-    version_number: string;
-    download_url: string;
-}
-
-export interface DataPackInfo {
-    filename: string;
-    path: string;
-    sha1_hash: string | null;
-    file_size: number;
-    is_disabled: boolean;
-    modrinth_info: DataPackModrinthInfo | null;
-    curseforge_info?: import('./profile').GenericCurseForgeInfo | null;
-}
-
 // --- Structures for Bulk Project Lookup --- 
 
 // Corresponds to ModrinthModeratorMessage in Rust
@@ -218,17 +149,6 @@ export interface ModrinthProject {
     gallery: ModrinthGalleryImage[];
     game_versions?: string[] | null; // Added based on Rust struct
     loaders?: string[] | null; // Added based on Rust struct
-}
-
-// Allowed hash algorithms for Modrinth API requests
-export type ModrinthHashAlgorithm = "sha1" | "sha512";
-
-// Request body for checking mod updates via the bulk API
-export interface ModrinthBulkUpdateRequestBody {
-    hashes: string[];      // SHA1 or SHA512 hashes of the currently installed mod files
-    algorithm: ModrinthHashAlgorithm; // Use the specific type
-    loaders: string[];     // List of mod loaders to filter by (e.g., ["fabric", "quilt"])
-    game_versions: string[]; // List of game versions to filter by (e.g., ["1.20.1"])
 }
 
 // --- Modrinth Tag Types ---

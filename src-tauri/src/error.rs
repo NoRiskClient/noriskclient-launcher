@@ -13,9 +13,6 @@ pub enum AppError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
 
-    #[error("Configuration error: {0}")]
-    Config(String),
-
     #[error("Download error: {0}")]
     Download(String),
 
@@ -27,9 +24,6 @@ pub enum AppError {
 
     #[error("Zip error: {0}")]
     Zip(#[from] zip::result::ZipError),
-
-    #[error("Profile error: {0}")]
-    Profile(String),
 
     #[error("Java download error: {0}")]
     JavaDownload(String),
@@ -76,20 +70,11 @@ pub enum AppError {
     #[error("{0}")]
     DatabaseUnavailable(String),
 
-    #[error("Event state was not properly initialized")]
-    EventStateNotInitialized,
-
     #[error("Tauri error: {0}")]
     TauriError(#[from] tauri::Error),
 
-    #[error("Process error: {0}")]
-    ProcessError(String),
-
     #[error("Account error: {0}")]
     AccountError(String),
-
-    #[error("Event error: {0}")]
-    EventError(String),
 
     #[error("Discord error: {0}")]
     DiscordError(String),
@@ -102,25 +87,6 @@ pub enum AppError {
     #[error("User is not logged in, no credentials available!")]
     NoCredentialsError,
 
-    #[error("Profile '{profile_id}' cannot update mod '{mod_id}': Missing required dependency project ID '{missing_project_id}'. Please add this mod first.")]
-    MissingModDependency {
-        profile_id: Uuid,
-        mod_id: Uuid,
-        missing_project_id: String,
-    },
-
-    #[error("Could not find primary file for Modrinth version '{version_id}'")]
-    ModrinthPrimaryFileNotFound { version_id: String },
-
-    #[error("Invalid Mod Loader: {0}")]
-    InvalidModLoader(String),
-
-    #[error("Norisk Pack not found: {0}")]
-    NoriskPackNotFound(String),
-
-    #[error("Failed to resolve mod: {0}")]
-    ModResolutionFailed(String),
-
     #[error("Process spawn failed: {0}")]
     ProcessSpawnFailed(String),
 
@@ -129,18 +95,6 @@ pub enum AppError {
 
     #[error("Process kill failed: {0}")]
     ProcessKillFailed(u32),
-
-    #[error("Modrinth hash not found: {0}")]
-    ModrinthHashNotFound(String),
-
-    #[error("Mrpack error: {0}")]
-    MrpackError(String),
-
-    #[error("Unsupported OS: {0}")]
-    UnsupportedOS(String),
-
-    #[error("Unsupported architecture: {0}")]
-    UnsupportedArchitecture(String),
 
     #[error("Request error: {0}")]
     RequestError(String),
@@ -191,9 +145,6 @@ pub enum AppError {
     },
     #[error("Filesystem operation error (fs_extra): {0}")]
     FsExtra(#[from] FsExtraError),
-
-    #[error("Feature not implemented: {0}")]
-    NotImplemented(String),
 
     #[error("Resource not found: {0}")]
     NotFound(String),

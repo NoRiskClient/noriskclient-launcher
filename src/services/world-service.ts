@@ -68,15 +68,6 @@ export const deleteWorld = (profileId: string, worldFolder: string): Promise<voi
   return invoke('delete_world', { profileId, worldFolder });
 };
 
-/**
- * Checks if a world's session.lock file can be acquired, indicating if it's likely in use.
- * @returns A promise that resolves with true if the world is locked, false otherwise.
- */
-export const checkWorldLockStatus = (profileId: string, worldFolder: string): Promise<boolean> => {
-    console.debug(`[WorldService] Checking lock status for world: ${worldFolder} in profile ${profileId}`);
-    return invoke('check_world_lock_status', { profileId, worldFolder });
-};
-
 // --- Frontend Helper Functions ---
 
 /**

@@ -82,22 +82,6 @@ pub enum UnifiedSortType {
 }
 
 impl UnifiedSortType {
-    pub fn to_string(&self) -> String {
-        match self {
-            UnifiedSortType::Relevance => "relevance".to_string(),
-            UnifiedSortType::Downloads => "downloads".to_string(),
-            UnifiedSortType::Follows => "follows".to_string(),
-            UnifiedSortType::Newest => "newest".to_string(),
-            UnifiedSortType::Updated => "updated".to_string(),
-            UnifiedSortType::Name => "name".to_string(),
-            UnifiedSortType::Author => "author".to_string(),
-            UnifiedSortType::Featured => "featured".to_string(),
-            UnifiedSortType::Popularity => "popularity".to_string(),
-            UnifiedSortType::Category => "category".to_string(),
-            UnifiedSortType::GameVersion => "game_version".to_string(),
-        }
-    }
-
     pub fn to_modrinth_sort_type(&self) -> Option<modrinth::ModrinthSortType> {
         match self {
             UnifiedSortType::Relevance => Some(modrinth::ModrinthSortType::Relevance),
@@ -1423,4 +1407,3 @@ pub async fn switch_modpack_version(request: ModpackSwitchRequest) -> Result<Mod
         mods,
     })
 }
-

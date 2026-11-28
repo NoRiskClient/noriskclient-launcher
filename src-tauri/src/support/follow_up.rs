@@ -45,6 +45,7 @@ pub fn watch(profile_id: Uuid, session: SessionRef) {
     watched().insert(profile_id, session);
 }
 
+#[cfg(feature = "test-api")]
 pub fn is_watched(profile_id: Uuid) -> bool {
     watched().contains_key(&profile_id)
 }

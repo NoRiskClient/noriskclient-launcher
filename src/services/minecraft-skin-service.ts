@@ -33,23 +33,6 @@ export class MinecraftSkinService {
     }
 
     /**
-     * Initiates the process to upload a new skin file for the user.
-     * NOTE: This likely triggers a file dialog on the Rust side.     * @param skinVariant - The model variant ('classic' or 'slim').
-     * @returns A promise that resolves when the upload process is initiated or completed.
-     */
-    static async uploadSkin(skinVariant: SkinVariant): Promise<void> {
-        // Assuming "upload_skin" handles file selection internally via Tauri dialogs
-        await invoke("upload_skin", { skinVariant });
-    }
-
-    /**
-     * Resets the user's skin back to the default (Steve/Alex).     * @returns A promise that resolves when the reset is complete.
-     */
-    static async resetSkin(): Promise<void> {
-        await invoke("reset_skin");
-    }
-
-    /**
      * Applies a locally stored skin (using its base64 data) to the user's profile.     * @param base64Data - The base64 encoded PNG data of the skin.
      * @param skinVariant - The model variant ('classic' or 'slim').
      * @returns A promise that resolves when the skin is applied.

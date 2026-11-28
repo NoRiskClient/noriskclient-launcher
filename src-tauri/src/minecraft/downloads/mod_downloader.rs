@@ -12,7 +12,6 @@ use std::sync::Arc;
 use tokio::fs::{self, read_dir};
 use tokio::io::AsyncWriteExt;
 
-const DEFAULT_CONCURRENT_MOD_DOWNLOADS: usize = 4;
 const HASH_CONCURRENCY: usize = 8;
 const MOD_CACHE_DIR_NAME: &str = "mod_cache";
 
@@ -22,13 +21,6 @@ pub struct ModDownloadService {
 }
 
 impl ModDownloadService {
-    pub fn new() -> Self {
-        Self {
-            concurrent_downloads: DEFAULT_CONCURRENT_MOD_DOWNLOADS,
-            stats: None,
-        }
-    }
-
     pub fn with_concurrency(concurrent_downloads: usize) -> Self {
         Self {
             concurrent_downloads,

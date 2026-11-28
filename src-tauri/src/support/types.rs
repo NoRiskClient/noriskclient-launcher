@@ -12,8 +12,6 @@ pub struct RequestedBy {
     pub avatar_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minecraft_uuid: Option<String>,
-    #[serde(default, skip_serializing)]
-    pub discord_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

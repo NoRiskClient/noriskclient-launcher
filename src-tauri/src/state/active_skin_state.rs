@@ -98,12 +98,6 @@ impl ActiveSkinManager {
         self.db.read().await.skins.get(&normalize_uuid(uuid)).cloned()
     }
 
-    pub async fn clear(&self, uuid: &str) -> Result<()> {
-        self.ensure_loaded().await?;
-        self.db.write().await.skins.remove(&normalize_uuid(uuid));
-        self.save().await
-    }
-
     pub async fn set(&self, uuid: &str, base64_data: String, variant: String, source: &str) -> Result<bool> {
         self.ensure_loaded().await?;
         let key = normalize_uuid(uuid);

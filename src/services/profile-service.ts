@@ -4,7 +4,6 @@ import type {
   ContentInstallStatus,
   CopyProfileParams,
   CreateProfileParams,
-  CustomModInfo,
   ExportProfileParams,
   Profile,
   ProfilePatch,
@@ -18,18 +17,7 @@ import type {
   UploadProfileIconPayload,
 } from "../types/profile";
 import type { ImportPackPreview } from "../types/importPreview";
-import type {
-  DataPackInfo,
-  ModrinthVersion,
-  ResourcePackInfo,
-  ShaderPackInfo,
-} from "../types/modrinth";
-import { NoriskVersionsConfig } from "../types/noriskVersions";
 import { FileNode } from "../types/fileSystem";
-
-export async function listProfiles(): Promise<Profile[]> {
-  return invoke<Profile[]>("list_profiles");
-}
 
 export async function searchProfiles(query: string): Promise<Profile[]> {
   return invoke<Profile[]>("search_profiles", { query });
@@ -102,106 +90,6 @@ export async function getDefaultJvmArgs(profile: Profile, heapMb: number): Promi
   return invoke<string>("get_default_jvm_args", { profile, heapMb });
 }
 
-export async function setProfileModEnabled(
-  profileId: string,
-  modId: string,
-  enabled: boolean,
-): Promise<void> {
-  return invoke<void>("set_profile_mod_enabled", { profileId, modId, enabled });
-}
-
-export async function deleteModFromProfile(
-  profileId: string,
-  modId: string,
-): Promise<void> {
-  return invoke<void>("delete_mod_from_profile", { profileId, modId });
-}
-
-export async function addModrinthModToProfile(
-  profileId: string,
-  projectId: string,
-  versionId: string,
-  fileName: string,
-  downloadUrl: string,
-  fileHashSha1?: string,
-  modName?: string,
-  versionNumber?: string,
-  loaders?: string[],
-  gameVersions?: string[],
-): Promise<void> {
-  return invoke<void>("add_modrinth_mod_to_profile", {
-    profileId,
-    projectId,
-    versionId,
-    fileName,
-    downloadUrl,
-    fileHashSha1,
-    modName,
-    versionNumber,
-    loaders,
-    gameVersions,
-  });
-}
-
-export async function updateModrinthModVersion(
-  profileId: string,
-  modInstanceId: string,
-  newVersionDetails: ModrinthVersion,
-): Promise<void> {
-  return invoke<void>("update_modrinth_mod_version", {
-    profileId,
-    modInstanceId,
-    newVersionDetails,
-  });
-}
-
-export async function getLocalResourcepacks(
-  profileId: string,
-): Promise<ResourcePackInfo[]> {
-  return invoke<ResourcePackInfo[]>("get_local_resourcepacks", { profileId });
-}
-
-export async function getLocalShaderpacks(
-  profileId: string,
-): Promise<ShaderPackInfo[]> {
-  return invoke<ShaderPackInfo[]>("get_local_shaderpacks", { profileId });
-}
-
-export async function getLocalDatapacks(
-  profileId: string,
-): Promise<DataPackInfo[]> {
-  return invoke<DataPackInfo[]>("get_local_datapacks", { profileId });
-}
-
-export async function getCustomMods(
-  profileId: string,
-): Promise<CustomModInfo[]> {
-  return invoke<CustomModInfo[]>("get_custom_mods", { profileId });
-}
-
-export async function setCustomModEnabled(
-  profileId: string,
-  filename: string,
-  enabled: boolean,
-): Promise<void> {
-  return invoke<void>("set_custom_mod_enabled", {
-    profileId,
-    filename,
-    enabled,
-  });
-}
-
-export async function deleteCustomMod(
-  profileId: string,
-  filename: string,
-): Promise<void> {
-  return invoke<void>("delete_custom_mod", { profileId, filename });
-}
-
-export async function importLocalMods(profileId: string): Promise<void> {
-  return invoke<void>("import_local_mods", { profileId });
-}
-
 export async function openProfileFolder(profileId: string): Promise<void> {
   return invoke<void>("open_profile_folder", { profileId });
 }
@@ -219,84 +107,6 @@ export async function getProfileDirectoryLevel(
   return invoke<FileNode>("get_profile_directory_level", { profileId, subPath });
 }
 
-export async function setNoriskModStatus(
-  profileId: string,
-  packId: string,
-  modId: string,
-  gameVersion: string,
-  loader: string,
-  disabled: boolean,
-): Promise<void> {
-  return invoke<void>("set_norisk_mod_status", {
-    profileId,
-    packId,
-    modId,
-    gameVersion,
-    loader,
-    disabled,
-  });
-}
-
-export async function addModrinthContentToProfile(
-  profileId: string,
-  projectId: string,
-  versionId: string,
-  fileName: string,
-  downloadUrl: string,
-  fileHashSha1: string | null,
-  contentName: string | null,
-  versionNumber: string | null,
-  projectType: string,
-): Promise<void> {
-  return invoke<void>("add_modrinth_content_to_profile", {
-    profileId,
-    projectId,
-    versionId,
-    fileName,
-    downloadUrl,
-    fileHashSha1,
-    contentName,
-    versionNumber,
-    projectType,
-  });
-}
-
-export async function updateResourcepackFromModrinth(
-  profileId: string,
-  resourcepack: ResourcePackInfo,
-  newVersionDetails: ModrinthVersion,
-): Promise<void> {
-  return invoke<void>("update_resourcepack_from_modrinth", {
-    profileId,
-    resourcepack,
-    newVersionDetails,
-  });
-}
-
-export async function updateShaderpackFromModrinth(
-  profileId: string,
-  shaderpack: ShaderPackInfo,
-  newVersionDetails: ModrinthVersion,
-): Promise<void> {
-  return invoke<void>("update_shaderpack_from_modrinth", {
-    profileId,
-    shaderpack,
-    newVersionDetails,
-  });
-}
-
-export async function updateDatapackFromModrinth(
-  profileId: string,
-  datapack: DataPackInfo,
-  newVersionDetails: ModrinthVersion,
-): Promise<void> {
-  return invoke<void>("update_datapack_from_modrinth", {
-    profileId,
-    datapack,
-    newVersionDetails,
-  });
-}
-
 export async function isContentInstalled(
   params: CheckContentParams,
 ): Promise<ContentInstallStatus> {
@@ -309,16 +119,8 @@ export async function batchCheckContentInstalled(
   return invoke<BatchContentInstallStatus>("batch_check_content_installed", { params });
 }
 
-export async function getNoriskPacks(): Promise<any> {
-  return invoke<any>("get_norisk_packs");
-}
-
 export async function getNoriskPacksResolved(): Promise<any> {
   return invoke<any>("get_norisk_packs_resolved");
-}
-
-export async function getStandardProfiles(): Promise<NoriskVersionsConfig> {
-  return invoke<NoriskVersionsConfig>("get_standard_profiles");
 }
 
 export async function refreshNoriskPacks(): Promise<void> {
@@ -397,10 +199,6 @@ export async function getProfileInstancePath(profileId: string): Promise<string>
 }
 export async function getDefaultProfilePath(): Promise<string> {
   return invoke<string>("get_default_profile_path");
-}
-
-export async function getProfileDiskSize(profileId: string): Promise<number> {
-  return invoke<number>("get_profile_disk_size", { profileId });
 }
 
 export interface AddSymlinkParams {

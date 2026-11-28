@@ -81,6 +81,7 @@ pub fn loader_from_curseforge_name(name: &str) -> LoaderPick {
     }
 }
 
+#[cfg(feature = "test-api")]
 pub fn loader_from_vanilla_version_id(version_id: &str) -> LoaderPick {
     let trimmed = version_id.trim();
     if trimmed.is_empty() {
@@ -136,6 +137,7 @@ pub fn loader_from_vanilla_version_id(version_id: &str) -> LoaderPick {
     }
 }
 
+#[cfg(feature = "test-api")]
 pub fn is_version_like(value: &str) -> bool {
     let trimmed = value.trim();
     !trimmed.is_empty()

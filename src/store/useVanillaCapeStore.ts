@@ -1,13 +1,11 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { VanillaCapeService } from "../services/vanilla-cape-service";
 import { invalidateEquippedCosmetics } from "../services/cosmetic-cache";
-import type { VanillaCape, VanillaCapeInfo } from "../types/vanillaCapes";
+import type { VanillaCape } from "../types/vanillaCapes";
 
 interface VanillaCapeState {
   ownedCapes: VanillaCape[];
   equippedCape: VanillaCape | null;
-  capeInfo: VanillaCapeInfo[];
   isLoading: boolean;
   error: string | null;
   lastFetchTime: number | null;
@@ -18,104 +16,82 @@ interface VanillaCapeState {
   setError: (error: string | null) => void;
 }
 
-const STORAGE_KEY = "norisk-vanilla-capes";
+export const useVanillaCapeStore = create<VanillaCapeState>()((set, get) => ({
+  ownedCapes: [],
+  equippedCape: null,
+  isLoading: false,
+  error: null,
+  lastFetchTime: null,
 
-export const useVanillaCapeStore = create<VanillaCapeState>()(
-  persist(
-    (set, get) => ({
-      ownedCapes: [],
-      equippedCape: null,
-      capeInfo: [],
-      isLoading: false,
-      error: null,
-      lastFetchTime: null,
+  fetchOwnedCapes: async () => {
+    const now = Date.now();
+    const lastFetch = get().lastFetchTime;
+    
+    // Prevent multiple calls within 5 seconds
+    if (lastFetch && now - lastFetch < 5000) {
+      console.log("Skipping fetch - too soon since last call");
+      return;
+    }
 
-      fetchOwnedCapes: async () => {
-        const now = Date.now();
-        const lastFetch = get().lastFetchTime;
-        
-        // Prevent multiple calls within 5 seconds
-        if (lastFetch && now - lastFetch < 5000) {
-          console.log("Skipping fetch - too soon since last call");
-          return;
+    if (get().isLoading) {
+      console.log("Skipping fetch - already loading");
+      return;
+    }
+
+    set({ isLoading: true, error: null, lastFetchTime: now });
+    try {
+      const ownedCapes = await VanillaCapeService.getOwnedVanillaCapes();
+      const equippedCape = await VanillaCapeService.getCurrentlyEquippedVanillaCape();
+      
+      set({ 
+        ownedCapes, 
+        equippedCape,
+        isLoading: false 
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch owned capes";
+      set({ error: errorMessage, isLoading: false });
+      console.error("Failed to fetch owned vanilla capes:", error);
+    }
+  },
+
+  equipCape: async (capeId: string | null) => {
+    const previousEquipped = get().equippedCape;
+    
+    try {
+      if (capeId === null) {
+        set({ equippedCape: null });
+      } else {
+        const cape = get().ownedCapes.find(c => c.id === capeId);
+        if (cape) {
+          set({ equippedCape: { ...cape, equipped: true } });
         }
+      }
 
-        if (get().isLoading) {
-          console.log("Skipping fetch - already loading");
-          return;
-        }
+      await VanillaCapeService.equipVanillaCape(capeId);
+      invalidateEquippedCosmetics();
 
-        set({ isLoading: true, error: null, lastFetchTime: now });
-        try {
-          const ownedCapes = await VanillaCapeService.getOwnedVanillaCapes();
-          const equippedCape = await VanillaCapeService.getCurrentlyEquippedVanillaCape();
-          
-          set({ 
-            ownedCapes, 
-            equippedCape,
-            isLoading: false 
-          });
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "Failed to fetch owned capes";
-          set({ error: errorMessage, isLoading: false });
-          console.error("Failed to fetch owned vanilla capes:", error);
-        }
-      },
+      set(state => ({
+        ownedCapes: state.ownedCapes.map(cape => ({
+          ...cape,
+          equipped: cape.id === capeId
+        }))
+      }));
+    } catch (error) {
+      set({ equippedCape: previousEquipped });
 
-      equipCape: async (capeId: string | null) => {
-        const previousEquipped = get().equippedCape;
-        
-        try {
-          if (capeId === null) {
-            set({ equippedCape: null });
-          } else {
-            const cape = get().ownedCapes.find(c => c.id === capeId);
-            if (cape) {
-              set({ equippedCape: { ...cape, equipped: true } });
-            }
-          }
+      const errorMessage = error instanceof Error ? error.message : "Failed to equip cape";
+      set({ error: errorMessage });
+      console.error("Failed to equip vanilla cape:", error);
+      throw error; // Re-throw so the calling code can handle the error
+    }
+  },
 
-          await VanillaCapeService.equipVanillaCape(capeId);
-          invalidateEquippedCosmetics();
+  setLoading: (loading: boolean) => {
+    set({ isLoading: loading });
+  },
 
-          set(state => ({
-            ownedCapes: state.ownedCapes.map(cape => ({
-              ...cape,
-              equipped: cape.id === capeId
-            }))
-          }));
-        } catch (error) {
-          set({ equippedCape: previousEquipped });
-
-          const errorMessage = error instanceof Error ? error.message : "Failed to equip cape";
-          set({ error: errorMessage });
-          console.error("Failed to equip vanilla cape:", error);
-          throw error; // Re-throw so the calling code can handle the error
-        }
-      },
-
-      setLoading: (loading: boolean) => {
-        set({ isLoading: loading });
-      },
-
-      setError: (error: string | null) => {
-        set({ error });
-      },
-    }),
-    {
-      name: STORAGE_KEY,
-      partialize: (state) => ({
-        capeInfo: state.capeInfo,
-      }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.ownedCapes = [];
-          state.equippedCape = null;
-          state.isLoading = false;
-          state.error = null;
-          state.lastFetchTime = null;
-        }
-      },
-    },
-  ),
-);
+  setError: (error: string | null) => {
+    set({ error });
+  },
+}));

@@ -25,18 +25,6 @@ pub async fn get_process(process_id: Uuid) -> Result<Option<ProcessMetadata>, Co
 }
 
 #[tauri::command]
-pub async fn get_processes_by_profile(
-    profile_id: Uuid,
-) -> Result<Vec<ProcessMetadata>, CommandError> {
-    let state = State::get().await?;
-    let processes = state
-        .process_manager
-        .get_process_metadata_by_profile(profile_id)
-        .await;
-    Ok(processes)
-}
-
-#[tauri::command]
 pub async fn stop_process(process_id: Uuid) -> Result<(), CommandError> {
     let state = State::get().await?;
     state.process_manager.stop_process(process_id).await?;

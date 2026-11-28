@@ -133,12 +133,6 @@ export interface SyncPack {
   mods: SyncPackModEntry[];
 }
 
-export interface SyncPackSubscriber {
-  profile_id: string;
-  profile_name: string;
-  instance_path: string;
-}
-
 export interface SyncConflict {
   path: string;
   winner_pack_id: string;

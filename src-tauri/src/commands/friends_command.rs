@@ -38,13 +38,10 @@ async fn get_auth_info() -> Result<(String, Uuid, String, bool), CommandError> {
 #[tauri::command]
 pub async fn get_friends() -> Result<Vec<FriendsFriendUser>, CommandError> {
     let (token, uuid, _, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     let info = FriendsApi::get_friends(&token, &uuid, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    state.friends_state.set_friends(info.friends.clone()).await;
 
     Ok(info.friends)
 }
@@ -63,13 +60,10 @@ pub async fn get_pending_requests() -> Result<Vec<FriendRequestWithUsers>, Comma
 #[tauri::command]
 pub async fn get_friends_user() -> Result<FriendsUser, CommandError> {
     let (token, _, username, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     let user = FriendsApi::get_current_user(&token, &username, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    state.friends_state.set_current_user(user.clone()).await;
 
     Ok(user)
 }
@@ -108,17 +102,12 @@ pub async fn deny_friend_request(target_name: String) -> Result<(), CommandError
 }
 
 #[tauri::command(rename_all = "camelCase")]
-pub async fn remove_friend(target_name: String, target_uuid: String) -> Result<(), CommandError> {
+pub async fn remove_friend(target_name: String) -> Result<(), CommandError> {
     let (token, _, _, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     FriendsApi::remove_friend(&token, &target_name, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    let uuid = Uuid::parse_str(&target_uuid).map_err(|e| CommandError::from(AppError::ParseError(format!("Invalid UUID: {}", e))))?;
-
-    state.friends_state.remove_friend(&uuid).await;
 
     Ok(())
 }
@@ -218,15 +207,10 @@ pub async fn get_or_create_chat(friend_uuid: String) -> Result<Chat, CommandErro
 #[tauri::command]
 pub async fn get_private_chats() -> Result<Vec<ComputedChat>, CommandError> {
     let (token, _, _, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     let chats = ChatApi::get_private_chats(&token, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    for chat in &chats {
-        state.friends_state.set_chat(chat.clone()).await;
-    }
 
     Ok(chats)
 }
@@ -234,17 +218,12 @@ pub async fn get_private_chats() -> Result<Vec<ComputedChat>, CommandError> {
 #[tauri::command(rename_all = "camelCase")]
 pub async fn get_chat_messages(chat_id: String, page: u32, limit: Option<u32>) -> Result<Vec<ChatMessage>, CommandError> {
     let (token, _, _, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     let limit = limit.unwrap_or(25);
 
     let messages = ChatApi::get_messages(&token, &chat_id, page, limit, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    if page <= 1 {
-        state.friends_state.set_messages(&chat_id, messages.clone()).await;
-    }
 
     Ok(messages)
 }
@@ -256,13 +235,10 @@ pub async fn send_chat_message(
     relates_to: Option<String>,
 ) -> Result<ChatMessage, CommandError> {
     let (token, _, _, is_experimental) = get_auth_info().await?;
-    let state = State::get().await.map_err(|e| CommandError::from(e))?;
 
     let message = ChatApi::send_message(&token, &chat_id, &content, relates_to, is_experimental)
         .await
         .map_err(|e| CommandError::from(e))?;
-
-    state.friends_state.add_message(&chat_id, message.clone()).await;
 
     Ok(message)
 }

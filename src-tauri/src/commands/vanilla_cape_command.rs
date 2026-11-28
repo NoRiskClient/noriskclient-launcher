@@ -1,13 +1,7 @@
 use crate::error::{AppError, CommandError};
-use crate::minecraft::api::vanilla_cape_api::{VanillaCape, VanillaCapeApi, VanillaCapeInfo};
+use crate::minecraft::api::vanilla_cape_api::{VanillaCape, VanillaCapeApi};
 use crate::state::state_manager::State;
 use log::debug;
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug)]
-pub struct EquipVanillaCapePayload {
-    pub cape_id: Option<String>,
-}
 
 #[tauri::command]
 pub async fn get_owned_vanilla_capes() -> Result<Vec<VanillaCape>, CommandError> {
@@ -113,22 +107,4 @@ pub async fn equip_vanilla_cape(cape_id: Option<String>) -> Result<(), CommandEr
     }
 
     result
-}
-
-#[tauri::command]
-pub async fn get_vanilla_cape_info() -> Result<Vec<VanillaCapeInfo>, CommandError> {
-    debug!("Command called: get_vanilla_cape_info");
-
-    let cape_api = VanillaCapeApi::new();
-    let cape_info = cape_api.get_cape_info();
-
-    debug!("Command completed: get_vanilla_cape_info - returned {} cape info entries", cape_info.len());
-    Ok(cape_info)
-}
-
-#[tauri::command]
-pub async fn refresh_vanilla_cape_data() -> Result<(), CommandError> {
-    debug!("Command called: refresh_vanilla_cape_data");
-    debug!("Command completed: refresh_vanilla_cape_data");
-    Ok(())
 }

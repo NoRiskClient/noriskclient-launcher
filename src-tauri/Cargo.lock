@@ -3967,6 +3967,7 @@ dependencies = [
  "norisk-capture",
  "norisk-ipc",
  "norisk-logging",
+ "noriskclient-launcher-v3",
  "once_cell",
  "p256",
  "quick-xml 0.31.0",

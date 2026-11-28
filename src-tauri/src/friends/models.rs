@@ -199,14 +199,6 @@ impl From<ApiFriendsFriendRequestResponse> for FriendRequestWithUsers {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum MessageStatus {
-    Sent,
-    Received,
-    Read,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatParticipant {
@@ -301,12 +293,6 @@ pub struct CreateChatMessageRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EditChatMessageRequest {
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OnlineStateChangeEvent {
     pub new_state: OnlineState,
     pub user: OnlineStateChangeUser,
@@ -325,13 +311,6 @@ pub struct FriendOnlineEvent {
     pub uuid: Uuid,
     pub username: String,
     pub server: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageReceivedEvent {
-    pub chat_id: String,
-    pub message: ChatMessage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -8,26 +8,10 @@ use crate::utils::referral_utils;
 use crate::utils::updater_utils;
 use chrono::{Duration, Utc};
 use log::{error, info, warn};
-use tauri::plugin::TauriPlugin;
 use tauri::Manager;
 use tauri::{Runtime, UserAttentionType};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
-
-//TODO das wäre geiler aber habs noch nicht hinbekommen
-//Error during login: minecraft_auth.begin_login not allowed. Plugin not found
-pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    tauri::plugin::Builder::<R>::new("minecraft_auth")
-        .invoke_handler(tauri::generate_handler![
-            begin_login,
-            cancel_login,
-            remove_account,
-            get_active_account,
-            set_active_account,
-            get_accounts
-        ])
-        .build()
-}
 
 /// Begin the Minecraft login flow
 /// Returns a URL that the user needs to visit to sign in

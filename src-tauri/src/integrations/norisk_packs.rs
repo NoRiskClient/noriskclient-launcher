@@ -711,6 +711,7 @@ pub async fn import_noriskpack_as_profile(pack_path: PathBuf, event_id: Option<U
 
 /// Handles the opening of a .noriskpack file, either on app startup or second instance.
 /// It will call the `import_profile` command if a valid file path is found in the arguments.
+#[allow(dead_code, reason = "the startup call in run() is disabled")]
 pub async fn handle_noriskpack_file_paths<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
     args: Vec<String>, // Changed from Vec<PathBuf>

@@ -119,7 +119,6 @@ impl NoriskVersionManager {
 
     /// Saves the current configuration back to the JSON file.
     /// Note: This might not be frequently used for standard versions unless caching fetched data.
-    #[allow(dead_code)]
     async fn save_config(&self) -> Result<()> {
         let _guard = self.save_lock.lock().await;
 
@@ -157,17 +156,6 @@ impl NoriskVersionManager {
     /// Returns a clone of the entire current NoriskVersionsConfig.
     pub async fn get_config(&self) -> NoriskVersionsConfig {
         self.config.read().await.clone()
-    }
-
-    /// Updates the entire configuration and saves it to the file.
-    /// Note: Use with caution, as standard versions are often meant to be static or fetched.
-    #[allow(dead_code)]
-    pub async fn update_config(&self, new_config: NoriskVersionsConfig) -> Result<()> {
-        {
-            let mut config_guard = self.config.write().await;
-            *config_guard = new_config;
-        }
-        self.save_config().await // Save the updated config
     }
 
     /// Returns a standard profile by ID if found

@@ -84,6 +84,7 @@ impl CfgFile {
         self.get(key)?.parse().ok()
     }
 
+    #[cfg(feature = "test-api")]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

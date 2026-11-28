@@ -269,13 +269,6 @@ impl ImportSelection {
     pub fn includes(&self, key: &str) -> bool {
         buckets::find(key).is_some_and(|bucket| (bucket.selected)(self))
     }
-
-    pub fn with(mut self, key: &str, value: bool) -> Self {
-        if let Some(bucket) = buckets::find(key) {
-            (bucket.set)(&mut self, value);
-        }
-        self
-    }
 }
 
 #[derive(Serialize, Clone, Debug)]

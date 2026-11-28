@@ -1,7 +1,6 @@
 use crate::error::{AppError, Result};
 use crate::integrations::lenient;
-use futures::future::join_all;
-use log::{self, error, info};
+use log;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -293,16 +292,6 @@ pub struct ModrinthUser {
 }
 // --- End Structures for Team Members ---
 
-// NEUE Struktur für den Input der Bulk-Abfrage
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ModrinthProjectContext {
-    pub project_id: String, // Modrinth Project ID (oder Slug)
-    pub loader: String,     // Der spezifische Loader-Filter für dieses Projekt
-    pub game_version: String, // Die spezifische Game-Version für dieses Projekt
-                            // Optional: Könnte man erweitern, z.B. um die aktuell installierte version_id für direkten Vergleich
-                            // pub current_version_id: Option<String>,
-}
-
 // Enum for project types
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -491,30 +480,6 @@ pub async fn search_projects(
         .map_err(|e| AppError::Other(format!("Failed to parse Modrinth response: {}", e)))
 }
 
-// Keep the old function for backward compatibility
-pub async fn search_mods(
-    query: String,
-    game_version: Option<String>,
-    loader: Option<String>,
-    limit: Option<u32>,
-) -> Result<Vec<ModrinthSearchHit>> {
-    let result = search_projects(
-        query,
-        ModrinthProjectType::Mod,
-        game_version,
-        loader,
-        limit,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .await?;
-
-    Ok(result.hits)
-}
-
 // Function to get versions for a specific Modrinth project
 pub async fn get_mod_versions(
     project_id_or_slug: String,
@@ -636,70 +601,6 @@ pub async fn get_version_details(version_id: String) -> Result<ModrinthVersion> 
     Ok(version_details)
 }
 
-/// Fetches ALL compatible versions for a list of Modrinth projects concurrently,
-/// using specific filters for each project.
-///
-/// Returns a HashMap mapping the input project context to a Result containing either
-/// the Vec<ModrinthVersion> or an AppError specific to that context's fetch.
-pub async fn get_all_versions_for_projects(
-    contexts: Vec<ModrinthProjectContext>,
-) -> Result<HashMap<ModrinthProjectContext, Result<Vec<ModrinthVersion>>>> {
-    if contexts.is_empty() {
-        return Ok(HashMap::new());
-    }
-
-    info!(
-        "Fetching all compatible versions for {} project contexts.",
-        contexts.len()
-    );
-
-    // Create a list of futures, one for each context
-    let futures = contexts.into_iter().map(|context| {
-        let original_context = context.clone();
-
-        async move {
-            let loaders = Some(vec![context.loader]);
-            let game_versions = Some(vec![context.game_version]);
-
-            // Call get_mod_versions and return the Result directly
-            let versions_result: Result<Vec<ModrinthVersion>> =
-                get_mod_versions(context.project_id, loaders, game_versions).await;
-
-            // Log success or failure for this specific context
-            match &versions_result {
-                Ok(versions) => info!(
-                    "Successfully fetched {} versions for project '{}'",
-                    versions.len(),
-                    original_context.project_id
-                ),
-                Err(e) => error!(
-                    "Failed to fetch versions for project '{}': {}",
-                    original_context.project_id, e
-                ),
-            };
-
-            // Return the context and the Result<Vec<ModrinthVersion>>
-            (original_context, versions_result)
-        }
-    });
-
-    // Execute all futures concurrently
-    let results: Vec<(ModrinthProjectContext, Result<Vec<ModrinthVersion>>)> =
-        join_all(futures).await;
-
-    // Collect results into a HashMap
-    let version_map: HashMap<ModrinthProjectContext, Result<Vec<ModrinthVersion>>> =
-        results.into_iter().collect();
-
-    info!(
-        "Finished fetching all versions. Got results for {} project contexts.",
-        version_map.len()
-    );
-    // The outer Result is for potential errors during the setup/collection,
-    // individual fetch errors are inside the map values.
-    Ok(version_map)
-}
-
 /// Fetches version details for multiple files from Modrinth using a list of hashes (SHA1 or SHA512).
 /// https://docs.modrinth.com/api-spec/#tag/version_files/operation/getVersionsByHashes
 pub async fn get_versions_by_hashes(
@@ -794,36 +695,6 @@ pub struct ModrinthBulkUpdateRequestBody {
     pub algorithm: String,
     pub loaders: Vec<String>,
     pub game_versions: Vec<String>,
-}
-
-impl ModrinthBulkUpdateRequestBody {
-    /// Create a new BulkUpdateRequestBody with validation
-    pub fn new(
-        hashes: Vec<String>,
-        algorithm: String,
-        loaders: Vec<String>,
-        game_versions: Vec<String>,
-    ) -> Result<Self> {
-        if hashes.is_empty() {
-            return Err(AppError::Other(
-                "No hashes provided for update check".to_string(),
-            ));
-        }
-
-        if algorithm != "sha1" && algorithm != "sha512" {
-            return Err(AppError::Other(format!(
-                "Invalid hash algorithm provided: {}",
-                algorithm
-            )));
-        }
-
-        Ok(Self {
-            hashes,
-            algorithm,
-            loaders,
-            game_versions,
-        })
-    }
 }
 
 /// Efficiently checks for updates to multiple mods using a single API call.

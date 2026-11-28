@@ -1,11 +1,10 @@
 use crate::commands::path_commands::UploadProfileImagesPayload;
-use crate::error::{AppError, CommandError};
+use crate::error::CommandError;
 use crate::state::profile_state::default_profile_path;
 use crate::utils::disk_space_utils::DiskSpaceUtils;
 use crate::integrations::modrinth::{
-    self, search_mods, search_projects,
-    ModrinthBulkUpdateRequestBody, ModrinthProjectContext, ModrinthProjectType, ModrinthSearchHit,
-    ModrinthSearchResponse, ModrinthSortType, ModrinthVersion,
+    self, search_projects, ModrinthProjectType, ModrinthSearchResponse, ModrinthSortType,
+    ModrinthVersion,
 };
 use crate::integrations::mrpack;
 use crate::integrations::unified_mod::{
@@ -16,8 +15,6 @@ use crate::integrations::unified_mod::{
 use crate::state::content_cache_state::CacheBehaviour;
 use crate::state::profile_state::ModPackSource;
 use crate::state::State;
-use serde::Serialize;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 #[tauri::command]
@@ -66,29 +63,6 @@ pub async fn search_modrinth_projects(
 }
 
 #[tauri::command]
-pub async fn search_modrinth_mods(
-    query: String,
-    game_version: Option<String>,
-    loader: Option<String>, // Expects loader identifier like "fabric", "forge", "quilt", "neoforge"
-    limit: Option<u32>,
-) -> Result<Vec<ModrinthSearchHit>, CommandError> {
-    // Keep CommandError for consistency if used elsewhere
-    // Call the actual API function from the integrations module
-    log::debug!(
-        "Received search_modrinth_mods command: query={}, version={}, loader={}, limit={:?}",
-        query,
-        game_version.as_deref().unwrap_or("None"),
-        loader.as_deref().unwrap_or("None"),
-        limit
-    );
-    // Use map_err to convert AppError to CommandError if necessary, or adjust Result type
-    let result = search_mods(query, game_version, loader, limit)
-        .await
-        .map_err(CommandError::from)?;
-    Ok(result)
-}
-
-#[tauri::command]
 pub async fn get_modrinth_mod_versions(
     project_id_or_slug: String,
     loaders: Option<Vec<String>>,
@@ -113,56 +87,6 @@ pub async fn get_modrinth_mod_versions(
         )
         .await
         .map_err(CommandError::from)
-}
-
-#[derive(Serialize, Debug)]
-pub struct ModrinthLatestVersionResult {
-    context: ModrinthProjectContext,
-    latest_version: Option<ModrinthVersion>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ModrinthAllVersionsResult {
-    context: ModrinthProjectContext,
-    versions: Option<Vec<ModrinthVersion>>,
-    error: Option<String>,
-}
-
-#[tauri::command]
-pub async fn get_all_modrinth_versions_for_contexts(
-    contexts: Vec<ModrinthProjectContext>,
-) -> Result<Vec<ModrinthAllVersionsResult>, CommandError> {
-    log::debug!(
-        "Received get_all_modrinth_versions_for_contexts command for {} contexts",
-        contexts.len()
-    );
-
-    let result_map: HashMap<ModrinthProjectContext, Result<Vec<ModrinthVersion>, AppError>> =
-        match modrinth::get_all_versions_for_projects(contexts).await {
-            Ok(map) => map,
-            Err(e) => {
-                log::error!("Error during bulk version fetch setup: {}", e);
-                return Err(CommandError::from(e));
-            }
-        };
-
-    let frontend_results: Vec<ModrinthAllVersionsResult> = result_map
-        .into_iter()
-        .map(|(context, versions_result)| match versions_result {
-            Ok(versions) => ModrinthAllVersionsResult {
-                context,
-                versions: Some(versions),
-                error: None,
-            },
-            Err(app_error) => ModrinthAllVersionsResult {
-                context,
-                versions: None,
-                error: Some(app_error.to_string()),
-            },
-        })
-        .collect();
-
-    Ok(frontend_results)
 }
 
 /// Download and install a Modrinth modpack from its URL
@@ -283,28 +207,6 @@ pub async fn get_modrinth_project_details(
     Ok(result)
 }
 
-/// Efficiently checks for updates to multiple mods using a single API call.
-/// Takes hashes of current mod files and returns the latest available versions.
-/// Mods without updates or not found on Modrinth are omitted from the results.
-#[tauri::command]
-pub async fn check_modrinth_updates(
-    request: ModrinthBulkUpdateRequestBody,
-) -> Result<HashMap<String, ModrinthVersion>, CommandError> {
-    log::debug!(
-        "Received check_modrinth_updates command for {} mod hashes",
-        request.hashes.len()
-    );
-
-    // Call the actual API function from the integrations module
-    let updates = modrinth::check_bulk_updates(request)
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!("Found updates for {} mods", updates.len());
-
-    Ok(updates)
-}
-
 /// Unified command for checking mod updates across all platforms (currently only Modrinth)
 /// This will eventually support both Modrinth and CurseForge based on item platforms
 #[tauri::command]
@@ -350,36 +252,6 @@ pub async fn get_modrinth_tags_command(
         tags.game_versions.len()
     );
     Ok(tags)
-}
-
-/// Fetches Modrinth version details for a given list of SHA1 hashes.
-#[tauri::command]
-pub async fn get_modrinth_versions_by_hashes(
-    hashes: Vec<String>,
-    cache_behaviour: Option<CacheBehaviour>,
-    // hash_algorithm: String, // Modrinth API for versions by hash is specific to SHA1 currently
-) -> Result<HashMap<String, ModrinthVersion>, CommandError> {
-    log::debug!(
-        "Received get_modrinth_versions_by_hashes command for {} hashes",
-        hashes.len()
-    );
-
-    if hashes.is_empty() {
-        return Ok(HashMap::new()); // Return empty map if no hashes are provided
-    }
-
-    let state = State::get().await.map_err(CommandError::from)?;
-    let versions_map = state
-        .content_cache
-        .get_modrinth_versions_by_hashes(hashes, cache_behaviour.unwrap_or_default())
-        .await
-        .map_err(CommandError::from)?;
-
-    log::info!(
-        "Modrinth lookup by hash returned {} matches",
-        versions_map.len()
-    );
-    Ok(versions_map)
 }
 
 /// Unified mod search across both Modrinth and CurseForge platforms.

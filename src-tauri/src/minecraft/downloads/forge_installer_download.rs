@@ -441,14 +441,6 @@ impl ForgeInstallerDownloadService {
         self.base_path.join(&maven_path)
     }
 
-    pub fn get_client_path(&self, version: &str) -> PathBuf {
-        let maven_path = format!(
-            "net/minecraftforge/forge/{}/forge-{}-client.jar",
-            version, version
-        );
-        self.base_path.join(&maven_path)
-    }
-
     pub async fn extract_jars(&self, version: &str) -> Result<()> {
         // Konstruiere den Maven-Pfad für Forge
         let maven_path = format!(

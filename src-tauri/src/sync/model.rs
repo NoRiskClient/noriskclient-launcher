@@ -163,10 +163,3 @@ pub struct SyncTargetState {
     pub content_sha1: Option<String>,
     pub last_source_profile: Option<Uuid>,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SyncPackSubscriber {
-    pub profile_id: Uuid,
-    pub profile_name: String,
-    pub instance_path: String,
-}

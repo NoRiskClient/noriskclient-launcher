@@ -10,10 +10,8 @@ use reqwest;
 use serde::Serialize;
 use serde_json::{self, Value};
 use sha1::{Digest, Sha1};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
-use urlencoding;
 use tokio;
 use tokio::fs as tokio_fs;
 
@@ -325,98 +323,6 @@ impl MinecraftApiService {
         }
     }
 
-    // Change skin using access token (requires authentication)
-    pub async fn change_skin(
-        &self,
-        access_token: &str,
-        uuid: &str,
-        skin_path: &str,
-        skin_variant: &str,
-    ) -> Result<Option<String>> {
-        debug!(
-            "API call: change_skin for UUID: {} with variant: {}",
-            uuid, skin_variant
-        );
-        debug!("Skin file path: {}", skin_path);
-
-        let url = format!("https://api.minecraftservices.com/minecraft/profile/skins");
-        debug!("Request URL: {}", url);
-
-        // Read skin file as bytes
-        debug!("Reading skin file");
-        let file_content = match fs::read(skin_path) {
-            Ok(content) => {
-                debug!("Successfully read skin file ({} bytes)", content.len());
-                content
-            }
-            Err(e) => {
-                debug!("Failed to read skin file: {}", e);
-                return Err(AppError::Other(format!("Failed to read skin file: {}", e)));
-            }
-        };
-
-        // Get filename from path
-        let filename = Path::new(skin_path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("skin.png");
-        debug!("Using filename: {}", filename);
-
-        let client = &*HTTP_CLIENT;
-        debug!("Creating multipart form with file and variant");
-
-        // Create form with file part and variant part
-        let mime_result = reqwest::multipart::Part::bytes(file_content)
-            .file_name(filename.to_string())
-            .mime_str("image/png");
-
-        if let Err(ref e) = mime_result {
-            debug!("Failed to set MIME type: {}", e);
-        }
-
-        let form = reqwest::multipart::Form::new()
-            .part(
-                "file",
-                mime_result.map_err(|e| AppError::Other(format!("Invalid MIME type: {}", e)))?,
-            )
-            .text("variant", skin_variant.to_string());
-
-        debug!("Sending skin upload request to Minecraft API");
-        // Send multipart request
-        let response_result = client
-            .post(url)
-            .header("Authorization", format!("Bearer {}", access_token))
-            .multipart(form)
-            .send()
-            .await;
-
-        if let Err(ref e) = response_result {
-            debug!("API request failed: {:?}", e);
-        }
-
-        let response = response_result.map_err(AppError::MinecraftApi)?;
-        debug!("Received response with status: {}", response.status());
-
-        // Check if successful
-        if !response.status().is_success() {
-            let error_text_result = response.text().await;
-
-            if let Err(ref e) = error_text_result {
-                debug!("Failed to read error response: {:?}", e);
-            }
-
-            let error_text = error_text_result.map_err(AppError::MinecraftApi)?;
-            debug!("Skin upload failed: {}", error_text);
-            return Err(AppError::Other(format!(
-                "Failed to change skin: {}",
-                error_text
-            )));
-        }
-
-        debug!("API call completed: change_skin - Skin uploaded successfully");
-        Ok(Self::active_skin_url(response).await)
-    }
-
     async fn active_skin_url(response: reqwest::Response) -> Option<String> {
         match response.json::<SkinUpdateResponse>().await {
             Ok(profile) => profile.active_skin().map(|skin| skin.url.clone()),
@@ -425,49 +331,6 @@ impl MinecraftApiService {
                 None
             }
         }
-    }
-
-    // Reset skin to default
-    pub async fn reset_skin(&self, access_token: &str, uuid: &str) -> Result<()> {
-        debug!("API call: reset_skin for UUID: {}", uuid);
-
-        let url = format!("{}/user/profile/{}/skin", MOJANG_API_URL, uuid);
-        debug!("Request URL: {}", url);
-
-        let client = &*HTTP_CLIENT;
-        debug!("Sending skin reset request to Minecraft API");
-
-        let response_result = client
-            .delete(&url)
-            .header("Authorization", format!("Bearer {}", access_token))
-            .send()
-            .await;
-
-        if let Err(ref e) = response_result {
-            debug!("API request failed: {:?}", e);
-        }
-
-        let response = response_result.map_err(AppError::MinecraftApi)?;
-        debug!("Received response with status: {}", response.status());
-
-        // Check if successful
-        if !response.status().is_success() {
-            let error_text_result = response.text().await;
-
-            if let Err(ref e) = error_text_result {
-                debug!("Failed to read error response: {:?}", e);
-            }
-
-            let error_text = error_text_result.map_err(AppError::MinecraftApi)?;
-            debug!("Skin reset failed: {}", error_text);
-            return Err(AppError::Other(format!(
-                "Failed to reset skin: {}",
-                error_text
-            )));
-        }
-
-        debug!("API call completed: reset_skin - Skin reset successfully");
-        Ok(())
     }
 
     // Change skin using base64 data (requires authentication)
@@ -616,84 +479,6 @@ impl MinecraftApiService {
 
         debug!("API call completed: join_server_session - Successfully joined server session");
         Ok(())
-    }
-
-    // Verify login session on server - check if player has joined with the given server ID
-    pub async fn has_joined(
-        &self,
-        username: &str,
-        server_id: &str,
-        client_ip: Option<&str>,
-    ) -> Result<Option<MinecraftProfile>> {
-        debug!(
-            "API call: has_joined for username: {} server_id: {}{}",
-            username,
-            server_id,
-            if let Some(ip) = client_ip {
-                format!(" client_ip: {}", ip)
-            } else {
-                String::new()
-            }
-        );
-
-        // Build the URL with query parameters
-        let mut url = format!(
-            "{}/session/minecraft/hasJoined?username={}&serverId={}",
-            MOJANG_SESSION_URL,
-            urlencoding::encode(username),
-            urlencoding::encode(server_id)
-        );
-
-        // Add optional IP parameter
-        if let Some(ip) = client_ip {
-            url.push_str(&format!("&ip={}", urlencoding::encode(ip)));
-        }
-
-        debug!("Request URL: {}", url);
-
-        let response_result = HTTP_CLIENT.get(&url).send().await;
-
-        if let Err(ref e) = response_result {
-            debug!("API request failed: {:?}", e);
-        }
-
-        let response = response_result.map_err(AppError::MinecraftApi)?;
-        debug!("Received response with status: {}", response.status());
-
-        // Handle different response cases
-        match response.status().as_u16() {
-            200 => {
-                // Success - player has joined, return profile
-                let profile = response
-                    .json::<MinecraftProfile>()
-                    .await
-                    .map_err(AppError::MinecraftApi)?;
-                
-                debug!("Player verification successful for username: {}", username);
-                Ok(Some(profile))
-            }
-            204 => {
-                // No Content - player has not joined or verification failed
-                debug!("Player verification failed - player has not joined: {}", username);
-                Ok(None)
-            }
-            _ => {
-                // Other status codes indicate errors
-                let error_text_result = response.text().await;
-
-                if let Err(ref e) = error_text_result {
-                    debug!("Failed to read error response: {:?}", e);
-                }
-
-                let error_text = error_text_result.map_err(AppError::MinecraftApi)?;
-                debug!("Player verification request failed: {}", error_text);
-                
-                Err(AppError::Other(format!(
-                    "Failed to verify player session: {}",
-                    error_text
-                )))
-            }
-        }
     }
 
     // Test method with real server simulation (more realistic test)

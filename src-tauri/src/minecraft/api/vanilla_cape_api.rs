@@ -238,9 +238,4 @@ impl VanillaCapeApi {
         Ok(())
     }
 
-    /// Get information about all known vanilla capes
-    pub fn get_cape_info(&self) -> Vec<VanillaCapeInfo> {
-        self.cape_info.values().cloned().collect()
-    }
-
 }

@@ -133,10 +133,6 @@ pub struct UniquePlayersResponse {
 pub struct NoRiskApi;
 
 impl NoRiskApi {
-    pub fn new() -> Self {
-        Self
-    }
-
     pub fn get_api_base(is_experimental: bool) -> String {
         if is_experimental {
             trace!("[NoRisk API] Using experimental API endpoint");

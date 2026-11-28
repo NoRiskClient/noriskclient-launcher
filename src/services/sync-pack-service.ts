@@ -11,7 +11,6 @@ import type {
   SyncPack,
   SyncPackModMatrix,
   SyncPackModMatrixRow,
-  SyncPackSubscriber,
   SyncReport,
   SyncTarget,
   SyncTargetKind,
@@ -21,10 +20,6 @@ import type {
 
 export async function getSyncPacks(): Promise<SyncPack[]> {
   return invoke<SyncPack[]>("get_sync_packs");
-}
-
-export async function getSyncPack(packId: string): Promise<SyncPack | null> {
-  return invoke<SyncPack | null>("get_sync_pack", { packId });
 }
 
 export async function createSyncPack(
@@ -148,12 +143,6 @@ export async function setProfileSyncPacks(
   });
 }
 
-export async function getSyncPackSubscribers(
-  packId: string,
-): Promise<SyncPackSubscriber[]> {
-  return invoke<SyncPackSubscriber[]>("get_sync_pack_subscribers", { packId });
-}
-
 export async function getProfileSyncConflicts(
   profileId: string,
 ): Promise<SyncConflict[]> {
@@ -240,10 +229,6 @@ export async function resolveSyncPackMod(
     mcVersion: mcVersion ?? null,
     loader: loader ?? null,
   });
-}
-
-export async function getOrCreateDefaultSyncPack(): Promise<SyncPack> {
-  return invoke<SyncPack>("get_or_create_default_sync_pack");
 }
 
 export async function addDroppedSyncTarget(

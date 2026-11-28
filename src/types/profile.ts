@@ -199,12 +199,6 @@ export interface ModPackInfo {
   file_hash?: string | null;
 }
 
-export interface CustomModInfo {
-  filename: string;
-  is_enabled: boolean;
-  path: string;
-}
-
 export interface Profile {
   id: string;
   name: string;

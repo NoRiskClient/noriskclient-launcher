@@ -2,8 +2,6 @@ use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use log::LevelFilter;
 use norisk_logging::LogSetup;
 
-pub use norisk_logging::{RedactingEncoder, FILE_PATTERN as LOG_PATTERN};
-
 const LOG_DIR_NAME: &str = "logs";
 const LOG_FILE_NAME: &str = "launcher.log";
 
