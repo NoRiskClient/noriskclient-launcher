@@ -2356,6 +2356,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Geht nur mit dem Standard-Ausgabegerät. Stelle das Gerät oben zurück auf Standard.",
   "settings.clips.audio.microphone_denoise": "Rauschunterdrückung",
   "settings.clips.audio.microphone_denoise.description": "Filtert Lüfter, Tastatur und Hintergrundrauschen aus deiner Stimme. Läuft auf deinem Rechner und kostet kaum Leistung.",
+  "settings.clips.audio.microphone_mono": "Mikrofon in Mono",
+  "settings.clips.audio.microphone_mono.description": "Legt deine Stimme auf beide Seiten. Schalte das ein, wenn man dich in deinen Clips nur auf einem Ohr hört.",
   "settings.clips.audio.microphone_volume": "Stimmen-Lautstärke",
   "settings.clips.storage.limit": "Speicherplatz",
   "settings.clips.storage.limit_description": "Älteste Clips werden gelöscht, sobald der Ordner {{gb}} GB überschreitet.",

@@ -242,6 +242,7 @@ impl Engine {
                 self.audio_plan(target.pid()),
                 Arc::clone(&epoch_for_audio),
                 self.config.microphone_denoise,
+                self.config.microphone_mono,
             ) {
                 Ok(pipeline) => Some(pipeline),
                 Err(e) => {
@@ -389,6 +390,7 @@ fn encode_loop(
 
     let mut last: Option<PoolFrame> = None;
     let mut last_pts = i64::MIN;
+    let mut last_at = Instant::now();
     let mut repeats: u64 = 0;
     let mut reported = false;
 
@@ -442,12 +444,14 @@ fn encode_loop(
                     return;
                 }
                 last_pts = pts;
+                last_at = Instant::now();
                 last = Some(frame);
             }
             Err(RecvTimeoutError::Timeout) => {
                 let Some(frame) = last.as_mut() else { continue };
 
-                last_pts += step;
+                last_pts += elapsed_ticks(last_at.elapsed()).max(step);
+                last_at = Instant::now();
                 let shown = match black.as_mut() {
                     Some(black) if hidden.load(Ordering::Relaxed) => black,
                     _ => frame,
@@ -473,6 +477,10 @@ fn encode_loop(
             guard.push(packet);
         }
     }
+}
+
+fn elapsed_ticks(elapsed: std::time::Duration) -> i64 {
+    (elapsed.as_nanos() * TIME_BASE_DEN as u128 / 1_000_000_000) as i64
 }
 
 fn rebase_pts(timestamp_100ns: i64, epoch_100ns: i64) -> i64 {

@@ -69,9 +69,11 @@ const FALLBACK_PATIENCE: Duration = Duration::from_secs(5);
 
 pub struct WindowSearch {
     pid: u32,
+    timeout: Duration,
     deadline: Instant,
     fallback: Option<(GameWindow, Instant)>,
     patient: bool,
+    minimized: bool,
 }
 
 fn runs_java(pid: u32) -> bool {
@@ -124,9 +126,11 @@ impl WindowSearch {
         }
         Self {
             pid,
+            timeout,
             deadline: Instant::now() + timeout,
             fallback: None,
             patient,
+            minimized: false,
         }
     }
 
@@ -160,6 +164,14 @@ impl WindowSearch {
             }
         }
 
+        if has_minimized_window(self.pid) {
+            if !self.minimized {
+                log::info!("Process {}'s window is minimized; waiting for it to come back", self.pid);
+                self.minimized = true;
+            }
+            self.deadline = Instant::now() + self.timeout;
+        }
+
         if Instant::now() >= self.deadline {
             return match self.fallback.take() {
                 Some((window, _)) => SearchStep::Found(window),
@@ -168,6 +180,19 @@ impl WindowSearch {
         }
 
         SearchStep::Waiting
+    }
+}
+
+fn has_minimized_window(pid: u32) -> bool {
+    let mut handles: Vec<HWND> = Vec::with_capacity(256);
+    unsafe {
+        let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut _ as isize));
+        handles.into_iter().any(|hwnd| {
+            IsWindowVisible(hwnd).as_bool()
+                && IsIconic(hwnd).as_bool()
+                && pid_of(hwnd) == pid
+                && GetWindow(hwnd, GW_OWNER).map_or(true, |owner| owner.0.is_null())
+        })
     }
 }
 

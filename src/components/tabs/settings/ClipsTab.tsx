@@ -732,6 +732,19 @@ export function ClipsTab() {
                     disabled={!clips.enabled || saving}
                   />
                 </SettingRow>
+
+                <SettingRow
+                  label={t("settings.clips.audio.microphone_mono")}
+                  description={t("settings.clips.audio.microphone_mono.description")}
+                  searchKeywords={kw("settings.clips.audio.microphone_mono", "mono", "stereo", "links", "left", "ohr", "ear")}
+                  disabled={!clips.enabled}
+                >
+                  <ToggleSwitch
+                    checked={clips.microphone_mono}
+                    onChange={(microphone_mono) => patch({ microphone_mono })}
+                    disabled={!clips.enabled || saving}
+                  />
+                </SettingRow>
               </>
             )}
           </>

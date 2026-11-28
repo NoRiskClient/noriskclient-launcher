@@ -53,6 +53,7 @@ pub struct Engine {
     empty_warned: bool,
     excluded: std::cell::Cell<Option<Option<u32>>>,
     excluded_checked: Instant,
+    saves: Vec<std::thread::JoinHandle<()>>,
 }
 
 #[derive(Clone, Copy)]
@@ -77,6 +78,7 @@ struct Retired {
 }
 
 const RETAIN_FOR: Duration = Duration::from_secs(MAX_CLIP_SECONDS_RETAINED);
+const SAVE_GRACE: Duration = Duration::from_millis(2500);
 const EXCLUDED_CHECK_EVERY: Duration = Duration::from_secs(5);
 const MAX_CLIP_SECONDS_RETAINED: u64 = 130;
 
@@ -114,6 +116,7 @@ impl Engine {
             empty_warned: false,
             excluded: std::cell::Cell::new(None),
             excluded_checked: Instant::now(),
+            saves: Vec::new(),
         }
     }
 
@@ -152,7 +155,19 @@ impl Engine {
         }
 
         log::info!("Engine shutting down");
+        self.finish_saves(SAVE_GRACE);
         self.detach();
+    }
+
+    fn finish_saves(&mut self, budget: Duration) {
+        let deadline = Instant::now() + budget;
+        while self.saves.iter().any(|save| !save.is_finished()) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let unfinished = self.saves.iter().filter(|save| !save.is_finished()).count();
+        if unfinished > 0 {
+            log::warn!("Shutting down with {unfinished} clip(s) still being written");
+        }
     }
 
     fn announce_ready(&self) {
@@ -218,6 +233,9 @@ impl Engine {
             LauncherToCapture::Configure(config) => {
                 self.trouble = Trouble::default();
                 let restart = self.active.is_some() && needs_restart(&self.config, &config);
+                if self.saves.is_empty() {
+                    crate::writer::sweep_parts(&config.output_dir);
+                }
                 self.config = config;
                 if restart {
                     log::info!("Configuration changed materially; restarting the pipeline");
@@ -263,7 +281,7 @@ impl Engine {
                 self.paused = None;
                 self.retry = None;
                 self.trouble = Trouble::default();
-                self.detach();
+                self.detach_retaining_buffer(Duration::ZERO);
             }
             LauncherToCapture::SetBufferEnabled { enabled } => {
                 if enabled == self.buffering_enabled {
@@ -486,7 +504,7 @@ impl Engine {
         }
 
         let wanted = fit_output(source, (self.config.width, self.config.height));
-        if wanted == (pipeline.settings.width, pipeline.settings.height) {
+        if !outgrows(wanted, (pipeline.settings.width, pipeline.settings.height)) {
             self.resize_settling = None;
             return;
         }
@@ -535,7 +553,7 @@ impl Engine {
 
     fn detach_retaining_buffer(&mut self, spoiled: Duration) {
         if let Some(audio) = self.active.as_ref().and_then(|p| p.audio.as_ref()) {
-            audio.drain_mixer();
+            audio.drain_mixer(true);
         }
 
         let retired = self.active.as_ref().map(|pipeline| Retired {
@@ -768,15 +786,29 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.microphone_device_id != next.microphone_device_id
         || current.microphone_volume != next.microphone_volume
         || current.microphone_denoise != next.microphone_denoise
+        || current.microphone_mono != next.microphone_mono
         || current.excluded_audio_executable != next.excluded_audio_executable
         || current.bitrate_kbps != next.bitrate_kbps
         || current.buffer_seconds != next.buffer_seconds
+}
+
+fn outgrows(wanted: (u32, u32), current: (u32, u32)) -> bool {
+    wanted.0 > current.0 || wanted.1 > current.1
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use norisk_ipc::EncoderPreference;
+
+    #[test]
+    fn only_a_window_that_outgrows_the_recording_rebuilds_it() {
+        assert!(!outgrows((854, 480), (1280, 672)));
+        assert!(!outgrows((1280, 672), (1280, 672)));
+        assert!(outgrows((1280, 672), (854, 480)));
+        assert!(outgrows((1280, 720), (1280, 672)));
+        assert!(outgrows((960, 720), (1280, 672)));
+    }
 
     fn base() -> CaptureConfig {
         CaptureConfig::default()
@@ -812,6 +844,10 @@ mod tests {
 
         let mut next = base();
         next.capture_microphone = !base().capture_microphone;
+        assert!(needs_restart(&base(), &next));
+
+        let mut next = base();
+        next.microphone_mono = !base().microphone_mono;
         assert!(needs_restart(&base(), &next));
 
         let mut next = base();

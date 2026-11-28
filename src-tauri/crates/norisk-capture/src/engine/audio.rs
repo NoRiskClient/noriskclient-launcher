@@ -70,15 +70,15 @@ impl AudioPipeline {
         std::iter::once(&self.master).chain(self.stems.iter())
     }
 
-    pub(super) fn drain_mixer(&self) {
+    pub(super) fn drain_mixer(&self, ending: bool) {
         for (mixer, sink) in &self.mixers {
-            let tail = mixer.flush();
+            let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
+            let tail = if ending { mixer.flush() } else { mixer.settle() };
             if tail.is_empty() {
                 continue;
             }
 
             let samples: usize = tail.iter().map(|block| block.samples.len()).sum();
-            let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
             for block in tail {
                 (*sink)(&block.samples, block.timestamp_100ns);
             }
@@ -217,8 +217,8 @@ impl Destination {
                 sink,
                 gain,
             } => {
+                let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
                 for block in mixer.push(*track, samples, relative, *gain) {
-                    let mut sink = sink.lock().unwrap_or_else(|e| e.into_inner());
                     (*sink)(&block.samples, block.timestamp_100ns);
                 }
             }
@@ -384,11 +384,28 @@ fn dense_peaks(points: &[crate::buffer::Peak], clip: &crate::buffer::Clip) -> Ve
 
 pub(super) fn start_audio(
     window_seconds: f32,
-    plan: AudioPlan,
+    mut plan: AudioPlan,
     epoch: Arc<AtomicI64>,
     denoise_microphone: bool,
+    mono_microphone: bool,
 ) -> Result<AudioPipeline> {
     use crate::audio::{LoopbackCapture, Mixer, Track};
+
+    plan.sources.retain_mut(|planned| {
+        if planned.track != Track::Microphone {
+            return true;
+        }
+        match crate::audio::wasapi::probe_source(&planned.source) {
+            Ok((resolved, _)) => {
+                planned.source = resolved;
+                true
+            }
+            Err(e) => {
+                log::warn!("Recording without the microphone: {e:#}");
+                false
+            }
+        }
+    });
 
     if plan.sources.is_empty() {
         anyhow::bail!("no audio source to record");
@@ -515,20 +532,26 @@ pub(super) fn start_audio(
 
         let mut denoiser = (denoise_microphone && track == Track::Microphone)
             .then(|| crate::audio::denoise::Denoiser::new(microphone_format.channels));
+        let mono = (mono_microphone && track == Track::Microphone)
+            .then_some(microphone_format.channels as usize);
         let mut cleaned: Vec<f32> = Vec::new();
 
         captures.push(LoopbackCapture::start_from(
             source,
             move |samples: &[f32], timestamp: i64| {
                 let relative = rebase(&epoch, timestamp);
-                let samples = match denoiser.as_mut() {
-                    Some(denoiser) => {
-                        cleaned.clear();
-                        cleaned.extend_from_slice(samples);
-                        denoiser.process(&mut cleaned);
-                        cleaned.as_slice()
+                let samples = if denoiser.is_some() || mono.is_some() {
+                    cleaned.clear();
+                    cleaned.extend_from_slice(samples);
+                    if let Some(channels) = mono {
+                        crate::audio::mix::fold_to_mono(&mut cleaned, channels);
                     }
-                    None => samples,
+                    if let Some(denoiser) = denoiser.as_mut() {
+                        denoiser.process(&mut cleaned);
+                    }
+                    cleaned.as_slice()
+                } else {
+                    samples
                 };
                 for destination in &destinations {
                     destination.accept(samples, relative, &mut scratch);
@@ -536,14 +559,16 @@ pub(super) fn start_audio(
             },
         )?);
 
-        if denoise_microphone && track == Track::Microphone {
-            log::info!(
-                "Recording {track:?} audio at {:.0}% with noise suppression",
-                gain * 100.0
-            );
-        } else {
-            log::info!("Recording {track:?} audio at {:.0}%", gain * 100.0);
-        }
+        let extras = match (
+            denoise_microphone && track == Track::Microphone,
+            mono_microphone && track == Track::Microphone,
+        ) {
+            (true, true) => " in mono with noise suppression",
+            (true, false) => " with noise suppression",
+            (false, true) => " in mono",
+            (false, false) => "",
+        };
+        log::info!("Recording {track:?} audio at {:.0}%{extras}", gain * 100.0);
     }
 
     log::info!(

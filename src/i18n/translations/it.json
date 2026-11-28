@@ -2285,6 +2285,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Funziona solo con il dispositivo di uscita predefinito. Riporta il dispositivo qui sopra su predefinito.",
   "settings.clips.audio.microphone_denoise": "Soppressione del rumore",
   "settings.clips.audio.microphone_denoise.description": "Filtra ventole, tastiera e rumore di fondo dalla tua voce. Gira sul tuo computer e costa quasi nulla.",
+  "settings.clips.audio.microphone_mono": "Microfono in mono",
+  "settings.clips.audio.microphone_mono.description": "Mette la tua voce su entrambi i lati. Attivalo se nei tuoi clip la tua voce si sente solo da un orecchio.",
   "settings.clips.audio.microphone_volume": "Volume voce",
   "settings.clips.storage.limit": "Limite disco",
   "settings.clips.storage.limit_description": "Le clip più vecchie vengono eliminate quando la cartella supera {{gb}} GB.",

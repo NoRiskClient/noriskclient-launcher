@@ -25,7 +25,7 @@ impl Engine {
         }
 
         if let Some(audio) = self.active.as_ref().and_then(|p| p.audio.as_ref()) {
-            audio.drain_mixer();
+            audio.drain_mixer(false);
         }
 
         let (pre, post) = (
@@ -132,7 +132,7 @@ impl Engine {
         let events = self.events.clone();
         let reason = request.reason;
 
-        std::thread::Builder::new()
+        let save = std::thread::Builder::new()
             .name("nrc-save".into())
             .spawn(move || match write_mp4(&clip, &path, &track, audio_track.as_slice()) {
                 Ok(written) => {
@@ -179,6 +179,8 @@ impl Engine {
                 }
             })
             .context("could not start the clip writer thread")?;
+        self.saves.retain(|save| !save.is_finished());
+        self.saves.push(save);
 
         Ok(())
     }

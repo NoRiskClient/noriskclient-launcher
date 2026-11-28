@@ -126,13 +126,12 @@ pub async fn bring_up(
         .send(LauncherToCapture::Configure(clips.to_capture_config()))?;
 
     adopt_running_game(&state);
+    crate::utils::game_watch::spawn();
 
     #[cfg(any(windows, target_os = "macos"))]
     let registered = crate::utils::hotkey_manager::apply(app, clips)?;
     #[cfg(not(any(windows, target_os = "macos")))]
     let registered = Vec::new();
-
-    crate::utils::game_watch::spawn();
 
     Ok(registered)
 }

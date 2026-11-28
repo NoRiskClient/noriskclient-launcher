@@ -2351,6 +2351,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Only works with the default output device. Set the device above back to default.",
   "settings.clips.audio.microphone_denoise": "Noise suppression",
   "settings.clips.audio.microphone_denoise.description": "Filters fans, keyboard and background hiss out of your voice. Runs on your own machine and costs almost nothing.",
+  "settings.clips.audio.microphone_mono": "Mono microphone",
+  "settings.clips.audio.microphone_mono.description": "Puts your voice on both sides. Turn this on if your voice is only heard in one ear in your clips.",
   "settings.clips.audio.microphone_volume": "Voice volume",
   "settings.clips.storage.limit": "Disk limit",
   "settings.clips.storage.limit_description": "Oldest clips are deleted once the folder passes {{gb}} GB.",

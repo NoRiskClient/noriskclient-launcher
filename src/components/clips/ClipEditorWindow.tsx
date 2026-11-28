@@ -75,6 +75,9 @@ export function ClipEditorWindow() {
         if (!sure) return;
       }
       editor.current = { dirty: false, busy: false };
+      setDuration(0);
+      setDetails(null);
+      setBroken(false);
       setClip(next);
     };
 

@@ -51,14 +51,41 @@ impl Binding {
         Some(binding)
     }
 
-    fn matches(&self, pressed_key: u32) -> bool {
-        if pressed_key != self.key {
-            return false;
-        }
-        held(VK_CONTROL.0 as i32) == self.ctrl
-            && held(VK_SHIFT.0 as i32) == self.shift
-            && held(VK_MENU.0 as i32) == self.alt
+    fn accepts(&self, pressed: u32, held: Modifiers) -> bool {
+        pressed == self.key
+            && (!self.ctrl || held.ctrl)
+            && (!self.shift || held.shift)
+            && (!self.alt || held.alt)
     }
+
+    fn modifier_count(&self) -> u8 {
+        self.ctrl as u8 + self.shift as u8 + self.alt as u8
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Modifiers {
+    ctrl: bool,
+    shift: bool,
+    alt: bool,
+}
+
+impl Modifiers {
+    fn now() -> Self {
+        Self {
+            ctrl: held(VK_CONTROL.0 as i32),
+            shift: held(VK_SHIFT.0 as i32),
+            alt: held(VK_MENU.0 as i32),
+        }
+    }
+}
+
+fn choose(bindings: &[(Binding, u8)], pressed: u32, held: Modifiers) -> Option<u8> {
+    bindings
+        .iter()
+        .filter(|(binding, _)| binding.accepts(pressed, held))
+        .max_by_key(|(binding, _)| binding.modifier_count())
+        .map(|(_, tag)| *tag)
 }
 
 fn held(vk: i32) -> bool {
@@ -260,14 +287,15 @@ pub fn uninstall() {
 fn dispatch(pressed: u32) {
     if let Ok(watch) = WATCH.try_lock() {
         if let Some(watch) = watch.as_ref() {
-            if let Some((_, tag)) = watch.bindings.iter().find(|(b, _)| b.matches(pressed)) {
-                let _ = watch.events.send(Press::Fired(*tag));
+            let modifiers = Modifiers::now();
+            if let Some(tag) = choose(&watch.bindings, pressed, modifiers) {
+                let _ = watch.events.send(Press::Fired(tag));
             } else if watch.bindings.iter().any(|(b, _)| b.key == pressed) {
                 let _ = watch.events.send(Press::Ignored {
                     key: pressed,
-                    ctrl: held(VK_CONTROL.0 as i32),
-                    shift: held(VK_SHIFT.0 as i32),
-                    alt: held(VK_MENU.0 as i32),
+                    ctrl: modifiers.ctrl,
+                    shift: modifiers.shift,
+                    alt: modifiers.alt,
                 });
             }
         }
@@ -308,6 +336,37 @@ unsafe extern "system" fn callback(code: i32, wparam: WPARAM, lparam: LPARAM) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn mods(ctrl: bool, shift: bool, alt: bool) -> Modifiers {
+        Modifiers { ctrl, shift, alt }
+    }
+
+    #[test]
+    fn the_save_key_works_while_sprinting_or_sneaking() {
+        let save = Binding::parse("F8").unwrap();
+        let toggle = Binding::parse("Alt+F8").unwrap();
+        let bindings = [(save, 0), (toggle, 1)];
+
+        assert_eq!(choose(&bindings, save.key, mods(false, false, false)), Some(0));
+        assert_eq!(choose(&bindings, save.key, mods(true, false, false)), Some(0));
+        assert_eq!(choose(&bindings, save.key, mods(false, true, false)), Some(0));
+        assert_eq!(choose(&bindings, save.key, mods(true, true, false)), Some(0));
+        assert_eq!(choose(&bindings, save.key, mods(false, false, true)), Some(1));
+        assert_eq!(choose(&bindings, 0x41, mods(false, false, false)), None);
+    }
+
+    #[test]
+    fn the_more_specific_binding_wins_and_missing_modifiers_never_match() {
+        let save = Binding::parse("F8").unwrap();
+        let toggle = Binding::parse("Shift+F8").unwrap();
+        let bindings = [(save, 0), (toggle, 1)];
+        assert_eq!(choose(&bindings, save.key, mods(false, true, false)), Some(1));
+        assert_eq!(choose(&bindings, save.key, mods(false, false, false)), Some(0));
+
+        let only = [(Binding::parse("Ctrl+Shift+KeyC").unwrap(), 0)];
+        assert_eq!(choose(&only, 0x43, mods(true, false, false)), None);
+        assert_eq!(choose(&only, 0x43, mods(true, true, true)), Some(0));
+    }
 
     #[test]
     fn letters_and_function_keys_parse() {

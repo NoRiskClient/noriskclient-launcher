@@ -212,6 +212,23 @@ pub fn details_path(clip: &Path) -> PathBuf {
     meta_path(&resolved(clip), "nrc.json")
 }
 
+pub fn adopt_folder(dir: &Path, previous: &Path) {
+    let Ok(entries) = std::fs::read_dir(resolved(dir)) else {
+        return;
+    };
+    let previous = resolved(previous);
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("mp4")) {
+            continue;
+        }
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        adopt_sidecars(&resolved(&path), fingerprint(&previous.join(name)));
+    }
+}
+
 fn adopt_sidecars(clip: &Path, earlier: u32) {
     if earlier == fingerprint(clip) {
         return;
@@ -522,9 +539,15 @@ pub fn enforce_limit(dir: &Path, limit_gb: u32, keep: &[PathBuf]) -> Result<Vec<
     if limit_gb == 0 {
         return Ok(Vec::new());
     }
-    let limit = limit_gb as u64 * 1024 * 1024 * 1024;
+    enforce_bytes(dir, limit_gb as u64 * 1024 * 1024 * 1024, keep, limit_gb)
+}
 
-    let plan = cleanup_plan(&list(dir)?, limit, keep);
+fn enforce_bytes(dir: &Path, limit: u64, keep: &[PathBuf], limit_gb: u32) -> Result<Vec<PathBuf>> {
+    let mut keep = keep.to_vec();
+    keep.extend(sources_in_use());
+    let limit = limit.saturating_sub(gif_bytes(dir));
+
+    let plan = cleanup_plan(&list(dir)?, limit, &keep);
     let mut removed = Vec::new();
 
     for path in plan.remove {
@@ -593,6 +616,7 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
         .ok_or_else(|| AppError::Other("that clip has no usable name".into()))?;
 
     let base = unsuffixed(stem, suffix);
+    let reserved_for = plain(source.clone());
     let mut pending = PENDING.lock().unwrap_or_else(|poison| poison.into_inner());
 
     for attempt in 0..1000 {
@@ -602,7 +626,9 @@ fn beside(dir: &Path, source: &Path, suffix: &str, extension: &str) -> Result<Pa
             format!("{base}{suffix}{}.{extension}", attempt + 1)
         };
         let candidate = plain(dir.join(name));
-        if !candidate.exists() && pending.insert(reservation(&candidate)) {
+        let key = reservation(&candidate);
+        if !candidate.exists() && !pending.contains_key(&key) {
+            pending.insert(key, reserved_for);
             return Ok(candidate);
         }
     }
@@ -623,8 +649,32 @@ fn unsuffixed<'a>(stem: &'a str, suffix: &str) -> &'a str {
         .unwrap_or(stem)
 }
 
-static PENDING: std::sync::Mutex<std::collections::BTreeSet<String>> =
-    std::sync::Mutex::new(std::collections::BTreeSet::new());
+static PENDING: std::sync::Mutex<std::collections::BTreeMap<String, PathBuf>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+
+fn sources_in_use() -> Vec<PathBuf> {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .values()
+        .cloned()
+        .collect()
+}
+
+pub fn describe_export(exported: &norisk_ipc::ExportedClip) -> ClipDetails {
+    let source = read_details(&exported.source);
+    ClipDetails {
+        duration_seconds: exported.duration_seconds as f32,
+        width: exported.width,
+        height: exported.height,
+        fps: source.as_ref().map_or(0, |details| details.fps),
+        peak_step_ms: norisk_ipc::PEAK_STEP_MS,
+        audio_tracks: Vec::new(),
+        game: source.as_ref().and_then(|details| details.game.clone()),
+        server: source.and_then(|details| details.server),
+        favourite: false,
+    }
+}
 
 fn reservation(destination: &Path) -> String {
     plain(destination.to_path_buf()).to_string_lossy().to_lowercase()
@@ -1308,6 +1358,71 @@ mod tests {
         assert!(!listed[0].managed, "the storage limit could otherwise delete it");
     }
 
+    fn managed_clip(dir: &Path, name: &str, bytes: usize, age_seconds: u64) -> PathBuf {
+        let clip = write_clip(dir, name, bytes);
+        write_details(&clip, &details_with(Vec::new())).unwrap();
+        let when = SystemTime::now() - std::time::Duration::from_secs(age_seconds);
+        std::fs::File::options().write(true).open(&clip).unwrap().set_modified(when).unwrap();
+        clip
+    }
+
+    #[test]
+    fn an_exported_clip_is_the_launchers_and_keeps_the_game() {
+        let dir = temp_dir("managed-export");
+        let source = write_clip(&dir, "fight.mp4", 32);
+        let mut details = details_with(Vec::new());
+        details.game = Some("Minecraft".into());
+        write_details(&source, &details).unwrap();
+        let path = write_clip(&dir, "fight_vertical.mp4", 16);
+
+        let exported = norisk_ipc::ExportedClip {
+            path: path.clone(),
+            source,
+            width: 720,
+            height: 1280,
+            duration_seconds: 5.0,
+            size_bytes: 16,
+        };
+        write_details(&path, &describe_export(&exported)).unwrap();
+
+        let listed = list(&dir).unwrap();
+        let export = listed.iter().find(|c| same_name(&c.path, &path)).unwrap();
+        assert!(export.managed, "the storage limit must be able to clear exports too");
+        assert_eq!(read_details(&path).unwrap().game.as_deref(), Some("Minecraft"));
+    }
+
+    #[test]
+    fn a_clip_being_exported_survives_the_storage_limit() {
+        let dir = temp_dir("busy-source");
+        let source = managed_clip(&dir, "old.mp4", 100, 600);
+        managed_clip(&dir, "new.mp4", 100, 60);
+        let gif = gif_destination(&dir, &source).unwrap();
+
+        let removed = enforce_bytes(&dir, 150, &[], 0).unwrap();
+        assert!(
+            !removed.iter().any(|path| same_name(path, &source)) && source.exists(),
+            "the source of a running export was deleted"
+        );
+
+        release_destination(&gif);
+        managed_clip(&dir, "newer.mp4", 100, 0);
+        let removed = enforce_bytes(&dir, 150, &[], 0).unwrap();
+        assert!(removed.iter().any(|path| same_name(path, &source)), "once the export is done the source is fair game");
+    }
+
+    #[test]
+    fn gifs_count_against_the_storage_limit() {
+        let dir = temp_dir("gif-budget");
+        let oldest = managed_clip(&dir, "a.mp4", 100, 600);
+        managed_clip(&dir, "b.mp4", 100, 60);
+        write_clip(&dir, "b.gif", 100);
+
+        let removed = enforce_bytes(&dir, 250, &[], 0).unwrap();
+        assert_eq!(removed.len(), 1, "200 B of clips and 100 B of GIFs are over 250 B");
+        assert!(same_name(&removed[0], &oldest));
+        assert!(dir.join("b.gif").exists(), "GIFs themselves are never deleted");
+    }
+
     #[test]
     fn a_recorded_clip_is_the_launchers() {
         let dir = temp_dir("managed-own");
@@ -1372,6 +1487,46 @@ mod tests {
 
         assert!(read_details(&clip).is_some());
         assert_eq!(details_path(&clip), details_path(&dir.join(".").join("same.mp4")));
+    }
+
+    #[test]
+    fn a_clip_can_be_renamed_to_a_different_case() {
+        let dir = temp_dir("rename-case");
+        let clip = write_clip(&dir, "funny.mp4", 32);
+        write_details(&clip, &details_with(Vec::new())).unwrap();
+
+        let renamed = rename(&dir, &clip, "Funny").unwrap();
+
+        assert_eq!(renamed.file_name().unwrap(), "Funny.mp4");
+        let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, ["Funny.mp4"]);
+        assert!(read_details(&renamed).is_some());
+    }
+
+    #[test]
+    fn renaming_onto_another_clip_is_still_refused() {
+        let dir = temp_dir("rename-taken");
+        let clip = write_clip(&dir, "one.mp4", 32);
+        write_clip(&dir, "two.mp4", 32);
+        assert!(rename(&dir, &clip, "Two").is_err());
+    }
+
+    #[test]
+    fn clips_moved_to_a_new_folder_keep_their_details() {
+        let old = temp_dir("moved-from");
+        let new = temp_dir("moved-to");
+        let clip = write_clip(&old, "kept.mp4", 32);
+        let mut details = details_with(Vec::new());
+        details.favourite = true;
+        write_details(&clip, &details).unwrap();
+        let moved = new.join("kept.mp4");
+        std::fs::rename(&clip, &moved).unwrap();
+        assert!(read_details(&moved).is_none());
+
+        adopt_folder(&new, &old);
+
+        assert!(read_details(&moved).unwrap().favourite);
+        assert!(list(&new).unwrap()[0].managed);
     }
 
     #[test]

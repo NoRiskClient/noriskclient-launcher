@@ -835,7 +835,9 @@ impl ProcessManager {
             }
 
             if let Ok(global_state) = State::get().await {
-                if global_state.config_manager.get_config().await.clips.enabled {
+                if global_state.config_manager.get_config().await.clips.enabled
+                    && global_state.capture_supervisor.attached() == Some(pid)
+                {
                     let _ = global_state
                         .capture_supervisor
                         .send(norisk_ipc::LauncherToCapture::DetachWindow);

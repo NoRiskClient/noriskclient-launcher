@@ -2300,6 +2300,8 @@
   "settings.clips.audio.exclude.needs_default_device": "यह केवल डिफ़ॉल्ट आउटपुट डिवाइस के साथ काम करता है। ऊपर डिवाइस को फिर से डिफ़ॉल्ट पर सेट करें।",
   "settings.clips.audio.microphone_denoise": "शोर दमन",
   "settings.clips.audio.microphone_denoise.description": "आपकी आवाज़ से पंखे, कीबोर्ड और पृष्ठभूमि का शोर हटाता है। आपके ही कंप्यूटर पर चलता है और लगभग कुछ नहीं लेता।",
+  "settings.clips.audio.microphone_mono": "मोनो माइक्रोफ़ोन",
+  "settings.clips.audio.microphone_mono.description": "आपकी आवाज़ को दोनों तरफ़ रखता है। इसे चालू करें अगर आपकी क्लिप में आपकी आवाज़ सिर्फ़ एक कान में सुनाई देती है।",
   "settings.clips.audio.microphone_volume": "आवाज़ का वॉल्यूम",
   "settings.clips.storage.limit": "डिस्क लिमिट",
   "settings.clips.storage.limit_description": "जैसे ही फ़ोल्डर {{gb}} GB से ज़्यादा हो जाता है, सबसे पुरानी क्लिप्स डिलीट हो जाती हैं।",

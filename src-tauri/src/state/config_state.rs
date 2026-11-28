@@ -13,7 +13,7 @@ use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 const CONFIG_FILENAME: &str = "launcher_config.json";
-const CONFIG_CURRENT_VERSION: u32 = 1;
+const CONFIG_CURRENT_VERSION: u32 = 2;
 
 /// Game initialization hooks
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
@@ -139,6 +139,8 @@ pub struct ClipConfig {
     #[serde(default)]
     pub microphone_denoise: bool,
     #[serde(default)]
+    pub microphone_mono: bool,
+    #[serde(default)]
     pub excluded_audio_executable: Option<String>,
     #[serde(default)]
     pub output_dir: Option<PathBuf>,
@@ -190,6 +192,7 @@ impl Default for ClipConfig {
             microphone_device_id: None,
             microphone_volume: default_volume(),
             microphone_denoise: false,
+            microphone_mono: false,
             excluded_audio_executable: None,
             output_dir: None,
             max_storage_gb: default_clip_max_storage_gb(),
@@ -334,6 +337,7 @@ impl ClipConfig {
             microphone_device_id: self.microphone_device_id.clone(),
             microphone_volume: self.microphone_volume,
             microphone_denoise: self.microphone_denoise,
+            microphone_mono: self.microphone_mono,
             excluded_audio_executable: self.excluded_audio_executable.clone(),
             output_dir: self.resolved_output_dir(),
         }
@@ -374,7 +378,7 @@ fn default_clip_hotkey_save() -> String {
     "F8".to_string()
 }
 fn default_clip_hotkey_toggle() -> String {
-    "Shift+F8".to_string()
+    "Alt+F8".to_string()
 }
 fn default_true_bool() -> bool {
     true
@@ -527,6 +531,17 @@ impl LauncherConfig {
     pub fn enabled_global_jvm_args(&self) -> Option<&str> {
         crate::state::profile_state::enabled_jvm_args(self.use_global_jvm_args, &self.global_jvm_args)
     }
+
+    fn upgrade(&mut self) -> bool {
+        if self.version >= CONFIG_CURRENT_VERSION {
+            return false;
+        }
+        if self.clips.hotkey_save == "F8" && self.clips.hotkey_toggle == "Shift+F8" {
+            self.clips.hotkey_toggle = default_clip_hotkey_toggle();
+        }
+        self.version = CONFIG_CURRENT_VERSION;
+        true
+    }
 }
 
 #[allow(deprecated)]
@@ -604,6 +619,7 @@ impl ConfigManager {
 
                 loaded_config.clips.normalize();
                 loaded_config.migrate_legacy_jvm_args();
+                let upgraded = loaded_config.upgrade();
 
                 // Update the stored config
                 let mut config = self.config.write().await;
@@ -612,6 +628,12 @@ impl ConfigManager {
 
                 // Update cache
                 update_custom_game_dir(loaded_config.custom_game_directory);
+
+                drop(config);
+                if upgraded {
+                    info!("Upgraded the launcher configuration to version {CONFIG_CURRENT_VERSION}");
+                    self.save_config().await?;
+                }
             }
             Err(e) => {
                 error!("Failed to parse config file: {}", e);
@@ -1448,5 +1470,41 @@ mod clip_quality_tests {
                 serde_json::json!(name)
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod upgrade {
+    use super::*;
+
+    fn old(save: &str, toggle: &str) -> LauncherConfig {
+        let mut config = LauncherConfig::default();
+        config.version = 1;
+        config.clips.hotkey_save = save.into();
+        config.clips.hotkey_toggle = toggle.into();
+        config
+    }
+
+    #[test]
+    fn the_old_default_pause_key_moves_off_shift_once() {
+        let mut config = old("F8", "Shift+F8");
+        assert!(config.upgrade());
+        assert_eq!(config.clips.hotkey_toggle, "Alt+F8");
+        assert_eq!(config.version, CONFIG_CURRENT_VERSION);
+
+        config.clips.hotkey_toggle = "Shift+F8".into();
+        assert!(!config.upgrade(), "a key chosen after the upgrade stays");
+        assert_eq!(config.clips.hotkey_toggle, "Shift+F8");
+    }
+
+    #[test]
+    fn hand_picked_keys_are_left_alone() {
+        let mut config = old("F9", "Shift+F8");
+        config.upgrade();
+        assert_eq!(config.clips.hotkey_toggle, "Shift+F8");
+
+        let mut config = old("F8", "F10");
+        config.upgrade();
+        assert_eq!(config.clips.hotkey_toggle, "F10");
     }
 }

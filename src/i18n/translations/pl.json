@@ -2285,6 +2285,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Działa tylko z domyślnym urządzeniem wyjściowym. Ustaw urządzenie powyżej z powrotem na domyślne.",
   "settings.clips.audio.microphone_denoise": "Redukcja szumów",
   "settings.clips.audio.microphone_denoise.description": "Odfiltrowuje wentylatory, klawiaturę i szum tła z twojego głosu. Działa na twoim komputerze i prawie nic nie kosztuje.",
+  "settings.clips.audio.microphone_mono": "Mikrofon w trybie mono",
+  "settings.clips.audio.microphone_mono.description": "Umieszcza twój głos po obu stronach. Włącz, jeśli w twoich klipach słychać cię tylko w jednym uchu.",
   "settings.clips.audio.microphone_volume": "Głośność głosu",
   "settings.clips.storage.limit": "Limit dysku",
   "settings.clips.storage.limit_description": "Najstarsze klipy są usuwane, gdy folder przekroczy {{gb}} GB.",
