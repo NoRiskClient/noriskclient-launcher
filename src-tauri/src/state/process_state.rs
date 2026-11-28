@@ -1,5 +1,6 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
+use crate::minecraft::AotRecording;
 use crate::minecraft::downloads::mod_resolver::{
     ModOutcome, ModResolutionReport, ModResolutionStatus,
 };
@@ -435,6 +436,7 @@ impl ProcessManager {
         memory_max_mb: u32,
         mods: Vec<CrashModInfo>,
         modpack: Option<CrashModpackInfo>,
+        aot_recording: Option<AotRecording>,
     ) -> Result<Uuid> {
         log::info!("Attempting to start process for profile {}", profile_id);
 
@@ -667,6 +669,9 @@ impl ProcessManager {
 
             let exit_code: Option<i32> = exit_status.and_then(|s| s.code());
             let mut success: bool = exit_code == Some(0);
+            if let Some(recording) = aot_recording {
+                tokio::spawn(recording.finish(success));
+            }
 
             let was_intentionally_stopped = {
                 let processes_map = processes_arc_clone.read().await;

@@ -522,6 +522,7 @@ pub async fn install_minecraft_version(
     // Create and use Minecraft launcher
     let launcher = MinecraftLauncher::new(
         java_path.clone(),
+        java_major,
         game_directory.clone(),
         credentials.clone(),
     );

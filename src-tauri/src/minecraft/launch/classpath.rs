@@ -196,6 +196,13 @@ impl ClasspathBuilder {
         self
     }
 
+    /// Leaves the Minecraft jar off the classpath and returns it.
+    pub fn take_client_jar(&mut self) -> Option<PathBuf> {
+        let custom = self.custom_client_jar_path.take();
+        let vanilla = self.vanilla_client_jar.take();
+        custom.or(vanilla)
+    }
+
     /// Builds the classpath: libraries in insertion order, Minecraft jar last, so a library
     /// carrying a patched copy of a Minecraft class wins over the jar itself.
     pub fn build(&self) -> String {
@@ -235,9 +242,7 @@ impl ClasspathBuilder {
                     &mut ordered,
                 );
             }
-            (None, None) => {
-                info!("⚠️ Warning: No client jar found! This might cause issues.");
-            }
+            (None, None) => debug!("Client jar left off the classpath"),
         }
 
         info!(

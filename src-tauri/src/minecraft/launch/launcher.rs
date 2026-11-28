@@ -4,11 +4,11 @@ use crate::minecraft::downloads::norisk_natives_download::NoriskNativesDownloadS
 use crate::minecraft::downloads::mod_resolver::ModResolutionReport;
 use crate::minecraft::dto::piston_meta::PistonMeta;
 use crate::minecraft::minecraft_auth::Credentials;
-use crate::minecraft::ClasspathBuilder;
+use crate::minecraft::{aot_cache_applies, module_flags, prepare_aot_cache, ClasspathBuilder};
 use crate::minecraft::GameArguments;
 use crate::minecraft::JvmArguments;
 use crate::minecraft::{sets_gc, DEFAULT_GC_ARGS};
-use crate::state::profile_state::{ImageSource, Profile, ProfileBanner, WindowSize};
+use crate::state::profile_state::{ImageSource, ModLoader, Profile, ProfileBanner, WindowSize};
 use crate::state::state_manager::State;
 use log::{info, warn};
 use std::path::{Path, PathBuf};
@@ -155,6 +155,7 @@ fn resolve_profile_banner_path(
 
 pub struct MinecraftLauncher {
     java_path: PathBuf,
+    java_major: u32,
     game_directory: PathBuf,
     credentials: Option<Credentials>,
 }
@@ -162,11 +163,13 @@ pub struct MinecraftLauncher {
 impl MinecraftLauncher {
     pub fn new(
         java_path: PathBuf,
+        java_major: u32,
         game_directory: PathBuf,
         credentials: Option<Credentials>,
     ) -> Self {
         Self {
             java_path,
+            java_major,
             game_directory,
             credentials,
         }
@@ -279,18 +282,24 @@ impl MinecraftLauncher {
             .join(&piston_meta.id);
 
         // Build classpath first as it's needed for JVM arguments
-        let classpath = if let Some(client_jar) = params.custom_client_jar {
-            ClasspathBuilder::new(&piston_meta.id)
-                .add_additional_libraries(&params.additional_libraries, 1)
-                .add_piston_libraries(&piston_meta.libraries)
-                .set_custom_client_jar(client_jar)
-                .build()
+        let mut classpath_builder = ClasspathBuilder::new(&piston_meta.id);
+        classpath_builder
+            .add_additional_libraries(&params.additional_libraries, 1)
+            .add_piston_libraries(&piston_meta.libraries);
+        if let Some(client_jar) = params.custom_client_jar {
+            classpath_builder.set_custom_client_jar(client_jar);
+        }
+        let is_fabric = profile.as_ref().is_some_and(|p| p.loader == ModLoader::Fabric);
+        let aot_game_jar = if aot_cache_applies(
+            self.java_major,
+            is_fabric,
+            params.additional_jvm_args.iter().map(String::as_str),
+        ) {
+            classpath_builder.take_client_jar()
         } else {
-            ClasspathBuilder::new(&piston_meta.id)
-                .add_additional_libraries(&params.additional_libraries, 1)
-                .add_piston_libraries(&piston_meta.libraries)
-                .build()
+            None
         };
+        let classpath = classpath_builder.build();
 
         // Create JVM arguments processor
         let jvm_args = JvmArguments::new(
@@ -305,18 +314,38 @@ impl MinecraftLauncher {
         let mut has_classpath = false;
         let mut has_natives = false;
 
-        if let Some(arguments) = &piston_meta.arguments {
-            let processed_jvm_args = jvm_args.process_arguments(&arguments.jvm);
-            for arg in &processed_jvm_args {
-                command.arg(arg);
-                if arg == "-cp" {
-                    has_classpath = true;
-                }
-                if arg.starts_with("-Djava.library.path=") {
-                    has_natives = true;
-                }
+        let processed_jvm_args = piston_meta
+            .arguments
+            .as_ref()
+            .map(|arguments| jvm_args.process_arguments(&arguments.jvm))
+            .unwrap_or_default();
+        for arg in &processed_jvm_args {
+            command.arg(arg);
+            if arg == "-cp" {
+                has_classpath = true;
+            }
+            if arg.starts_with("-Djava.library.path=") {
+                has_natives = true;
             }
         }
+
+        let aot_recording = aot_game_jar.and_then(|game_jar| {
+            command.arg(format!("-Dfabric.gameJarPath={}", game_jar.display()));
+            let flags = module_flags(
+                processed_jvm_args
+                    .iter()
+                    .chain(&params.additional_jvm_args)
+                    .map(String::as_str),
+            );
+            let (aot_args, recording) = prepare_aot_cache(
+                &LAUNCHER_DIRECTORY.meta_dir().join("aot"),
+                &self.java_path,
+                flags,
+                &classpath,
+            );
+            command.args(aot_args);
+            recording
+        });
 
         info!("Adding RAM JVM argument: -Xmx{}M", params.memory_max_mb);
         command.arg(format!("-Xmx{}M", params.memory_max_mb));
@@ -628,6 +657,7 @@ impl MinecraftLauncher {
                 params.memory_max_mb,
                 crash_mods,
                 crash_modpack,
+                aot_recording,
             )
             .await?;
 
