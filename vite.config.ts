@@ -4,11 +4,10 @@ import { resolve } from 'path';
 import { readFileSync } from 'fs';
 
 const pkg = JSON.parse(
-  readFileSync(resolve(__dirname, 'package.json'), 'utf-8'),
+  readFileSync(resolve(import.meta.dirname, 'package.json'), 'utf-8'),
 ) as { dependencies: Record<string, string> };
 const skinRendererVersion = pkg.dependencies['@noriskclient/nrc-skin-renderer'];
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
@@ -19,18 +18,12 @@ export default defineConfig(async ({ command }) => ({
     __SKIN_RENDERER_VERSION__: JSON.stringify(skinRendererVersion),
   },
 
-  esbuild: {
-    // A release build has no dev tools and nothing forwards the console to the log file,
-    // so these calls only cost time there. `yarn dev` keeps them.
-    pure: command === "build" ? ["console.log", "console.debug"] : [],
-  },
-
   resolve: {
     dedupe: ["three", "react", "react-dom", "@react-three/fiber", "@react-three/drei"],
     alias: [
       {
         find: /^@iconify\/react$/,
-        replacement: resolve(__dirname, "src/lib/iconify.tsx"),
+        replacement: resolve(import.meta.dirname, "src/lib/iconify.tsx"),
       },
     ],
   },
@@ -57,14 +50,17 @@ export default defineConfig(async ({ command }) => ({
     },
   },
   build: {
-    rollupOptions: {
+    // macOS 11 ships the WebKit of Safari 14.
+    target: ["chrome105", "safari14"],
+    rolldownOptions: {
+      treeshake: command === "build" ? { manualPureFunctions: ["console.log", "console.debug"] } : undefined,
       input: {
-        main: resolve(__dirname, 'index.html'),
-        updater: resolve(__dirname, 'updater.html'),
-        minecraftLogWindow: resolve(__dirname, 'minecraft-log-window.html'),
-        singleLogWindow: resolve(__dirname, 'single-log-window.html'),
-        clipOverlay: resolve(__dirname, 'clip-overlay.html'),
-        clipEditorWindow: resolve(__dirname, 'clip-editor-window.html')
+        main: resolve(import.meta.dirname, 'index.html'),
+        updater: resolve(import.meta.dirname, 'updater.html'),
+        minecraftLogWindow: resolve(import.meta.dirname, 'minecraft-log-window.html'),
+        singleLogWindow: resolve(import.meta.dirname, 'single-log-window.html'),
+        clipOverlay: resolve(import.meta.dirname, 'clip-overlay.html'),
+        clipEditorWindow: resolve(import.meta.dirname, 'clip-editor-window.html')
       }
     }
   }

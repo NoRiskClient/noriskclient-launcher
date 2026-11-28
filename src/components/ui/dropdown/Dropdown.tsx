@@ -51,7 +51,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
     const accentColor = useThemeStore((state) => state.accentColor);
     const borderRadius = useThemeStore((state) => state.borderRadius);
     const previousIsOpen = useRef(isOpen);
-    const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [dropdownHeight, setDropdownHeight] = useState(300);
 
     const colors = getVariantColors("default", accentColor);

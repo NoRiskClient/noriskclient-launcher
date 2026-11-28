@@ -30,7 +30,7 @@ interface UseProfileLaunchOptions {
 export function useProfileLaunch(options: UseProfileLaunchOptions) {
   const { profileId, quickPlaySingleplayer, quickPlayMultiplayer, onLaunchSuccess, onLaunchError, skipLastPlayedUpdate } = options;
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { showModal, hideModal } = useGlobalModal();
 
 
