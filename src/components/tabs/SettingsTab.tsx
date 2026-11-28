@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { setDiscordState } from "../../utils/discordRpc";
 import { parseErrorMessage } from "../../utils/error-utils";
 import { useClipSettingsSync } from "../../hooks/useClipSettingsSync";
+import { applyClipSettings } from "../../services/clip-service";
 import { isMacOS, supportsClips } from "../../utils/platform";
 
 type SettingsTabId = "general" | "appearance" | "clips" | "ads" | "advanced" | "debug";
@@ -139,6 +140,10 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const sidebarListRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSaveRef = useRef<LauncherConfig | null>(null);
+  const savedConfigRef = useRef<LauncherConfig | null>(null);
+  const mountedRef = useRef(true);
+  savedConfigRef.current = config;
 
   useEffect(() => {
     if (!activeSection) return;
@@ -223,11 +228,21 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
+    pendingSaveRef.current = configToSave;
     autoSaveTimeoutRef.current = setTimeout(async () => {
+      autoSaveTimeoutRef.current = null;
+      pendingSaveRef.current = null;
       setSaving(true);
       try {
+        const before = savedConfigRef.current;
         const updatedConfig =
           await ConfigService.setLauncherConfig(configToSave);
+        if (!mountedRef.current) {
+          if (JSON.stringify(before?.clips) !== JSON.stringify(updatedConfig.clips)) {
+            await applyClipSettings();
+          }
+          return;
+        }
         setConfig(updatedConfig);
         toast.success(t("settings.toast.auto_saved"), {
           duration: 2000,
@@ -246,6 +261,26 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
   useEffect(() => {
     loadConfig();
   }, [loadConfig]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const pending = pendingSaveRef.current;
+      if (!autoSaveTimeoutRef.current || !pending) return;
+      clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+      pendingSaveRef.current = null;
+      const before = savedConfigRef.current;
+      ConfigService.setLauncherConfig(pending)
+        .then((saved) => {
+          if (JSON.stringify(before?.clips) !== JSON.stringify(saved.clips)) {
+            return applyClipSettings();
+          }
+        })
+        .catch((err) => console.error("Failed to save settings on close:", err));
+    };
+  }, []);
 
   useEffect(() => {
     if (
