@@ -22,6 +22,7 @@ interface CaptureError {
   code: string;
   message: string;
   recoverable: boolean;
+  destination?: string;
 }
 
 type Shown =
@@ -68,7 +69,7 @@ export function ClipOverlay() {
     });
 
     const failed = listen<CaptureError>("clip_error", (event) => {
-      if (event.payload.code === "audio_device") return;
+      if (event.payload.code === "audio_device" || event.payload.destination) return;
       present({ kind: "error", error: event.payload });
     });
 
