@@ -12,6 +12,12 @@ members = ["crates/norisk-ipc", "crates/norisk-logging", "crates/norisk-capture"
 [profile.release.package.norisk-capture]
 opt-level = 3
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.dev.package.norisk-capture]
 opt-level = 3
 
@@ -82,7 +88,7 @@ opt-level = 3
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "noriskclient_launcher_v3_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
