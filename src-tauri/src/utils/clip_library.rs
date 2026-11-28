@@ -1490,6 +1490,28 @@ mod tests {
     }
 
     #[test]
+    fn a_clip_can_be_renamed_to_a_different_case() {
+        let dir = temp_dir("rename-case");
+        let clip = write_clip(&dir, "funny.mp4", 32);
+        write_details(&clip, &details_with(Vec::new())).unwrap();
+
+        let renamed = rename(&dir, &clip, "Funny").unwrap();
+
+        assert_eq!(renamed.file_name().unwrap(), "Funny.mp4");
+        let names: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, ["Funny.mp4"]);
+        assert!(read_details(&renamed).is_some());
+    }
+
+    #[test]
+    fn renaming_onto_another_clip_is_still_refused() {
+        let dir = temp_dir("rename-taken");
+        let clip = write_clip(&dir, "one.mp4", 32);
+        write_clip(&dir, "two.mp4", 32);
+        assert!(rename(&dir, &clip, "Two").is_err());
+    }
+
+    #[test]
     fn clips_moved_to_a_new_folder_keep_their_details() {
         let old = temp_dir("moved-from");
         let new = temp_dir("moved-to");
