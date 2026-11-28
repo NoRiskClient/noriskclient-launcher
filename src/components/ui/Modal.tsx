@@ -169,7 +169,7 @@ export function Modal({
             {!hideCloseButton && (
               <IconButton
                 ref={closeButtonRef}
-                icon={<Icon icon="solar:close-circle-bold" />}
+                icon={<Icon icon="nrc:close" />}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose();

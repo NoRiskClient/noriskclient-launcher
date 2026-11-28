@@ -78,7 +78,7 @@ export function ModDetailLightbox({
         onClick={onClose}
         className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
       >
-        <Icon icon="solar:close-circle-bold" className="w-8 h-8" />
+        <Icon icon="nrc:close" className="w-8 h-8" />
       </button>
 
       {/* Navigation - Previous */}

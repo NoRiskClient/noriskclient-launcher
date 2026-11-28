@@ -129,7 +129,7 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
             <span className="flex items-center justify-end gap-0.5">
               {version.url && (
                 <IconAction
-                  icon="solar:square-arrow-right-up-bold"
+                  icon="solar:arrow-right-up-bold"
                   title={t("mod_detail.versions.open_page")}
                   onClick={() => void openExternalUrl(version.url).catch(() => {})}
                 />
@@ -143,7 +143,7 @@ export function VersionTable({ versions, installingIds = {}, onInstall, stateFor
               )}
               {state?.installed && onDelete && !state.inPack && (
                 <IconAction
-                  icon="solar:trash-bin-minimalistic-bold"
+                  icon="solar:trash-bin-trash-bold"
                   title={t("common.delete")}
                   tone="danger"
                   onClick={() => onDelete(version)}

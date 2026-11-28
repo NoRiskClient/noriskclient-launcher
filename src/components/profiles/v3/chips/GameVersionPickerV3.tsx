@@ -47,7 +47,7 @@ export function GameVersionPickerV3({
       {/* Search — same recipe as LocalContentTabV3 toolbar */}
       <div className="p-2">
         <div className="relative">
-          <Icon icon="solar:magnifer-linear" className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
+          <Icon icon="solar:magnifer-bold" className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40 pointer-events-none" />
           <input
             autoFocus
             type="text"

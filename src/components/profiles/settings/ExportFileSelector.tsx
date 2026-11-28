@@ -141,7 +141,7 @@ export function ExportFileSelector({
           size="sm"
           onClick={() => onSelectionChange(collectPaths(structure?.children))}
           disabled={loading || !structure?.children?.length}
-          icon={<Icon icon="solar:check-read-outline" className="w-4 h-4" />}
+          icon={<Icon icon="solar:check-square-bold" className="w-4 h-4" />}
           className="text-xs px-3 py-1.5"
         >
           {t("common.select_all")}
@@ -151,7 +151,7 @@ export function ExportFileSelector({
           size="sm"
           onClick={() => onSelectionChange(new Set())}
           disabled={loading || selected.size === 0}
-          icon={<Icon icon="solar:close-circle-outline" className="w-4 h-4" />}
+          icon={<Icon icon="solar:close-square-bold" className="w-4 h-4" />}
           className="text-xs px-3 py-1.5"
         >
           {t("export.deselect_all")}

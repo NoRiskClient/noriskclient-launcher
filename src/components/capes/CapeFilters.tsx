@@ -61,19 +61,17 @@ export function CapeFilters({
     {
       value: "mostUsed",
       label: t('capes.mostUsed'),
-      icon: <Icon icon="solar:heart-bold" className="w-5 h-5" />,
+      icon: <Icon icon="solar:fire-bold" className="w-5 h-5" />,
     },
     {
       value: "newest",
       label: t('capes.newest'),
-      icon: <Icon icon="solar:sort-by-time-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:sort-from-top-to-bottom-bold" className="w-5 h-5" />,
     },
     {
       value: "oldest",
       label: t('capes.oldest'),
-      icon: (
-        <Icon icon="mdi:arrow-up-bold-circle-outline" className="w-5 h-5" />
-      ),
+      icon: <Icon icon="solar:sort-from-bottom-to-top-bold" className="w-5 h-5" />,
     },
   ];
 
@@ -81,17 +79,17 @@ export function CapeFilters({
     {
       value: "",
       label: t('capes.allTime'),
-      icon: <Icon icon="solar:calendar-mark-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-mark-bold" className="w-5 h-5" />,
     },
     {
       value: "weekly",
       label: t('capes.weekly'),
-      icon: <Icon icon="mdi:calendar-week-outline" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-bold" className="w-5 h-5" />,
     },
     {
       value: "monthly",
       label: t('capes.monthly'),
-      icon: <Icon icon="solar:calendar-date-linear" className="w-5 h-5" />,
+      icon: <Icon icon="solar:calendar-date-bold" className="w-5 h-5" />,
     },
   ];
 
@@ -128,7 +126,7 @@ export function CapeFilters({
         onClick={handleOwnedToggle}
         variant={currentFilters.showOwnedOnly ? "flat" : "flat-secondary"}
         size="md"
-        icon={<Icon icon="solar:user-id-broken" className="w-5 h-5" />}
+        icon={<Icon icon="solar:user-id-bold" className="w-5 h-5" />}
         className="min-w-0 h-[42px]"
         disabled={!activeAccount}
         title={

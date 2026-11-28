@@ -37,7 +37,7 @@ export function PlayerPreview3D({ skinUrl, variant, capeUrl = null, height = "fi
           variant="ghost"
           size="sm"
           className="absolute top-0 right-0 z-10"
-          icon={<Icon icon={showElytra ? "ph:airplane-tilt-fill" : "ph:airplane-tilt-duotone"} className="w-5 h-5" />}
+          icon={<Icon icon={showElytra ? "solar:hanger-2-bold" : "nrc:elytra"} className="w-5 h-5" />}
           title={elytraLabel}
           aria-label={elytraLabel}
         />

@@ -21,7 +21,6 @@ import { Tooltip } from "../../../ui/Tooltip";
 import { ModUpdateText } from "../../../ui/ModUpdateText";
 import { ConfirmDeleteDialog } from "../../../modals/ConfirmDeleteDialog";
 import { BrowseContentSideSheetV3 } from "../BrowseContentSideSheetV3";
-import { preloadIcons } from "../../../../lib/icon-utils";
 import { useDelayedTrue } from "../../../../hooks/useDelayedTrue";
 import { EmptyStateV3 } from "../shared/EmptyStateV3";
 import { FloatingActionBar, useSelectAllUndo, type FABActionConfig } from "../shared/FloatingActionBar";
@@ -43,20 +42,6 @@ import {
   mergeGridEntries,
   type GridEntry,
 } from "./local-content/contentGrid";
-
-preloadIcons([
-  "solar:magnifer-linear", "solar:filter-bold", "solar:sort-vertical-bold",
-  "solar:alt-arrow-down-linear", "solar:refresh-bold", "solar:refresh-circle-bold",
-  "solar:add-circle-bold", "solar:shield-check-bold", "solar:close-circle-linear",
-  "solar:bolt-bold-duotone", "solar:menu-dots-bold", "solar:folder-linear",
-  "solar:trash-bin-trash-linear", "solar:trash-bin-trash-bold", "solar:tag-linear",
-  "solar:check-circle-bold", "solar:check-read-linear", "solar:arrow-up-bold",
-  "solar:play-bold", "solar:pause-bold", "solar:volume-cross-bold",
-  "solar:volume-cross-linear", "solar:volume-loud-linear", "solar:volume-loud-bold",
-  "solar:box-bold", "solar:danger-triangle-bold", "solar:close-circle-bold",
-  "solar:sort-from-top-to-bottom-bold", "solar:ruler-bold", "solar:list-bold",
-  "solar:hand-stars-bold", "solar:link-round-bold", "solar:copy-bold", "solar:copy-bold-duotone",
-]);
 
 type SortKey = "name" | "size" | "type" | "updates";
 type FilterKey =
@@ -454,7 +439,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
       label: manager.isUpdatingAll
         ? t("profiles.v3.toolbar.updateAll")
         : `${t("profiles.v3.toolbar.updateAll")} (${manager.updatableContentCount})`,
-      icon: manager.isUpdatingAll || manager.isCheckingUpdates ? "solar:refresh-bold" : "solar:refresh-circle-bold",
+      icon: "solar:refresh-circle-bold",
       variant: "highlight" as const,
       disabled: manager.isUpdatingAll,
       loading: manager.isUpdatingAll || manager.isCheckingUpdates,
@@ -624,7 +609,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
         )}
         {isNrc && !selectedPackId ? (
           <EmptyStateV3
-            icon="solar:shield-check-bold-duotone"
+            icon="solar:shield-check-bold"
             title={t("profiles.v3.content.noPackTitle")}
             hint={t("profiles.v3.content.noPackHint")}
           />
@@ -639,7 +624,7 @@ export function LocalContentTabV3<T extends LocalContentItem>({
           )
         ) : gridEntries.length === 0 ? (
           <EmptyStateV3
-            icon={emptyStateIconOverride ?? "solar:widget-bold-duotone"}
+            icon={emptyStateIconOverride ?? "solar:widget-bold"}
             title={manager.searchQuery
               ? t("profiles.v3.content.noMatch", { type: itemTypeNamePlural.toLowerCase(), query: manager.searchQuery })
               : t("profiles.v3.content.noItems", { type: itemTypeNamePlural.toLowerCase() })}

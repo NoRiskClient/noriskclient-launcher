@@ -54,13 +54,12 @@ export function ContentActionButtons({
             key={action.id}
             id={action.id}
             label={action.label}
-            icon={action.icon}
+            icon={action.loading ? "svg-spinners:ring-resize" : action.icon}
             variant={action.variant}
             tooltip={action.tooltip}
             disabled={action.disabled || action.loading}
             size={size}
             onClick={(e) => handleButtonClick(action, e)}
-            className={action.loading ? "animate-spin" : ""}
           />
         );
 

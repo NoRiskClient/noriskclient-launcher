@@ -687,8 +687,8 @@ function PermissionsList({ permissions, refreshing, onRefresh }: PermissionsList
           title={t('debug.permissions.refresh')}
         >
           <Icon
-            icon="solar:refresh-bold"
-            className={`w-4 h-4 text-white/70 ${refreshing ? "animate-spin" : ""}`}
+            icon={refreshing ? "svg-spinners:ring-resize" : "solar:refresh-bold"}
+            className="w-4 h-4 text-white/70"
           />
         </button>
       </div>

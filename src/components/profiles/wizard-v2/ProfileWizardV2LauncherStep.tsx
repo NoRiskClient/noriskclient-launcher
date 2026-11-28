@@ -160,7 +160,7 @@ export function ProfileWizardV2LauncherStep({
         disabled={busy || count === 0}
         size="md"
         className="min-w-[180px] text-sm"
-        icon={<Icon icon="solar:download-bold" className="w-5 h-5" />}
+        icon={<Icon icon="solar:download-minimalistic-bold" className="w-5 h-5" />}
         iconPosition="left"
       >
         {count > 0
@@ -260,7 +260,7 @@ export function ProfileWizardV2LauncherStep({
             onClick={() => void addFolder()}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 px-4 py-2.5 font-minecraft text-xs text-white/45 transition-colors hover:border-white/30 hover:text-white"
           >
-            <Icon icon="solar:folder-with-files-bold" className="h-4 w-4" />
+            <Icon icon="solar:folder-open-bold" className="h-4 w-4" />
             {t("profiles.launcherImport.manual.add")}
           </button>
         )}

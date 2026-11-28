@@ -208,7 +208,7 @@ export function SyncPackCard({
             triggerRef={menuRef}
           >
             <ThemedDropdownItem
-              icon="solar:pen-linear"
+              icon="solar:pen-bold"
               onClick={() => {
                 setMenuOpen(false);
                 startRename();
@@ -217,7 +217,7 @@ export function SyncPackCard({
               {t("syncPacks.rename")}
             </ThemedDropdownItem>
             <ThemedDropdownItem
-              icon="solar:folder-linear"
+              icon="solar:folder-open-bold"
               onClick={() => {
                 setMenuOpen(false);
                 openFolder(pack.id);
@@ -227,7 +227,7 @@ export function SyncPackCard({
             </ThemedDropdownItem>
             <ThemedDropdownDivider />
             <ThemedDropdownItem
-              icon="solar:trash-bin-trash-linear"
+              icon="solar:trash-bin-trash-bold"
               tone="danger"
               onClick={() => {
                 setMenuOpen(false);
@@ -240,7 +240,7 @@ export function SyncPackCard({
         </div>
 
         <Icon
-          icon="solar:alt-arrow-down-linear"
+          icon="solar:alt-arrow-down-bold"
           className="h-4 w-4 flex-shrink-0 text-white/20 transition-all group-hover/head:text-white/50"
           style={{ transform: isOpen ? "rotate(180deg)" : undefined }}
         />

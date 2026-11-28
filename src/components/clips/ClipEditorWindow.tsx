@@ -220,7 +220,7 @@ export function ClipEditorWindow() {
             >
               {clip?.name}
             </span>
-            <WindowButton icon="mdi:close" label={t("window.close")} danger onClick={closeNow} />
+            <WindowButton icon="pixel:window-close-solid" label={t("window.close")} danger onClick={closeNow} />
           </header>
           <div
             data-tauri-drag-region

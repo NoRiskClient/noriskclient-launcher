@@ -355,7 +355,7 @@ export function SettingsTab({ onClose }: SettingsTabProps) {
         <ActionButton
           id="open-directory"
           label={t("settings.open_directory")}
-          icon="solar:folder-bold"
+          icon="solar:folder-open-bold"
           variant="highlight"
           tooltip={t("settings.open_directory.tooltip")}
           size="sm"

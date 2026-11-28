@@ -59,7 +59,7 @@ export function SyncPackVersionRow({
 
   const marker: Record<Mode, { icon: string; color: string; tip: string }> = {
     latest: {
-      icon: "solar:refresh-circle-linear",
+      icon: "solar:refresh-circle-bold",
       color: "rgba(255,255,255,0.4)",
       tip: t("syncPacks.entries.modeLatestTip"),
     },
@@ -141,7 +141,7 @@ export function SyncPackVersionRow({
           <span className="truncate">{chipLabel}</span>
           {canSwitch && !resolving && (
             <Icon
-              icon="solar:alt-arrow-down-linear"
+              icon="solar:alt-arrow-down-bold"
               className="h-3 w-3 flex-shrink-0 opacity-50"
             />
           )}

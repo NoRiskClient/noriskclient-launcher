@@ -88,7 +88,7 @@ export function EditableChipV3({
           <Icon icon="solar:lock-keyhole-minimalistic-bold" className="w-3.5 h-3.5 text-white/30 ml-0.5 flex-shrink-0" />
         ) : (
           <Icon
-            icon="solar:pen-linear"
+            icon="solar:pen-bold"
             className={`w-3.5 h-3.5 ml-0.5 flex-shrink-0 transition-opacity ${
               open ? "opacity-80" : "opacity-40 group-hover:opacity-80"
             }`}

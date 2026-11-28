@@ -422,7 +422,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
             color: accentColor.value,
           }}
         >
-          <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+          <Icon icon="nrc:close" className="w-4 h-4" />
         </button>
       </div>
 
@@ -441,7 +441,7 @@ export function ChatPanel({ friend }: ChatPanelProps) {
               }}
             >
               <Icon
-                icon="solar:chat-round-line-linear"
+                icon="solar:chat-round-line-bold"
                 className="w-6 h-6"
                 style={{ color: accentColor.value }}
               />

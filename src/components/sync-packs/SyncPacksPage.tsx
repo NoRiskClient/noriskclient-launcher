@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@iconify/react";
 
-import { preloadIcons } from "../../lib/icon-utils";
 import { useThemeStore } from "../../store/useThemeStore";
 import { useProjectIcons } from "../../hooks/useProjectIcons";
 import type { ProjectIconRef } from "../../hooks/useProjectIcons";
@@ -24,15 +23,6 @@ import { RailPanel } from "../ads/AdRail";
 import { SyncPacksRail } from "./SyncPacksRail";
 
 const SYNC_PACKS_DISCORD_URL = "https://discord.norisk.gg";
-
-preloadIcons([
-  "solar:arrow-left-linear",
-  "solar:trash-bin-trash-bold",
-  "solar:alt-arrow-down-linear",
-  "solar:folder-bold",
-  "solar:file-text-bold",
-  "solar:box-minimalistic-bold",
-]);
 
 export function SyncPacksPage() {
   const { t } = useTranslation();
@@ -230,7 +220,7 @@ export function SyncPacksPage() {
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
-          <Icon icon="solar:arrow-left-linear" className="w-4 h-4" />
+          <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
           <span className="text-xs font-minecraft uppercase tracking-wider">
             {t("profiles.back")}
           </span>

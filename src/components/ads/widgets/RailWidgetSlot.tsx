@@ -55,8 +55,8 @@ export function RailWidgetSlot({ width, height }: { width: number; height: numbe
           <span className="font-minecraft text-[10px] text-white/30 tabular-nums mr-1">
             {index + 1}/{WIDGETS.length}
           </span>
-          <StepButton icon="solar:alt-arrow-left-linear" label={t("rail_widgets.previous")} onClick={() => step(-1)} />
-          <StepButton icon="solar:alt-arrow-right-linear" label={t("rail_widgets.next")} onClick={() => step(1)} />
+          <StepButton icon="solar:alt-arrow-left-bold" label={t("rail_widgets.previous")} onClick={() => step(-1)} />
+          <StepButton icon="solar:alt-arrow-right-bold" label={t("rail_widgets.next")} onClick={() => step(1)} />
         </div>
       </div>
       <div key={id} className="flex-1 min-h-0 overflow-y-auto no-scrollbar animate-in fade-in duration-200">

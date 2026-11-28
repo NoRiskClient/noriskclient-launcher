@@ -69,7 +69,7 @@ export function ConfirmDeleteDialog({
   return (
     <Modal
       title={dialogTitle}
-      titleIcon={<Icon icon="solar:trash-bin-trash-bold-duotone" className="w-6 h-6 text-red-400" />}
+      titleIcon={<Icon icon="solar:trash-bin-trash-bold" className="w-6 h-6 text-red-400" />}
       onClose={onClose}
       width="sm"
       footer={dialogFooter}

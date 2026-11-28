@@ -294,7 +294,7 @@ export function ProfilesTabV2() {
   if (profiles.length === 0) {
     return (
       <EmptyState
-        icon="solar:widget-bold"
+        icon="solar:user-id-bold"
         message={t('profiles.noProfilesFound')}
         action={
           <Button
@@ -384,7 +384,7 @@ export function ProfilesTabV2() {
       {/* Virtualized profile list. Version-divider headers appear only while a version filter is active. */}
       <div className="flex-1 min-h-0 h-full">
         {virtualRows.length === 0 ? (
-          <EmptyState icon="solar:widget-bold" message={t('profiles.noProfilesFound')} />
+          <EmptyState icon="solar:user-id-bold" message={t('profiles.noProfilesFound')} />
         ) : (
           <Virtuoso
             data={virtualRows}

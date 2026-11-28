@@ -117,7 +117,7 @@ export function SyncPackModRow({
         }
         trailing={
           <Icon
-            icon="solar:alt-arrow-down-linear"
+            icon="solar:alt-arrow-down-bold"
             className="h-4 w-4 flex-shrink-0 text-white/15 transition-all group-hover/row:text-white/40"
             style={{ transform: isExpanded ? "rotate(180deg)" : undefined }}
           />
@@ -142,8 +142,8 @@ export function SyncPackModRow({
                 className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-black/40 text-white/45 transition-colors hover:border-white/20 hover:bg-black/60 hover:!text-white disabled:opacity-30"
               >
                 <Icon
-                  icon="solar:refresh-bold"
-                  className={`h-3.5 w-3.5 ${resolving ? "animate-spin" : ""}`}
+                  icon={resolving ? "svg-spinners:ring-resize" : "solar:refresh-bold"}
+                  className="h-3.5 w-3.5"
                 />
               </button>
             </Tooltip>

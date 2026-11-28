@@ -31,7 +31,6 @@ import { useCapeFavoritesStore } from "../../store/useCapeFavoritesStore";
 import { useVanillaCapeStore } from "../../store/useVanillaCapeStore";
 import type { VanillaCape } from "../../types/vanillaCapes";
 import { useGlobalModal } from "../../hooks/useGlobalModal";
-import { preloadIcons } from "../../lib/icon-utils";
 import { deleteCape, checkIsModerator, getCapeImageUrl } from "../../services/cape-service";
 import { toast } from "react-hot-toast";
 import { UploadCapeModal } from "./UploadCapeModal";
@@ -197,15 +196,15 @@ export function CapeBrowser(): JSX.Element {
 
   // Filter options for SearchWithFilters
   const sortOptions = [
-    { value: "mostUsed", label: t('capes.mostUsed'), icon: "solar:heart-bold" },
-    { value: "newest", label: t('capes.newest'), icon: "solar:sort-by-time-linear" },
-    { value: "oldest", label: t('capes.oldest'), icon: "mdi:arrow-up-bold-circle-outline" },
+    { value: "mostUsed", label: t('capes.mostUsed'), icon: "solar:fire-bold" },
+    { value: "newest", label: t('capes.newest'), icon: "solar:sort-from-top-to-bottom-bold" },
+    { value: "oldest", label: t('capes.oldest'), icon: "solar:sort-from-bottom-to-top-bold" },
   ];
 
   const filterOptions = [
-    { value: "", label: t('capes.allTime'), icon: "solar:calendar-mark-linear" },
-    { value: "weekly", label: t('capes.weekly'), icon: "mdi:calendar-week-outline" },
-    { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-linear" },
+    { value: "", label: t('capes.allTime'), icon: "solar:calendar-mark-bold" },
+    { value: "weekly", label: t('capes.weekly'), icon: "solar:calendar-bold" },
+    { value: "monthly", label: t('capes.monthly'), icon: "solar:calendar-date-bold" },
   ];
 
 
@@ -231,10 +230,6 @@ export function CapeBrowser(): JSX.Element {
     if (!activeAccount) return;
     checkIsModerator().then(setIsModerator).catch(() => setIsModerator(false));
   }, [activeAccount]);
-
-  useEffect(() => {
-    preloadIcons(["solar:add-square-bold-duotone"]);
-  }, []);
 
   // Initial load for ALL capes
   useEffect(() => {
@@ -974,7 +969,7 @@ export function CapeBrowser(): JSX.Element {
                           title={t('capes.downloadTemplate')}
                         >
                           <div className="w-4 h-4 flex items-center justify-center">
-                            <Icon icon="solar:download-bold" className="w-4 h-4" />
+                            <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                           </div>
                           <span>{t('capes.template')}</span>
                           <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3" />
@@ -985,14 +980,14 @@ export function CapeBrowser(): JSX.Element {
                               onClick={() => handleDownloadTemplate(false)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithoutElytra')}</span>
                             </button>
                             <button
                               onClick={() => handleDownloadTemplate(true)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/10 font-smallcaps text-sm transition-all duration-200"
                             >
-                              <Icon icon="solar:download-bold" className="w-4 h-4" />
+                              <Icon icon="solar:download-minimalistic-bold" className="w-4 h-4" />
                               <span>{t('capes.templateWithElytra')}</span>
                             </button>
                           </div>

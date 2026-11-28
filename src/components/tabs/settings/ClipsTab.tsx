@@ -788,7 +788,7 @@ export function ClipsTab() {
             <Button
               variant="flat"
               size="sm"
-              icon={<Icon icon="solar:folder-with-files-bold" className="w-4 h-4" />}
+              icon={<Icon icon="solar:folder-open-bold" className="w-4 h-4" />}
               onClick={() =>
                 void openClipFolder().catch((e) => toast.error(parseErrorMessage(e)))
               }

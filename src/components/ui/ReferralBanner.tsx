@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, UserPlus, AlertCircle, Loader2 } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { useReferralStore } from "../../store/referral-store";
 import { useThemeStore } from "../../store/useThemeStore";
 import { getLauncherConfig } from "../../services/launcher-config-service";
@@ -70,7 +70,7 @@ export function ReferralBanner() {
         }}
       >
         <div className="flex items-center gap-3 px-4 py-2">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <Icon icon="solar:danger-circle-bold" className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="font-minecraft text-sm text-white/80 tracking-wide">
             <span className="text-red-400">{t('common.error')}:</span> {error}
           </span>
@@ -80,7 +80,7 @@ export function ReferralBanner() {
             className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
             aria-label={t('common.close_banner')}
           >
-            <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
+            <Icon icon="nrc:close" className="w-3.5 h-3.5 text-white/50 hover:text-white" />
           </button>
         </div>
       </div>
@@ -100,7 +100,7 @@ export function ReferralBanner() {
         }}
       >
         <div className="flex items-center gap-3 px-4 py-2">
-          <Loader2 className="w-4 h-4 text-white/70 flex-shrink-0 animate-spin" />
+          <Icon icon="svg-spinners:ring-resize" className="w-4 h-4 text-white/70 flex-shrink-0" />
           <span className="font-minecraft text-sm text-white/80 tracking-wide">
             {t('referral.loading')}
           </span>
@@ -131,7 +131,7 @@ export function ReferralBanner() {
             style={{ imageRendering: "pixelated" }}
           />
         ) : (
-          <UserPlus className="w-4 h-4 text-white/70 flex-shrink-0 mt-0.5" />
+          <Icon icon="solar:user-plus-bold" className="w-4 h-4 text-white/70 flex-shrink-0 mt-0.5" />
         )}
 
         {/* Content */}
@@ -160,7 +160,7 @@ export function ReferralBanner() {
           className="flex-shrink-0 ml-1 p-1 rounded-full transition-colors hover:bg-white/10"
           aria-label={t('common.close_banner')}
         >
-          <X className="w-3.5 h-3.5 text-white/50 hover:text-white" />
+          <Icon icon="nrc:close" className="w-3.5 h-3.5 text-white/50 hover:text-white" />
         </button>
       </div>
     </div>

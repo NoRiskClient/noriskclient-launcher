@@ -571,7 +571,7 @@ export function LogViewerCore({
               onClick={() => setSearchTerm("")}
               className="text-white/40 hover:text-white/70 flex-shrink-0"
             >
-              <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+              <Icon icon="nrc:close" className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -739,7 +739,7 @@ export function LogViewerCore({
             }`}
           >
             {isUploading ? (
-              <Icon icon="svg-spinners:pulse-3" className="w-4 h-4" />
+              <Icon icon="svg-spinners:ring-resize" className="w-4 h-4" />
             ) : (
               <Icon icon="solar:upload-bold" className="w-4 h-4" />
             )}

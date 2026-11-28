@@ -128,7 +128,7 @@ export function ProfileWizardV2ReviewStep({
         disabled={busy || !preview || !trimmedName}
         size="md"
         className="min-w-[180px] text-sm"
-        icon={<Icon icon="solar:download-bold" className="w-5 h-5" />}
+        icon={<Icon icon="solar:download-minimalistic-bold" className="w-5 h-5" />}
         iconPosition="left"
       >
         {t("profiles.import.confirm")}

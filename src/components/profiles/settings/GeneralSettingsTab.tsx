@@ -159,7 +159,7 @@ export function GeneralSettingsTab({ profile, editedProfile, updateProfile, onRe
         title={t("profiles.settings.copyProfileId")}
         className="flex items-center gap-1.5 px-1 text-white/30 transition-colors hover:text-white/60"
       >
-        <Icon icon="solar:copy-linear" className="h-3.5 w-3.5" />
+        <Icon icon="solar:copy-bold" className="h-3.5 w-3.5" />
         <span className="font-minecraft text-xs tracking-wide">{profile.id}</span>
       </button>
     </div>

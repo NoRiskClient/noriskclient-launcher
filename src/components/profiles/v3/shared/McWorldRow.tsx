@@ -25,7 +25,7 @@ export function McWorldRow({ world, onPlay, playDisabled, nameSlot }: McWorldRow
     <div className="flex flex-1 min-w-0 gap-1.5 font-minecraft normal-case tracking-normal leading-[18px] select-none">
       <McIcon
         src={world.icon_path ? convertFileSrc(world.icon_path) : null}
-        fallback="solar:planet-bold-duotone"
+        fallback="solar:planet-bold"
         onPlay={onPlay}
         playDisabled={playDisabled}
       />

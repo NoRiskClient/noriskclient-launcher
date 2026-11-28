@@ -78,7 +78,7 @@ export function LauncherNoticeBanner() {
                     className="mt-3 inline-flex items-center gap-1.5 font-smallcaps text-xs transition-colors hover:underline underline-offset-2"
                     style={{ color }}
                   >
-                    <Icon icon="solar:arrow-right-up-linear" className="w-4 h-4" />
+                    <Icon icon="solar:arrow-right-up-bold" className="w-4 h-4" />
                     {notice.link_label || notice.link_url}
                   </button>
                 )}

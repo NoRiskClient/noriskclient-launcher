@@ -45,7 +45,7 @@ export function LegalAcceptanceModal() {
         className="group w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
         style={{ borderColor: `${accentColor.value}26` }}
       >
-        <Icon icon="solar:document-text-linear" className="w-5 h-5 mt-0.5 text-white/50 flex-shrink-0" />
+        <Icon icon="solar:document-text-bold" className="w-5 h-5 mt-0.5 text-white/50 flex-shrink-0" />
         <span className="flex-1 min-w-0">
           <span className="block font-minecraft text-white">{doc.title}</span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-xs font-minecraft text-white/40">
@@ -70,7 +70,7 @@ export function LegalAcceptanceModal() {
         </span>
         <span className="self-center flex items-center gap-1 text-xs font-minecraft text-white/40 group-hover:text-white transition-colors">
           {t("legal.open")}
-          <Icon icon="solar:arrow-right-up-linear" className="w-3.5 h-3.5" />
+          <Icon icon="solar:arrow-right-up-bold" className="w-3.5 h-3.5" />
         </span>
       </button>
     );

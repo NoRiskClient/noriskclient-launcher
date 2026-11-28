@@ -203,7 +203,7 @@ export function SymlinkSettingsTab({
                       <span className="shrink-0 text-xs text-white/40">{symlink.link_type}</span>
                     </p>
                     <p className="flex items-center gap-1.5 font-minecraft text-xs text-white/40">
-                      <Icon icon="solar:arrow-right-linear" className="h-3 w-3 shrink-0" />
+                      <Icon icon="solar:arrow-right-bold" className="h-3 w-3 shrink-0" />
                       <span className="truncate normal-case" title={symlink.target_path}>
                         {symlink.target_path}
                       </span>
@@ -215,7 +215,7 @@ export function SymlinkSettingsTab({
                     onClick={() => openInternalPath(symlink.link_path)}
                   />
                   <IconAction
-                    icon="solar:trash-bin-minimalistic-bold"
+                    icon="solar:trash-bin-trash-bold"
                     label={t("symlink.remove_symlink")}
                     tone="danger"
                     onClick={() => removeSymlink(symlink.link_path)}

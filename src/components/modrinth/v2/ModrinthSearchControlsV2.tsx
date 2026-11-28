@@ -201,7 +201,7 @@ export const ModrinthSearchControlsV2: React.FC<
               >
                 <span>{version}</span>
                 <Icon
-                  icon="solar:close-circle-bold"
+                  icon="nrc:close"
                   className="w-4 h-4 ml-1"
                 />
               </TagBadge>
@@ -217,7 +217,7 @@ export const ModrinthSearchControlsV2: React.FC<
               >
                 <span>{loader}</span>
                 <Icon
-                  icon="solar:close-circle-bold"
+                  icon="nrc:close"
                   className="w-4 h-4 ml-1"
                 />
               </TagBadge>
@@ -233,7 +233,7 @@ export const ModrinthSearchControlsV2: React.FC<
               >
                 <span>{category}</span>
                 <Icon
-                  icon="solar:close-circle-bold"
+                  icon="nrc:close"
                   className="w-4 h-4 ml-1"
                 />
               </TagBadge>
@@ -249,7 +249,7 @@ export const ModrinthSearchControlsV2: React.FC<
               >
                 <span>{t('content.filters.client')}</span>
                 <Icon
-                  icon="solar:close-circle-bold"
+                  icon="nrc:close"
                   className="w-4 h-4 ml-1"
                 />
               </TagBadge>
@@ -265,7 +265,7 @@ export const ModrinthSearchControlsV2: React.FC<
               >
                 <span>{t('content.filters.server')}</span>
                 <Icon
-                  icon="solar:close-circle-bold"
+                  icon="nrc:close"
                   className="w-4 h-4 ml-1"
                 />
               </TagBadge>

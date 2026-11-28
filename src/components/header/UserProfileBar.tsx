@@ -78,7 +78,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
         </div>
 
         <IconButton
-          icon={<Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />}
+          icon={<Icon icon="solar:users-group-rounded-bold" className="w-5 h-5" />}
           onClick={toggleFriendsSidebar}
           variant="flat"
           size="sm"
@@ -87,7 +87,7 @@ export function UserProfileBar({ className }: UserProfileBarProps) {
         />
 
         <IconButton
-          icon={<Icon icon="solar:link-linear" className="w-5 h-5" />}
+          icon={<Icon icon="solar:link-bold" className="w-5 h-5" />}
           onClick={openSocialsModal}
           variant="flat"
           size="sm"

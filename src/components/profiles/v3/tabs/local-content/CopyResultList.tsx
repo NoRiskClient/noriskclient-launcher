@@ -19,7 +19,7 @@ type Status = "copied" | "alreadyThere" | "inactive" | "failed";
 
 const STATUS_STYLE: Record<Status, { icon: string; className: string }> = {
   copied: { icon: "solar:check-circle-bold", className: "text-emerald-400" },
-  alreadyThere: { icon: "solar:check-read-linear", className: "text-white/40" },
+  alreadyThere: { icon: "solar:check-circle-bold", className: "text-white/40" },
   inactive: { icon: "solar:clock-circle-bold", className: "text-amber-400" },
   failed: { icon: "solar:close-circle-bold", className: "text-red-400" },
 };
@@ -51,7 +51,7 @@ export function ItemIcon({ iconUrl, size }: { iconUrl: string | null; size: "sm"
       {iconUrl ? (
         <img src={iconUrl} alt="" className="w-full h-full object-cover" />
       ) : (
-        <Icon icon="solar:bolt-bold-duotone" className="w-3.5 h-3.5 text-white/50" />
+        <Icon icon="solar:bolt-bold" className="w-3.5 h-3.5 text-white/50" />
       )}
     </div>
   );
@@ -94,7 +94,7 @@ export function CopyResultList({
                   className="flex items-center gap-1.5 flex-shrink-0 rounded-md border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white/80 font-minecraft normal-case transition-colors hover:border-white/25 hover:bg-black/30 hover:text-white"
                 >
                   {t("profiles.v3.copy.openShort")}
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
+                  <Icon icon="solar:alt-arrow-right-bold" className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>

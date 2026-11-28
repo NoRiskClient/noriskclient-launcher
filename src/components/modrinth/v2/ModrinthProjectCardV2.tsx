@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import type {
   ModrinthGameVersion,
 } from "../../../types/modrinth";
@@ -12,7 +12,6 @@ import { TagBadge } from "../../ui/TagBadge";
 import { ModrinthVersionListV2 } from "./ModrinthVersionListV2";
 import { openExternalUrl } from "../../../services/tauri-service";
 import { toast } from "react-hot-toast";
-import { preloadIcons } from "../../../lib/icon-utils";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "../../ui/Tooltip";
 import { useNavigate } from "react-router-dom";
@@ -177,14 +176,6 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
   }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-
-    useEffect(() => {
-      preloadIcons([
-        "solar:download-minimalistic-bold",
-        "solar:alt-arrow-up-bold",
-        "solar:alt-arrow-down-bold",
-      ]);
-    }, []);
 
     const handleTitleClick = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -371,8 +362,7 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
           {hit.project_type === "modpack" ? (
             <ActionButton
               label={isInstallingModpackAsProfile ? "Installing..." : "Install"}
-              icon={isInstallingModpackAsProfile ? "solar:refresh-bold" : "solar:download-minimalistic-bold"}
-              iconClassName={isInstallingModpackAsProfile ? "animate-spin-slow" : ""}
+              icon={isInstallingModpackAsProfile ? "svg-spinners:ring-resize" : "solar:download-minimalistic-bold"}
               variant={isInstallingModpackAsProfile ? "secondary" : "primary"}
               disabled={isInstallingModpackAsProfile || isQuickInstalling || (!!installStatus?.is_installed && !!selectedProfile)}
               onClick={(e) => {
@@ -393,12 +383,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
               label={isQuickInstalling ? "Installing..." : "Install"}
               icon={
                 isQuickInstalling 
-                  ? "solar:refresh-bold" 
+                  ? "svg-spinners:ring-resize" 
                   : (projectNoRiskStatus === 'blocked' || projectNoRiskStatus === 'warning')
                     ? "solar:danger-triangle-bold"
                     : "solar:download-minimalistic-bold"
               }
-              iconClassName={isQuickInstalling ? "animate-spin-slow" : ""}
               variant={isQuickInstalling ? "secondary" : "primary"}
               disabled={isQuickInstalling || (!!installStatus?.is_installed && !!selectedProfile)}
               onClick={(e) => {
@@ -411,12 +400,11 @@ export const ModrinthProjectCardV2 = React.memo<ModrinthProjectCardV2Props>(
           <ActionButton
             icon={
               isLoadingVersions
-                ? "solar:refresh-bold"
+                ? "svg-spinners:ring-resize"
                 : isExpanded
                   ? "solar:alt-arrow-up-bold"
                   : "solar:alt-arrow-down-bold"
             }
-            iconClassName={isLoadingVersions ? "animate-spin-fast" : ""}
             variant="icon-only"
             disabled={isLoadingVersions}
             tooltip={isExpanded ? "Hide Versions" : "Show Versions"}

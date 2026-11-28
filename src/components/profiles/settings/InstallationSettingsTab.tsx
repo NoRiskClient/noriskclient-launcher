@@ -279,7 +279,7 @@ export function InstallationSettingsTab({
                     className="flex items-center gap-1 px-2.5 py-1 text-xs"
                   >
                     {olderFamilies.includes(family) ? family : t("profiles.settings.olderVersions")}
-                    <Icon icon="solar:alt-arrow-down-linear" className="h-3 w-3" />
+                    <Icon icon="solar:alt-arrow-down-bold" className="h-3 w-3" />
                   </Chip>
                   {olderOpen && (
                     <div className="absolute left-0 top-full z-20 mt-1 flex w-64 flex-wrap gap-1.5 rounded-lg border border-white/20 bg-black/90 p-2 shadow-xl backdrop-blur-sm">

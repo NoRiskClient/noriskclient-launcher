@@ -18,7 +18,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
         <span>
           {title} <span className="text-white/50">({count})</span>
         </span>
-        <Icon icon={open ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-right-linear"} className="w-4 h-4" />
+        <Icon icon={open ? "solar:alt-arrow-down-bold" : "solar:alt-arrow-right-bold"} className="w-4 h-4" />
       </button>
       {open && (
         <ul className="max-h-48 overflow-y-auto custom-scrollbar border-t border-white/10 px-3 py-2 space-y-1 font-mono text-xs text-white/70">

@@ -225,7 +225,7 @@ export function ProfileScreenshotModal({
             { danger: true },
           )}
           <div className="w-px h-6 bg-white/10 mx-2" />
-          {action(t("common.close"), "solar:close-circle-bold", onClose)}
+          {action(t("common.close"), "nrc:close", onClose)}
         </div>
       </div>
       <div
@@ -290,7 +290,7 @@ export function ProfileScreenshotModal({
                 onPointerDown={(e) => e.stopPropagation()}
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center bg-black/50 text-white/70 hover:text-white hover:bg-black/70 opacity-60 hover:opacity-100 transition"
               >
-                <Icon icon="solar:alt-arrow-left-linear" className="w-5 h-5" />
+                <Icon icon="solar:alt-arrow-left-bold" className="w-5 h-5" />
               </button>
             )}
             {position.index < position.total - 1 && (
@@ -302,7 +302,7 @@ export function ProfileScreenshotModal({
                 onPointerDown={(e) => e.stopPropagation()}
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center bg-black/50 text-white/70 hover:text-white hover:bg-black/70 opacity-60 hover:opacity-100 transition"
               >
-                <Icon icon="solar:alt-arrow-right-linear" className="w-5 h-5" />
+                <Icon icon="solar:alt-arrow-right-bold" className="w-5 h-5" />
               </button>
             )}
           </>

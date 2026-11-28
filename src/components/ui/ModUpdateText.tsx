@@ -44,7 +44,7 @@ export function ModUpdateText({
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center gap-2">
           <Icon
-            icon="solar:box-bold-duotone"
+            icon="solar:box-bold"
             className="w-4 h-4 text-purple-400 flex-shrink-0"
           />
           <span className="text-sm font-semibold text-purple-300">
@@ -57,7 +57,7 @@ export function ModUpdateText({
         <div className="space-y-1 text-xs text-gray-300">
           <div className="flex items-start gap-2">
             <Icon
-              icon="solar:shield-warning-bold-duotone"
+              icon="solar:shield-warning-bold"
               className="w-3 h-3 text-yellow-400 flex-shrink-0 mt-0.5"
             />
             <div>
@@ -74,7 +74,7 @@ export function ModUpdateText({
 
           <div className="flex items-start gap-2">
             <Icon
-              icon="solar:refresh-bold-duotone"
+              icon="solar:refresh-bold"
               className="w-3 h-3 text-blue-400 flex-shrink-0 mt-0.5"
             />
             <div>
@@ -107,7 +107,7 @@ export function ModUpdateText({
         <div className="space-y-1 text-xs text-gray-300">
           <div className="flex items-start gap-2">
             <Icon
-              icon="solar:shield-warning-bold-duotone"
+              icon="solar:shield-warning-bold"
               className="w-3 h-3 text-yellow-400 flex-shrink-0 mt-0.5"
             />
             <div>
@@ -139,7 +139,7 @@ export function ModUpdateText({
       <div className="space-y-1 text-xs text-gray-300">
         <div className="flex items-start gap-2">
           <Icon
-            icon="solar:refresh-circle-bold-duotone"
+            icon="solar:refresh-circle-bold"
             className="w-3 h-3 text-green-400 flex-shrink-0 mt-0.5"
           />
           <div>

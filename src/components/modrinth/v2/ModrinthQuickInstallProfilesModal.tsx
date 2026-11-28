@@ -168,7 +168,7 @@ export function ModrinthQuickInstallProfilesModal({
             <Button
               variant="secondary"
               className={cn("ml-auto", PLAIN_TEXT)}
-              icon={<Icon icon="solar:add-folder-line-duotone" className="w-4 h-4" />}
+              icon={<Icon icon="solar:add-folder-bold" className="w-4 h-4" />}
               onClick={switchToQuickProfileView}
             >
               {t('profiles.new_profile')}

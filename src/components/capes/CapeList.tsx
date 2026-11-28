@@ -127,9 +127,8 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
             disabled={isCurrentlyEquipping}
           >
             <Icon
-              icon={isFavorite ? "ph:heart-fill" : "ph:heart"}
-              className="w-4 h-4"
-              style={{ color: isFavorite ? "#ef4444" : undefined }}
+              icon={isFavorite ? "solar:star-bold" : "solar:star-linear"}
+              className={isFavorite ? "w-4 h-4 text-yellow-400" : "w-4 h-4"}
             />
           </button>
         )}
@@ -145,7 +144,7 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
             title={t('capes.deleteCape')}
             disabled={isCurrentlyEquipping}
           >
-            <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
           </button>
         )}
 
@@ -183,7 +182,7 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
             const cosmeticCape = cape as CosmeticCape;
             if (isNoCape) {
               return <div className="w-full h-full flex items-center justify-center bg-white/5">
-                <Icon icon="solar:close-circle-bold-duotone" className="w-10 h-10 text-white/20" />
+                <Icon icon="solar:close-circle-bold" className="w-10 h-10 text-white/20" />
               </div>;
             }
             if (isInReview) {
@@ -193,7 +192,7 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
               return cosmeticCape.blurHash
                 ? <CapeImage imageUrl={cosmeticCape.blurHash} part="front" width={displayWidth} className="rounded-sm block blur-sm" />
                 : <div className="w-full h-full flex items-center justify-center bg-white/5">
-                    <Icon icon="solar:close-circle-bold-duotone" className="w-10 h-10 text-white/20" />
+                    <Icon icon="solar:close-circle-bold" className="w-10 h-10 text-white/20" />
                   </div>;
             }
             return <CapeImage imageUrl={imageUrl} part="front" width={displayWidth} className="rounded-sm block" />;
@@ -266,7 +265,7 @@ const CapeItemDisplay = memo(function CapeItemDisplay({
             <div className="flex items-center justify-center gap-2 text-xs font-minecraft">
               <div className="text-white/60 flex items-center gap-1">
                 <Icon
-                  icon="solar:download-minimalistic-outline"
+                  icon="solar:download-minimalistic-bold"
                   className="w-3 h-3 text-white/50"
                 />
                 <span title={t('capes.usesCount', { formattedCount: (cape as CosmeticCape).uses.toLocaleString() })}>
@@ -481,7 +480,7 @@ export function CapeList({
           {
             id: "favorite",
             label: capeMenu && favoriteCapeIds.includes(capeIdOf(capeMenu.target)) ? t("capes.unfavorite") : t("capes.favorite"),
-            icon: "solar:heart-bold",
+            icon: capeMenu && favoriteCapeIds.includes(capeIdOf(capeMenu.target)) ? "solar:star-linear" : "solar:star-bold",
             onClick: (cape: CosmeticCape | VanillaCape) => void toggleFavorite(capeIdOf(cape)),
           },
         ]),
@@ -537,7 +536,7 @@ export function CapeList({
     return (
       <div className="flex-1 h-full flex items-center justify-center p-5">
         <SignedOutState
-          icon="solar:hanger-2-line-duotone"
+          icon="solar:hanger-2-bold"
           title={t('capes.signedOut.title')}
           description={t('capes.signedOut.description')}
         />
@@ -549,7 +548,7 @@ export function CapeList({
     return (
       <div className="flex-grow flex items-center justify-center p-5">
         <EmptyState
-          icon="solar:hanger-2-line-duotone"
+          icon="solar:hanger-2-bold"
           message={
             isVanilla
               ? searchQuery
@@ -586,8 +585,8 @@ export function CapeList({
       <div ref={ref} className="flex justify-center items-center p-8">
         {isFetchingMore ? (
           <Icon
-            icon="eos-icons:loading"
-            className="w-8 h-8 animate-spin"
+            icon="svg-spinners:ring-resize"
+            className="w-8 h-8"
             style={{ color: accentColor.value }}
           />
         ) : (

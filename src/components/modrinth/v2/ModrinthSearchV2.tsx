@@ -188,7 +188,7 @@ export function ModrinthSearchV2({
   
   const sortOptions: { value: UnifiedSortType; label: string; icon?: string }[] = [
     { value: UnifiedSortType.Relevance, label: t('content.search.sort.relevance'), icon: 'solar:sort-bold' },
-    { value: UnifiedSortType.Downloads, label: t('content.search.sort.downloads'), icon: 'solar:download-bold' },
+    { value: UnifiedSortType.Downloads, label: t('content.search.sort.downloads'), icon: 'solar:download-minimalistic-bold' },
     { value: UnifiedSortType.Follows, label: t('content.search.sort.follows'), icon: 'solar:heart-bold' },
     { value: UnifiedSortType.Newest, label: t('content.search.sort.newest'), icon: 'solar:calendar-mark-bold' },
     { value: UnifiedSortType.Updated, label: t('content.search.sort.updated'), icon: 'solar:refresh-bold' },

@@ -118,7 +118,7 @@ export function ContentTile({
           {iconUrl ? (
             <img src={iconUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <Icon icon="solar:bolt-bold-duotone" className="w-6 h-6 text-white/50" />
+            <Icon icon="solar:bolt-bold" className="w-6 h-6 text-white/50" />
           )}
         </div>
         {noRiskStatus === "blocked" && (
@@ -207,7 +207,7 @@ export function ContentTile({
                 );
               })()}
               <span className="truncate">{isSwitchingVersion ? t("profiles.v3.tile.switching") : (versionText || "—")}</span>
-              {isSwitchable && !isSwitchingVersion && <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 flex-shrink-0 opacity-60" />}
+              {isSwitchable && !isSwitchingVersion && <Icon icon="solar:alt-arrow-down-bold" className="w-3 h-3 flex-shrink-0 opacity-60" />}
             </button>
 
             <VersionSelectDropdown
@@ -242,8 +242,8 @@ export function ContentTile({
             }`}
           >
             <Icon
-              icon={isQuickUpdating ? "solar:refresh-bold" : "solar:arrow-up-bold"}
-              className={`w-4 h-4 ${isQuickUpdating ? "animate-spin" : ""}`}
+              icon={isQuickUpdating ? "svg-spinners:ring-resize" : "solar:arrow-up-bold"}
+              className="w-4 h-4"
             />
           </button>
         </Tooltip>
@@ -271,7 +271,7 @@ export function ContentTile({
         </button>
         <ThemedDropdown open={menuOpen} onClose={() => onMenuToggle(false)} width="w-52" triggerRef={menuButtonRef}>
           <ThemedDropdownItem
-            icon="solar:folder-linear"
+            icon="solar:folder-open-bold"
             onClick={() => { onOpenFolder(); onMenuToggle(false); }}
           >
             {t("profiles.v3.tile.openFolder")}
@@ -280,7 +280,7 @@ export function ContentTile({
             <>
               <ThemedDropdownDivider />
               <ThemedDropdownItem
-                icon={(item.updates_enabled ?? true) ? "solar:volume-cross-linear" : "solar:volume-loud-linear"}
+                icon={(item.updates_enabled ?? true) ? "solar:volume-cross-bold" : "solar:volume-loud-bold"}
                 onClick={() => { onToggleUpdateChecks(); onMenuToggle(false); }}
               >
                 {(item.updates_enabled ?? true) ? t("profiles.v3.tile.pauseUpdates") : t("profiles.v3.tile.resumeUpdates")}
@@ -291,7 +291,7 @@ export function ContentTile({
             <>
               <ThemedDropdownDivider />
               <ThemedDropdownItem
-                icon="solar:trash-bin-trash-linear"
+                icon="solar:trash-bin-trash-bold"
                 tone="danger"
                 onClick={() => { onDelete(); onMenuToggle(false); }}
               >

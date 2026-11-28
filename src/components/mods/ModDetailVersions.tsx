@@ -465,7 +465,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                       onClick={() => setVersionTypeFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
+                      <Icon icon="nrc:close" className="w-3 h-3" />
                     </button>
                   </TagBadge>
                 )}
@@ -477,7 +477,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                       onClick={() => setGameVersionFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
+                      <Icon icon="nrc:close" className="w-3 h-3" />
                     </button>
                   </TagBadge>
                 )}
@@ -489,7 +489,7 @@ export function ModDetailVersions({ project, targetProfile, installTarget }: Mod
                       onClick={() => setLoaderFilter("all")}
                       className="ml-1.5 text-current opacity-70 hover:opacity-100"
                     >
-                      <Icon icon="solar:close-circle-bold" className="w-3 h-3" />
+                      <Icon icon="nrc:close" className="w-3 h-3" />
                     </button>
                   </TagBadge>
                 )}

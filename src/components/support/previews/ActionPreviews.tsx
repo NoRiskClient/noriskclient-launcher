@@ -37,7 +37,7 @@ function ChangeCard({
           <span className="rounded-md bg-black/40 border border-white/10 px-3 py-1 font-mono text-lg text-white/60 break-all">
             {from || "?"}
           </span>
-          <Icon icon="solar:alt-arrow-right-linear" className="w-6 h-6 text-white/60" />
+          <Icon icon="solar:alt-arrow-right-bold" className="w-6 h-6 text-white/60" />
           <span className="rounded-md bg-green-500/15 border border-green-500/40 px-3 py-1 font-mono text-lg text-green-200 break-all">
             {to || "?"}
           </span>

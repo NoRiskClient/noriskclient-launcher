@@ -75,7 +75,7 @@ export function ImportPackConfirmModal() {
         onClick={handleConfirm}
         size="md"
         disabled={isLoading || isImporting || !trimmedName}
-        icon={<Icon icon="solar:download-bold" className="w-5 h-5 text-white" />}
+        icon={<Icon icon="solar:download-minimalistic-bold" className="w-5 h-5 text-white" />}
       >
         {t("profiles.import.confirm")}
       </Button>

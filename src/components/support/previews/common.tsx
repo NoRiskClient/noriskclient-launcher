@@ -55,7 +55,7 @@ function FullText({ text }: { text: string }) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1 font-minecraft text-sm tracking-wide text-white/60 hover:text-white"
       >
-        <Icon icon="solar:alt-arrow-down-linear" className={cn("w-4 h-4 transition-transform", open && "rotate-180")} />
+        <Icon icon="solar:alt-arrow-down-bold" className={cn("w-4 h-4 transition-transform", open && "rotate-180")} />
         {t("support_request.preview.full_text")}
       </button>
       {open && <MonoBlock text={text} />}

@@ -603,7 +603,7 @@ export function ClipTrimmer({
           {
             id: "reveal",
             label: t("clips.gallery.reveal"),
-            icon: "solar:folder-with-files-bold",
+            icon: "solar:folder-open-bold",
             onSelect: () =>
               void revealClip(path).catch((e) => toast.error(parseErrorMessage(e))),
           },
@@ -612,7 +612,7 @@ export function ClipTrimmer({
           {
             id: "close",
             label: t("common.close"),
-            icon: "solar:close-circle-bold",
+            icon: "nrc:close",
             disabled: busy,
             onSelect: onCancel,
           },
@@ -808,18 +808,18 @@ export function ClipTrimmer({
 
         <div className="flex items-center gap-1">
           <WindowButton
-            icon="mdi:minus"
+            icon="pixel:minus-solid"
             label={t("window.minimize")}
             onClick={() => void getCurrentWindow().minimize()}
           />
           <WindowButton
-            icon="mdi:checkbox-blank-outline"
+            icon="pixel:expand-solid"
             iconClassName="h-3.5 w-3.5"
             label={t("window.maximize")}
             onClick={() => void getCurrentWindow().toggleMaximize()}
           />
           <WindowButton
-            icon="mdi:close"
+            icon="pixel:window-close-solid"
             label={t("window.close")}
             danger
             disabled={busy}

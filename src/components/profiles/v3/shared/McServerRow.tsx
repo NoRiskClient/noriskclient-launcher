@@ -54,7 +54,7 @@ export function McServerRow({ name, pingState, savedIcon, className = "", onPlay
     <div className={`flex gap-1.5 font-minecraft normal-case tracking-normal leading-[18px] select-none ${className}`}>
       <McIcon
         src={icon ? `data:image/png;base64,${icon}` : null}
-        fallback="solar:server-bold-duotone"
+        fallback="solar:server-bold"
         onPlay={onPlay}
         playDisabled={playDisabled}
       />

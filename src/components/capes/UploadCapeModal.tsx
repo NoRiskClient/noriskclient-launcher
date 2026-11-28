@@ -157,8 +157,8 @@ export function UploadCapeModal({
                 <Icon
                   icon={
                     showElytraPreview
-                      ? "ph:airplane-tilt-fill"
-                      : "ph:airplane-tilt-duotone"
+                      ? "solar:hanger-2-bold"
+                      : "nrc:elytra"
                   }
                   className="w-5 h-5"
                 />

@@ -58,7 +58,7 @@ export function GroupPicker({
             }}
             className="p-2 rounded-lg border border-white/10 text-white/50 hover:text-white hover:border-white/25 transition-colors"
           >
-            <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
+            <Icon icon="nrc:close" className="w-5 h-5" />
           </button>
         </Tooltip>
       </div>
@@ -96,7 +96,7 @@ export function GroupPicker({
         }}
         className="px-3 py-1.5 rounded-lg border border-dashed border-white/20 text-white/50 hover:text-white hover:border-white/40 font-minecraft text-sm tracking-wide transition-colors flex items-center gap-1.5"
       >
-        <Icon icon="solar:add-circle-linear" className="w-4 h-4" />
+        <Icon icon="solar:add-circle-bold" className="w-4 h-4" />
         {newLabel ?? t("profiles.import.group_new")}
       </button>
     </div>
