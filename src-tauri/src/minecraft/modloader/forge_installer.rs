@@ -1,13 +1,13 @@
 use crate::config::{ProjectDirsExt, LAUNCHER_DIRECTORY};
 use crate::error::{AppError, Result};
 use crate::minecraft::api::forge_api::ForgeApi;
-use crate::minecraft::dto::forge_install_profile::ForgeInstallProfile;
 use crate::minecraft::downloads::{ForgeInstallerDownloadService, ForgeLibrariesDownload};
 use crate::minecraft::launch::forge_arguments::ForgeArguments;
 use crate::minecraft::ForgePatcher;
 use crate::state::event_state::{EventPayload, EventType};
 use crate::state::profile_state::Profile;
 use crate::state::state_manager::State;
+use crate::utils::download_utils::DownloadUtils;
 use log::info;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -141,20 +141,8 @@ impl ForgeInstaller {
             })
             .await?;
 
-        let forge_version = forge_installer_download
-            .extract_version_json(&target_forge_version)
-            .await?;
-        let profile_json = forge_installer_download
-            .extract_install_profile(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_data_folder(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_maven_folder(&target_forge_version)
-            .await?;
-        forge_installer_download
-            .extract_jars(&target_forge_version)
+        let (forge_version, profile_json) = forge_installer_download
+            .extract_installer(&target_forge_version)
             .await?;
 
         state
@@ -183,7 +171,11 @@ impl ForgeInstaller {
         // Forge code as an ordinary library. Assuming a patched jar there puts a file that was
         // never written on the classpath — Java skips missing entries silently, so the
         // Minecraft jar just goes absent.
-        let patched_client_jar = profile_json.as_ref().and_then(declared_patched_client_jar);
+        let patched_client_jar = profile_json
+            .as_ref()
+            .and_then(|p| p.data.get("PATCHED"))
+            .and_then(|patched| declared_patched_client_jar(&patched.client))
+            .map(|jar| LAUNCHER_DIRECTORY.meta_dir().join("libraries").join(jar));
 
         if let Some(forge_profile) = profile_json {
             state
@@ -204,7 +196,7 @@ impl ForgeInstaller {
             // Processors only need to run when their output is missing. A build that declares
             // no patched jar has nothing to skip, so it always runs them.
             let should_run_patcher = match &patched_client_jar {
-                Some(jar) if jar.exists() => {
+                Some(jar) if DownloadUtils::is_zip_file_complete(jar).await => {
                     info!("✅ Pre-patched Forge client found: {}", jar.display());
                     false
                 }
@@ -348,17 +340,16 @@ pub struct ForgeInstallResult {
     pub custom_client_path: Option<PathBuf>,
 }
 
-/// Resolves the patched client jar that the install profile declares in `data.PATCHED`,
-/// returning `None` for builds that patch nothing.
+/// Resolves the patched client jar that an install profile declares in `data.PATCHED` to its
+/// path inside the libraries directory, returning `None` when the value is no coordinate.
 ///
 /// The declared coordinate must not be reconstructed from a naming convention: Forge writes
 /// `[net.minecraftforge:forge:<version>:client]`, NeoForge up to 21.9
 /// `[net.neoforged:neoforge:<version>:client]`, and NeoForge from 21.10 on
 /// `[net.neoforged:minecraft-client-patched:<version>]` — a different artifact with no
 /// classifier at all.
-fn declared_patched_client_jar(profile: &ForgeInstallProfile) -> Option<PathBuf> {
-    let declared = profile.data.get("PATCHED")?.client.trim();
-    let coordinate = declared.strip_prefix('[')?.strip_suffix(']')?;
+pub fn declared_patched_client_jar(declared: &str) -> Option<PathBuf> {
+    let coordinate = declared.trim().strip_prefix('[')?.strip_suffix(']')?;
 
     let mut parts = coordinate.split(':');
     let group = parts.next()?;
@@ -372,13 +363,10 @@ fn declared_patched_client_jar(profile: &ForgeInstallProfile) -> Option<PathBuf>
     };
 
     Some(
-        LAUNCHER_DIRECTORY
-            .meta_dir()
-            .join("libraries")
-            .join(group.replace('.', "/"))
-            .join(artifact)
-            .join(version)
-            .join(file_name),
+        group
+            .split('.')
+            .chain([artifact, version, file_name.as_str()])
+            .collect(),
     )
 }
 
