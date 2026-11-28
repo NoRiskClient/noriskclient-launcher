@@ -11,6 +11,16 @@ const TRACKS: usize = 3;
 
 const HOLD_100NS: i64 = 2_000_000;
 
+pub fn fold_to_mono(samples: &mut [f32], channels: usize) {
+    if channels < 2 {
+        return;
+    }
+    for frame in samples.chunks_exact_mut(channels) {
+        let average = frame.iter().sum::<f32>() / channels as f32;
+        frame.fill(average);
+    }
+}
+
 pub fn apply_gain(samples: &[f32], gain: f32, out: &mut Vec<f32>) {
     out.clear();
     out.reserve(samples.len());
@@ -193,6 +203,17 @@ mod tests {
 
     fn frames(count: usize, value: f32) -> Vec<f32> {
         vec![value; count * CHANNELS as usize]
+    }
+
+    #[test]
+    fn a_voice_on_one_side_ends_up_on_both() {
+        let mut samples = vec![0.8, 0.0, -0.4, 0.0, 0.2, 0.6];
+        fold_to_mono(&mut samples, 2);
+        assert_eq!(samples, vec![0.4, 0.4, -0.2, -0.2, 0.4, 0.4]);
+
+        let mut single = vec![0.3, -0.3];
+        fold_to_mono(&mut single, 1);
+        assert_eq!(single, vec![0.3, -0.3], "a mono stream is left alone");
     }
 
     #[test]

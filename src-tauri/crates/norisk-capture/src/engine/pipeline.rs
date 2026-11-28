@@ -242,6 +242,7 @@ impl Engine {
                 self.audio_plan(target.pid()),
                 Arc::clone(&epoch_for_audio),
                 self.config.microphone_denoise,
+                self.config.microphone_mono,
             ) {
                 Ok(pipeline) => Some(pipeline),
                 Err(e) => {

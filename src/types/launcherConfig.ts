@@ -89,6 +89,7 @@ export interface ClipConfig {
   microphone_device_id: string | null;
   microphone_volume: number;
   microphone_denoise: boolean;
+  microphone_mono: boolean;
   excluded_audio_executable: string | null;
   output_dir: string | null;
   max_storage_gb: number;

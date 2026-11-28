@@ -54,6 +54,8 @@ pub struct CaptureConfig {
     #[serde(default)]
     pub microphone_denoise: bool,
     #[serde(default)]
+    pub microphone_mono: bool,
+    #[serde(default)]
     pub excluded_audio_executable: Option<String>,
     pub output_dir: PathBuf,
 }
@@ -98,6 +100,7 @@ impl Default for CaptureConfig {
             microphone_device_id: None,
             microphone_volume: default_volume(),
             microphone_denoise: false,
+            microphone_mono: false,
             excluded_audio_executable: None,
             output_dir: PathBuf::new(),
         }

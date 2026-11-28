@@ -2285,6 +2285,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Yalnızca varsayılan çıkış aygıtıyla çalışır. Yukarıdaki aygıtı varsayılana geri al.",
   "settings.clips.audio.microphone_denoise": "Gürültü engelleme",
   "settings.clips.audio.microphone_denoise.description": "Sesinden fanları, klavyeyi ve arka plan uğultusunu süzer. Kendi bilgisayarında çalışır ve neredeyse hiçbir şeye mal olmaz.",
+  "settings.clips.audio.microphone_mono": "Mono mikrofon",
+  "settings.clips.audio.microphone_mono.description": "Sesini iki tarafa da verir. Kliplerinde sesin yalnızca tek kulakta duyuluyorsa bunu aç.",
   "settings.clips.audio.microphone_volume": "Ses seviyesi (mikrofon)",
   "settings.clips.storage.limit": "Disk sınırı",
   "settings.clips.storage.limit_description": "Klasör {{gb}} GB'ı geçtiğinde en eski klipler silinir.",

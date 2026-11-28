@@ -2287,6 +2287,8 @@
   "settings.clips.audio.exclude.needs_default_device": "Работает только со стандартным устройством вывода. Верни устройство выше на стандартное.",
   "settings.clips.audio.microphone_denoise": "Шумоподавление",
   "settings.clips.audio.microphone_denoise.description": "Убирает из голоса вентиляторы, клавиатуру и фоновый шум. Работает на твоём компьютере и почти ничего не стоит.",
+  "settings.clips.audio.microphone_mono": "Микрофон в моно",
+  "settings.clips.audio.microphone_mono.description": "Выводит голос на обе стороны. Включи, если в клипах тебя слышно только в одном ухе.",
   "settings.clips.audio.microphone_volume": "Громкость голоса",
   "settings.clips.storage.limit": "Лимит диска",
   "settings.clips.storage.limit_description": "Самые старые клипы удаляются, как только папка превышает {{gb}} ГБ.",

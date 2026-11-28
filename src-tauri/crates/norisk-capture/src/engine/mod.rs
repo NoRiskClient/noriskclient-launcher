@@ -786,6 +786,7 @@ fn needs_restart(current: &CaptureConfig, next: &CaptureConfig) -> bool {
         || current.microphone_device_id != next.microphone_device_id
         || current.microphone_volume != next.microphone_volume
         || current.microphone_denoise != next.microphone_denoise
+        || current.microphone_mono != next.microphone_mono
         || current.excluded_audio_executable != next.excluded_audio_executable
         || current.bitrate_kbps != next.bitrate_kbps
         || current.buffer_seconds != next.buffer_seconds
@@ -843,6 +844,10 @@ mod tests {
 
         let mut next = base();
         next.capture_microphone = !base().capture_microphone;
+        assert!(needs_restart(&base(), &next));
+
+        let mut next = base();
+        next.microphone_mono = !base().microphone_mono;
         assert!(needs_restart(&base(), &next));
 
         let mut next = base();
